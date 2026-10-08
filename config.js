@@ -29,7 +29,15 @@ const SENHA_MESTRE = '3aaa687c86f4f34e72a06d969c9e769e2b582739957e62f5694cb5598b
    Mestre (por exemplo, numa TV ou num compartilhamento de tela).
    Para os jogadores verem o mapa no celular deles, ao vivo, cole aqui
    a configuração do seu projeto Firebase (o README explica o passo a passo). */
-const FIREBASE = null;
+const FIREBASE = {
+  apiKey: "AIzaSyCFVn9bXN4HxBCXqZ7zl1gS4bsLHO1vaVM",
+  authDomain: "a-planta-caixadefosforos.firebaseapp.com",
+  databaseURL: "https://a-planta-caixadefosforos-default-rtdb.firebaseio.com",
+  projectId: "a-planta-caixadefosforos",
+  storageBucket: "a-planta-caixadefosforos.firebasestorage.app",
+  messagingSenderId: "801839612801",
+  appId: "1:801839612801:web:ce7b84b71c28d5b3a55e80"
+};
 /* Exemplo de como fica depois de colar:
 const FIREBASE = {
   apiKey: "AIza...",
