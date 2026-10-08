@@ -188,13 +188,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .saida-seta { font-size: 30px; color: #c4a8ff; }
 .saida-txt { font-size: 13px; letter-spacing: .08em; margin-top: 2px; }
 
+/* Blocos maciços entre as salas (tampa sólida das paredes) */
+.macico {
+  position: absolute;
+  background: #241638;
+  background-image:
+    linear-gradient(rgba(196,168,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196,168,255,.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
 /* Paredes 2.5D */
 .parede {
   position: absolute;
   background: linear-gradient(180deg, #5b3fa0, #2a1b4a);
   border-top: 2px solid #b79cff;
   backface-visibility: visible;
-  opacity: .92;
 }
 .parede.h { transform-origin: 50% 100%; transform: rotateX(-90deg); }
 .parede.v { transform-origin: 0 50%; transform: rotateY(-90deg);
@@ -353,6 +362,56 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tray .qtd { font-family: var(--mono); color: var(--texto-dim); }
 
 .ferramentas { display: grid; gap: 8px; }
+
+/* ---------- Tela de entrada (Jogador / Mestre) ---------- */
+.perfil {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center; padding: 20px;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(139,92,246,.22), transparent 60%),
+    rgba(7,6,10,.97);
+  overflow-y: auto;
+}
+.perfil-caixa { width: min(760px, 100%); text-align: center; }
+.perfil-kicker {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .2em;
+  color: var(--roxo-claro); text-transform: uppercase; margin: 0 0 10px;
+}
+.perfil h2 { font-family: var(--display); font-size: 34px; margin: 0 0 24px; letter-spacing: .04em; }
+.perfil-opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.perfil-btn {
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 34px 20px; border-radius: 12px;
+  background: #120f1a; border: 1px solid var(--linha);
+  transition: .15s;
+}
+.perfil-btn:hover { border-color: var(--roxo); box-shadow: 0 0 30px rgba(139,92,246,.35); transform: translateY(-2px); }
+.perfil-btn-titulo { font-family: var(--display); font-size: 26px; font-weight: 700; }
+.perfil-btn-sub { font-size: 14px; color: var(--texto-dim); }
+.perfil-aviso { color: var(--texto-dim); margin: -12px 0 20px; font-size: 15px; }
+.perfil-personagens {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.perso {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 10px; border-radius: 10px;
+  background: #120f1a; border: 1px solid var(--linha); transition: .15s;
+}
+.perso:hover { border-color: var(--cor); box-shadow: 0 0 22px var(--cor); }
+.perso img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid var(--cor); }
+.perso strong { font-family: var(--display); font-size: 17px; }
+.perso span { font-family: var(--mono); font-size: 12px; color: var(--texto-dim); }
+
+/* ficha do próprio jogador */
+.ficha.minha .ficha-cabeca { cursor: grab; outline: 2px dashed #fff; outline-offset: 3px; }
+.voce { font-family: var(--mono); font-size: 11px; color: #fff; background: var(--roxo-escuro); border: 1px solid var(--roxo); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+
+@media (max-width: 860px) {
+  .perfil h2 { font-size: 26px; }
+  .perfil-opcoes { grid-template-columns: 1fr; }
+  .perfil-btn { padding: 24px 16px; }
+}
 
 /* ---------- Diálogos ---------- */
 .dlg {

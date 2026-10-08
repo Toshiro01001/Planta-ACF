@@ -120,7 +120,12 @@ const Store = {
     firebase.initializeApp(FIREBASE);
     this.db = firebase.database();
     this.auth = firebase.auth();
-    this.auth.onAuthStateChanged(u => definirMestre(!!u));
+    this.auth.onAuthStateChanged(u => {
+      definirMestre(!!u && !u.isAnonymous);
+      // jogador precisa de um login anônimo para poder mover a própria ficha
+      if (!u && meu) this.auth.signInAnonymously().catch(erroGravacao);
+      if (!u && lerPerfil() === 'mestre') { salvarPerfil(''); mostrarPerfil(1); }
+    });
     this.db.ref('.info/connected').on('value', s => setSync(s.val() ? 'ao vivo' : 'reconectando…', s.val() ? 'vivo' : ''));
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
@@ -199,8 +204,7 @@ function definirMestre(sim) {
   mestre = sim;
   document.body.classList.toggle('mestre', sim);
   $$('.mestre-only').forEach(el => el.hidden = !sim);
-  $('#btnMestre').textContent = sim ? 'Mestre ✓' : 'Mestre';
-  $('#btnMestre').classList.toggle('ativo', sim);
+  atualizarBotaoPerfil();
   if (Store.modo === 'local') { try { sim ? localStorage.setItem('acf-mestre', '1') : localStorage.removeItem('acf-mestre'); } catch (e) {} }
   if (sim && Store.modo === 'firebase' && Store.vazio) { Store.vazio = false; Store.gravarTudo(); }
   montarAndar();
@@ -463,6 +467,7 @@ function montarAndar() {
     ladoComPorta(s.x + R, s.y, s.x + R, s.y + R, c < 4 || lado === 'dir', paredes);    // direita
   }
   if (saida) desenharSaida(saida, paredes);
+  desenharMacico(saida, paredes);
   paredes.forEach(pw => stage.appendChild(pw));
 
   fichasDom.clear();
@@ -471,6 +476,68 @@ function montarAndar() {
 }
 
 // elevador/porta para o próximo andar
+// corredor do elevador, quando a sala fica na borda da planta
+function retSaida(saida) {
+  if (!saida || !saida.lado) return null;
+  const s = retSala(saida.p);
+  if (saida.lado === 'baixo') return { x: s.x + (R - CW) / 2, y: s.y + R, w: CW, h: M };
+  if (saida.lado === 'cima')  return { x: s.x + (R - CW) / 2, y: s.y - M, w: CW, h: M };
+  if (saida.lado === 'esq')   return { x: s.x - M, y: s.y + (R - CW) / 2, w: M, h: CW };
+  if (saida.lado === 'dir')   return { x: s.x + R, y: s.y + (R - CW) / 2, w: M, h: CW };
+  return null;
+}
+
+// Tudo o que não é sala nem corredor vira bloco maciço: uma tampa sólida
+// na altura das paredes, que esconde os vazios entre as salas.
+function desenharMacico(saida, paredes) {
+  const P = 0.5;                        // resolução da grade (meio quadradinho)
+  const n = Math.round(W / P);
+  const aberto = Array.from({ length: n }, () => new Array(n).fill(false));
+  const abertos = [];
+  for (let p = 1; p <= 25; p++) abertos.push(retSala(p));
+  CORREDORES.forEach(c => abertos.push(c));
+  const rs = retSaida(saida);
+  if (rs) abertos.push(rs);
+  abertos.forEach(r => {
+    for (let j = Math.round(r.y / P); j < Math.round((r.y + r.h) / P); j++)
+      for (let i = Math.round(r.x / P); i < Math.round((r.x + r.w) / P); i++) aberto[j][i] = true;
+  });
+
+  // junta as células sólidas em retângulos (faixas horizontais empilhadas)
+  const usado = Array.from({ length: n }, () => new Array(n).fill(false));
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    if (aberto[j][i] || usado[j][i]) continue;
+    let w = 0; while (i + w < n && !aberto[j][i + w] && !usado[j][i + w]) w++;
+    let h = 1;
+    while (j + h < n) {
+      let ok = true;
+      for (let k = 0; k < w; k++) if (aberto[j + h][i + k] || usado[j + h][i + k]) { ok = false; break; }
+      if (!ok) break; h++;
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) usado[j + y][i + x] = true;
+    const tampa = el('div', 'macico', { left: px(i * P), top: px(j * P), width: px(w * P), height: px(h * P) });
+    tampa.style.transform = `translateZ(${WH * T}px)`;
+    stage.appendChild(tampa);
+  }
+
+  // paredes externas da Caixa (com abertura onde sai o elevador)
+  const lado = (x1, y1, x2, y2, abertura) => {
+    if (!abertura) { paredes.push(parede(x1, y1, x2, y2)); return; }
+    if (y1 === y2) {
+      if (abertura.a > x1) paredes.push(parede(x1, y1, abertura.a, y1));
+      if (abertura.b < x2) paredes.push(parede(abertura.b, y1, x2, y1));
+    } else {
+      if (abertura.a > y1) paredes.push(parede(x1, y1, x1, abertura.a));
+      if (abertura.b < y2) paredes.push(parede(x1, abertura.b, x1, y2));
+    }
+  };
+  const ab = l => rs && saida.lado === l ? (l === 'cima' || l === 'baixo' ? { a: rs.x, b: rs.x + rs.w } : { a: rs.y, b: rs.y + rs.h }) : null;
+  lado(0, 0, W, 0, ab('cima'));
+  lado(0, H, W, H, ab('baixo'));
+  lado(0, 0, 0, H, ab('esq'));
+  lado(W, 0, W, H, ab('dir'));
+}
+
 function desenharSaida(saida, paredes) {
   const s = retSala(saida.p);
   const destino = andarAtual < 5 ? `${andarAtual + 1}º ANDAR` : '???';
@@ -527,7 +594,7 @@ function desenharFichas() {
 
   Object.entries(tokens).forEach(([id, tk]) => {
     if (!SER[tk.s] || tk.a !== andarAtual) return;
-    if (tk.h && !mestre) return;
+    if (tk.h && !mestre && tk.s !== meu) return;
     vistos.add(id);
     let f = fichasDom.get(id);
     if (!f) {
@@ -550,6 +617,7 @@ function desenharFichas() {
     }
     $('.ficha-nome', f).textContent = rotuloFicha(tk);
     f.classList.toggle('oculta', !!tk.h);
+    f.classList.toggle('minha', !mestre && tk.s === meu);
     f.classList.toggle('selecionada', selecionado === id);
   });
 
@@ -562,7 +630,7 @@ function ligarArraste(f) {
     e.stopPropagation();
     esconderDica();
     const id = f.dataset.id;
-    if (!mestre) { selecionar(id); return; }
+    if (!podeMover(Store.state.tokens[id])) { selecionar(id); return; }
     const tk = Store.state.tokens[id];
     const p = telaParaPiso(e.clientX, e.clientY);
     arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0 };
@@ -606,12 +674,12 @@ function selecionar(id) {
 function desenharCartao() {
   const c = $('#cartao');
   const tk = selecionado && Store.state.tokens[selecionado];
-  if (!tk || (tk.h && !mestre)) { c.hidden = true; return; }
+  if (!tk || (tk.h && !mestre && tk.s !== meu)) { c.hidden = true; return; }
   const s = SER[tk.s];
   c.style.setProperty('--cor', s.cor);
   const foto = s.img ? `<img src="${s.img}" alt="">` : `<div class="cartao-bola"></div>`;
   let linhas = '';
-  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}<br>Função: ${s.funcao}</p>`;
+  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}<br>Função: ${s.funcao}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
   if (s.tipo === 'npc') linhas = `<p>Função: ${s.funcao}</p>`;
   if (s.tipo === 'filho') linhas = `<p>Filho da O.R.F.E.U.</p>`;
   const titulo = s.tipo === 'filho' ? s.nome + (tk.n > 1 ? ` #${tk.n}` : '') : s.nome;
@@ -658,7 +726,7 @@ function desenharPainel() {
     const tk = tokens[s.id];
     const visivel = tk && (!tk.h || mestre);
     return `<li data-id="${s.id}">${bola(s)}<span class="info">
-      <strong>${s.nome} <span class="sub" style="display:inline">${s.codigo}</span></strong>
+      <strong>${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
       <span class="sub">${s.jogador} · ${s.funcao}</span>
       <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span></span></li>`;
   }).join('');
@@ -776,13 +844,64 @@ $('#formSenha').addEventListener('submit', async e => {
   }
 });
 
-$('#btnMestre').addEventListener('click', () => {
-  if (mestre) return;
+/* ---------- Perfil: Jogador ou Mestre ---------- */
+let meu = null;   // id da cobaia do jogador neste navegador
+function lerPerfil() { try { return localStorage.getItem('acf-perfil') || ''; } catch (e) { return ''; } }
+function salvarPerfil(v) { try { v ? localStorage.setItem('acf-perfil', v) : localStorage.removeItem('acf-perfil'); } catch (e) {} }
+const podeMover = tk => !!tk && (mestre || (!!meu && tk.s === meu));
+
+function atualizarBotaoPerfil() {
+  const b = $('#btnMestre');
+  b.textContent = mestre ? 'Mestre ✓ · trocar' : meu ? `${SER[meu].nome} · trocar` : 'Entrar';
+  b.classList.toggle('ativo', mestre || !!meu);
+}
+
+function mostrarPerfil(passo) {
+  $('#perfil').hidden = false;
+  $('#perfilPasso1').hidden = passo !== 1;
+  $('#perfilPasso2').hidden = passo !== 2;
+  if (passo === 2) {
+    $('#listaPersonagens').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s =>
+      `<button class="perso" data-id="${s.id}" style="--cor:${s.cor}">
+        <img src="${s.img}" alt=""><strong>${s.nome}</strong><span>${s.jogador}</span></button>`).join('');
+    $$('#listaPersonagens .perso').forEach(b => b.onclick = () => escolherPersonagem(b.dataset.id));
+  }
+}
+
+function escolherPersonagem(id) {
+  meu = id;
+  salvarPerfil('jogador:' + id);
+  $('#perfil').hidden = true;
+  if (Store.modo === 'firebase' && !Store.auth.currentUser) Store.auth.signInAnonymously().catch(erroGravacao);
+  atualizarBotaoPerfil();
+  atualizarTudo();
+  const tk = Store.state.tokens[id];
+  if (tk && podeVer(tk.a)) irParaFicha(id);
+}
+
+function abrirLoginMestre() {
+  $('#perfil').hidden = true;
   $('#campoEmail').hidden = Store.modo !== 'firebase';
   $('#mestreErro').hidden = true;
   $('#mestreSenha').value = '';
   $('#dlgMestre').showModal();
-});
+}
+
+function trocarPerfil() {
+  meu = null;
+  salvarPerfil('');
+  if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
+  definirMestre(false);
+  selecionar(null);
+  mostrarPerfil(1);
+}
+
+$('#btnSouJogador').addEventListener('click', () => mostrarPerfil(2));
+$('#btnSouMestre').addEventListener('click', abrirLoginMestre);
+$('#btnVoltarPerfil').addEventListener('click', () => mostrarPerfil(1));
+$('#btnMestre').addEventListener('click', trocarPerfil);
+// cancelar o login de Mestre volta para a tela de escolha
+$('#dlgMestre').addEventListener('close', () => { if (!mestre && !meu && lerPerfil() !== 'mestre') mostrarPerfil(1); });
 
 $('#formMestre').addEventListener('submit', async e => {
   if (e.submitter && e.submitter.value === 'cancel') return;
@@ -792,17 +911,16 @@ $('#formMestre').addEventListener('submit', async e => {
   if (Store.modo === 'firebase') {
     try {
       await Store.auth.signInWithEmailAndPassword($('#mestreEmail').value.trim(), senha);
+      salvarPerfil('mestre'); meu = null;
       $('#dlgMestre').close();
     } catch (err) { erro('E-mail ou senha recusados.'); }
   } else {
-    if (await hash(senha) === SENHA_MESTRE) { $('#dlgMestre').close(); definirMestre(true); }
+    if (await hash(senha) === SENHA_MESTRE) { salvarPerfil('mestre'); meu = null; definirMestre(true); $('#dlgMestre').close(); }
     else erro('Senha recusada.');
   }
 });
 
-$('#btnSair').addEventListener('click', () => {
-  if (Store.modo === 'firebase') Store.auth.signOut(); else definirMestre(false);
-});
+$('#btnSair').addEventListener('click', trocarPerfil);
 
 $('#chkElementos').addEventListener('change', e => Store.definir(['rev', 'a' + andarAtual], e.target.checked ? true : null));
 
@@ -844,10 +962,15 @@ window.addEventListener('resize', () => enquadrar());
   aplicarCamera();
   montarAndar();
   enquadrar();
-  if (!FIREBASE) { try { if (localStorage.getItem('acf-mestre') === '1') mestre = true; } catch (e) {} }
+  const perfil = lerPerfil();
+  if (perfil.startsWith('jogador:') && SER[perfil.slice(8)]) meu = perfil.slice(8);
+  if (!FIREBASE && perfil === 'mestre') { try { if (localStorage.getItem('acf-mestre') === '1') mestre = true; } catch (e) {} }
   await Store.iniciar();
   if (mestre && Store.modo === 'local') definirMestre(true);
+  atualizarBotaoPerfil();
   atualizarTudo();
+  // sem perfil salvo: pergunta quem é
+  if (!meu && !mestre && !(FIREBASE && perfil === 'mestre')) mostrarPerfil(1);
 })();
 
 })();

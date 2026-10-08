@@ -29,13 +29,17 @@ Cada andar tem a sua senha, guardada só como hash no `config.js`. Para trocar: 
 
 A trava é feita no navegador. Ela segura o jogador comum, mas quem souber ler código consegue contornar.
 
+## Perfis
+
+Ao abrir o site, a pessoa escolhe **Jogador** ou **Mestre**. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
+
 ## Tempo real (Firebase)
 
-Sem Firebase, o site funciona em **modo local**: o Mestre move as fichas e outra aba ou tela do mesmo computador acompanha (bom para TV ou compartilhamento de tela). Para cada jogador ver no próprio celular:
+Sem Firebase, o site funciona em **modo local**: as posições ficam no navegador de cada um, e outra aba ou tela do mesmo computador acompanha (bom para TV ou compartilhamento de tela). Para cada jogador ver e mover a sua ficha pelo próprio celular:
 
 1. Em <https://console.firebase.google.com>, crie um projeto.
 2. **Build › Realtime Database › Create database** (modo bloqueado).
-3. **Build › Authentication › Get started › E-mail/senha › Ativar**. Na aba **Users**, crie o usuário do Mestre e copie o **UID**.
+3. **Build › Authentication › Get started**. Ative **E-mail/senha** e também **Anônimo** (é o login invisível dos jogadores). Na aba **Users**, crie o usuário do Mestre e copie o **UID**.
 4. Em **Authentication › Settings › Authorized domains**, adicione `toshiro01001.github.io`.
 5. Em **Realtime Database › Rules**, cole e publique (troque o UID):
 
@@ -44,7 +48,12 @@ Sem Firebase, o site funciona em **modo local**: o Mestre move as fichas e outra
   "rules": {
     "mapa": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'"
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      "tokens": {
+        "$id": {
+          ".write": "auth != null && data.exists() && newData.exists() && ($id === 'faca' || $id === 'sabonete' || $id === 'mostarda' || $id === 'papelao' || $id === 'papel' || $id === 'luva' || $id === 'velcro') && newData.child('s').val() === data.child('s').val() && newData.child('a').val() === data.child('a').val() && newData.child('h').val() === data.child('h').val()"
+        }
+      }
     }
   }
 }
@@ -52,4 +61,4 @@ Sem Firebase, o site funciona em **modo local**: o Mestre move as fichas e outra
 
 6. Em **Configurações do projeto › Seus apps › Web (</>)**, registre um app e copie o objeto `firebaseConfig` para a linha `const FIREBASE` do `config.js`.
 
-Com isso, todo mundo lê o mapa, e só a conta do Mestre consegue mexer.
+Com isso: todo mundo vê o mapa; os jogadores só conseguem mudar a posição das 7 cobaias, sem trocá-las de andar nem revelar fichas ocultas; o resto só a conta do Mestre mexe.
