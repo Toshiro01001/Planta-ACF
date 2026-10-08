@@ -86,6 +86,12 @@
       <ul id="listaCobaias" class="lista-seres"></ul>
     </section>
 
+    <section class="bloco">
+      <h2>Medidor de ruído</h2>
+      <p class="mini">Barulho que cada cobaia faz pela sala em que está.</p>
+      <ul id="listaRuido" class="lista-ruido"></ul>
+    </section>
+
     <section class="bloco" id="blocoPresencas">
       <h2>Presenças neste andar</h2>
       <ul id="listaPresencas" class="lista-seres"></ul>
@@ -108,8 +114,37 @@
       <p class="mini">Cada clique coloca mais um no centro do andar aberto.</p>
       <div id="trayFilhos" class="tray"></div>
 
-      <h3>Ferramentas</h3>
+      <h3>Salas</h3>
+      <p class="mini">Clique numa sala do mapa para revelar ou esconder dos jogadores.</p>
       <div class="ferramentas">
+        <button id="btnRevelarAndar" class="btn-fantasma">Revelar todas as salas deste andar</button>
+        <button id="btnEsconderAndar" class="btn-fantasma">Esconder todas as salas deste andar</button>
+      </div>
+
+      <h3>Ferramentas</h3>
+      <div class="decibel">
+        <div id="decibelimetro" class="decibel-coluna"></div>
+        <div class="decibel-lado">
+          <p id="decibelInfo" class="mini"></p>
+          <div id="alertaRuido" class="alerta-ruido" hidden>
+            <strong>Limite rompido!</strong>
+            <span id="alertaRuidoTxt"></span>
+            <button id="btnRegistrarAlerta" class="btn-roxo">Registrar quebra</button>
+          </div>
+          <div class="quebras">
+            <span>Quebras do limite diário: <b id="qtdQuebras">0</b> / 3</span>
+            <div id="barraQuebras" class="barra-quebras"></div>
+            <div class="quebras-botoes">
+              <button id="btnQuebra" class="btn-fantasma">+1 quebra</button>
+              <button id="btnQuebraMenos" class="btn-fantasma">−1</button>
+              <button id="btnQuebraZerar" class="btn-fantasma">Novo dia</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button id="btnProtocolo" class="btn-protocolo" disabled>Iniciar Protocolo Filho da O.R.F.E.U.</button>
+      <div class="ferramentas">
+        <button id="btnTesteSom" class="btn-fantasma">Testar o som do alarme</button>
         <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
         <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra</button>
         <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
@@ -118,6 +153,14 @@
     </section>
   </aside>
 </main>
+
+<!-- Protocolo Filho da O.R.F.E.U. -->
+<div id="telaProtocolo" class="tela-protocolo" hidden>
+  <p class="tp-kicker">O.R.F.E.U. · limite diário de ruído excedido</p>
+  <h2>Protocolo Filho da O.R.F.E.U.</h2>
+  <p class="tp-sub">INICIADO</p>
+</div>
+<div id="faixaProtocolo" class="faixa-protocolo" hidden>⚠ PROTOCOLO FILHO DA O.R.F.E.U. EM CURSO</div>
 
 <!-- Tela de entrada: Jogador ou Mestre -->
 <div id="perfil" class="perfil" hidden>

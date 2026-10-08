@@ -363,6 +363,80 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .ferramentas { display: grid; gap: 8px; }
 
+/* ---------- Salas desconhecidas ---------- */
+.sala.desconhecida { background-color: #100c16; }
+.sala.desconhecida .sala-cn { font-size: 20px; letter-spacing: .25em; color: rgba(236,230,247,.35); text-transform: uppercase; }
+.sala.oculta-jog { outline: 2px dashed rgba(196,168,255,.45); outline-offset: -8px; }
+.sala-oculta { display: block; font-family: var(--mono); font-size: 12px; color: #ff9fb2; margin-top: 4px; letter-spacing: .08em; }
+.sala.sel { box-shadow: inset 0 0 0 3px #fff, 0 0 30px rgba(255,255,255,.4); }
+.sala-bola { border-radius: 8px !important; }
+
+/* ---------- Medidor de ruído ---------- */
+.lista-ruido { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lista-ruido li { display: grid; grid-template-columns: 80px auto 1fr; gap: 10px; align-items: center; font-size: 14px; }
+.lista-ruido .r-txt { font-family: var(--mono); font-size: 12px; color: var(--texto-dim); white-space: nowrap; }
+.lista-ruido li.estouro .r-txt { color: #ff6b6b; }
+.medidor { display: inline-flex; gap: 3px; }
+.medidor .q { width: 13px; height: 12px; border-radius: 2px; background: #2a2238; }
+.q.on.n1, .dq.on.n1 { background: #3ddc97; }
+.q.on.n2, .dq.on.n2 { background: #9be15d; }
+.q.on.n3, .dq.on.n3 { background: #f5c84c; }
+.q.on.n4, .dq.on.n4 { background: #ff8c42; }
+.q.on.n5, .dq.on.n5 { background: #ff3b3b; box-shadow: 0 0 10px #ff3b3b; }
+
+.decibel { display: grid; grid-template-columns: 130px 1fr; gap: 12px; margin-bottom: 12px; }
+.decibel-coluna { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: #0b0910; border: 1px solid var(--linha); }
+.dq { height: 30px; border-radius: 4px; background: #221b2e; display: flex; flex-direction: column; justify-content: center; padding: 0 8px; }
+.dq span { font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,.75); }
+.dq em { font-style: normal; font-size: 10px; color: rgba(255,255,255,.55); }
+.dq.on span, .dq.on em { color: #0b0910; font-weight: 600; }
+.alerta-ruido {
+  display: grid; gap: 6px; padding: 10px; border-radius: 8px; margin-bottom: 10px;
+  background: rgba(255,59,59,.12); border: 1px solid #ff3b3b; font-size: 13px;
+  animation: pulsa 1s infinite alternate;
+}
+.alerta-ruido strong { color: #ff6b6b; }
+@keyframes pulsa { from { box-shadow: 0 0 0 rgba(255,59,59,0); } to { box-shadow: 0 0 18px rgba(255,59,59,.5); } }
+.quebras { font-size: 14px; display: grid; gap: 6px; }
+.barra-quebras { display: flex; gap: 6px; }
+.barra-quebras span { flex: 1; height: 10px; border-radius: 3px; background: #2a2238; }
+.barra-quebras span.on { background: #ff3b3b; box-shadow: 0 0 8px #ff3b3b; }
+.quebras-botoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.quebras-botoes .btn-fantasma { padding: 5px 10px; font-size: 13px; }
+.btn-protocolo {
+  width: 100%; margin: 4px 0 12px; padding: 12px; border-radius: 8px;
+  font-family: var(--display); font-weight: 700; letter-spacing: .04em;
+  background: #2a1016; border: 1px solid #5a1f2a; color: #ff9fb2;
+}
+.btn-protocolo:disabled { opacity: .4; cursor: not-allowed; }
+.btn-protocolo.pronto { background: #b3001b; border-color: #ff3b3b; color: #fff; animation: pulsa .7s infinite alternate; }
+
+/* alarme: a tela pisca em vermelho */
+body.pisca::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 60;
+  animation: piscaVermelho 2.4s ease-out;
+}
+@keyframes piscaVermelho {
+  0%, 30%, 60% { background: rgba(255,0,30,.35); }
+  15%, 45%, 75% { background: rgba(255,0,30,.05); }
+  100% { background: transparent; }
+}
+
+/* Protocolo Filho da O.R.F.E.U. */
+.tela-protocolo {
+  position: fixed; inset: 0; z-index: 70; display: grid; place-content: center; text-align: center;
+  background: #1a0005; animation: protocolo 1s infinite alternate; padding: 20px;
+}
+@keyframes protocolo { from { background: #1a0005; } to { background: #6b0010; } }
+.tela-protocolo h2 { font-family: var(--display); font-size: clamp(28px, 6vw, 64px); margin: 10px 0; color: #fff; letter-spacing: .04em; }
+.tp-kicker { font-family: var(--mono); letter-spacing: .2em; color: #ff9fb2; text-transform: uppercase; margin: 0; }
+.tp-sub { font-family: var(--mono); font-size: 28px; letter-spacing: .5em; color: #ff3b3b; margin: 0; }
+.faixa-protocolo {
+  position: fixed; left: 0; right: 0; top: var(--topo-h); z-index: 30;
+  text-align: center; padding: 6px; font-family: var(--mono); letter-spacing: .15em; font-size: 13px;
+  background: #b3001b; color: #fff; animation: pulsa .8s infinite alternate;
+}
+
 /* ---------- Tela de entrada (Jogador / Mestre) ---------- */
 .perfil {
   position: fixed; inset: 0; z-index: 50;
