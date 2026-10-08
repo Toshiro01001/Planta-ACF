@@ -111,24 +111,26 @@ const ZONA_NEUTRA_ISENTA = true;
 /* ---------------------------------------------------------
    OS SERES DA CAIXA
    tipo: 'cobaia' (jogadores), 'npc' (cobaias NPC), 'filho' (Filhos da O.R.F.E.U.)
+   ATENÇÃO: este arquivo é público. Nunca escreva aqui a função de nenhuma
+   cobaia: as funções ficam só com o Mestre, no painel "Funções".
    Os Filhos aparecem só pelo codinome. O nome verdadeiro de cada um
    NÃO está neste arquivo, de propósito: o repositório é público.
    --------------------------------------------------------- */
 const SERES = [
   // Cobaias dos jogadores
-  { id: 'faca',     tipo: 'cobaia', codigo: 'FHP-001', nome: 'Faca',     jogador: 'Nathalie Costa',  funcao: 'Cobaia', cor: '#27c46b', img: 'img/faca.jpg' },
-  { id: 'sabonete', tipo: 'cobaia', codigo: 'FHP-002', nome: 'Sabonete', jogador: 'Lucas Matheus',   funcao: 'Cobaia', cor: '#ff7a45', img: 'img/sabonete.jpg' },
-  { id: 'mostarda', tipo: 'cobaia', codigo: 'FHP-003', nome: 'Mostarda', jogador: 'Carlos André',    funcao: 'Cobaia', cor: '#e5b81e', img: 'img/mostarda.jpg' },
-  { id: 'papelao',  tipo: 'cobaia', codigo: 'FHP-004', nome: 'Papelão',  jogador: 'André Carvalho',  funcao: 'Médico', cor: '#b98656', img: 'img/papelao.jpg' },
-  { id: 'papel',    tipo: 'cobaia', codigo: 'FHP-005', nome: 'Papel',    jogador: 'Danton Melo',     funcao: 'Faísca', cor: '#22d3e6', img: 'img/papel.jpg' },
-  { id: 'luva',     tipo: 'cobaia', codigo: 'FHP-006', nome: 'Luva',     jogador: 'Gabriel Padilha', funcao: 'Médico', cor: '#3d7bff', img: 'img/luva.jpg' },
-  { id: 'velcro',   tipo: 'cobaia', codigo: 'FHP-007', nome: 'Velcro',   jogador: 'Ricardo Filho',   funcao: 'Água',   cor: '#ff5ca8', img: 'img/velcro.jpg' },
+  { id: 'faca',     tipo: 'cobaia', codigo: 'FHP-001', nome: 'Faca',     jogador: 'Nathalie Costa',  cor: '#27c46b', img: 'img/faca.jpg' },
+  { id: 'sabonete', tipo: 'cobaia', codigo: 'FHP-002', nome: 'Sabonete', jogador: 'Lucas Matheus',   cor: '#ff7a45', img: 'img/sabonete.jpg' },
+  { id: 'mostarda', tipo: 'cobaia', codigo: 'FHP-003', nome: 'Mostarda', jogador: 'Carlos André',    cor: '#e5b81e', img: 'img/mostarda.jpg' },
+  { id: 'papelao',  tipo: 'cobaia', codigo: 'FHP-004', nome: 'Papelão',  jogador: 'André Carvalho',  cor: '#b98656', img: 'img/papelao.jpg' },
+  { id: 'papel',    tipo: 'cobaia', codigo: 'FHP-005', nome: 'Papel',    jogador: 'Danton Melo',     cor: '#22d3e6', img: 'img/papel.jpg' },
+  { id: 'luva',     tipo: 'cobaia', codigo: 'FHP-006', nome: 'Luva',     jogador: 'Gabriel Padilha', cor: '#3d7bff', img: 'img/luva.jpg' },
+  { id: 'velcro',   tipo: 'cobaia', codigo: 'FHP-007', nome: 'Velcro',   jogador: 'Ricardo Filho',   cor: '#ff5ca8', img: 'img/velcro.jpg' },
 
   // Cobaias NPC (só aparecem quando o mestre coloca no mapa)
-  { id: 'risa',        tipo: 'npc', codigo: 'FHP-008', nome: 'Risa',        funcao: 'Cobaia', cor: '#a3ff3c', img: 'img/risa.jpg' },
-  { id: 'coelho',      tipo: 'npc', codigo: 'FHP-009', nome: 'Coelho',      funcao: 'Água',   cor: '#ff3b3b', img: 'img/coelho.jpg' },
-  { id: 'cara-palida', tipo: 'npc', codigo: 'FHP-010', nome: 'Cara Pálida', funcao: 'Médico', cor: '#d8dde6', img: 'img/cara-palida.jpg' },
-  { id: 'onirico',     tipo: 'npc', codigo: 'FHP-011', nome: 'Onírico',     funcao: 'Cobaia', cor: '#7b61ff', img: 'img/onirico.jpg' },
+  { id: 'risa',        tipo: 'npc', codigo: 'FHP-008', nome: 'Risa',        cor: '#a3ff3c', img: 'img/risa.jpg' },
+  { id: 'coelho',      tipo: 'npc', codigo: 'FHP-009', nome: 'Coelho',      cor: '#ff3b3b', img: 'img/coelho.jpg' },
+  { id: 'cara-palida', tipo: 'npc', codigo: 'FHP-010', nome: 'Cara Pálida', cor: '#d8dde6', img: 'img/cara-palida.jpg' },
+  { id: 'onirico',     tipo: 'npc', codigo: 'FHP-011', nome: 'Onírico',     cor: '#7b61ff', img: 'img/onirico.jpg' },
 
   // Filhos da O.R.F.E.U. (codinomes; podem entrar no mapa várias vezes)
   { id: 'f01', tipo: 'filho', codigo: 'F-01', nome: 'Sobra',      cor: '#ff4d6d' },

@@ -176,6 +176,33 @@ const Store = {
   },
 };
 
+/* =========================================================
+   SEGREDOS DO MESTRE (funções das cobaias)
+   Nunca ficam no código público. No modo local, ficam só no navegador
+   do Mestre; com Firebase, num caminho que só a conta do Mestre lê.
+   ========================================================= */
+const Segredos = {
+  dados: {}, ref: null,
+  carregar() {
+    if (Store.modo === 'firebase') {
+      if (this.ref) return;
+      this.ref = Store.db.ref('segredos');
+      this.ref.on('value', s => { this.dados = s.val() || {}; atualizarTudo(); }, () => {});
+    } else {
+      try { this.dados = JSON.parse(localStorage.getItem('acf-segredos') || '{}'); } catch (e) { this.dados = {}; }
+    }
+  },
+  parar() { if (this.ref) { this.ref.off(); this.ref = null; } this.dados = {}; },
+  definir(id, valor) {
+    valor = (valor || '').trim();
+    if (valor) this.dados[id] = valor; else delete this.dados[id];
+    if (Store.modo === 'firebase') Store.db.ref('segredos/' + id).set(valor || null).catch(erroGravacao);
+    else { try { localStorage.setItem('acf-segredos', JSON.stringify(this.dados)); } catch (e) {} }
+  },
+};
+// a função só existe na tela do Mestre
+const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
+
 function erroGravacao(e) {
   console.error(e);
   setSync('sem permissão para gravar', 'erro');
@@ -215,6 +242,7 @@ function definirMestre(sim) {
   $$('.mestre-only').forEach(el => el.hidden = !sim);
   atualizarBotaoPerfil();
   if (Store.modo === 'local') { try { sim ? localStorage.setItem('acf-mestre', '1') : localStorage.removeItem('acf-mestre'); } catch (e) {} }
+  if (sim) Segredos.carregar(); else Segredos.parar();
   if (sim && Store.modo === 'firebase' && Store.vazio) { Store.vazio = false; Store.gravarTudo(); }
   montarAndar();
   atualizarTudo();
@@ -746,8 +774,9 @@ function desenharCartao() {
   c.style.setProperty('--cor', s.cor);
   const foto = s.img ? `<img src="${s.img}" alt="">` : `<div class="cartao-bola"></div>`;
   let linhas = '';
-  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}<br>Função: ${s.funcao}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
-  if (s.tipo === 'npc') linhas = `<p>Função: ${s.funcao}</p>`;
+  const fn = funcaoDe(s.id);
+  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}${fn ? `<br>Função: ${fn} <span class="so-mestre">só o Mestre vê</span>` : ''}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
+  if (s.tipo === 'npc') linhas = fn ? `<p>Função: ${fn} <span class="so-mestre">só o Mestre vê</span></p>` : '';
   if (s.tipo === 'filho') linhas = `<p>Filho da O.R.F.E.U.</p>`;
   const titulo = s.tipo === 'filho' ? s.nome + (tk.n > 1 ? ` #${tk.n}` : '') : s.nome;
 
@@ -794,7 +823,7 @@ function desenharPainel() {
     const visivel = tk && (!tk.h || mestre);
     return `<li data-id="${s.id}">${bola(s)}<span class="info">
       <strong>${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
-      <span class="sub">${s.jogador} · ${s.funcao}</span>
+      <span class="sub">${s.jogador}${funcaoDe(s.id) ? ' · ' + funcaoDe(s.id) : ''}</span>
       <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span></span></li>`;
   }).join('');
 
@@ -816,7 +845,17 @@ function desenharPainel() {
   if (mestre) desenharTray();
 }
 
+function desenharFuncoes() {
+  const caixa = $('#listaFuncoes');
+  if (caixa.contains(document.activeElement)) return;   // não atrapalha quem está digitando
+  caixa.innerHTML = SERES.filter(s => s.tipo !== 'filho').map(s =>
+    `<label class="funcao-linha"><span>${s.nome}</span>
+      <input data-id="${s.id}" value="${(Segredos.dados[s.id] || '').replace(/"/g, '&quot;')}" placeholder="função"></label>`).join('');
+  $$('input', caixa).forEach(i => i.onchange = () => { Segredos.definir(i.dataset.id, i.value); atualizarTudo(); });
+}
+
 function desenharTray() {
+  desenharFuncoes();
   const tokens = Store.state.tokens || {};
   const unicos = SERES.filter(s => s.tipo !== 'filho');
   $('#trayNpc').innerHTML = unicos.map(s => {

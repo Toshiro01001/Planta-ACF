@@ -29,6 +29,10 @@ Cada andar tem a sua senha, guardada só como hash no `config.js`. Para trocar: 
 
 A trava é feita no navegador. Ela segura o jogador comum, mas quem souber ler código consegue contornar.
 
+## Funções das cobaias
+
+As funções nunca ficam no código (o repositório é público). O Mestre preenche no painel **Funções (só o Mestre vê)**; elas ficam no navegador dele ou, com Firebase, num caminho que só a conta do Mestre lê.
+
 ## Perfis
 
 Ao abrir o site, a pessoa escolhe **Jogador** ou **Mestre**. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
@@ -54,6 +58,10 @@ Sem Firebase, o site funciona em **modo local**: as posições ficam no navegado
           ".write": "auth != null && data.exists() && newData.exists() && ($id === 'faca' || $id === 'sabonete' || $id === 'mostarda' || $id === 'papelao' || $id === 'papel' || $id === 'luva' || $id === 'velcro') && newData.child('s').val() === data.child('s').val() && newData.child('a').val() === data.child('a').val() && newData.child('h').val() === data.child('h').val()"
         }
       }
+    },
+    "segredos": {
+      ".read": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'"
     }
   }
 }
