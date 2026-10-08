@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planta da Caixa</title>
+<meta name="description" content="A Caixa de Fósforos · planta do complexo com a posição das cobaias em tempo real.">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <span class="marca-kicker">O.R.F.E.U. · Planta do Complexo</span>
+    <h1>A Caixa de Fósforos</h1>
+  </div>
+  <div class="topo-dir">
+    <span id="sync" class="sync" title="Estado da conexão">modo local</span>
+    <button id="btnMestre" class="btn-fantasma">Mestre</button>
+    <button id="btnPainel" class="btn-fantasma so-celular" aria-label="Abrir painel">Painel</button>
+  </div>
+</header>
+
+<main class="corpo">
+
+  <!-- Elevador: escolha do andar -->
+  <nav class="elevador" aria-label="Andares">
+    <span class="elevador-titulo">Andar</span>
+    <div id="listaAndares" class="lista-andares"></div>
+  </nav>
+
+  <!-- Área do mapa -->
+  <section class="palco-area">
+    <div id="viewport" class="viewport">
+      <div id="stage" class="stage"></div>
+    </div>
+
+    <!-- Tela de bloqueio do andar -->
+    <div id="bloqueio" class="bloqueio" hidden>
+      <form id="formSenha" class="terminal" autocomplete="off">
+        <p class="terminal-linha">&gt; ACESSO RESTRITO</p>
+        <p class="terminal-linha" id="bloqueioTitulo">&gt; 2º ANDAR</p>
+        <p class="terminal-linha dim">&gt; insira a credencial do andar</p>
+        <div class="terminal-entrada">
+          <span>&gt;</span>
+          <input id="inputSenha" type="password" aria-label="Senha do andar" spellcheck="false">
+        </div>
+        <p id="erroSenha" class="terminal-erro" hidden>&gt; CREDENCIAL RECUSADA</p>
+        <button class="btn-roxo" type="submit">Liberar</button>
+      </form>
+    </div>
+
+    <div class="andar-legenda">
+      <span id="legendaAndar">1º Andar</span>
+      <small id="legendaSub">Hospital e laboratório</small>
+    </div>
+
+    <!-- Controles de câmera -->
+    <div class="camera" aria-label="Câmera">
+      <button data-cam="girarE" title="Girar para a esquerda">⟲</button>
+      <button data-cam="girarD" title="Girar para a direita">⟳</button>
+      <button data-cam="iso" title="Vista isométrica">ISO</button>
+      <button data-cam="topo" title="Vista de cima">TOPO</button>
+      <button data-cam="mais" title="Aproximar">+</button>
+      <button data-cam="menos" title="Afastar">−</button>
+      <button data-cam="mover" id="btnModoMover" title="Arrastar move o mapa em vez de girar">✥</button>
+      <button data-cam="centro" title="Centralizar">◎</button>
+    </div>
+
+    <div class="dica" id="dica">Arraste para girar · botão direito ou dois dedos para mover · roda ou pinça para zoom</div>
+
+    <!-- Cartão do ser selecionado -->
+    <div id="cartao" class="cartao" hidden></div>
+  </section>
+
+  <!-- Painel lateral -->
+  <aside id="painel" class="painel">
+    <button class="fechar-painel so-celular" id="btnFecharPainel" aria-label="Fechar painel">×</button>
+
+    <section class="bloco">
+      <h2>Cobaias</h2>
+      <ul id="listaCobaias" class="lista-seres"></ul>
+    </section>
+
+    <section class="bloco" id="blocoPresencas">
+      <h2>Presenças neste andar</h2>
+      <ul id="listaPresencas" class="lista-seres"></ul>
+      <p id="semPresencas" class="vazio">Nada à vista. Por enquanto.</p>
+    </section>
+
+    <!-- Só para o Mestre -->
+    <section class="bloco mestre-only" hidden>
+      <h2>Mestre</h2>
+
+      <label class="chave">
+        <input type="checkbox" id="chkElementos">
+        <span>Mostrar elementos das salas aos jogadores neste andar</span>
+      </label>
+
+      <h3>Cobaias NPC</h3>
+      <div id="trayNpc" class="tray"></div>
+
+      <h3>Filhos da O.R.F.E.U.</h3>
+      <p class="mini">Cada clique coloca mais um no centro do andar aberto.</p>
+      <div id="trayFilhos" class="tray"></div>
+
+      <h3>Ferramentas</h3>
+      <div class="ferramentas">
+        <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
+        <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra</button>
+        <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
+        <button id="btnSair" class="btn-fantasma">Sair do modo Mestre</button>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<!-- Janelas -->
+<dialog id="dlgMestre" class="dlg">
+  <form method="dialog" id="formMestre" autocomplete="off">
+    <h2>Entrar como Mestre</h2>
+    <div id="campoEmail" hidden>
+      <label>E-mail da conta Firebase<input id="mestreEmail" type="email"></label>
+    </div>
+    <label>Senha<input id="mestreSenha" type="password"></label>
+    <p id="mestreErro" class="erro" hidden></p>
+    <div class="dlg-acoes">
+      <button value="cancel" class="btn-fantasma" formnovalidate>Cancelar</button>
+      <button id="btnEntrarMestre" class="btn-roxo" value="ok">Entrar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgHash" class="dlg">
+  <form method="dialog">
+    <h2>Gerar hash de senha</h2>
+    <p class="mini">Digite a senha nova. Copie o resultado e cole no <code>config.js</code>, na linha do andar certo.</p>
+    <label>Senha nova<input id="hashEntrada" type="text" spellcheck="false"></label>
+    <textarea id="hashSaida" readonly rows="3"></textarea>
+    <div class="dlg-acoes">
+      <button class="btn-roxo" value="ok">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="data.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
