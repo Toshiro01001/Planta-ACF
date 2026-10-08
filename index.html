@@ -75,6 +75,21 @@
 
     <!-- Cartão do ser selecionado -->
     <div id="cartao" class="cartao" hidden></div>
+
+    <!-- Dados -->
+    <button id="btnDados" class="btn-dados" title="Rolar dados">🎲 Dados</button>
+    <div id="painelDados" class="painel-dados" hidden>
+      <div class="dados-topo"><h3 id="dadosTitulo">Rolar dados</h3><button id="btnFecharDados" class="fechar" aria-label="Fechar">×</button></div>
+      <div class="dados-campos">
+        <label>Quantos d20<input id="dadosQtd" type="number" min="1" max="10" value="1"></label>
+        <label>Bônus<input id="dadosBonus" type="number" value="0"></label>
+      </div>
+      <label class="chave"><input type="checkbox" id="dadosDesv"><span>Desvantagem (usa o menor dado)</span></label>
+      <button id="btnRolar" class="btn-roxo">Rolar</button>
+      <div id="dadosResultado" class="dados-resultado"></div>
+      <button id="btnRolarFora" class="btn-fantasma">Vou rolar em outro lugar</button>
+    </div>
+    <div id="aviso" class="aviso" hidden></div>
   </section>
 
   <!-- Painel lateral -->
@@ -84,6 +99,15 @@
     <section class="bloco">
       <h2>Cobaias</h2>
       <ul id="listaCobaias" class="lista-seres"></ul>
+    </section>
+
+    <section class="bloco" id="blocoPersg" hidden>
+      <h2>Perseguição</h2>
+      <ol id="listaPersg" class="lista-persg"></ol>
+      <div id="minhaVez" class="minha-vez" hidden>
+        <p id="minhaVezTxt"></p>
+        <button id="btnRefazerMinha" class="btn-fantasma">Refazer rota</button>
+      </div>
     </section>
 
     <section class="bloco">
@@ -147,10 +171,30 @@
         </div>
       </div>
       <button id="btnProtocolo" class="btn-protocolo" disabled>Iniciar Protocolo Filho da O.R.F.E.U.</button>
+
+      <h3>Perseguição</h3>
+      <div id="persgSetup">
+        <p class="mini">Marque quem participa, preencha a iniciativa (ou role no 🎲) e o deslocamento por turno. Os jogadores podem rolar no site: o resultado aparece aqui.</p>
+        <div id="setupPersg" class="setup-persg"></div>
+        <div class="ferramentas">
+          <button id="btnPedirIni" class="btn-fantasma">Pedir iniciativa aos jogadores</button>
+          <button id="btnIniciarPersg" class="btn-roxo">Iniciar perseguição</button>
+        </div>
+      </div>
+      <div id="persgAtiva" hidden>
+        <p class="mini"><b id="persgRodada">Rodada 1</b> · a ordem vai da maior iniciativa para a menor.</p>
+        <ol id="ordemPersg" class="ordem-persg"></ol>
+        <label class="chave"><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
+        <div class="ferramentas">
+          <button id="btnProxTurno" class="btn-roxo">Próximo turno</button>
+          <button id="btnRefazerVez" class="btn-fantasma">Refazer rota de quem está na vez</button>
+          <button id="btnEncerrarPersg" class="btn-fantasma perigo">Encerrar perseguição</button>
+        </div>
+      </div>
       <div class="ferramentas">
         <button id="btnTesteSom" class="btn-fantasma">Testar o som do alarme</button>
         <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
-        <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra</button>
+        <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra…</button>
         <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
         <button id="btnSair" class="btn-fantasma">Sair do modo Mestre</button>
       </div>
@@ -165,6 +209,7 @@
   <p class="tp-sub">INICIADO</p>
 </div>
 <div id="faixaProtocolo" class="faixa-protocolo" hidden>⚠ PROTOCOLO FILHO DA O.R.F.E.U. EM CURSO</div>
+<div id="faixaPersg" class="faixa-persg" hidden></div>
 
 <!-- Tela de entrada: Jogador ou Mestre -->
 <div id="perfil" class="perfil" hidden>
@@ -205,6 +250,15 @@
       <button value="cancel" class="btn-fantasma" formnovalidate>Cancelar</button>
       <button id="btnEntrarMestre" class="btn-roxo" value="ok">Entrar</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="dlgReset" class="dlg">
+  <form method="dialog">
+    <h2>Recolocar cobaias na Zona Neutra</h2>
+    <p class="mini">Escolha o andar. As 7 cobaias vão para a Zona Neutra dele.</p>
+    <div id="listaReset" class="ferramentas"></div>
+    <div class="dlg-acoes"><button class="btn-fantasma" value="cancel">Cancelar</button></div>
   </form>
 </dialog>
 
