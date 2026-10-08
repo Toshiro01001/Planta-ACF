@@ -363,6 +363,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .ferramentas { display: grid; gap: 8px; }
 
+/* ---------- Funções (só Mestre) ---------- */
+.lista-funcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.funcao-linha { display: grid; gap: 2px; font-size: 13px; color: var(--texto-dim); }
+.funcao-linha input {
+  background: #0b0910; border: 1px solid var(--linha); color: var(--texto);
+  border-radius: 5px; padding: 5px 7px; font: 13px var(--mono);
+}
+.so-mestre { font-family: var(--mono); font-size: 10px; color: #ff9fb2; border: 1px solid #5a1f2a; border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+
 /* ---------- Salas desconhecidas ---------- */
 .sala.desconhecida { background-color: #100c16; }
 .sala.desconhecida .sala-cn { font-size: 20px; letter-spacing: .25em; color: rgba(236,230,247,.35); text-transform: uppercase; }
