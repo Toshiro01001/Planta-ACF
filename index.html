@@ -20,7 +20,7 @@
   </div>
   <div class="topo-dir">
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
-    <button id="btnMestre" class="btn-fantasma">Mestre</button>
+    <button id="btnMestre" class="btn-fantasma">Entrar</button>
     <button id="btnPainel" class="btn-fantasma so-celular" aria-label="Abrir painel">Painel</button>
   </div>
 </header>
@@ -101,7 +101,7 @@
         <span>Mostrar elementos das salas aos jogadores neste andar</span>
       </label>
 
-      <h3>Cobaias NPC</h3>
+      <h3>Cobaias e NPCs</h3>
       <div id="trayNpc" class="tray"></div>
 
       <h3>Filhos da O.R.F.E.U.</h3>
@@ -118,6 +118,32 @@
     </section>
   </aside>
 </main>
+
+<!-- Tela de entrada: Jogador ou Mestre -->
+<div id="perfil" class="perfil" hidden>
+  <div class="perfil-caixa">
+    <p class="perfil-kicker">O.R.F.E.U. · identificação</p>
+    <div id="perfilPasso1">
+      <h2>Você é...</h2>
+      <div class="perfil-opcoes">
+        <button id="btnSouJogador" class="perfil-btn">
+          <span class="perfil-btn-titulo">Jogador</span>
+          <span class="perfil-btn-sub">Escolha a sua cobaia e mova a sua ficha</span>
+        </button>
+        <button id="btnSouMestre" class="perfil-btn">
+          <span class="perfil-btn-titulo">Mestre</span>
+          <span class="perfil-btn-sub">Controle total da Caixa</span>
+        </button>
+      </div>
+    </div>
+    <div id="perfilPasso2" hidden>
+      <h2>Qual cobaia você interpreta?</h2>
+      <p class="perfil-aviso">Você só poderá mover a ficha que escolher aqui.</p>
+      <div id="listaPersonagens" class="perfil-personagens"></div>
+      <button id="btnVoltarPerfil" class="btn-fantasma">Voltar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Janelas -->
 <dialog id="dlgMestre" class="dlg">
