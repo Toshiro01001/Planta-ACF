@@ -80,16 +80,16 @@ function descreveLocal(tk) {
 /* ---------- Estado inicial ---------- */
 const CENTRO_ZN = (() => { const s = retSala(25); return { x: s.x + R / 2, y: s.y + R / 2 }; })();
 
-function posicoesIniciais() {
+function posicoesIniciais(andar = 1) {
   const tokens = {};
   const cob = SERES.filter(s => s.tipo === 'cobaia');
   cob.forEach((s, i) => {
     const ang = (i / cob.length) * Math.PI * 2 - Math.PI / 2;
-    tokens[s.id] = { s: s.id, a: 1, x: +(CENTRO_ZN.x + Math.cos(ang) * 1.6).toFixed(2), y: +(CENTRO_ZN.y + Math.sin(ang) * 1.6).toFixed(2), h: false, n: 1 };
+    tokens[s.id] = { s: s.id, a: andar, x: +(CENTRO_ZN.x + Math.cos(ang) * 1.6).toFixed(2), y: +(CENTRO_ZN.y + Math.sin(ang) * 1.6).toFixed(2), h: false, n: 1 };
   });
   return tokens;
 }
-const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false } });
+const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false } });
 
 /* =========================================================
    SINCRONIA: modo local ou Firebase
@@ -139,7 +139,7 @@ const Store = {
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
       if (v && v.tokens !== undefined) {
-        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false } };
+        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false }, persg: v.persg || { on: false } };
         this.vazio = false;
       } else {
         this.state = estadoPadrao();
@@ -476,6 +476,7 @@ function montarAndar() {
   // corredores
   CORREDORES.forEach(c => {
     const d = el('div', 'corredor', { left: px(c.x), top: px(c.y), width: px(c.w), height: px(c.h), backgroundSize: `${T}px ${T}px` });
+    d.innerHTML = '<span class="corr-m">14 m</span>';
     stage.appendChild(d);
     if (c.eixo === 'h') {
       paredes.push(parede(c.x, c.y, c.x + c.w, c.y));
@@ -495,7 +496,8 @@ function montarAndar() {
     let [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
     if (!visivel) { nome = ''; elm = '?'; }
     const elemento = ELEMENTOS[elm] || ELEMENTOS['?'];
-    const d = el('div', 'sala', { left: px(s.x), top: px(s.y), width: px(s.w), height: px(s.h), backgroundSize: `${T}px ${T}px` });
+    // grade do piso: 8 quadradinhos por lado (cada um com 0,88 m)
+    const d = el('div', 'sala', { left: px(s.x), top: px(s.y), width: px(s.w), height: px(s.h), backgroundSize: `${R * T / 8}px ${R * T / 8}px` });
     d.dataset.cn = cn;
     if (p === 25 && visivel) d.classList.add('neutra');
     if (!visivel) d.classList.add('desconhecida');
@@ -642,7 +644,13 @@ const fichasDom = new Map();
 let selecionado = null;
 let arrastando = null;
 
-function rotuloFicha(tk) {
+function rotuloFicha(tk, id) {
+  const s = SER[tk.s];
+  const pz = participante(id);
+  if (pz) return `${rotuloBase(tk)} · ${fmtM(tk.m || 0)}/${pz.lim} m`;
+  return rotuloBase(tk);
+}
+function rotuloBase(tk) {
   const s = SER[tk.s];
   if (s.tipo === 'filho') return tk.n > 1 ? `${s.codigo} ${s.nome} #${tk.n}` : `${s.codigo} ${s.nome}`;
   return s.nome;
@@ -676,7 +684,8 @@ function desenharFichas() {
     if (!arrastando || arrastando.id !== id) {
       f.style.left = px(tk.x); f.style.top = px(tk.y);
     }
-    $('.ficha-nome', f).textContent = rotuloFicha(tk);
+    $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
+    f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
     f.classList.toggle('minha', !mestre && tk.s === meu);
     f.classList.toggle('selecionada', selecionado === id);
@@ -691,22 +700,46 @@ function ligarArraste(f) {
     e.stopPropagation();
     esconderDica();
     const id = f.dataset.id;
-    if (!podeMover(Store.state.tokens[id])) { selecionar(id); return; }
     const tk = Store.state.tokens[id];
+    if (!podeMover(tk)) { selecionar(id); return; }
+    const motivo = bloqueioPerseguicao(id, tk);
+    if (motivo) { aviso(motivo); selecionar(id); return; }
     const p = telaParaPiso(e.clientX, e.clientY);
-    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0 };
+    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0, limitado: !!limiteDe(id) };
     cabeca.setPointerCapture(e.pointerId);
     f.classList.add('arrastada');
   });
   cabeca.addEventListener('pointermove', e => {
     if (!arrastando || arrastando.id !== f.dataset.id) return;
-    const p = telaParaPiso(e.clientX, e.clientY);
-    const x = clamp(p.x + arrastando.dx, 0.3, W - 0.3);
-    const y = clamp(p.y + arrastando.dy, 0.3, H - 0.3);
-    arrastando.andou = true;
-    f.style.left = px(x); f.style.top = px(y);
     const tk = Store.state.tokens[arrastando.id];
-    tk.x = +x.toFixed(2); tk.y = +y.toFixed(2);
+    const p = telaParaPiso(e.clientX, e.clientY);
+    let alvo = { x: clamp(p.x + arrastando.dx, 0.3, W - 0.3), y: clamp(p.y + arrastando.dy, 0.3, H - 0.3) };
+    const atual = { x: tk.x, y: tk.y };
+    // paredes: não atravessa blocos maciços (só se a ficha já está num lugar andável)
+    if (andavel(tk.a, atual.x, atual.y) && !caminhoLivre(tk.a, atual, alvo)) return;
+    // perseguição: limite de deslocamento do turno
+    const lim = limiteDe(arrastando.id);
+    if (lim) {
+      const usado = tk.m || 0;
+      if (usado >= lim - 0.001) return;
+      let custo = custoMetros(atual, alvo);
+      if (usado + custo > lim) {
+        // anda só até gastar o que resta
+        let lo = 0, hi = 1;
+        for (let i = 0; i < 18; i++) {
+          const mid = (lo + hi) / 2;
+          const q = { x: atual.x + (alvo.x - atual.x) * mid, y: atual.y + (alvo.y - atual.y) * mid };
+          if (usado + custoMetros(atual, q) <= lim) lo = mid; else hi = mid;
+        }
+        alvo = { x: atual.x + (alvo.x - atual.x) * lo, y: atual.y + (alvo.y - atual.y) * lo };
+        custo = lim - usado;
+      }
+      tk.m = +Math.min(lim, usado + custo).toFixed(2);
+    }
+    arrastando.andou = true;
+    tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2);
+    f.style.left = px(tk.x); f.style.top = px(tk.y);
+    $('.ficha-nome', f).textContent = rotuloFicha(tk, arrastando.id);
     const agora = performance.now();
     if (agora - arrastando.ultimo > 120) {   // envia aos jogadores enquanto arrasta
       arrastando.ultimo = agora;
@@ -715,10 +748,15 @@ function ligarArraste(f) {
   });
   const fim = () => {
     if (!arrastando || arrastando.id !== f.dataset.id) return;
-    const { id, andou } = arrastando;
+    const { id, andou, limitado } = arrastando;
     arrastando = null;
     f.classList.remove('arrastada');
-    if (andou) Store.definir(['tokens', id], { ...Store.state.tokens[id] });
+    const tk = Store.state.tokens[id];
+    // voltou ao ponto de partida do turno: zera o que andou
+    if (limitado && tk.x0 !== undefined && Math.hypot(tk.x - tk.x0, tk.y - tk.y0) < 0.35) {
+      tk.x = tk.x0; tk.y = tk.y0; tk.m = 0;
+    }
+    if (andou) Store.definir(['tokens', id], { ...tk });
     selecionar(id);
   };
   cabeca.addEventListener('pointerup', fim);
@@ -778,6 +816,7 @@ function desenharCartao() {
   if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}${fn ? `<br>Função: ${fn} <span class="so-mestre">só o Mestre vê</span>` : ''}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
   if (s.tipo === 'npc') linhas = fn ? `<p>Função: ${fn} <span class="so-mestre">só o Mestre vê</span></p>` : '';
   if (s.tipo === 'filho') linhas = `<p>Filho da O.R.F.E.U.</p>`;
+  if (s.tipo === 'robo') linhas = `<p>Robô S.T.A.F.F. · não faz barulho</p>`;
   const titulo = s.tipo === 'filho' ? s.nome + (tk.n > 1 ? ` #${tk.n}` : '') : s.nome;
 
   let acoes = '';
@@ -848,7 +887,7 @@ function desenharPainel() {
 function desenharFuncoes() {
   const caixa = $('#listaFuncoes');
   if (caixa.contains(document.activeElement)) return;   // não atrapalha quem está digitando
-  caixa.innerHTML = SERES.filter(s => s.tipo !== 'filho').map(s =>
+  caixa.innerHTML = SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'npc').map(s =>
     `<label class="funcao-linha"><span>${s.nome}</span>
       <input data-id="${s.id}" value="${(Segredos.dados[s.id] || '').replace(/"/g, '&quot;')}" placeholder="função"></label>`).join('');
   $$('input', caixa).forEach(i => i.onchange = () => { Segredos.definir(i.dataset.id, i.value); atualizarTudo(); });
@@ -926,6 +965,8 @@ function irParaAndar(a) {
 }
 
 function atualizarTudo() {
+  desenharPerseguicao();
+  verificarPedidoIniciativa();
   desenharRuido();
   verificarAlarme();
   atualizarProtocolo();
@@ -1106,6 +1147,254 @@ function revelarAndar(sim) {
 $('#btnRevelarAndar').addEventListener('click', () => { if (confirm('Revelar aos jogadores todas as salas deste andar?')) revelarAndar(true); });
 $('#btnEsconderAndar').addEventListener('click', () => { if (confirm('Esconder dos jogadores todas as salas deste andar?')) revelarAndar(false); });
 
+/* =========================================================
+   ESCALA E MOVIMENTO
+   Sala: 50 m² (5 x 5 quadradinhos de desenho = 7,07 m de lado).
+   No piso da sala, cada quadradinho da grade vale 0,88 m (8 por lado).
+   Corredor: 14 m de comprimento, seja qual for o tamanho desenhado.
+   ========================================================= */
+const LADO_SALA_M = Math.sqrt(50);        // 7,07 m
+const M_POR_UNID = LADO_SALA_M / R;       // 1,414 m por unidade da planta
+const M_CORREDOR = 14 / G;                // 7 m por unidade ao longo do corredor
+const fmtM = v => (Math.round(v * 10) / 10).toFixed(1).replace('.', ',');
+
+function dentro(r, x, y, folga = 0) {
+  return x >= r.x - folga && x <= r.x + r.w + folga && y >= r.y - folga && y <= r.y + r.h + folga;
+}
+function andavel(andar, x, y) {
+  for (let p = 1; p <= 25; p++) if (dentro(retSala(p), x, y)) return true;
+  for (const c of CORREDORES) if (dentro(c, x, y)) return true;
+  const rs = retSaida(saidaDoAndar(andar));
+  return !!(rs && dentro(rs, x, y));
+}
+function caminhoLivre(andar, a, b) {
+  const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.12));
+  for (let i = 1; i <= n; i++) {
+    if (!andavel(andar, a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n)) return false;
+  }
+  return true;
+}
+// metros por unidade em x e em y, conforme o lugar (sala ou corredor)
+function escalaEm(x, y) {
+  for (const c of CORREDORES) {
+    if (c.x !== undefined && dentro(c, x, y) && !(() => { for (let p = 1; p <= 25; p++) if (dentro(retSala(p), x, y)) return true; return false; })()) {
+      return c.eixo === 'h' ? [M_CORREDOR, M_POR_UNID] : [M_POR_UNID, M_CORREDOR];
+    }
+  }
+  return [M_POR_UNID, M_POR_UNID];
+}
+function custoMetros(a, b) {
+  const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.05));
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const x0 = a.x + (b.x - a.x) * i / n, y0 = a.y + (b.y - a.y) * i / n;
+    const x1 = a.x + (b.x - a.x) * (i + 1) / n, y1 = a.y + (b.y - a.y) * (i + 1) / n;
+    const [sx, sy] = escalaEm((x0 + x1) / 2, (y0 + y1) / 2);
+    total += Math.hypot((x1 - x0) * sx, (y1 - y0) * sy);
+  }
+  return total;
+}
+
+let avisoTimer = null;
+function aviso(txt) {
+  const el2 = $('#aviso');
+  el2.textContent = txt; el2.hidden = false;
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => { el2.hidden = true; }, 2600);
+}
+
+/* =========================================================
+   DADOS (d20 com bônus e desvantagem)
+   ========================================================= */
+let alvoDados = null;   // participante da perseguição que o Mestre está rolando
+function abrirDados(titulo, alvo = null) {
+  alvoDados = alvo;
+  $('#dadosTitulo').textContent = titulo || 'Rolar dados';
+  $('#dadosResultado').innerHTML = '';
+  $('#painelDados').hidden = false;
+}
+function fecharDados() { $('#painelDados').hidden = true; alvoDados = null; }
+
+function rolar() {
+  const qtd = clamp(parseInt($('#dadosQtd').value, 10) || 1, 1, 10);
+  const bonus = parseInt($('#dadosBonus').value, 10) || 0;
+  const desv = $('#dadosDesv').checked;
+  const dados = Array.from({ length: qtd }, () => 1 + Math.floor(Math.random() * 20));
+  const escolhido = desv ? Math.min(...dados) : Math.max(...dados);
+  const iEsc = dados.indexOf(escolhido);
+  const total = escolhido + bonus;
+  $('#dadosResultado').innerHTML =
+    `<div class="dados-faces">${dados.map((v, i) => `<span class="face${i === iEsc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>
+     <p class="dados-conta">${desv ? 'Menor' : 'Maior'} dado <b>${escolhido}</b> ${bonus >= 0 ? '+' : '−'} ${Math.abs(bonus)} = <span class="dados-total">${total}</span></p>`;
+  Som.tom(520, 0, 0.06, 'triangle', 0.08);
+  if (alvoDados && mestre) {
+    const inp = $(`#setupPersg input.ini[data-id="${alvoDados}"]`);
+    if (inp) inp.value = total;
+  } else if (meu && Store.state.tokens[meu]) {
+    // o resultado do jogador chega ao Mestre pela ficha dele
+    Store.definir(['tokens', meu], { ...Store.state.tokens[meu], r: { t: total, ts: Date.now() } });
+  }
+}
+$('#btnRolar').addEventListener('click', rolar);
+$('#btnDados').addEventListener('click', () => $('#painelDados').hidden ? abrirDados('Rolar dados') : fecharDados());
+$('#btnFecharDados').addEventListener('click', fecharDados);
+$('#btnRolarFora').addEventListener('click', () => {
+  if (meu && Store.state.tokens[meu]) Store.definir(['tokens', meu], { ...Store.state.tokens[meu], r: { fora: true, ts: Date.now() } });
+  fecharDados();
+});
+
+/* =========================================================
+   PERSEGUIÇÃO (turnos por iniciativa, deslocamento por turno)
+   ========================================================= */
+let movLivre = false;            // Mestre move sem limite (só nesta tela)
+let pedidoVisto = null;
+const P = () => Store.state.persg || { on: false };
+const ordemP = () => (P().ordem ? Object.values(P().ordem) : []);
+function participante(id) { return P().on ? ordemP().find(o => o.id === id) : null; }
+function vezAtual() { const o = ordemP(); return P().on && o.length ? (o[P().vez || 0] || {}).id : null; }
+// limite em metros para quem está arrastando (null = sem limite)
+function limiteDe(id) {
+  const pz = participante(id);
+  if (!pz || (mestre && movLivre)) return null;
+  return pz.lim || 9;
+}
+function bloqueioPerseguicao(id, tk) {
+  const pz = participante(id);
+  if (!pz || (mestre && movLivre)) return '';
+  if (vezAtual() !== id) return 'Na perseguição, só quem está na vez se move.';
+  if ((tk.m || 0) >= (pz.lim || 9) - 0.001) return `Deslocamento esgotado (${pz.lim || 9} m). Use "Refazer rota" para voltar ao início.`;
+  return '';
+}
+function nomeParticipante(id, paraJogador) {
+  const tk = Store.state.tokens[id];
+  if (!tk || !SER[tk.s]) return '(removido)';
+  if (paraJogador && tk.h && !mestre && tk.s !== meu) return '???';
+  return rotuloBase(tk);
+}
+
+function iniciarTurno(id) {
+  const tk = Store.state.tokens[id];
+  if (tk) Store.definir(['tokens', id], { ...tk, x0: tk.x, y0: tk.y, m: 0 });
+}
+function refazerRota(id) {
+  const tk = Store.state.tokens[id];
+  if (tk && tk.x0 !== undefined) Store.definir(['tokens', id], { ...tk, x: tk.x0, y: tk.y0, m: 0 });
+}
+
+function desenharSetup() {
+  const caixa = $('#setupPersg');
+  if (caixa.contains(document.activeElement)) return;
+  const pedido = P().req || 0;
+  const linhas = Object.entries(Store.state.tokens || {})
+    .filter(([, tk]) => SER[tk.s] && tk.a === andarAtual)
+    .sort((x, y) => ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[x[1].s].tipo) - ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[y[1].s].tipo));
+  const antes = {};
+  $$('#setupPersg .setup-linha').forEach(l => {
+    antes[l.dataset.id] = { ck: $('input.ck', l).checked, ini: $('input.ini', l).value, lim: $('input.lim', l).value };
+  });
+  caixa.innerHTML = linhas.map(([id, tk]) => {
+    const s = SER[tk.s];
+    const a0 = antes[id] || { ck: s.tipo === 'cobaia', ini: '', lim: '9' };
+    let ini = a0.ini, nota = '';
+    if (tk.r && tk.r.ts > pedido && pedido) {
+      if (tk.r.fora) nota = 'rola fora';
+      else if (!ini) { ini = tk.r.t; nota = 'rolou no site'; } else nota = `rolou ${tk.r.t}`;
+    }
+    return `<div class="setup-linha" data-id="${id}">
+      <input type="checkbox" class="ck" ${a0.ck ? 'checked' : ''} aria-label="Participa">
+      ${bola(s)}<span class="setup-nome">${rotuloBase(tk)}${nota ? `<small>${nota}</small>` : ''}</span>
+      <input class="ini" data-id="${id}" type="number" placeholder="ini" value="${ini}" aria-label="Iniciativa">
+      <button class="dado-mini" data-id="${id}" title="Rolar a iniciativa">🎲</button>
+      <input class="lim" type="number" min="1" value="${a0.lim}" aria-label="Deslocamento em metros"><span class="m">m</span>
+    </div>`;
+  }).join('') || '<p class="vazio">Ninguém neste andar.</p>';
+  $$('#setupPersg .dado-mini').forEach(b => b.onclick = () => abrirDados(`Iniciativa: ${nomeParticipante(b.dataset.id)}`, b.dataset.id));
+}
+
+function desenharPerseguicao() {
+  const p = P();
+  const ordem = ordemP();
+  const vez = vezAtual();
+  // faixa no topo para todos
+  $('#faixaPersg').hidden = !p.on;
+  if (p.on) $('#faixaPersg').textContent = `PERSEGUIÇÃO · Rodada ${p.rod || 1} · Vez de: ${vez ? nomeParticipante(vez, true) : '—'}`;
+  document.body.classList.toggle('em-persg', !!p.on);
+
+  // painel dos jogadores
+  $('#blocoPersg').hidden = !p.on;
+  if (p.on) {
+    $('#listaPersg').innerHTML = ordem.map((o, i) => {
+      const tk = Store.state.tokens[o.id];
+      const ativo = o.id === vez;
+      return `<li class="${ativo ? 'ativo' : ''}"><span class="ord">${i + 1}º</span>
+        <span class="pn">${nomeParticipante(o.id, true)}</span><span class="pi">ini ${o.ini}</span>
+        <span class="pm">${tk ? fmtM(tk.m || 0) : '0,0'} / ${o.lim} m</span></li>`;
+    }).join('');
+    const minha = meu && vez === meu;
+    $('#minhaVez').hidden = !minha;
+    if (minha) {
+      const tk = Store.state.tokens[meu];
+      const o = participante(meu);
+      $('#minhaVezTxt').textContent = `Sua vez! Você andou ${fmtM(tk.m || 0)} de ${o.lim} m.`;
+    }
+  }
+
+  if (!mestre) return;
+  $('#persgSetup').hidden = !!p.on;
+  $('#persgAtiva').hidden = !p.on;
+  if (!p.on) { desenharSetup(); return; }
+  $('#persgRodada').textContent = `Rodada ${p.rod || 1}`;
+  $('#ordemPersg').innerHTML = ordem.map((o, i) => {
+    const tk = Store.state.tokens[o.id];
+    const s = tk && SER[tk.s];
+    return `<li class="${o.id === vez ? 'ativo' : ''}" data-i="${i}">
+      <span class="ord">${i + 1}º</span>${s ? bola(s) : ''}<span class="pn">${nomeParticipante(o.id)}</span>
+      <span class="pi">${o.ini}</span><span class="pm">${tk ? fmtM(tk.m || 0) : '0,0'}/${o.lim} m</span>
+      <button data-mover="-1" title="Subir">▲</button><button data-mover="1" title="Descer">▼</button></li>`;
+  }).join('');
+  $$('#ordemPersg button').forEach(b => b.onclick = () => {
+    const i = +b.closest('li').dataset.i, j = i + +b.dataset.mover;
+    const o = ordemP();
+    if (j < 0 || j >= o.length) return;
+    const vezId = vezAtual();
+    [o[i], o[j]] = [o[j], o[i]];
+    Store.definir(['persg'], { ...P(), ordem: o, vez: Math.max(0, o.findIndex(x => x.id === vezId)) });
+  });
+}
+
+// jogador: abre os dados quando o Mestre pede a iniciativa
+function verificarPedidoIniciativa() {
+  const req = P().req || 0;
+  if (pedidoVisto === null) { pedidoVisto = req; return; }
+  if (req && req !== pedidoVisto) {
+    pedidoVisto = req;
+    if (meu && !mestre) abrirDados('O Mestre pediu: role a iniciativa');
+  }
+}
+
+$('#btnPedirIni').addEventListener('click', () => { Store.definir(['persg'], { ...P(), on: false, req: Date.now() }); aviso('Pedido enviado aos jogadores.'); });
+$('#btnIniciarPersg').addEventListener('click', () => {
+  const ordem = $$('#setupPersg .setup-linha').filter(l => $('input.ck', l).checked).map(l => ({
+    id: l.dataset.id,
+    ini: parseInt($('input.ini', l).value, 10) || 0,
+    lim: Math.max(1, parseFloat($('input.lim', l).value) || 9),
+  })).sort((x, y) => y.ini - x.ini);
+  if (!ordem.length) { aviso('Marque quem participa da perseguição.'); return; }
+  Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1 });
+  iniciarTurno(ordem[0].id);
+});
+$('#btnProxTurno').addEventListener('click', () => {
+  const o = ordemP(); if (!o.length) return;
+  let v = (P().vez || 0) + 1, rod = P().rod || 1;
+  if (v >= o.length) { v = 0; rod++; }
+  Store.definir(['persg'], { ...P(), vez: v, rod });
+  iniciarTurno(o[v].id);
+});
+$('#btnRefazerVez').addEventListener('click', () => { const v = vezAtual(); if (v) refazerRota(v); });
+$('#btnRefazerMinha').addEventListener('click', () => { if (meu) refazerRota(meu); });
+$('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição?')) Store.definir(['persg'], { on: false, req: P().req || 0 }); });
+$('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; });
+
 /* ---------- Perfil: Jogador ou Mestre ---------- */
 let meu = null;   // id da cobaia do jogador neste navegador
 function lerPerfil() { try { return localStorage.getItem('acf-perfil') || ''; } catch (e) { return ''; } }
@@ -1187,9 +1476,17 @@ $('#btnSair').addEventListener('click', trocarPerfil);
 $('#chkElementos').addEventListener('change', e => Store.definir(['rev', 'a' + andarAtual], e.target.checked ? true : null));
 
 $('#btnReset').addEventListener('click', () => {
-  if (!confirm('Recolocar as 7 cobaias na Zona Neutra do 1º andar?')) return;
-  const ini = posicoesIniciais();
-  Object.entries(ini).forEach(([id, tk]) => Store.definir(['tokens', id], tk));
+  $('#listaReset').innerHTML = ANDARES.map(an => `<button class="btn-fantasma" data-andar="${an.id}">${an.titulo} · CN ${25 * an.id}</button>`).join('');
+  $$('#listaReset button').forEach(b => b.onclick = () => {
+    const andar = +b.dataset.andar;
+    Object.entries(posicoesIniciais(andar)).forEach(([id, tk]) => {
+      const antigo = Store.state.tokens[id];
+      Store.definir(['tokens', id], { ...tk, h: antigo ? !!antigo.h : false });
+    });
+    $('#dlgReset').close();
+    irParaAndar(andar);
+  });
+  $('#dlgReset').showModal();
 });
 
 $('#btnLimpar').addEventListener('click', () => {

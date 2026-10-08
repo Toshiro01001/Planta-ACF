@@ -363,6 +363,67 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .ferramentas { display: grid; gap: 8px; }
 
+/* ---------- Dados ---------- */
+.btn-dados {
+  position: absolute; left: 18px; bottom: 44px; z-index: 6;
+  background: rgba(18,15,26,.95); border: 1px solid var(--roxo); border-radius: 8px;
+  padding: 8px 14px; font-family: var(--mono); font-size: 15px;
+}
+.btn-dados:hover { box-shadow: 0 0 16px rgba(139,92,246,.5); }
+.painel-dados {
+  position: absolute; left: 18px; bottom: 92px; z-index: 7; width: 290px;
+  background: rgba(18,15,26,.98); border: 1px solid var(--roxo); border-radius: 10px;
+  padding: 14px; display: grid; gap: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.6);
+}
+.dados-topo { display: flex; justify-content: space-between; align-items: center; }
+.dados-topo h3 { margin: 0; font-family: var(--display); font-size: 16px; }
+.dados-topo .fechar { background: none; border: 0; font-size: 20px; color: var(--texto-dim); }
+.dados-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dados-campos label { font-size: 12px; color: var(--texto-dim); display: grid; gap: 4px; }
+.dados-campos input { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px; padding: 7px; font: 16px var(--mono); width: 100%; }
+.dados-faces { display: flex; flex-wrap: wrap; gap: 6px; }
+.face { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; background: #221b2e; font: 18px var(--mono); color: var(--texto-dim); }
+.face.usada { background: var(--roxo); color: #fff; box-shadow: 0 0 12px var(--roxo); }
+.face.crit { border: 2px solid #3ddc97; }
+.face.falha { border: 2px solid #ff3b3b; }
+.dados-conta { margin: 6px 0 0; font-size: 14px; }
+.dados-total { font: 26px var(--mono); color: #fff; }
+
+.aviso {
+  position: absolute; left: 50%; top: 70px; transform: translateX(-50%); z-index: 8;
+  background: #2a1016; border: 1px solid #ff6b6b; color: #ffd0d8; padding: 8px 14px; border-radius: 8px; font-size: 14px;
+}
+
+/* ---------- Perseguição ---------- */
+.faixa-persg {
+  position: fixed; left: 0; right: 0; top: var(--topo-h); z-index: 29;
+  text-align: center; padding: 6px; font-family: var(--mono); letter-spacing: .12em; font-size: 13px;
+  background: #3b2366; color: #fff; border-bottom: 1px solid var(--roxo);
+}
+.lista-persg, .ordem-persg { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.lista-persg li, .ordem-persg li {
+  display: grid; grid-template-columns: 30px 1fr auto auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border-radius: 6px; background: #17121f; font-size: 14px;
+}
+.ordem-persg li { grid-template-columns: 30px 28px 1fr auto auto 24px 24px; }
+.ordem-persg .bola { width: 26px; height: 26px; border-width: 2px; }
+.lista-persg li.ativo, .ordem-persg li.ativo { background: var(--roxo-escuro); outline: 1px solid var(--roxo); }
+.ord { font-family: var(--mono); color: var(--texto-dim); }
+.pi, .pm { font-family: var(--mono); font-size: 12px; color: var(--texto-dim); white-space: nowrap; }
+.ordem-persg button { background: #221b2e; border: 1px solid var(--linha); border-radius: 4px; font-size: 10px; height: 22px; }
+.minha-vez { margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(139,92,246,.15); border: 1px solid var(--roxo); }
+.minha-vez p { margin: 0 0 8px; font-weight: 600; }
+.setup-persg { display: grid; gap: 4px; margin-bottom: 10px; max-height: 320px; overflow-y: auto; }
+.setup-linha { display: grid; grid-template-columns: 18px 24px 1fr 52px 30px 44px 14px; gap: 5px; align-items: center; font-size: 13px; }
+.setup-linha .bola { width: 22px; height: 22px; border-width: 2px; }
+.setup-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setup-nome small { display: block; font-family: var(--mono); font-size: 10px; color: #3ddc97; }
+.setup-linha input[type=number] { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 4px; padding: 3px 4px; font: 13px var(--mono); width: 100%; }
+.dado-mini { background: #221b2e; border: 1px solid var(--linha); border-radius: 4px; height: 26px; padding: 0; }
+.setup-linha .m { font-size: 11px; color: var(--texto-dim); }
+.ficha.na-vez .ficha-cabeca { box-shadow: 0 0 0 3px #fff, 0 0 24px #fff; }
+.corr-m { position: absolute; inset: 0; display: grid; place-items: center; font: 11px var(--mono); color: rgba(196,168,255,.55); pointer-events: none; }
+
 /* ---------- Funções (só Mestre) ---------- */
 .lista-funcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
 .funcao-linha { display: grid; gap: 2px; font-size: 13px; color: var(--texto-dim); }
@@ -519,6 +580,8 @@ body.pisca::after {
 /* ---------- Celular ---------- */
 @media (max-width: 860px) {
   :root { --topo-h: 56px; }
+  .painel-dados { left: 10px; right: 10px; width: auto; bottom: 110px; }
+  .btn-dados { left: 10px; bottom: 60px; }
   .topo { padding: 0 12px; }
   .marca h1 { font-size: 17px; }
   .marca-kicker { display: none; }
@@ -541,3 +604,13 @@ body.pisca::after {
   .cartao { top: auto; bottom: 110px; left: 10px; right: 10px; width: auto; }
   .sync { display: none; }
 }
+
+/* bolinhas nas listas da perseguição */
+.ordem-persg .bola, .setup-linha .bola {
+  display: inline-block; border-radius: 50%;
+  background: var(--cor) center / cover no-repeat; border: 2px solid var(--cor);
+}
+.setup-linha .bola.filho, .ordem-persg .bola.filho { border: 2px dashed #fff; box-shadow: 0 0 0 1px var(--cor); }
+/* a faixa da perseguição não cobre o nome do andar */
+body.em-persg .andar-legenda { top: 46px; }
+body.em-persg .cartao { top: 112px; }
