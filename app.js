@@ -59,11 +59,20 @@ function salaEm(andar, x, y) {
   return null;
 }
 
+// Sala revelada aos jogadores? O 1º andar começa conhecido; os outros, desconhecidos.
+// O Mestre muda isso clicando na sala (fica salvo em state.salas).
+function salaRevelada(andar, cn) {
+  const v = (Store.state.salas || {})['c' + cn];
+  return v === undefined ? andar === 1 : !!v;
+}
+const salaVisivel = (andar, cn) => mestre || salaRevelada(andar, cn);
+
 function descreveLocal(tk) {
   if (!tk) return 'fora do mapa';
   const p = salaEm(tk.a, tk.x, tk.y);
   if (!p) return `${nomeAndar(tk.a)} · Corredor`;
   const cn = cnDe(tk.a, p);
+  if (!salaVisivel(tk.a, cn)) return `${nomeAndar(tk.a)} · Sala desconhecida`;
   const [nome] = ANDARES[tk.a - 1].salas[cn] || [p === 25 ? 'Zona Neutra' : ''];
   return `${nomeAndar(tk.a)} · CN ${String(cn).padStart(2, '0')}${nome ? ' ' + nome : ''}`;
 }
@@ -80,7 +89,7 @@ function posicoesIniciais() {
   });
   return tokens;
 }
-const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {} });
+const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false } });
 
 /* =========================================================
    SINCRONIA: modo local ou Firebase
@@ -130,7 +139,7 @@ const Store = {
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
       if (v && v.tokens !== undefined) {
-        this.state = { tokens: v.tokens || {}, rev: v.rev || {} };
+        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false } };
         this.vazio = false;
       } else {
         this.state = estadoPadrao();
@@ -308,7 +317,11 @@ viewport.addEventListener('pointermove', e => {
 function soltar(e) {
   if (!ponteiros.has(e.pointerId)) return;
   ponteiros.delete(e.pointerId);
-  if (gesto && !gesto.andou && ponteiros.size === 0) selecionar(null);
+  if (gesto && !gesto.andou && ponteiros.size === 0) {
+    const pt = telaParaPiso(e.clientX, e.clientY);
+    const p = podeVer(andarAtual) ? salaEm(andarAtual, pt.x, pt.y) : null;
+    if (mestre && p) selecionarSala(cnDe(andarAtual, p)); else selecionar(null);
+  }
   if (ponteiros.size === 0) { gesto = null; viewport.classList.remove('arrastando'); }
   else if (ponteiros.size === 1) {
     const [p] = [...ponteiros.values()];
@@ -406,7 +419,8 @@ function montarAndar() {
   stage.innerHTML = '';
   const andar = ANDARES[andarAtual - 1];
   $('#legendaAndar').textContent = andar.titulo;
-  $('#legendaSub').textContent = andar.subtitulo;
+  const algumaRevelada = Array.from({ length: 25 }, (_, i) => cnDe(andarAtual, i + 1)).some(cn => salaRevelada(andarAtual, cn));
+  $('#legendaSub').textContent = mestre || algumaRevelada ? andar.subtitulo : 'Setor não mapeado';
 
   const bloqueado = !podeVer(andarAtual);
   $('#bloqueio').hidden = !bloqueado;
@@ -426,7 +440,10 @@ function montarAndar() {
   stage.appendChild(base);
 
   const paredes = [];
-  const saida = saidaDoAndar(andarAtual);
+  const saidaReal = saidaDoAndar(andarAtual);
+  // jogador só enxerga o elevador se a sala dele já foi revelada
+  const saida = saidaReal && salaVisivel(andarAtual, cnDe(andarAtual, saidaReal.p)) ? saidaReal : null;
+  assinaturaAndar = assinatura();
 
   // corredores
   CORREDORES.forEach(c => {
@@ -445,15 +462,22 @@ function montarAndar() {
   for (let p = 1; p <= 25; p++) {
     const s = retSala(p);
     const cn = cnDe(andarAtual, p);
-    const [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
+    const revelada = salaRevelada(andarAtual, cn);
+    const visivel = mestre || revelada;
+    let [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
+    if (!visivel) { nome = ''; elm = '?'; }
     const elemento = ELEMENTOS[elm] || ELEMENTOS['?'];
     const d = el('div', 'sala', { left: px(s.x), top: px(s.y), width: px(s.w), height: px(s.h), backgroundSize: `${T}px ${T}px` });
-    if (p === 25) d.classList.add('neutra');
+    d.dataset.cn = cn;
+    if (p === 25 && visivel) d.classList.add('neutra');
+    if (!visivel) d.classList.add('desconhecida');
+    if (mestre && !revelada) d.classList.add('oculta-jog');
     if (!Object.keys(andar.salas).length) d.classList.add('vazia-planta');
     d.style.setProperty('--el', elemento.cor);
     d.innerHTML = `<div class="sala-tinta"></div>
       <div class="sala-rotulo">
-        <span class="sala-cn">CN ${String(cn).padStart(2, '0')}</span>
+        ${visivel ? `<span class="sala-cn">CN ${String(cn).padStart(2, '0')}</span>` : '<span class="sala-cn">Desconhecido</span>'}
+        ${mestre && !revelada ? '<span class="sala-oculta">oculta aos jogadores</span>' : ''}
         ${nome ? `<span class="sala-nome">${nome}</span>` : ''}
         ${elm !== '?' && elm !== 'N' ? `<span class="sala-el">${elemento.nome}</span>` : ''}
       </div>`;
@@ -568,6 +592,15 @@ function desenharSaida(saida, paredes) {
   }
 }
 
+// muda quando o que o jogador pode ver no andar muda (salas reveladas, perfil)
+let assinaturaAndar = '';
+function assinatura() {
+  const s = Store.state.salas || {};
+  let t = (mestre ? 'M' : 'J') + andarAtual + ':';
+  for (let p = 1; p <= 25; p++) t += salaRevelada(andarAtual, cnDe(andarAtual, p)) ? '1' : '0';
+  return t;
+}
+
 function atualizarElementos() {
   const mostra = mestre || !!(Store.state.rev || {})['a' + andarAtual];
   stage.classList.toggle('mostra-elementos', mostra);
@@ -665,14 +698,48 @@ function ligarArraste(f) {
 }
 
 /* ---------- Cartão do ser selecionado ---------- */
+let salaSel = null;
 function selecionar(id) {
   selecionado = id;
+  salaSel = null;
+  $$('.sala.sel').forEach(s => s.classList.remove('sel'));
   $$('.ficha').forEach(f => f.classList.toggle('selecionada', f.dataset.id === id));
   desenharCartao();
 }
 
+function selecionarSala(cn) {
+  selecionar(null);
+  salaSel = cn;
+  $$('.sala').forEach(s => s.classList.toggle('sel', +s.dataset.cn === cn));
+  desenharCartao();
+}
+
+function desenharCartaoSala() {
+  const c = $('#cartao');
+  const cn = salaSel;
+  const a = Math.ceil(cn / 25);
+  const andar = ANDARES[a - 1];
+  const p = cn - 25 * (a - 1);
+  const [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
+  const el2 = ELEMENTOS[elm] || ELEMENTOS['?'];
+  const saida = saidaDoAndar(a);
+  const temSaida = saida && saida.p === p;
+  const rev = salaRevelada(a, cn);
+  c.style.setProperty('--cor', el2.cor);
+  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+    <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
+      <h3>CN ${String(cn).padStart(2, '0')}</h3><span class="cod">${nome || 'sem nome registrado'}</span></div></div>
+    <p>Elemento: ${el2.nome}${temSaida ? `<br><strong>Elevador para o ${a < 5 ? (a + 1) + 'º andar' : '???'}</strong>` : ''}</p>
+    <p>Para os jogadores: <strong>${rev ? 'revelada' : 'desconhecida'}</strong></p>
+    <div class="acoes"><button data-acao="revelar">${rev ? 'Esconder dos jogadores' : 'Revelar aos jogadores'}</button></div>`;
+  c.hidden = false;
+  $('.fechar', c).onclick = () => selecionar(null);
+  $('[data-acao="revelar"]', c).onclick = () => Store.definir(['salas', 'c' + cn], !rev);
+}
+
 function desenharCartao() {
   const c = $('#cartao');
+  if (salaSel && mestre) { desenharCartaoSala(); return; }
   const tk = selecionado && Store.state.tokens[selecionado];
   if (!tk || (tk.h && !mestre && tk.s !== meu)) { c.hidden = true; return; }
   const s = SER[tk.s];
@@ -820,6 +887,9 @@ function irParaAndar(a) {
 }
 
 function atualizarTudo() {
+  desenharRuido();
+  verificarAlarme();
+  atualizarProtocolo();
   desenharElevador();
   atualizarElementos();
   desenharFichas();
@@ -843,6 +913,159 @@ $('#formSenha').addEventListener('submit', async e => {
     $('#inputSenha').select();
   }
 });
+
+/* =========================================================
+   RUÍDO: decibelímetro, quebras do limite e o Protocolo
+   ========================================================= */
+// quadradinhos por número de cobaias na mesma sala
+const NIVEIS = [
+  { db: 0,  nome: 'Silêncio' },
+  { db: 28, nome: 'Baixo' },
+  { db: 41, nome: 'Moderado' },
+  { db: 57, nome: 'Alto' },
+  { db: 68, nome: 'No limite' },
+  { db: 83, nome: 'Limite rompido' },
+];
+const nivelDe = n => n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : n === 5 ? 4 : 5;
+
+// agrupa as cobaias por sala (andar + posição). No corredor, cada uma conta sozinha.
+const isentos = new Set();   // cobaias na Zona Neutra (não contam)
+function gruposDeSala() {
+  const g = new Map();
+  isentos.clear();
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (!SER[tk.s] || SER[tk.s].tipo !== 'cobaia') return;
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (p === 25 && typeof ZONA_NEUTRA_ISENTA !== 'undefined' && ZONA_NEUTRA_ISENTA) { isentos.add(id); return; }
+    const k = p ? `${tk.a}:${p}` : `corr:${id}`;
+    if (!g.has(k)) g.set(k, { a: tk.a, p, ids: [] });
+    g.get(k).ids.push(id);
+  });
+  return g;
+}
+
+function quadradinhos(nivel) {
+  let h = '<span class="medidor">';
+  for (let i = 1; i <= 5; i++) h += `<span class="q${i <= nivel ? ' on n' + i : ''}"></span>`;
+  return h + '</span>';
+}
+
+function nomeGrupo(gr) {
+  if (!gr.p) return `${nomeAndar(gr.a)} · Corredor`;
+  return descreveLocal({ a: gr.a, x: retSala(gr.p).x + 1, y: retSala(gr.p).y + 1 });
+}
+
+function desenharRuido() {
+  const grupos = gruposDeSala();
+  const nivelDoId = {};
+  grupos.forEach(gr => gr.ids.forEach(id => { nivelDoId[id] = { n: nivelDe(gr.ids.length), qtd: gr.ids.length }; }));
+  const tokens = Store.state.tokens || {};
+
+  $('#listaRuido').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
+    const tk = tokens[s.id];
+    const visivel = tk && (!tk.h || mestre || s.id === meu);
+    if (visivel && isentos.has(s.id)) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">Zona Neutra · isenta</span></li>`;
+    if (!visivel || !nivelDoId[s.id]) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">—</span></li>`;
+    const { n } = nivelDoId[s.id];
+    return `<li class="${n >= 5 ? 'estouro' : ''}"><span class="r-nome">${s.nome}</span>${quadradinhos(n)}<span class="r-txt">${NIVEIS[n].nome} · ${NIVEIS[n].db} dB</span></li>`;
+  }).join('');
+
+  if (!mestre) return;
+  // decibelímetro do Mestre: mostra a sala mais barulhenta da Caixa
+  let pior = null;
+  grupos.forEach(gr => { if (!pior || gr.ids.length > pior.ids.length) pior = gr; });
+  const nMax = pior ? nivelDe(pior.ids.length) : 0;
+  let col = '';
+  for (let i = 5; i >= 1; i--) col += `<div class="dq${i <= nMax ? ' on n' + i : ''}"><span>${NIVEIS[i].db} dB</span><em>${NIVEIS[i].nome}</em></div>`;
+  $('#decibelimetro').innerHTML = col;
+  $('#decibelInfo').textContent = pior ? `Mais barulho: ${nomeGrupo(pior)} (${pior.ids.length} cobaia${pior.ids.length > 1 ? 's' : ''})` : 'Nenhuma cobaia no mapa.';
+
+  const rompidas = [...grupos.values()].filter(gr => nivelDe(gr.ids.length) >= 5);
+  $('#alertaRuido').hidden = rompidas.length === 0;
+  $('#alertaRuidoTxt').textContent = rompidas.map(gr => `${nomeGrupo(gr)}: ${gr.ids.length} cobaias`).join(' · ');
+
+  const r = Store.state.ruido || { q: 0, p: false };
+  $('#qtdQuebras').textContent = r.q || 0;
+  $('#barraQuebras').innerHTML = [1, 2, 3].map(i => `<span class="${i <= (r.q || 0) ? 'on' : ''}"></span>`).join('');
+  const btnP = $('#btnProtocolo');
+  btnP.disabled = !r.p && (r.q || 0) < 3;
+  btnP.textContent = r.p ? 'Encerrar Protocolo Filho da O.R.F.E.U.' : 'Iniciar Protocolo Filho da O.R.F.E.U.';
+  btnP.classList.toggle('pronto', !r.p && (r.q || 0) >= 3);
+}
+
+// toca o aviso quando uma sala passa a romper o limite
+let salasRompidas = null;
+function verificarAlarme() {
+  const agora = new Set();
+  gruposDeSala().forEach((gr, k) => { if (nivelDe(gr.ids.length) >= 5) agora.add(k); });
+  if (salasRompidas) {
+    const nova = [...agora].some(k => !salasRompidas.has(k));
+    if (nova) { Som.alarme(); piscar(); }
+  }
+  salasRompidas = agora;
+}
+
+function piscar() {
+  document.body.classList.remove('pisca');
+  void document.body.offsetWidth;
+  document.body.classList.add('pisca');
+}
+
+let protocoloAntes = null;
+function atualizarProtocolo() {
+  const ativo = !!(Store.state.ruido || {}).p;
+  $('#faixaProtocolo').hidden = !ativo;
+  if (ativo && protocoloAntes === false) {
+    $('#telaProtocolo').hidden = false;
+    Som.sirene();
+    setTimeout(() => { $('#telaProtocolo').hidden = true; }, 7000);
+  }
+  if (!ativo) $('#telaProtocolo').hidden = true;
+  protocoloAntes = ativo;
+}
+
+/* ---------- Som (gerado pelo navegador, sem arquivos) ---------- */
+const Som = {
+  ctx: null,
+  pronto() {
+    if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  tom(freq, ini, dur, tipo = 'square', vol = 0.12, freqFim) {
+    const c = this.pronto(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = tipo; o.frequency.setValueAtTime(freq, c.currentTime + ini);
+    if (freqFim) o.frequency.linearRampToValueAtTime(freqFim, c.currentTime + ini + dur);
+    g.gain.setValueAtTime(vol, c.currentTime + ini);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + ini + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime + ini); o.stop(c.currentTime + ini + dur + 0.02);
+  },
+  alarme() { for (let i = 0; i < 4; i++) { this.tom(880, i * 0.42, 0.18); this.tom(620, i * 0.42 + 0.2, 0.18); } },
+  sirene() { for (let i = 0; i < 7; i++) { this.tom(420, i, 0.5, 'sawtooth', 0.1, 1050); this.tom(1050, i + 0.5, 0.5, 'sawtooth', 0.1, 420); } },
+};
+// navegadores só liberam som depois de um clique
+document.addEventListener('pointerdown', () => Som.pronto(), { passive: true });
+
+$('#btnQuebra').addEventListener('click', () => Store.definir(['ruido', 'q'], ((Store.state.ruido || {}).q || 0) + 1));
+$('#btnQuebraMenos').addEventListener('click', () => Store.definir(['ruido', 'q'], Math.max(0, ((Store.state.ruido || {}).q || 0) - 1)));
+$('#btnQuebraZerar').addEventListener('click', () => { if (confirm('Zerar as quebras do limite (novo dia)?')) Store.definir(['ruido', 'q'], 0); });
+$('#btnRegistrarAlerta').addEventListener('click', () => Store.definir(['ruido', 'q'], ((Store.state.ruido || {}).q || 0) + 1));
+$('#btnProtocolo').addEventListener('click', () => {
+  const r = Store.state.ruido || {};
+  // encerrar também zera o limite diário na hora
+  if (r.p) { if (confirm('Encerrar o Protocolo Filho da O.R.F.E.U.? As quebras do limite diário voltam a 0.')) Store.definir(['ruido'], { q: 0, p: false }); return; }
+  if (confirm('Iniciar o Protocolo Filho da O.R.F.E.U.? Todos os jogadores vão ver e ouvir o alarme.')) Store.definir(['ruido', 'p'], true);
+});
+$('#btnTesteSom').addEventListener('click', () => Som.alarme());
+
+// revelar ou esconder todas as salas do andar aberto
+function revelarAndar(sim) {
+  for (let p = 1; p <= 25; p++) Store.definir(['salas', 'c' + cnDe(andarAtual, p)], sim);
+}
+$('#btnRevelarAndar').addEventListener('click', () => { if (confirm('Revelar aos jogadores todas as salas deste andar?')) revelarAndar(true); });
+$('#btnEsconderAndar').addEventListener('click', () => { if (confirm('Esconder dos jogadores todas as salas deste andar?')) revelarAndar(false); });
 
 /* ---------- Perfil: Jogador ou Mestre ---------- */
 let meu = null;   // id da cobaia do jogador neste navegador
@@ -953,6 +1176,7 @@ $('#btnFecharPainel').addEventListener('click', () => $('#painel').classList.rem
    INÍCIO
    ========================================================= */
 Store.aoMudar(() => {
+  if (podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
   atualizarTudo();
 });
 

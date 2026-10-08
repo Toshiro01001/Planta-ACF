@@ -104,6 +104,10 @@ const ANDARES = [
   { id: 5, titulo: '5º Andar', subtitulo: 'Planta não registrada', saida: 107, salas: {} },
 ];
 
+/* RUÍDO: a Zona Neutra (sala 25 de cada andar) não conta para o limite diário.
+   Troque para false se o barulho também valer lá dentro. */
+const ZONA_NEUTRA_ISENTA = true;
+
 /* ---------------------------------------------------------
    OS SERES DA CAIXA
    tipo: 'cobaia' (jogadores), 'npc' (cobaias NPC), 'filho' (Filhos da O.R.F.E.U.)
