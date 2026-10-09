@@ -614,3 +614,27 @@ body.pisca::after {
 /* a faixa da perseguição não cobre o nome do andar */
 body.em-persg .andar-legenda { top: 46px; }
 body.em-persg .cartao { top: 112px; }
+
+/* ---------- Mestre Auxiliar: sons das salas ---------- */
+.sala::after, .corredor::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(255,40,60,.55), rgba(255,40,60,.15) 70%);
+  transition: opacity .4s;
+}
+.sala.som::after, .corredor.som::after {
+  opacity: calc(var(--som, 0) * 0.17);
+  animation: batida calc(2.2s - var(--som, 1) * 0.3s) ease-in-out infinite;
+}
+@keyframes batida { 0%,100% { filter: brightness(.8); } 50% { filter: brightness(1.6); } }
+.sala.pulso, .corredor.pulso { animation: pulsoSom 1.1s ease-out; }
+@keyframes pulsoSom {
+  0% { box-shadow: inset 0 0 0 3px rgba(255,60,80,.95), 0 0 40px rgba(255,40,60,.9); }
+  100% { box-shadow: inset 0 0 0 1px rgba(196,168,255,.25), 0 0 0 rgba(255,40,60,0); }
+}
+/* Mestre: cobaia visível aos Filhos ganha anel vermelho */
+.ficha.vista-filhos .ficha-cabeca { box-shadow: 0 0 0 3px #ff3b3b, 0 0 18px #ff3b3b; }
+/* tela de entrada com três opções */
+.perfil-opcoes { grid-template-columns: repeat(3, 1fr); }
+.aux-form { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+.aux-form input { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 8px; padding: 10px 12px; font: 16px var(--mono); width: 260px; }
+@media (max-width: 860px) { .perfil-opcoes { grid-template-columns: 1fr; } .aux-form { flex-direction: column; align-items: center; } }

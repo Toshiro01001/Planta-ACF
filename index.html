@@ -96,7 +96,7 @@
   <aside id="painel" class="painel">
     <button class="fechar-painel so-celular" id="btnFecharPainel" aria-label="Fechar painel">×</button>
 
-    <section class="bloco">
+    <section class="bloco" id="blocoCobaias">
       <h2>Cobaias</h2>
       <ul id="listaCobaias" class="lista-seres"></ul>
     </section>
@@ -110,7 +110,12 @@
       </div>
     </section>
 
-    <section class="bloco">
+    <section class="bloco" id="blocoSons" hidden>
+      <h2>Sons na Caixa</h2>
+      <p class="mini">Você não enxerga as cobaias. As salas com gente pulsam em vermelho, mais forte quanto mais barulho, e piscam quando alguém se move ali.</p>
+    </section>
+
+    <section class="bloco" id="blocoRuido">
       <h2>Medidor de ruído</h2>
       <p class="mini">Barulho que cada cobaia faz pela sala em que está.</p>
       <ul id="listaRuido" class="lista-ruido"></ul>
@@ -222,6 +227,10 @@
           <span class="perfil-btn-titulo">Jogador</span>
           <span class="perfil-btn-sub">Escolha a sua cobaia e mova a sua ficha</span>
         </button>
+        <button id="btnSouAux" class="perfil-btn">
+          <span class="perfil-btn-titulo">Mestre Auxiliar</span>
+          <span class="perfil-btn-sub">Controle os Filhos da O.R.F.E.U.</span>
+        </button>
         <button id="btnSouMestre" class="perfil-btn">
           <span class="perfil-btn-titulo">Mestre</span>
           <span class="perfil-btn-sub">Controle total da Caixa</span>
@@ -233,6 +242,21 @@
       <p class="perfil-aviso">Você só poderá mover a ficha que escolher aqui.</p>
       <div id="listaPersonagens" class="perfil-personagens"></div>
       <button id="btnVoltarPerfil" class="btn-fantasma">Voltar</button>
+    </div>
+    <div id="perfilPasso3" hidden>
+      <h2>Acesso de Mestre Auxiliar</h2>
+      <form id="formAux" class="aux-form" autocomplete="off">
+        <input id="auxSenha" type="password" placeholder="senha dos auxiliares" aria-label="Senha dos Mestres Auxiliares">
+        <button class="btn-roxo">Entrar</button>
+      </form>
+      <p id="auxErro" class="erro" hidden>Senha recusada.</p>
+      <button class="btn-fantasma voltar-perfil">Voltar</button>
+    </div>
+    <div id="perfilPasso4" hidden>
+      <h2>Quem é você?</h2>
+      <p class="perfil-aviso">Você move os Filhos da O.R.F.E.U. e o seu robô. As cobaias ficam invisíveis até o Mestre revelar.</p>
+      <div id="listaRobos" class="perfil-personagens"></div>
+      <button class="btn-fantasma voltar-perfil">Voltar</button>
     </div>
   </div>
 </div>

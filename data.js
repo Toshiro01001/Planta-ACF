@@ -133,10 +133,10 @@ const SERES = [
   { id: 'onirico',     tipo: 'npc', codigo: 'FHP-011', nome: 'Onírico',     cor: '#7b61ff', img: 'img/onirico.jpg' },
 
   // Robôs S.T.A.F.F. (não fazem barulho; o decibelímetro ignora)
-  { id: 'c2p0',    tipo: 'robo', codigo: 'S.T.A.F.F.', nome: 'C2P0',    cor: '#d9ad2b', img: 'img/c2p0.jpg' },
-  { id: 'b00bies', tipo: 'robo', codigo: 'S.T.A.F.F.', nome: 'B00BIES', cor: '#a7adb5', img: 'img/b00bies.jpg' },
-  { id: 'm3rl1n',  tipo: 'robo', codigo: 'S.T.A.F.F.', nome: 'M3RL1N',  cor: '#e03131', img: 'img/m3rl1n.jpg' },
-  { id: 'k4iser',  tipo: 'robo', codigo: 'S.T.A.F.F.', nome: 'K4ISER',  cor: '#ff7a3d', img: 'img/k4iser.jpg' },
+  { id: 'c2p0',    tipo: 'robo', jogador: 'Alice Pinheiro', codigo: 'S.T.A.F.F.', nome: 'C2P0',    cor: '#d9ad2b', img: 'img/c2p0.jpg' },
+  { id: 'b00bies', tipo: 'robo', jogador: 'Matheus Arizawa', codigo: 'S.T.A.F.F.', nome: 'B00BIES', cor: '#a7adb5', img: 'img/b00bies.jpg' },
+  { id: 'm3rl1n',  tipo: 'robo', jogador: 'Raphael Szczypior', codigo: 'S.T.A.F.F.', nome: 'M3RL1N',  cor: '#e03131', img: 'img/m3rl1n.jpg' },
+  { id: 'k4iser',  tipo: 'robo', jogador: 'Rodrigo T. Junior', codigo: 'S.T.A.F.F.', nome: 'K4ISER',  cor: '#ff7a3d', img: 'img/k4iser.jpg' },
 
   // Filhos da O.R.F.E.U. (codinomes; podem entrar no mapa várias vezes)
   { id: 'f01', tipo: 'filho', codigo: 'F-01', nome: 'Sobra',      cor: '#ff4d6d' },
