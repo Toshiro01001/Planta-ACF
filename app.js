@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009e';
+const VERSAO_SITE = '20261009f';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1216,7 +1216,7 @@ function desenharCartaoSala() {
       <button data-acao="trazcob">Trazer todas as cobaias para cá</button>
       ${grupo.size ? `<button data-acao="trazgrupo">Trazer o grupo (${grupo.size}) para cá</button>` : ''}</div>
     <label class="nota-sala">Anotações da sala <span class="so-mestre">só o Mestre vê</span>
-      <textarea class="nota-txt" rows="4" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
+      <textarea class="nota-txt" rows="9" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
     <span class="nota-status" aria-live="polite"></span>
     ${htmlEdicaoSala(a, cn, p)}`;
   c.hidden = false;
@@ -3919,11 +3919,18 @@ $('#arqSalas').addEventListener('change', async e => {
   try { d = JSON.parse(await f.text()); } catch (err) { alert('Arquivo inválido.'); return; }
   if (!d || d.tipo !== 'planta-acf-salas') { alert('Este arquivo não é uma lista de salas da Planta da Caixa.'); return; }
   const n = Object.keys(d.salas || {}).length;
-  if (!confirm(`Importar ${n} salas, os elevadores e os subtítulos? Os nomes atuais dessas salas serão substituídos.`)) return;
+  const nn = Object.keys(d.notas || {}).length;
+  if (!confirm(`Importar ${n} salas, os elevadores e os subtítulos${nn ? ` e os segredos de ${nn} salas (vão para as Anotações da sala, que só você vê)` : ''}? Os nomes atuais dessas salas serão substituídos.`)) return;
   Object.entries(d.salas || {}).forEach(([k, v]) => Priv.gravar(['salas', k], v));
   Object.entries(d.saidas || {}).forEach(([k, v]) => Priv.gravar(['saidas', k], v));
   Object.entries(d.andares || {}).forEach(([k, v]) => Priv.gravar(['andares', k], v));
-  Diario.registrar('sessao', `Salas importadas (${n})`);
+  // segredos: entram nas anotações da sala (só o Mestre lê); o que você já tinha escrito fica embaixo
+  Object.entries(d.notas || {}).forEach(([k, v]) => {
+    const antes = ((Segredos.dados._notas || {})[k] || '').trim();
+    if (antes === v.trim() || antes.includes(v.trim())) return;
+    Segredos.gravar(['_notas', k], antes && !v.includes(antes) ? `${v}\n\n· Suas anotações anteriores ·\n${antes}` : v);
+  });
+  Diario.registrar('sessao', `Salas importadas (${n})${nn ? ` com segredos de ${nn}` : ''}`);
   agendarSincMestre(); montarAndar(); atualizarTudo();
   aviso(`${n} salas importadas.`);
 });
