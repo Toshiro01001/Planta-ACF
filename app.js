@@ -65,7 +65,20 @@ function salaRevelada(andar, cn) {
   const v = (Store.state.salas || {})['c' + cn];
   return v === undefined ? andar === 1 : !!v;
 }
-const salaVisivel = (andar, cn) => mestre || salaRevelada(andar, cn);
+const salaVisivel = (andar, cn) => mestre || !!aux || salaRevelada(andar, cn);
+
+/* Quem enxerga cada ficha.
+   h  = Ocultação geral: escondida dos jogadores.
+   vf = Visível aos Filhos: o Mestre revelou essa cobaia/NPC aos Mestres Auxiliares.
+   Mestre vê tudo. Auxiliar vê Filhos e robôs sempre, e cobaias/NPCs só com vf.
+   Jogador vê o que não está oculto e a própria cobaia. */
+function visivelPara(tk) {
+  if (!tk || !SER[tk.s]) return false;
+  if (mestre) return true;
+  const tipo = SER[tk.s].tipo;
+  if (aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
+  return !tk.h || tk.s === meu;
+}
 
 function descreveLocal(tk) {
   if (!tk) return 'fora do mapa';
@@ -132,7 +145,7 @@ const Store = {
     this.auth.onAuthStateChanged(u => {
       definirMestre(!!u && !u.isAnonymous);
       // jogador precisa de um login anônimo para poder mover a própria ficha
-      if (!u && meu) this.auth.signInAnonymously().catch(erroGravacao);
+      if (!u && (meu || aux)) this.auth.signInAnonymously().catch(erroGravacao);
       if (!u && lerPerfil() === 'mestre') { salvarPerfil(''); mostrarPerfil(1); }
     });
     this.db.ref('.info/connected').on('value', s => setSync(s.val() ? 'ao vivo' : 'reconectando…', s.val() ? 'vivo' : ''));
@@ -408,7 +421,7 @@ function esconderDica() { if (!dicaFeita) { dicaFeita = true; $('#dica').style.o
    DESENHO DA PLANTA
    ========================================================= */
 let andarAtual = 1;
-const podeVer = a => mestre || liberados.has(a);
+const podeVer = a => mestre || !!aux || liberados.has(a);
 
 function el(tag, cls, estilo) {
   const e = document.createElement(tag);
@@ -474,8 +487,9 @@ function montarAndar() {
   assinaturaAndar = assinatura();
 
   // corredores
-  CORREDORES.forEach(c => {
+  CORREDORES.forEach((c, ci) => {
     const d = el('div', 'corredor', { left: px(c.x), top: px(c.y), width: px(c.w), height: px(c.h), backgroundSize: `${T}px ${T}px` });
+    d.dataset.ci = ci;
     d.innerHTML = '<span class="corr-m">14 m</span>';
     stage.appendChild(d);
     if (c.eixo === 'h') {
@@ -626,7 +640,7 @@ function desenharSaida(saida, paredes) {
 let assinaturaAndar = '';
 function assinatura() {
   const s = Store.state.salas || {};
-  let t = (mestre ? 'M' : 'J') + andarAtual + ':';
+  let t = (mestre ? 'M' : aux ? 'A' : 'J') + andarAtual + ':';
   for (let p = 1; p <= 25; p++) t += salaRevelada(andarAtual, cnDe(andarAtual, p)) ? '1' : '0';
   return t;
 }
@@ -663,7 +677,7 @@ function desenharFichas() {
 
   Object.entries(tokens).forEach(([id, tk]) => {
     if (!SER[tk.s] || tk.a !== andarAtual) return;
-    if (tk.h && !mestre && tk.s !== meu) return;
+    if (!visivelPara(tk)) return;
     vistos.add(id);
     let f = fichasDom.get(id);
     if (!f) {
@@ -687,7 +701,8 @@ function desenharFichas() {
     $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
     f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
-    f.classList.toggle('minha', !mestre && tk.s === meu);
+    f.classList.toggle('minha', !mestre && podeMover(tk));
+    f.classList.toggle('vista-filhos', mestre && !!tk.vf);
     f.classList.toggle('selecionada', selecionado === id);
   });
 
@@ -797,17 +812,29 @@ function desenharCartaoSala() {
       <h3>CN ${String(cn).padStart(2, '0')}</h3><span class="cod">${nome || 'sem nome registrado'}</span></div></div>
     <p>Elemento: ${el2.nome}${temSaida ? `<br><strong>Elevador para o ${a < 5 ? (a + 1) + 'º andar' : '???'}</strong>` : ''}</p>
     <p>Para os jogadores: <strong>${rev ? 'revelada' : 'desconhecida'}</strong></p>
-    <div class="acoes"><button data-acao="revelar">${rev ? 'Esconder dos jogadores' : 'Revelar aos jogadores'}</button></div>`;
+    <div class="acoes"><button data-acao="revelar">${rev ? 'Esconder dos jogadores' : 'Revelar aos jogadores'}</button>
+      <button data-acao="vfsim">Revelar aos Filhos quem está aqui</button>
+      <button data-acao="vfnao">Esconder dos Filhos quem está aqui</button></div>`;
   c.hidden = false;
   $('.fechar', c).onclick = () => selecionar(null);
   $('[data-acao="revelar"]', c).onclick = () => Store.definir(['salas', 'c' + cn], !rev);
+  // ocultação dos Filhos por sala: revela/esconde as cobaias e NPCs que estão nela
+  const naSala = () => Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
+    SER[tk.s] && (SER[tk.s].tipo === 'cobaia' || SER[tk.s].tipo === 'npc') && tk.a === a && salaEm(tk.a, tk.x, tk.y) === p);
+  const marcar = sim => {
+    const lista = naSala();
+    lista.forEach(([id, tk]) => Store.definir(['tokens', id], { ...tk, vf: sim }));
+    aviso(lista.length ? `${lista.length} ficha(s) ${sim ? 'reveladas aos' : 'escondidas dos'} Filhos.` : 'Nenhuma cobaia ou NPC nesta sala.');
+  };
+  $('[data-acao="vfsim"]', c).onclick = () => marcar(true);
+  $('[data-acao="vfnao"]', c).onclick = () => marcar(false);
 }
 
 function desenharCartao() {
   const c = $('#cartao');
   if (salaSel && mestre) { desenharCartaoSala(); return; }
   const tk = selecionado && Store.state.tokens[selecionado];
-  if (!tk || (tk.h && !mestre && tk.s !== meu)) { c.hidden = true; return; }
+  if (!tk || !visivelPara(tk)) { c.hidden = true; return; }
   const s = SER[tk.s];
   c.style.setProperty('--cor', s.cor);
   const foto = s.img ? `<img src="${s.img}" alt="">` : `<div class="cartao-bola"></div>`;
@@ -822,8 +849,10 @@ function desenharCartao() {
   let acoes = '';
   if (mestre) {
     const opcoes = ANDARES.map(a => `<option value="${a.id}" ${a.id === tk.a ? 'selected' : ''}>${a.titulo}</option>`).join('');
+    const podeVF = s.tipo === 'cobaia' || s.tipo === 'npc';
     acoes = `<div class="acoes">
-      <button data-acao="ocultar">${tk.h ? 'Mostrar aos jogadores' : 'Ocultar dos jogadores'}</button>
+      <button data-acao="ocultar">${tk.h ? 'Ocultação geral: LIGADA · revelar aos jogadores' : 'Ocultação geral: desligada · ocultar dos jogadores'}</button>
+      ${podeVF ? `<button data-acao="vf">${tk.vf ? 'Visível aos Filhos · esconder dos Filhos' : 'Oculta dos Filhos · revelar aos Filhos'}</button>` : ''}
       <select data-acao="andar" aria-label="Enviar para o andar">${opcoes}</select>
       <button data-acao="remover">Tirar do mapa</button>
     </div>`;
@@ -837,6 +866,8 @@ function desenharCartao() {
   $('.fechar', c).onclick = () => selecionar(null);
   if (mestre) {
     $('[data-acao="ocultar"]', c).onclick = () => Store.definir(['tokens', selecionado], { ...tk, h: !tk.h });
+    const bvf = $('[data-acao="vf"]', c);
+    if (bvf) bvf.onclick = () => Store.definir(['tokens', selecionado], { ...tk, vf: !tk.vf });
     $('[data-acao="remover"]', c).onclick = () => { const id = selecionado; selecionar(null); Store.definir(['tokens', id], null); };
     $('[data-acao="andar"]', c).onchange = ev => {
       const a = +ev.target.value;
@@ -859,7 +890,7 @@ function desenharPainel() {
   // Cobaias
   $('#listaCobaias').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
     const tk = tokens[s.id];
-    const visivel = tk && (!tk.h || mestre);
+    const visivel = tk && visivelPara(tk);
     return `<li data-id="${s.id}">${bola(s)}<span class="info">
       <strong>${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
       <span class="sub">${s.jogador}${funcaoDe(s.id) ? ' · ' + funcaoDe(s.id) : ''}</span>
@@ -868,14 +899,14 @@ function desenharPainel() {
 
   // Presenças no andar aberto (NPCs e Filhos)
   const pres = Object.entries(tokens)
-    .filter(([, tk]) => SER[tk.s] && SER[tk.s].tipo !== 'cobaia' && tk.a === andarAtual && (!tk.h || mestre))
+    .filter(([, tk]) => SER[tk.s] && (SER[tk.s].tipo !== 'cobaia' || aux) && tk.a === andarAtual && visivelPara(tk))
     .sort((a, b) => SER[a[1].s].codigo.localeCompare(SER[b[1].s].codigo));
   const podeAndar = podeVer(andarAtual);
   $('#listaPresencas').innerHTML = podeAndar ? pres.map(([id, tk]) => {
     const s = SER[tk.s];
     return `<li data-id="${id}">${bola(s)}<span class="info">
       <strong>${s.tipo === 'filho' ? `${s.codigo} · ${s.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : s.nome}</strong>
-      <span class="onde">${descreveLocal(tk)}${tk.h ? ' · oculto' : ''}</span></span></li>`;
+      <span class="onde">${descreveLocal(tk)}${mestre && tk.h ? ' · oculto' : ''}${mestre && tk.vf ? ' · visível aos Filhos' : ''}</span></span></li>`;
   }).join('') : '';
   $('#semPresencas').hidden = podeAndar && pres.length > 0;
 
@@ -921,14 +952,20 @@ function colocar(serId) {
   if (s.tipo !== 'filho') {
     const atual = tokens[serId];
     if (atual && atual.a === andarAtual) { irParaFicha(serId); return; }
-    Store.definir(['tokens', serId], { s: serId, a: andarAtual, ...pos, h: atual ? !!atual.h : false, n: 1 });
+    // NPCs e robôs nascem na Zona Neutra, ocultos (só o Mestre vê) até ele revelar
+    const oculto = atual ? !!atual.h : s.tipo !== 'cobaia';
+    Store.definir(['tokens', serId], { s: serId, a: andarAtual, ...pos, h: oculto, vf: atual ? !!atual.vf : false, n: 1 });
     selecionar(serId);
     return;
   }
   const usados = Object.values(tokens).filter(t => t.s === serId).map(t => t.n || 1);
   const n = usados.length ? Math.max(...usados) + 1 : 1;
   const id = `${serId}-${n}`;
-  Store.definir(['tokens', id], { s: serId, a: andarAtual, ...pos, h: false, n });
+  // Filhos nascem ocultos numa sala sorteada do andar (nunca na Zona Neutra)
+  const p = 1 + Math.floor(Math.random() * 24);
+  const r = retSala(p);
+  const lugar = { x: +(r.x + 0.7 + Math.random() * (R - 1.4)).toFixed(2), y: +(r.y + 0.7 + Math.random() * (R - 1.4)).toFixed(2) };
+  Store.definir(['tokens', id], { s: serId, a: andarAtual, ...lugar, h: true, n });
   selecionar(id);
 }
 
@@ -948,7 +985,7 @@ function irParaFicha(id) {
 function desenharElevador() {
   const tokens = Store.state.tokens || {};
   $('#listaAndares').innerHTML = ANDARES.map(a => {
-    const temCobaia = Object.values(tokens).some(t => t.a === a.id && SER[t.s] && SER[t.s].tipo === 'cobaia' && (!t.h || mestre));
+    const temCobaia = Object.values(tokens).some(t => t.a === a.id && SER[t.s] && SER[t.s].tipo === 'cobaia' && visivelPara(t));
     const trancado = !podeVer(a.id);
     return `<button class="andar-btn ${a.id === andarAtual ? 'atual' : ''}" data-andar="${a.id}" title="${a.titulo}${trancado ? ' (trancado)' : ''}">
       ${a.id}${trancado ? '<span class="cadeado">🔒</span>' : ''}${temCobaia && !trancado ? '<span class="ocupado"></span>' : ''}</button>`;
@@ -964,7 +1001,47 @@ function irParaAndar(a) {
   atualizarTudo();
 }
 
+// O que o Mestre Auxiliar "ouve": salas com cobaias pulsam em vermelho
+const ultimaPos = {};
+function desenharSons() {
+  const ouvinte = aux && !mestre;
+  if (!ouvinte) $$('.sala.som, .corredor.som').forEach(e => e.classList.remove('som'));
+  const grupos = gruposDeSala();
+  const alvo = new Map();
+  const elDe = (gr, k) => {
+    if (gr.p) return $(`.sala[data-cn="${cnDe(andarAtual, gr.p)}"]`, stage);
+    const tk = Store.state.tokens[k.slice(5)];
+    const ci = tk ? CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)) : -1;
+    return ci >= 0 ? $(`.corredor[data-ci="${ci}"]`, stage) : null;
+  };
+  grupos.forEach((gr, k) => {
+    if (gr.a !== andarAtual) return;
+    const e = elDe(gr, k);
+    if (e) alvo.set(e, Math.max(alvo.get(e) || 0, nivelDe(gr.ids.length)));
+  });
+  if (ouvinte) {
+    $$('.sala, .corredor', stage).forEach(e => {
+      const n = alvo.get(e) || 0;
+      e.classList.toggle('som', n > 0);
+      e.style.setProperty('--som', n);
+    });
+  }
+  // pulso quando uma cobaia se mexe
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (!SER[tk.s] || SER[tk.s].tipo !== 'cobaia') return;
+    const antes = ultimaPos[id];
+    ultimaPos[id] = `${tk.a}:${tk.x}:${tk.y}`;
+    if (!ouvinte || !antes || antes === ultimaPos[id] || tk.a !== andarAtual) return;
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (p === 25 && ZONA_NEUTRA_ISENTA) return;
+    let e = p ? $(`.sala[data-cn="${cnDe(andarAtual, p)}"]`, stage) : null;
+    if (!p) { const ci = CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)); e = ci >= 0 ? $(`.corredor[data-ci="${ci}"]`, stage) : null; }
+    if (e) { e.classList.remove('pulso'); void e.offsetWidth; e.classList.add('pulso'); }
+  });
+}
+
 function atualizarTudo() {
+  desenharSons();
   desenharPerseguicao();
   verificarPedidoIniciativa();
   desenharRuido();
@@ -1043,7 +1120,7 @@ function desenharRuido() {
 
   $('#listaRuido').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
     const tk = tokens[s.id];
-    const visivel = tk && (!tk.h || mestre || s.id === meu);
+    const visivel = tk && visivelPara(tk);
     if (visivel && isentos.has(s.id)) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">Zona Neutra · isenta</span></li>`;
     if (!visivel || !nivelDoId[s.id]) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">—</span></li>`;
     const { n } = nivelDoId[s.id];
@@ -1230,16 +1307,18 @@ function rolar() {
   if (alvoDados && mestre) {
     const inp = $(`#setupPersg input.ini[data-id="${alvoDados}"]`);
     if (inp) inp.value = total;
-  } else if (meu && Store.state.tokens[meu]) {
-    // o resultado do jogador chega ao Mestre pela ficha dele
-    Store.definir(['tokens', meu], { ...Store.state.tokens[meu], r: { t: total, ts: Date.now() } });
+  } else {
+    // o resultado chega ao Mestre pela ficha de quem rolou
+    const quem = meu || aux;
+    if (quem && Store.state.tokens[quem]) Store.definir(['tokens', quem], { ...Store.state.tokens[quem], r: { t: total, ts: Date.now() } });
   }
 }
 $('#btnRolar').addEventListener('click', rolar);
 $('#btnDados').addEventListener('click', () => $('#painelDados').hidden ? abrirDados('Rolar dados') : fecharDados());
 $('#btnFecharDados').addEventListener('click', fecharDados);
 $('#btnRolarFora').addEventListener('click', () => {
-  if (meu && Store.state.tokens[meu]) Store.definir(['tokens', meu], { ...Store.state.tokens[meu], r: { fora: true, ts: Date.now() } });
+  const quem = meu || aux;
+  if (quem && Store.state.tokens[quem]) Store.definir(['tokens', quem], { ...Store.state.tokens[quem], r: { fora: true, ts: Date.now() } });
   fecharDados();
 });
 
@@ -1268,7 +1347,7 @@ function bloqueioPerseguicao(id, tk) {
 function nomeParticipante(id, paraJogador) {
   const tk = Store.state.tokens[id];
   if (!tk || !SER[tk.s]) return '(removido)';
-  if (paraJogador && tk.h && !mestre && tk.s !== meu) return '???';
+  if (paraJogador && !visivelPara(tk)) return '???';
   return rotuloBase(tk);
 }
 
@@ -1330,12 +1409,13 @@ function desenharPerseguicao() {
         <span class="pn">${nomeParticipante(o.id, true)}</span><span class="pi">ini ${o.ini}</span>
         <span class="pm">${tk ? fmtM(tk.m || 0) : '0,0'} / ${o.lim} m</span></li>`;
     }).join('');
-    const minha = meu && vez === meu;
+    const tkv = vez && Store.state.tokens[vez];
+    const minha = !mestre && tkv && podeMover(tkv);
     $('#minhaVez').hidden = !minha;
     if (minha) {
-      const tk = Store.state.tokens[meu];
-      const o = participante(meu);
-      $('#minhaVezTxt').textContent = `Sua vez! Você andou ${fmtM(tk.m || 0)} de ${o.lim} m.`;
+      const o = participante(vez);
+      const quem = vez === meu ? 'Sua vez!' : `Vez de ${rotuloBase(tkv)}.`;
+      $('#minhaVezTxt').textContent = `${quem} Andou ${fmtM(tkv.m || 0)} de ${o.lim} m.`;
     }
   }
 
@@ -1368,7 +1448,7 @@ function verificarPedidoIniciativa() {
   if (pedidoVisto === null) { pedidoVisto = req; return; }
   if (req && req !== pedidoVisto) {
     pedidoVisto = req;
-    if (meu && !mestre) abrirDados('O Mestre pediu: role a iniciativa');
+    if ((meu || aux) && !mestre) abrirDados('O Mestre pediu: role a iniciativa');
   }
 }
 
@@ -1391,7 +1471,7 @@ $('#btnProxTurno').addEventListener('click', () => {
   iniciarTurno(o[v].id);
 });
 $('#btnRefazerVez').addEventListener('click', () => { const v = vezAtual(); if (v) refazerRota(v); });
-$('#btnRefazerMinha').addEventListener('click', () => { if (meu) refazerRota(meu); });
+$('#btnRefazerMinha').addEventListener('click', () => { const v = vezAtual(); const tk = v && Store.state.tokens[v]; if (tk && podeMover(tk)) refazerRota(v); });
 $('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição?')) Store.definir(['persg'], { on: false, req: P().req || 0 }); });
 $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; });
 
@@ -1399,18 +1479,33 @@ $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; })
 let meu = null;   // id da cobaia do jogador neste navegador
 function lerPerfil() { try { return localStorage.getItem('acf-perfil') || ''; } catch (e) { return ''; } }
 function salvarPerfil(v) { try { v ? localStorage.setItem('acf-perfil', v) : localStorage.removeItem('acf-perfil'); } catch (e) {} }
-const podeMover = tk => !!tk && (mestre || (!!meu && tk.s === meu));
+const podeMover = tk => !!tk && !!SER[tk.s] && (mestre || (!!meu && tk.s === meu) ||
+  (!!aux && (SER[tk.s].tipo === 'filho' || tk.s === aux)));
+let aux = null;   // robô do Mestre Auxiliar neste navegador
 
 function atualizarBotaoPerfil() {
   const b = $('#btnMestre');
-  b.textContent = mestre ? 'Mestre ✓ · trocar' : meu ? `${SER[meu].nome} · trocar` : 'Entrar';
-  b.classList.toggle('ativo', mestre || !!meu);
+  b.textContent = mestre ? 'Mestre ✓ · trocar' : meu ? `${SER[meu].nome} · trocar` : aux ? `${SER[aux].nome} (auxiliar) · trocar` : 'Entrar';
+  b.classList.toggle('ativo', mestre || !!meu || !!aux);
+  document.body.classList.toggle('auxiliar', !!aux && !mestre);
+  $('#blocoCobaias').hidden = !!aux && !mestre;
+  $('#blocoRuido').hidden = !!aux && !mestre;
+  $('#blocoSons').hidden = !(aux && !mestre);
 }
 
 function mostrarPerfil(passo) {
   $('#perfil').hidden = false;
   $('#perfilPasso1').hidden = passo !== 1;
   $('#perfilPasso2').hidden = passo !== 2;
+  $('#perfilPasso3').hidden = passo !== 3;
+  $('#perfilPasso4').hidden = passo !== 4;
+  if (passo === 3) { $('#auxSenha').value = ''; $('#auxErro').hidden = true; setTimeout(() => $('#auxSenha').focus(), 50); }
+  if (passo === 4) {
+    $('#listaRobos').innerHTML = SERES.filter(s => s.tipo === 'robo').map(s =>
+      `<button class="perso" data-id="${s.id}" style="--cor:${s.cor}">
+        <img src="${s.img}" alt=""><strong>${s.nome}</strong><span>${s.jogador}</span></button>`).join('');
+    $$('#listaRobos .perso').forEach(b => b.onclick = () => escolherRobo(b.dataset.id));
+  }
   if (passo === 2) {
     $('#listaPersonagens').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s =>
       `<button class="perso" data-id="${s.id}" style="--cor:${s.cor}">
@@ -1430,6 +1525,16 @@ function escolherPersonagem(id) {
   if (tk && podeVer(tk.a)) irParaFicha(id);
 }
 
+function escolherRobo(id) {
+  aux = id; meu = null;
+  salvarPerfil('aux:' + id);
+  $('#perfil').hidden = true;
+  if (Store.modo === 'firebase' && !Store.auth.currentUser) Store.auth.signInAnonymously().catch(erroGravacao);
+  atualizarBotaoPerfil();
+  montarAndar();
+  atualizarTudo();
+}
+
 function abrirLoginMestre() {
   $('#perfil').hidden = true;
   $('#campoEmail').hidden = Store.modo !== 'firebase';
@@ -1439,7 +1544,7 @@ function abrirLoginMestre() {
 }
 
 function trocarPerfil() {
-  meu = null;
+  meu = null; aux = null;
   salvarPerfil('');
   if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
   definirMestre(false);
@@ -1450,9 +1555,16 @@ function trocarPerfil() {
 $('#btnSouJogador').addEventListener('click', () => mostrarPerfil(2));
 $('#btnSouMestre').addEventListener('click', abrirLoginMestre);
 $('#btnVoltarPerfil').addEventListener('click', () => mostrarPerfil(1));
+$$('.voltar-perfil').forEach(b => b.addEventListener('click', () => mostrarPerfil(1)));
+$('#btnSouAux').addEventListener('click', () => mostrarPerfil(3));
+$('#formAux').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (await hash($('#auxSenha').value.trim()) === SENHA_AUX) mostrarPerfil(4);
+  else $('#auxErro').hidden = false;
+});
 $('#btnMestre').addEventListener('click', trocarPerfil);
 // cancelar o login de Mestre volta para a tela de escolha
-$('#dlgMestre').addEventListener('close', () => { if (!mestre && !meu && lerPerfil() !== 'mestre') mostrarPerfil(1); });
+$('#dlgMestre').addEventListener('close', () => { if (!mestre && !meu && !aux && lerPerfil() !== 'mestre') mostrarPerfil(1); });
 
 $('#formMestre').addEventListener('submit', async e => {
   if (e.submitter && e.submitter.value === 'cancel') return;
@@ -1462,11 +1574,11 @@ $('#formMestre').addEventListener('submit', async e => {
   if (Store.modo === 'firebase') {
     try {
       await Store.auth.signInWithEmailAndPassword($('#mestreEmail').value.trim(), senha);
-      salvarPerfil('mestre'); meu = null;
+      salvarPerfil('mestre'); meu = null; aux = null;
       $('#dlgMestre').close();
     } catch (err) { erro('E-mail ou senha recusados.'); }
   } else {
-    if (await hash(senha) === SENHA_MESTRE) { salvarPerfil('mestre'); meu = null; definirMestre(true); $('#dlgMestre').close(); }
+    if (await hash(senha) === SENHA_MESTRE) { salvarPerfil('mestre'); meu = null; aux = null; definirMestre(true); $('#dlgMestre').close(); }
     else erro('Senha recusada.');
   }
 });
@@ -1524,13 +1636,14 @@ window.addEventListener('resize', () => enquadrar());
   enquadrar();
   const perfil = lerPerfil();
   if (perfil.startsWith('jogador:') && SER[perfil.slice(8)]) meu = perfil.slice(8);
+  if (perfil.startsWith('aux:') && SER[perfil.slice(4)]) aux = perfil.slice(4);
   if (!FIREBASE && perfil === 'mestre') { try { if (localStorage.getItem('acf-mestre') === '1') mestre = true; } catch (e) {} }
   await Store.iniciar();
   if (mestre && Store.modo === 'local') definirMestre(true);
   atualizarBotaoPerfil();
   atualizarTudo();
   // sem perfil salvo: pergunta quem é
-  if (!meu && !mestre && !(FIREBASE && perfil === 'mestre')) mostrarPerfil(1);
+  if (!meu && !aux && !mestre && !(FIREBASE && perfil === 'mestre')) mostrarPerfil(1);
 })();
 
 })();

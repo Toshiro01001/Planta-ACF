@@ -19,6 +19,9 @@ const SENHAS_ANDARES = {
   5: 'ae92d66ed5035aee947afd5690361df5af5ec8bd72741cbd2443fdc3c5b4026a',
 };
 
+/* Senha dos Mestres Auxiliares (vale no modo local e com Firebase). */
+const SENHA_AUX = '69ed67323361e2f9b80a29085a884be5aef8e4ce745731b67f9a58d27fe227aa';
+
 /* Senha do Mestre (usada só no MODO LOCAL, sem Firebase).
    Com o Firebase ligado, o Mestre entra com o e-mail e a senha
    da conta criada no Firebase, e esta linha deixa de valer. */
