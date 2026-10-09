@@ -989,7 +989,7 @@ body.em-persg .relogio { top: 46px; }
 .parede.porta-parede.v.porta-f, .parede.porta-parede.v.porta-p { background: linear-gradient(90deg, #3a3e46, #8a909b); border-right-color: #c9ced6; }
 .corredor.corr-fechado { filter: brightness(.55) saturate(.6); }
 .dica-porta { font-size: 13px; color: var(--texto-dim); margin: 6px 0; }
-.btn-botao-vermelho { border-color: #d1121f !important; color: #ffd5d8 !important; }
+.btn-botao-vermelho { border: 1px solid #d1121f !important; color: #ffe3e6 !important; background: #3a0d14 !important; border-radius: 5px; padding: 6px 12px; font-weight: 600; }
 .so-mestre-txt { font-size: 12px; color: #c9a7ff; margin: 8px 0 2px; }
 .portas-acoes button.on, .arq-lista-mestre button.on { background: var(--roxo-escuro) !important; border-color: var(--roxo) !important; }
 
@@ -1140,7 +1140,7 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
    ========================================================= */
 .previa-svg { position: absolute; left: 0; top: 0; transform: translateZ(1.8px); pointer-events: none; overflow: visible; }
 .previa-linha { fill: none; stroke: var(--cor-trilha, #f5c84c); stroke-width: 4; stroke-dasharray: 10 8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 5px var(--cor-trilha, #f5c84c)); }
-.previa-rotulo { position: absolute; width: 0; height: 0; transform: translateZ(4px); pointer-events: none; }
+.previa-rotulo { position: absolute; width: 0; height: 0; transform: translateZ(34px); transform-style: preserve-3d; pointer-events: none; }
 .previa-rotulo span {
   position: absolute; left: 22px; top: -36px; white-space: nowrap; font: 15px var(--mono); padding: 2px 8px; border-radius: 5px;
   background: rgba(7,6,10,.92); border: 1px solid var(--cor-trilha, #f5c84c); color: #fff;
@@ -1302,7 +1302,7 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
 .sala.visitada .sala-cn::after { content: ' 👣'; font-size: .7em; opacity: .55; }
 
 /* régua */
-.regua-linha { stroke: #7dd3fc; stroke-width: 3; stroke-dasharray: 2 6; stroke-linecap: round; filter: drop-shadow(0 0 4px #38bdf8); }
+.regua-linha { stroke: #7dd3fc; stroke-width: 5; stroke-dasharray: 10 7; stroke-linecap: round; filter: drop-shadow(0 0 4px #38bdf8); }
 .regua-rotulo span { border-color: #7dd3fc !important; }
 .camera button.ativo { background: var(--roxo-escuro); border-color: var(--roxo); }
 
@@ -1327,3 +1327,15 @@ body.em-replay .ficha { opacity: .12; }
 .fantasma-bola { position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--cor); background: #222 center/cover; box-shadow: 0 0 14px var(--cor); transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)); }
 .fantasma em { position: absolute; left: 18px; top: -30px; font: 11px var(--mono); font-style: normal; white-space: nowrap; padding: 1px 5px; border-radius: 4px; background: rgba(7,6,10,.85); border: 1px solid var(--cor); color: #fff; transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)); }
 .fantasma.andando .fantasma-bola { box-shadow: 0 0 24px 6px var(--cor); }
+
+.faixa-persg.acabando { background: #5a3a00; }
+/* celular: com a faixa da perseguição (e do apagão/protocolo) no topo, a barra de andares desce */
+@media (max-width: 860px) {
+  body.em-persg .corpo { grid-template-rows: 92px 1fr; }
+  body.em-persg .elevador { padding-top: 28px; }
+  body.em-persg .eco-simbolo { top: calc(var(--topo-h) + 32px); }
+}
+@media (max-width: 860px) {
+  .abas-mestre { grid-template-columns: repeat(4, 1fr) 36px; }
+  .abas-mestre .fechar-abas { background: none; border: 0; font-size: 24px; color: var(--texto); padding: 0; }
+}

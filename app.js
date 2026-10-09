@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009f';
+const VERSAO_SITE = '20261009h';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2029,10 +2029,14 @@ function restanteVez() {
 function tickCrono() {
   const r = restanteVez();
   const el2 = $('#cronoVez');
-  el2.hidden = r === null;
+  // no celular o contador entra na própria faixa da perseguição (não cobre os andares)
+  const fx = $('#faixaPersg');
+  if (fx.dataset.crono) { fx.textContent = fx.textContent.replace(/ · ⏱ \d+s$/, ''); delete fx.dataset.crono; fx.classList.remove('acabando'); }
+  el2.hidden = r === null || celular();
   if (r === null) return;
   const vez = vezAtual();
   el2.textContent = `⏱ ${r}s · ${vez ? nomeParticipante(vez, !mestre) : ''}`;
+  if (celular() && !fx.hidden) { fx.textContent += ` · ⏱ ${r}s`; fx.dataset.crono = '1'; fx.classList.toggle('acabando', r <= 10); }
   el2.classList.toggle('acabando', r <= 10 && r > 0);
   el2.classList.toggle('esgotado', r === 0);
   const tkv = vez && Store.state.tokens[vez];
@@ -3974,7 +3978,7 @@ function aplicarAbas() {
   $$('#abasMestre button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === abaMestre));
   $$('.painel section[data-aba]').forEach(s => s.classList.toggle('fora-da-aba', mestre && s.dataset.aba !== abaMestre));
 }
-$$('#abasMestre button').forEach(b => b.addEventListener('click', () => {
+$$('#abasMestre button[data-aba]').forEach(b => b.addEventListener('click', () => {
   abaMestre = b.dataset.aba;
   try { localStorage.setItem('acf-aba', abaMestre); } catch (e) {}
   aplicarAbas();
@@ -4712,9 +4716,10 @@ function desenharZonaJogador() {
   Pedidos.ligar(mestre);
   const alvo = $('#zonaJogador');
   if (!alvo) return;
-  const sig = JSON.stringify([capacidadeEstoque(), Store.state.estoque, Store.state.cofre, diaAtual(), !!meu]);
+  const sig = JSON.stringify([capacidadeEstoque(), Store.state.estoque, Store.state.cofre, diaAtual(), !!meu, mestre ? Store.state.fichas : 0]);
   if (sig === zonaSig) return;
   zonaSig = sig;
+  if (mestre) desenharPedidos();
   alvo.innerHTML = meu ? htmlCofre() + htmlDespensa() : '';
   ligarDespensa(alvo);
   if (mestre) {
@@ -4824,6 +4829,8 @@ function aprovarPedido(k, p, pg) {
   responderSussurro(p.cx, `✅ Pedido aprovado: ${p.t}${pg !== 'nada' && c ? ` · pago com ${pg === 'cofre' ? 'o cofre do grupo' : 'suas sucatas'} (${txtCusto(c)})` : ''}`);
   Diario.registrar('sala', `Pedido aprovado: ${p.n} · ${p.t}`);
 }
+// celular: as abas do Mestre ficam por cima do × do painel; este × fica dentro delas
+$('#btnFecharPainelM').addEventListener('click', e => { e.stopPropagation(); $('#btnFecharPainel').click(); });
 $('#btnLimparPedidos').addEventListener('click', () => {
   Object.entries(Pedidos.dados || {}).forEach(([k, p]) => { if (p && p.st !== 'pend') Rede.set('pedidos/' + k, null).catch(() => {}); });
   aviso('Pedidos resolvidos apagados.');
