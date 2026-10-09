@@ -18,6 +18,15 @@
     <span class="marca-kicker">O.R.F.E.U. · Planta do Complexo</span>
     <h1>A Caixa de Fósforos</h1>
   </div>
+  <!-- Símbolo do Eco: muda de forma conforme a Balança (todos veem) -->
+  <button id="ecoSimbolo" class="eco-simbolo" title="Eco" aria-label="Eco">
+    <img data-e="neutro" class="ativo" src="img/eco-neutro.jpg" alt="">
+    <img data-e="mae-t" src="img/eco-mae-tingido.jpg" alt="">
+    <img data-e="mae-c" src="img/eco-mae-consagrado.jpg" alt="">
+    <img data-e="rei-t" src="img/eco-rei-tingido.jpg" alt="">
+    <img data-e="rei-c" src="img/eco-rei-consagrado.jpg" alt="">
+    <span id="ecoNome" class="eco-nome">Eco</span>
+  </button>
   <div class="topo-dir">
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
     <button id="btnChat" class="btn-fantasma btn-chat" hidden aria-label="Abrir o chat">💬 Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
@@ -78,15 +87,6 @@
 
     <div class="dica" id="dica">Arraste para girar · botão direito ou dois dedos para mover · roda ou pinça para zoom</div>
 
-    <!-- Símbolo do Eco (tinge conforme a Balança) -->
-    <button id="ecoSimbolo" class="eco-simbolo" title="Eco" aria-label="Eco">
-      <img data-e="neutro" class="ativo" src="img/eco-neutro.jpg" alt="">
-      <img data-e="mae-t" src="img/eco-mae-tingido.jpg" alt="">
-      <img data-e="mae-c" src="img/eco-mae-consagrado.jpg" alt="">
-      <img data-e="rei-t" src="img/eco-rei-tingido.jpg" alt="">
-      <img data-e="rei-c" src="img/eco-rei-consagrado.jpg" alt="">
-      <span id="ecoNome" class="eco-nome">Eco</span>
-    </button>
 
     <!-- Apagão -->
     <div id="telaApagao" class="tela-apagao" hidden><span>SINAL PERDIDO</span></div>

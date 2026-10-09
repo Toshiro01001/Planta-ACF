@@ -3081,6 +3081,7 @@ const Chat = {
       const n = this.aberto && c === this.canal ? 0 : this.naoLidas(c);
       const s = $('.n', b); s.hidden = !n; s.textContent = n;
     });
+    document.body.classList.toggle('chat-aberto', this.aberto && !$('#painelChat').hidden);
     if (this.aberto) this.visto[this.canal] = Date.now();
     const total = canais.reduce((t, c) => t + (this.aberto && c === this.canal ? 0 : this.naoLidas(c)), 0);
     $('#chatBadge').hidden = !total; $('#chatBadge').textContent = total;

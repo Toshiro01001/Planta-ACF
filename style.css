@@ -782,7 +782,8 @@ body.painel-fechado .painel { display: none; }
    SÍMBOLO DO ECO (todos veem; troca de forma conforme a Balança)
    ========================================================= */
 .eco-simbolo {
-  position: absolute; right: 16px; top: 14px; width: 70px; aspect-ratio: 2 / 3; z-index: 3;
+  position: relative; flex: none; margin-left: auto; margin-right: 14px;
+  height: calc(var(--topo-h) - 6px); aspect-ratio: 2 / 3; z-index: 31;
   padding: 0; border: 0; background: transparent; cursor: help;
   mix-blend-mode: screen;   /* o preto da imagem some no fundo do mapa */
 }
@@ -796,13 +797,12 @@ body.painel-fechado .painel { display: none; }
 .eco-simbolo.consagrado { animation: ecoPulso 2.8s ease-in-out infinite; }
 @keyframes ecoPulso { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 .eco-nome {
-  position: absolute; right: 0; top: 100%; margin-top: 4px;
+  position: absolute; right: 0; top: 100%; margin-top: 6px; z-index: 32;
   white-space: nowrap; font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase;
   color: var(--texto); background: rgba(7,6,10,.92); border: 1px solid var(--linha);
   padding: 2px 8px; border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .eco-simbolo:hover .eco-nome, .eco-simbolo:focus-visible .eco-nome, .eco-simbolo.mostra .eco-nome { opacity: 1; }
-body.em-persg .eco-simbolo { top: 46px; }
 
 /* =========================================================
    BALANÇA DO ECO (painel do Mestre)
@@ -884,8 +884,6 @@ body.em-persg .faixa-apagao { top: calc(var(--topo-h) + 28px); }
   .btn-dados, .btn-desfazer { bottom: 162px; }
   .painel-dados { bottom: 218px; }
   .cartao { bottom: 216px; }
-  .eco-simbolo { width: 48px; right: 10px; top: 10px; }
-  body.em-persg .eco-simbolo { top: 40px; }
   .faixa-apagao { font-size: 11px; letter-spacing: .05em; }
 }
 
@@ -1072,6 +1070,14 @@ body.tv .andar-legenda span { font-size: 34px; }
 }
 /* chat aberto no computador: o símbolo do Eco e o cartão não ficam por baixo */
 @media (min-width: 861px) {
-  body.chat-aberto .eco-simbolo { right: 386px; }
 }
 .cartao { max-height: calc(100% - 190px); }
+
+/* o símbolo do Eco mora no topo, no canto superior direito, fora do mapa */
+.topo { justify-content: flex-start; }
+.topo-dir { margin-left: 0; }
+@media (max-width: 860px) {
+  /* celular: fica no fim da faixa dos andares, à direita */
+  .eco-simbolo { position: fixed; top: calc(var(--topo-h) + 4px); right: 10px; height: 56px; margin: 0; }
+}
+body.tv .eco-simbolo { margin-right: 0; }
