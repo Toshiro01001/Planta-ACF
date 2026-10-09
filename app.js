@@ -101,9 +101,11 @@ const CENTRO_ZN = (() => { const s = retSala(25); return { x: s.x + R / 2, y: s.
 function posicoesIniciais(andar = 1) {
   const tokens = {};
   const cob = SERES.filter(s => s.tipo === 'cobaia');
+  const zn = retSala(25);
   cob.forEach((s, i) => {
-    const ang = (i / cob.length) * Math.PI * 2 - Math.PI / 2;
-    tokens[s.id] = { s: s.id, a: andar, x: +(CENTRO_ZN.x + Math.cos(ang) * 1.6).toFixed(2), y: +(CENTRO_ZN.y + Math.sin(ang) * 1.6).toFixed(2), h: false, n: 1 };
+    const fila = i < 4 ? 0 : 1, col = i < 4 ? i : i - 4, nessa = i < 4 ? 4 : cob.length - 4;
+    const x = zn.x + R * (col + 0.5) / nessa, y = zn.y + R - 0.75 - fila * 1.1;
+    tokens[s.id] = { s: s.id, a: andar, x: +x.toFixed(2), y: +y.toFixed(2), h: false, n: 1 };
   });
   return tokens;
 }
@@ -147,13 +149,16 @@ const Store = {
     firebase.initializeApp(FIREBASE);
     this.db = firebase.database();
     this.auth = firebase.auth();
+    // cada aba guarda o próprio login: Mestre, auxiliar e jogador podem ficar
+    // abertos no mesmo navegador sem um derrubar o outro
+    try { await this.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch (e) {}
     this.auth.onAuthStateChanged(u => {
       definirMestre(!!u && !u.isAnonymous);
       // jogador precisa de um login anônimo para poder mover a própria ficha
-      if (!u && (meu || aux)) this.auth.signInAnonymously().catch(erroGravacao);
+      if (!u && (meu || aux)) this.garantirLogin();
       if (!u && lerPerfil() === 'mestre') { salvarPerfil(''); mostrarPerfil(1); }
     });
-    this.db.ref('.info/connected').on('value', s => setSync(s.val() ? 'ao vivo' : 'reconectando…', s.val() ? 'vivo' : ''));
+    this.db.ref('.info/connected').on('value', s => { this.conectado = !!s.val(); mostrarConexao(); });
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
       if (v && v.tokens !== undefined) {
@@ -168,15 +173,29 @@ const Store = {
     });
   },
 
+  // login invisível do jogador/auxiliar; quem chamar espera ele terminar
+  garantirLogin() {
+    if (this.auth.currentUser) return Promise.resolve();
+    if (!this.loginAnon) this.loginAnon = this.auth.signInAnonymously().finally(() => { this.loginAnon = null; });
+    return this.loginAnon;
+  },
+
   // caminho: ['tokens', id] ou ['rev', 'a1']; valor null apaga
   definir(caminho, valor) {
+    // jogador e auxiliar: o site barra aqui o que o servidor recusaria
+    if (!mestre) {
+      const motivo = recusaLocal(caminho, valor);
+      if (motivo) { aviso(motivo); this.avisar(); return; }
+    }
     let alvo = this.state;
     for (let i = 0; i < caminho.length - 1; i++) alvo = alvo[caminho[i]] = alvo[caminho[i]] || {};
     const k = caminho[caminho.length - 1];
     if (valor === null) delete alvo[k]; else alvo[k] = valor;
 
     if (this.modo === 'firebase') {
-      this.db.ref('mapa/' + caminho.join('/')).set(valor).catch(erroGravacao);
+      const enviar = () => this.db.ref('mapa/' + caminho.join('/')).set(valor).catch(erroGravacao);
+      if (mestre || this.auth.currentUser) enviar();
+      else this.garantirLogin().then(enviar).catch(erroGravacao);
     } else {
       this.salvarLocal();
     }
@@ -256,9 +275,31 @@ const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&
 // a função só existe na tela do Mestre
 const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
 
+/* Mesmas condições das regras do Firebase, conferidas antes de enviar.
+   Jogador: só a própria cobaia. Auxiliar: os Filhos e o próprio robô.
+   Ninguém além do Mestre troca andar, ocultação, coloca ou tira fichas. */
+function recusaLocal(caminho, valor) {
+  if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
+  const atual = (Store.state.tokens || {})[caminho[1]];
+  if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar fichas do mapa.';
+  if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover essa ficha.';
+  const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
+  if (!igual('s') || !igual('a') || !igual('h') || !igual('vf')) return 'Só o Mestre pode mudar o andar ou a ocultação de uma ficha.';
+  return '';
+}
+
+// recusa do servidor: aviso passageiro; o mapa volta sozinho ao estado certo
+let erroTimer = null;
 function erroGravacao(e) {
-  console.error(e);
-  setSync('sem permissão para gravar', 'erro');
+  console.warn('Gravação recusada:', e && e.message ? e.message : e);
+  setSync('ação recusada', 'erro');
+  aviso('O servidor recusou essa ação. O mapa voltou ao estado certo.');
+  clearTimeout(erroTimer);
+  erroTimer = setTimeout(mostrarConexao, 4000);
+}
+function mostrarConexao() {
+  if (Store.modo !== 'firebase') return;
+  setSync(Store.conectado ? 'ao vivo' : 'reconectando…', Store.conectado ? 'vivo' : '');
 }
 
 function carregarScript(src) {
@@ -712,37 +753,46 @@ function rotuloBase(tk) {
   return s.nome;
 }
 
-/* Quando há mais de 3 fichas numa sala, elas se arrumam em fileiras no
-   rodapé da sala (só na tela; a posição salva não muda). */
+/* Fichas encostadas umas nas outras se afastam um pouco, só na tela
+   (a posição salva não muda). Ficha em espaço livre aparece exatamente
+   onde está, então dá para movê-la à vontade dentro da sala.
+   Sala com mais de 3 fichas: fichas um pouco menores e nomes só ao selecionar. */
 const posTela = new Map();
-let fichasPorFila = 0;
-function porFilaAtual() {
-  const k = Math.min(2.4, Math.max(0.8, 0.85 / cam.s));
-  return clamp(Math.floor((R * T) / (26 * k)), 3, 9);
-}
+const cheias = new Set();
+let fichasPorFila = 0;   // guarda o zoom usado no último cálculo
+function porFilaAtual() { return +Math.min(2.4, Math.max(0.8, 0.85 / cam.s)).toFixed(2); }
 function calcularFileiras(lista) {
   posTela.clear();
+  cheias.clear();
   fichasPorFila = porFilaAtual();
-  const porSala = new Map();
+  const k = fichasPorFila;
+  const grupos = new Map();
   lista.forEach(([id, tk]) => {
     if (arrastando && arrastando.id === id) return;
     const p = salaEm(tk.a, tk.x, tk.y);
-    if (!p) return;
-    if (!porSala.has(p)) porSala.set(p, []);
-    porSala.get(p).push([id, tk]);
+    const chave = p ? 'p' + p : 'c';
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push({ id, x: tk.x, y: tk.y, x0: tk.x, y0: tk.y, p });
   });
-  const ordemTipo = ['cobaia', 'npc', 'robo', 'filho'];
-  porSala.forEach((l, p) => {
-    if (l.length <= 3) return;
-    l.sort((a, b) => ordemTipo.indexOf(SER[a[1].s].tipo) - ordemTipo.indexOf(SER[b[1].s].tipo) || a[0].localeCompare(b[0]));
-    const r = retSala(p), nf = fichasPorFila;
-    const filas = Math.ceil(l.length / nf);
-    const passo = Math.min(0.85, (R - 1.4) / Math.max(1, filas - 1 || 1));
-    l.forEach(([id], i) => {
-      const fila = Math.floor(i / nf), col = i % nf;
-      const nessa = Math.min(nf, l.length - fila * nf);
-      posTela.set(id, { x: +(r.x + R * (col + 0.5) / nessa).toFixed(2), y: +(r.y + R - 0.55 - fila * passo).toFixed(2) });
-    });
+  grupos.forEach(l => {
+    const cheia = l[0].p && l.length > 3;
+    if (cheia) l.forEach(o => cheias.add(o.id));
+    const D = Math.min(1.3, (34 * k * (cheia ? 0.7 : 1)) / T * 0.9);   // distância mínima entre cabeças
+    for (let it = 0; it < 12; it++) {
+      let mexeu = false;
+      for (let a = 0; a < l.length; a++) for (let b = a + 1; b < l.length; b++) {
+        const A = l[a], B = l[b];
+        let dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy);
+        if (d >= D) continue;
+        if (d < 0.001) { dx = Math.cos(a + b); dy = Math.sin(a + b); d = 1; }
+        const em = (D - d) / 2;
+        A.x -= dx / d * em; A.y -= dy / d * em; B.x += dx / d * em; B.y += dy / d * em;
+        mexeu = true;
+      }
+      l.forEach(o => { if (o.p) { const r = retSala(o.p); o.x = clamp(o.x, r.x + 0.3, r.x + R - 0.3); o.y = clamp(o.y, r.y + 0.3, r.y + R - 0.3); } });
+      if (!mexeu) break;
+    }
+    l.forEach(o => { if (Math.abs(o.x - o.x0) > 0.01 || Math.abs(o.y - o.y0) > 0.01) posTela.set(o.id, { x: +o.x.toFixed(2), y: +o.y.toFixed(2) }); });
   });
 }
 
@@ -776,7 +826,7 @@ function desenharFichas() {
       const pos = posTela.get(id) || tk;
       f.style.left = px(pos.x); f.style.top = px(pos.y);
     }
-    f.classList.toggle('em-fila', posTela.has(id));
+    f.classList.toggle('em-fila', cheias.has(id));
     $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
     f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
@@ -1652,8 +1702,14 @@ $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; })
 
 /* ---------- Perfil: Jogador ou Mestre ---------- */
 let meu = null;   // id da cobaia do jogador neste navegador
-function lerPerfil() { try { return localStorage.getItem('acf-perfil') || ''; } catch (e) { return ''; } }
-function salvarPerfil(v) { try { v ? localStorage.setItem('acf-perfil', v) : localStorage.removeItem('acf-perfil'); } catch (e) {} }
+function lerPerfil() {
+  try { const s = sessionStorage.getItem('acf-perfil'); if (s !== null) return s; } catch (e) {}
+  try { return localStorage.getItem('acf-perfil') || ''; } catch (e) { return ''; }
+}
+function salvarPerfil(v) {
+  try { sessionStorage.setItem('acf-perfil', v || ''); } catch (e) {}
+  try { v ? localStorage.setItem('acf-perfil', v) : localStorage.removeItem('acf-perfil'); } catch (e) {}
+}
 const podeMover = tk => !!tk && !!SER[tk.s] && (mestre || (!!meu && tk.s === meu) ||
   (!!aux && (SER[tk.s].tipo === 'filho' || tk.s === aux)));
 let aux = null;   // robô do Mestre Auxiliar neste navegador
@@ -1693,7 +1749,7 @@ function escolherPersonagem(id) {
   meu = id;
   salvarPerfil('jogador:' + id);
   $('#perfil').hidden = true;
-  if (Store.modo === 'firebase' && !Store.auth.currentUser) Store.auth.signInAnonymously().catch(erroGravacao);
+  if (Store.modo === 'firebase') Store.garantirLogin().catch(erroGravacao);
   atualizarBotaoPerfil();
   atualizarTudo();
   const tk = Store.state.tokens[id];
@@ -1705,7 +1761,7 @@ function escolherRobo(id) {
   aux = id; meu = null;
   salvarPerfil('aux:' + id);
   $('#perfil').hidden = true;
-  if (Store.modo === 'firebase' && !Store.auth.currentUser) Store.auth.signInAnonymously().catch(erroGravacao);
+  if (Store.modo === 'firebase') Store.garantirLogin().catch(erroGravacao);
   atualizarBotaoPerfil();
   montarAndar();
   atualizarTudo();
