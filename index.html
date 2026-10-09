@@ -21,7 +21,8 @@
   <div class="topo-dir">
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
     <button id="btnMestre" class="btn-fantasma">Entrar</button>
-    <button id="btnPainel" class="btn-fantasma so-celular" aria-label="Abrir painel">Painel</button>
+    <button id="btnRecolher" class="btn-fantasma so-desktop" title="Esconder ou mostrar o painel lateral">Painel ⟩</button>
+    <button id="btnPainel" class="btn-fantasma btn-painel so-celular" aria-label="Abrir painel">☰ Painel</button>
   </div>
 </header>
 
@@ -78,6 +79,7 @@
 
     <!-- Dados -->
     <button id="btnDados" class="btn-dados" title="Rolar dados">🎲 Dados</button>
+    <button id="btnDesfazer" class="btn-desfazer" title="Desfazer o último movimento (Ctrl+Z)" hidden>↶ Desfazer</button>
     <div id="painelDados" class="painel-dados" hidden>
       <div class="dados-topo"><h3 id="dadosTitulo">Rolar dados</h3><button id="btnFecharDados" class="fechar" aria-label="Fechar">×</button></div>
       <div class="dados-campos">
@@ -94,6 +96,7 @@
 
   <!-- Painel lateral -->
   <aside id="painel" class="painel">
+    <button class="painel-alca so-celular" id="btnAlca" aria-label="Fechar painel"><span></span></button>
     <button class="fechar-painel so-celular" id="btnFecharPainel" aria-label="Fechar painel">×</button>
 
     <section class="bloco" id="blocoCobaias">
@@ -128,7 +131,7 @@
     </section>
 
     <!-- Só para o Mestre -->
-    <section class="bloco mestre-only" hidden>
+    <section class="bloco mestre-only" id="blocoMestre" hidden>
       <h2>Mestre</h2>
 
       <label class="chave">
@@ -164,16 +167,22 @@
             <span id="alertaRuidoTxt"></span>
             <button id="btnRegistrarAlerta" class="btn-roxo">Registrar quebra</button>
           </div>
-          <div class="quebras">
-            <span>Quebras do limite diário: <b id="qtdQuebras">0</b> / 3</span>
-            <div id="barraQuebras" class="barra-quebras"></div>
-            <div class="quebras-botoes">
-              <button id="btnQuebra" class="btn-fantasma">+1 quebra</button>
-              <button id="btnQuebraMenos" class="btn-fantasma">−1</button>
-              <button id="btnQuebraZerar" class="btn-fantasma">Novo dia</button>
-            </div>
-          </div>
         </div>
+      </div>
+      <div class="quebras ciclo">
+        <div class="ciclo-topo">
+          <button id="btnDia" class="ciclo-dia" title="Corrigir o número do dia">Dia <b id="cicloDia">1</b></button>
+          <span class="ciclo-hoje">Quebras hoje: <b id="qtdHoje">0</b></span>
+        </div>
+        <span>Rumo ao Protocolo: <b id="qtdQuebras">0</b> / 3</span>
+        <div id="barraQuebras" class="barra-quebras"></div>
+        <p id="cicloInfo" class="mini ciclo-info"></p>
+        <div class="quebras-botoes">
+          <button id="btnQuebra" class="btn-fantasma">+1 quebra</button>
+          <button id="btnQuebraMenos" class="btn-fantasma">−1</button>
+          <button id="btnQuebraZerar" class="btn-fantasma">Novo dia</button>
+        </div>
+        <p id="cicloHist" class="mini ciclo-hist"></p>
       </div>
       <button id="btnProtocolo" class="btn-protocolo" disabled>Iniciar Protocolo Filho da O.R.F.E.U.</button>
 
@@ -202,6 +211,53 @@
         <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra…</button>
         <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
         <button id="btnSair" class="btn-fantasma">Sair do modo Mestre</button>
+      </div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoDiario" hidden>
+      <h2>Diário da sessão</h2>
+      <p class="mini">Registro automático, só do Mestre: movimentos, rolagens, quebras, Protocolo, perseguição e revelações. Ele grava enquanto a sua tela de Mestre estiver aberta.</p>
+      <div class="diario-ctrl">
+        <select id="filtroDiario" aria-label="Filtrar o diário">
+          <option value="">Tudo</option>
+          <option value="mov">Movimentos</option>
+          <option value="dado">Dados</option>
+          <option value="ruido">Ruído e Protocolo</option>
+          <option value="persg">Perseguição</option>
+          <option value="sala">Salas e fichas</option>
+        </select>
+        <button id="btnSessao" class="btn-fantasma">Marcar nova sessão</button>
+      </div>
+      <ol id="listaDiario" class="lista-diario"></ol>
+      <p id="diarioVazio" class="vazio">Nada registrado ainda.</p>
+      <div class="ferramentas duas">
+        <button id="btnBaixarDiario" class="btn-fantasma">Baixar diário (.txt)</button>
+        <button id="btnLimparDiario" class="btn-fantasma perigo">Limpar diário</button>
+      </div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoRolagens" hidden>
+      <h2>Rolagens recentes</h2>
+      <p class="mini">As últimas 5 rolagens de cada um, da mais nova para a mais antiga. ⚠ marca quem rolou de novo em menos de 1 minuto.</p>
+      <div id="listaRolagens" class="lista-rolagens"></div>
+      <p id="rolagensVazio" class="vazio">Ninguém rolou ainda.</p>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoNotas" hidden>
+      <h2>Anotações das salas</h2>
+      <p class="mini">Clique numa sala do mapa para escrever pistas, armadilhas ou o que já foi revelado. Só o Mestre vê.</p>
+      <ul id="listaNotas" class="lista-notas"></ul>
+      <p id="notasVazio" class="vazio">Nenhuma anotação neste andar.</p>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoBackup" hidden>
+      <h2>Backup</h2>
+      <p class="mini">Baixe ao fim de cada sessão: guarda a posição de todas as fichas, salas reveladas, ruído, dia, funções, anotações e o diário. Restaurar volta tudo a esse ponto (o diário atual é mantido).</p>
+      <p class="mini alerta-mini">O arquivo contém as funções das cobaias. Guarde só com você e nunca envie ao GitHub.</p>
+      <div class="ferramentas">
+        <button id="btnBackup" class="btn-roxo">Baixar backup</button>
+        <button id="btnRestaurar" class="btn-fantasma">Restaurar backup…</button>
+        <input type="file" id="arqBackup" accept=".json,application/json" hidden>
       </div>
     </section>
   </aside>
