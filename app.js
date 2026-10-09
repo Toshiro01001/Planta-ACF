@@ -77,8 +77,13 @@ function visivelPara(tk) {
   if (mestre) return true;
   const tipo = SER[tk.s].tipo;
   if (aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
+  // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
+  if (apagaoAtivo() && tk.s !== meu && (!apagaoIsento || apagaoQueda)) return false;
   return !tk.h || tk.s === meu;
 }
+const apagaoAtivo = () => !!(Store.state.ap && Store.state.ap.on);
+let apagaoIsento = false;   // calculado em verificarApagao()
+let apagaoQueda = false;    // primeiros segundos do apagão: todas as fichas somem
 
 function descreveLocal(tk) {
   if (!tk) return 'fora do mapa';
@@ -102,7 +107,7 @@ function posicoesIniciais(andar = 1) {
   });
   return tokens;
 }
-const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false } });
+const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null });
 
 /* =========================================================
    SINCRONIA: modo local ou Firebase
@@ -152,7 +157,7 @@ const Store = {
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
       if (v && v.tokens !== undefined) {
-        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false }, persg: v.persg || { on: false } };
+        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false }, persg: v.persg || { on: false }, ap: v.ap || null, eco: v.eco || null };
         this.vazio = false;
       } else {
         this.state = estadoPadrao();
@@ -195,17 +200,18 @@ const Store = {
    do Mestre; com Firebase, num caminho que só a conta do Mestre lê.
    ========================================================= */
 const Segredos = {
-  dados: {}, ref: null,
+  dados: {}, ref: null, pronto: false,
   carregar() {
     if (Store.modo === 'firebase') {
       if (this.ref) return;
       this.ref = Store.db.ref('segredos');
-      this.ref.on('value', s => { this.dados = s.val() || {}; atualizarTudo(); }, () => {});
+      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; atualizarTudo(); }, () => {});
     } else {
       try { this.dados = JSON.parse(localStorage.getItem('acf-segredos') || '{}'); } catch (e) { this.dados = {}; }
+      this.pronto = true;
     }
   },
-  parar() { if (this.ref) { this.ref.off(); this.ref = null; } this.dados = {}; },
+  parar() { if (this.ref) { this.ref.off(); this.ref = null; } this.dados = {}; this.pronto = false; },
   definir(id, valor) {
     valor = (valor || '').trim();
     this.gravar([id], valor || null);
@@ -308,6 +314,7 @@ function aplicarCamera() {
   stage.style.setProperty('--tilt', cam.tilt + 'deg');
   // fichas mantêm o mesmo tamanho na tela, com qualquer zoom
   stage.style.setProperty('--k', Math.min(2.4, Math.max(0.8, 0.85 / cam.s)).toFixed(3));
+  if (typeof fichasPorFila !== 'undefined' && fichasPorFila && porFilaAtual() !== fichasPorFila) desenharFichas();
 }
 
 function enquadrar() {
@@ -395,7 +402,7 @@ function soltar(e) {
   if (gesto && !gesto.andou && ponteiros.size === 0) {
     const pt = telaParaPiso(e.clientX, e.clientY);
     const p = podeVer(andarAtual) ? salaEm(andarAtual, pt.x, pt.y) : null;
-    if (mestre && p) selecionarSala(cnDe(andarAtual, p)); else selecionar(null);
+    if (p) selecionarSala(cnDe(andarAtual, p)); else selecionar(null);
   }
   if (ponteiros.size === 0) { gesto = null; viewport.classList.remove('arrastando'); }
   else if (ponteiros.size === 1) {
@@ -434,6 +441,7 @@ $$('.camera button').forEach(b => b.addEventListener('click', () => {
     case 'mais': zoomEm(cx, cy, 1.25); break;
     case 'menos': zoomEm(cx, cy, 0.8); break;
     case 'centro': cam.rot = 0; cam.tilt = 50; enquadrar(); return;
+    case 'eu': focarMinhaFicha(celular()); return;
     case 'mover':
       modoMover = !modoMover;
       b.classList.toggle('ativo', modoMover);
@@ -704,10 +712,45 @@ function rotuloBase(tk) {
   return s.nome;
 }
 
+/* Quando há mais de 3 fichas numa sala, elas se arrumam em fileiras no
+   rodapé da sala (só na tela; a posição salva não muda). */
+const posTela = new Map();
+let fichasPorFila = 0;
+function porFilaAtual() {
+  const k = Math.min(2.4, Math.max(0.8, 0.85 / cam.s));
+  return clamp(Math.floor((R * T) / (26 * k)), 3, 9);
+}
+function calcularFileiras(lista) {
+  posTela.clear();
+  fichasPorFila = porFilaAtual();
+  const porSala = new Map();
+  lista.forEach(([id, tk]) => {
+    if (arrastando && arrastando.id === id) return;
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (!p) return;
+    if (!porSala.has(p)) porSala.set(p, []);
+    porSala.get(p).push([id, tk]);
+  });
+  const ordemTipo = ['cobaia', 'npc', 'robo', 'filho'];
+  porSala.forEach((l, p) => {
+    if (l.length <= 3) return;
+    l.sort((a, b) => ordemTipo.indexOf(SER[a[1].s].tipo) - ordemTipo.indexOf(SER[b[1].s].tipo) || a[0].localeCompare(b[0]));
+    const r = retSala(p), nf = fichasPorFila;
+    const filas = Math.ceil(l.length / nf);
+    const passo = Math.min(0.85, (R - 1.4) / Math.max(1, filas - 1 || 1));
+    l.forEach(([id], i) => {
+      const fila = Math.floor(i / nf), col = i % nf;
+      const nessa = Math.min(nf, l.length - fila * nf);
+      posTela.set(id, { x: +(r.x + R * (col + 0.5) / nessa).toFixed(2), y: +(r.y + R - 0.55 - fila * passo).toFixed(2) });
+    });
+  });
+}
+
 function desenharFichas() {
   if (!podeVer(andarAtual)) return;
   const tokens = Store.state.tokens || {};
   const vistos = new Set();
+  calcularFileiras(Object.entries(tokens).filter(([, tk]) => SER[tk.s] && tk.a === andarAtual && visivelPara(tk)));
 
   Object.entries(tokens).forEach(([id, tk]) => {
     if (!SER[tk.s] || tk.a !== andarAtual) return;
@@ -730,8 +773,10 @@ function desenharFichas() {
       fichasDom.set(id, f);
     }
     if (!arrastando || arrastando.id !== id) {
-      f.style.left = px(tk.x); f.style.top = px(tk.y);
+      const pos = posTela.get(id) || tk;
+      f.style.left = px(pos.x); f.style.top = px(pos.y);
     }
+    f.classList.toggle('em-fila', posTela.has(id));
     $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
     f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
@@ -754,7 +799,11 @@ function ligarArraste(f) {
     const motivo = bloqueioPerseguicao(id, tk);
     if (motivo) { aviso(motivo); selecionar(id); return; }
     const p = telaParaPiso(e.clientX, e.clientY);
-    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0, limitado: !!limiteDe(id), antes: { a: tk.a, x: tk.x, y: tk.y, m: tk.m || 0 } };
+    const antes = { a: tk.a, x: tk.x, y: tk.y, m: tk.m || 0 };
+    // ficha em fileira: o arraste começa de onde ela aparece na tela
+    const vista = posTela.get(id);
+    if (vista) { tk.x = vista.x; tk.y = vista.y; }
+    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0, limitado: !!limiteDe(id), antes };
     cabeca.setPointerCapture(e.pointerId);
     f.classList.add('arrastada');
   });
@@ -805,6 +854,7 @@ function ligarArraste(f) {
     if (limitado && tk.x0 !== undefined && Math.hypot(tk.x - tk.x0, tk.y - tk.y0) < 0.35) {
       tk.x = tk.x0; tk.y = tk.y0; tk.m = 0;
     }
+    if (!andou) { tk.x = antes.x; tk.y = antes.y; }
     if (andou) {
       Store.definir(['tokens', id], { ...tk });
       if (!mestre && (tk.x !== antes.x || tk.y !== antes.y)) empilharLocal(id, antes);
@@ -884,9 +934,32 @@ function desenharCartaoSala() {
   $('[data-acao="vfnao"]', c).onclick = () => marcar(false);
 }
 
+// cartão da sala para jogadores e auxiliares: nome completo e quem está ali
+function desenharCartaoSalaPublico() {
+  const c = $('#cartao');
+  delete c.dataset.sala;
+  const cn = salaSel;
+  const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1);
+  const vis = salaVisivel(a, cn);
+  const [nome, elm] = vis ? (ANDARES[a - 1].salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?'])) : ['', '?'];
+  const mostraEl = vis && !!(Store.state.rev || {})['a' + a] && elm !== '?' && elm !== 'N';
+  const el2 = ELEMENTOS[mostraEl ? elm : '?'] || ELEMENTOS['?'];
+  const aqui = Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
+    SER[tk.s] && tk.a === a && salaEm(tk.a, tk.x, tk.y) === p && visivelPara(tk)).map(([, tk]) => rotuloBase(tk));
+  c.style.setProperty('--cor', el2.cor);
+  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+    <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
+      <h3>${vis ? 'CN ' + pad2(cn) : 'Sala desconhecida'}</h3><span class="cod">${vis ? (nome || 'sem nome registrado') : 'ainda não mapeada'}</span></div></div>
+    ${mostraEl ? `<p>Elemento: ${el2.nome}</p>` : ''}
+    <p><strong>Aqui:</strong> ${aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>`;
+  c.hidden = false;
+  $('.fechar', c).onclick = () => selecionar(null);
+}
+
 function desenharCartao() {
   const c = $('#cartao');
   if (salaSel && mestre) { desenharCartaoSala(); return; }
+  if (salaSel) { desenharCartaoSalaPublico(); return; }
   delete c.dataset.sala;
   const tk = selecionado && Store.state.tokens[selecionado];
   if (!tk || !visivelPara(tk)) { c.hidden = true; return; }
@@ -1110,6 +1183,10 @@ function atualizarTudo() {
   marcarNotas();
   desenharExtrasMestre();
   atualizarDesfazer();
+  desenharApagaoMestre();
+  desenharBalanca();
+  desenharEco();
+  atualizarBotaoMinha();
 }
 
 /* =========================================================
@@ -1123,6 +1200,7 @@ $('#formSenha').addEventListener('submit', async e => {
     salvarLiberados();
     montarAndar();
     atualizarTudo();
+    focoInicialCelular();
   } else {
     $('#erroSenha').hidden = false;
     $('#inputSenha').select();
@@ -1619,7 +1697,8 @@ function escolherPersonagem(id) {
   atualizarBotaoPerfil();
   atualizarTudo();
   const tk = Store.state.tokens[id];
-  if (tk && podeVer(tk.a)) irParaFicha(id);
+  if (celular()) { focoInicial = false; focoInicialCelular(); }
+  else if (tk && podeVer(tk.a)) irParaFicha(id);
 }
 
 function escolherRobo(id) {
@@ -1776,7 +1855,7 @@ const Diario = {
 
   // chamado a cada mudança do mapa
   observar(st) {
-    const novo = JSON.parse(JSON.stringify({ tokens: st.tokens || {}, salas: st.salas || {}, rev: st.rev || {}, ruido: st.ruido || {}, persg: st.persg || {} }));
+    const novo = JSON.parse(JSON.stringify({ tokens: st.tokens || {}, salas: st.salas || {}, rev: st.rev || {}, ruido: st.ruido || {}, persg: st.persg || {}, ap: st.ap || null }));
     const ant = this.prev;
     this.prev = novo;
     if (!ant || this.reiniciar) { this.reiniciar = false; this.pend = {}; return; }
@@ -1785,6 +1864,12 @@ const Diario = {
     this.difSalas(ant, novo);
     this.difRuido(ant.ruido, novo.ruido);
     this.difPersg(ant.persg, novo.persg);
+    const apA = !!(ant.ap && ant.ap.on), apB = !!(novo.ap && novo.ap.on);
+    if (!apA && apB) {
+      const ve = Object.keys(apagaoVe()).filter(id => apagaoVe()[id]).map(id => SER[id] ? SER[id].nome : id);
+      this.registrar('sala', `APAGÃO ligado${ve.length ? ' · continuam enxergando: ' + ve.join(', ') : ''}`);
+    }
+    if (apA && !apB) this.registrar('sala', 'Apagão desligado');
   },
 
   difFichas(A, B) {
@@ -2042,7 +2127,7 @@ $('#arqBackup').addEventListener('change', async e => {
   const m = pacote.mapa;
   Diario.reiniciar = true;
   Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
-  Store.state = { tokens: m.tokens || {}, rev: m.rev || {}, salas: m.salas || {}, ruido: m.ruido || { q: 0, p: false }, persg: m.persg || { on: false } };
+  Store.state = { tokens: m.tokens || {}, rev: m.rev || {}, salas: m.salas || {}, ruido: m.ruido || { q: 0, p: false }, persg: m.persg || { on: false }, ap: m.ap || null, eco: m.eco || null };
   Store.gravarTudo();
   const seg = { ...(pacote.segredos || {}) };
   delete seg._diario;
@@ -2098,9 +2183,192 @@ $('#btnRecolher').addEventListener('click', () => aplicarRecolhido(!document.bod
 })();
 
 /* =========================================================
+   APAGÃO
+   O sinal da Interface cai. Cada jogador passa a ver só a própria ficha.
+   Quem o Mestre marcar continua vendo. A lista fica nos segredos do Mestre;
+   no mapa público vai só um sorteio e códigos embaralhados, sem nomes.
+   ========================================================= */
+let apagaoChave = '';
+let apagaoAntes = false;
+let apagaoTimer = null;
+async function verificarApagao() {
+  const ap = Store.state.ap;
+  const ativo = !!(ap && ap.on);
+  // entrada no apagão: tudo some por alguns segundos e a tela pisca
+  if (ativo && !apagaoAntes && !mestre && !aux) {
+    apagaoQueda = true;
+    $('#telaApagao').hidden = false;
+    document.body.classList.add('apagao-queda');
+    clearTimeout(apagaoTimer);
+    apagaoTimer = setTimeout(() => {
+      apagaoQueda = false;
+      $('#telaApagao').hidden = true;
+      document.body.classList.remove('apagao-queda');
+      atualizarTudo();
+    }, 3200);
+  }
+  if (!ativo) { apagaoQueda = false; clearTimeout(apagaoTimer); $('#telaApagao').hidden = true; document.body.classList.remove('apagao-queda'); }
+  apagaoAntes = ativo;
+  document.body.classList.toggle('apagao', ativo && !mestre && !aux);
+  $('#faixaApagao').hidden = !(ativo && mestre);
+  // quem continua vendo
+  const chave = ativo && meu ? `${ap.n}:${meu}:${(ap.v || []).join(',')}` : '';
+  if (chave === apagaoChave) return;
+  apagaoChave = chave;
+  let isento = false;
+  if (chave) isento = Object.values(ap.v || {}).includes(await hash(ap.n + ':' + meu));
+  if (isento !== apagaoIsento) { apagaoIsento = isento; atualizarTudo(); }
+}
+
+const apagaoVe = () => (mestre && Segredos.dados._apagaoVe) || {};
+function desenharApagaoMestre() {
+  if (!mestre) return;
+  const caixa = $('#listaApagaoVe');
+  if (!caixa.contains(document.activeElement)) {
+    const ve = apagaoVe();
+    caixa.innerHTML = SERES.filter(x => x.tipo === 'cobaia').map(x =>
+      `<label class="chave"><input type="checkbox" data-id="${x.id}" ${ve[x.id] ? 'checked' : ''}><span>${x.nome} <small>${x.jogador}</small></span></label>`).join('');
+    $$('input', caixa).forEach(i => i.onchange = async () => {
+      Segredos.gravar(['_apagaoVe', i.dataset.id], i.checked ? true : null);
+      if (apagaoAtivo()) await publicarApagao(true);
+    });
+  }
+  const b = $('#btnApagao');
+  b.textContent = apagaoAtivo() ? 'Desligar apagão' : 'Ligar apagão';
+  b.classList.toggle('pronto', apagaoAtivo());
+}
+
+// grava no mapa só um sorteio e códigos (com alguns falsos, para não revelar quantos são)
+async function publicarApagao(ligar) {
+  if (!ligar) { Store.definir(['ap'], null); return; }
+  const n = Math.random().toString(36).slice(2, 10);
+  const ids = Object.keys(apagaoVe()).filter(id => apagaoVe()[id]);
+  const v = await Promise.all(ids.map(id => hash(n + ':' + id)));
+  while (v.length < 4) v.push(await hash(n + ':' + Math.random().toString(36)));
+  v.sort();
+  Store.definir(['ap'], { on: true, n, v });
+}
+$('#btnApagao').addEventListener('click', async () => {
+  if (apagaoAtivo()) { await publicarApagao(false); return; }
+  if (confirm('Ligar o apagão? Os jogadores passam a enxergar só a própria ficha até você desligar.')) await publicarApagao(true);
+});
+
+/* =========================================================
+   BALANÇA DO ECO
+   Valor em % para o Rei (0 = tudo da Mãe, 100 = tudo do Rei), começa em 50.
+   Fica nos segredos do Mestre. O mapa público recebe só a forma do símbolo
+   (neutro, tingido ou consagrado, e para qual lado), nunca o número.
+   ========================================================= */
+const balanca = () => { const v = Segredos.dados._balanca; return typeof v === 'number' ? v : 50; };
+// 50/50 a 60/40 neutro · 65/35 a 85/15 tingido · 90/10 a 100 consagrado
+function estagioEco(r) {
+  const d = Math.abs(r - 50);
+  if (d <= 10) return 'neutro';
+  return (r > 50 ? 'rei' : 'mae') + (d >= 40 ? '-c' : '-t');
+}
+const NOME_ECO = { neutro: 'Eco', 'mae-t': 'Eco Tingido', 'rei-t': 'Eco Tingido', 'mae-c': 'Eco Consagrado', 'rei-c': 'Eco Consagrado' };
+const ESTADO_MESTRE = { neutro: 'Neutro', 'mae-t': 'Tingido para a Mãe', 'rei-t': 'Tingido para o Rei', 'mae-c': 'Consagrado à Mãe', 'rei-c': 'Consagrado ao Rei' };
+
+// o Mestre mantém a forma pública do símbolo igual à Balança
+function sincronizarEco() {
+  if (!mestre || !Segredos.pronto) return;
+  const e = estagioEco(balanca());
+  if (((Store.state.eco || {}).e || 'neutro') !== e) Store.definir(['eco'], { e });
+}
+function mudarBalanca(v) {
+  v = clamp(Math.round(v / 5) * 5, 0, 100);
+  const antes = balanca();
+  if (v === antes) return;
+  Segredos.gravar(['_balanca'], v);
+  const ea = estagioEco(antes), eb = estagioEco(v);
+  Diario.registrar('sala', `Balança do Eco: Rei ${v}% / Mãe ${100 - v}% (${v > antes ? '+' + (v - antes) + ' Rei' : '+' + (antes - v) + ' Mãe'})${ea !== eb ? ' · ' + ESTADO_MESTRE[eb] : ''}`);
+  sincronizarEco();
+  desenharBalanca();
+  desenharEco();
+}
+function desenharBalanca() {
+  if (!mestre) return;
+  const v = balanca(), e = estagioEco(v);
+  const rg = $('#balancaRange');
+  if (document.activeElement !== rg) rg.value = v;
+  $('#balRei').textContent = v + '%';
+  $('#balMae').textContent = (100 - v) + '%';
+  $('#balancaEstado').textContent = ESTADO_MESTRE[e];
+  $('#balancaEstado').className = 'bal-estado ' + (e.startsWith('rei') ? 'rei' : e.startsWith('mae') ? 'mae' : '');
+  sincronizarEco();
+}
+$('#balancaRange').addEventListener('change', e => mudarBalanca(+e.target.value));
+$('#btnBalMae').addEventListener('click', () => mudarBalanca(balanca() - 5));
+$('#btnBalRei').addEventListener('click', () => mudarBalanca(balanca() + 5));
+$('#btnBalZerar').addEventListener('click', () => { if (confirm('Voltar a Balança para 50/50?')) mudarBalanca(50); });
+
+// o símbolo no canto do mapa (todos veem)
+function desenharEco() {
+  const e = mestre && Segredos.pronto ? estagioEco(balanca()) : ((Store.state.eco || {}).e || 'neutro');
+  const caixa = $('#ecoSimbolo');
+  $$('img', caixa).forEach(im => im.classList.toggle('ativo', im.dataset.e === e));
+  caixa.classList.toggle('consagrado', e.endsWith('-c'));
+  const nome = NOME_ECO[e] || 'Eco';
+  $('#ecoNome').textContent = nome;
+  caixa.title = nome;
+  caixa.setAttribute('aria-label', nome);
+}
+// no celular, tocar mostra o nome por alguns segundos
+let ecoTimer = null;
+$('#ecoSimbolo').addEventListener('click', () => {
+  const c = $('#ecoSimbolo');
+  c.classList.add('mostra');
+  clearTimeout(ecoTimer);
+  ecoTimer = setTimeout(() => c.classList.remove('mostra'), 2500);
+});
+
+/* =========================================================
+   CELULAR: começar perto da própria ficha
+   ========================================================= */
+const celular = () => window.innerWidth <= 860;
+const minhaFichaId = () => meu || aux || null;
+// zoom que mostra cerca de 3 x 3 salas
+function focarMinhaFicha(comZoom) {
+  const id = minhaFichaId();
+  const tk = id && (Store.state.tokens || {})[id];
+  if (!tk) return false;
+  if (tk.a !== andarAtual) { if (!podeVer(tk.a)) return false; irParaAndar(tk.a); }
+  if (comZoom) {
+    const r = viewport.getBoundingClientRect();
+    cam.s = clamp(r.width / ((3 * R + 2 * G) * T) * 0.98, 0.2, 4);
+  }
+  const p = salaEm(tk.a, tk.x, tk.y);
+  const alvo = p ? { x: retSala(p).x + R / 2, y: retSala(p).y + R / 2 } : tk;
+  focar(alvo.x, alvo.y);
+  return true;
+}
+let focoInicial = false;
+function focoInicialCelular() {
+  if (focoInicial || mestre || !minhaFichaId() || !celular()) return;
+  if (focarMinhaFicha(true)) focoInicial = true;
+}
+function atualizarBotaoMinha() {
+  const id = minhaFichaId();
+  $('#btnIrMinha').hidden = !(id && (Store.state.tokens || {})[id] && !mestre);
+}
+
+// gaveta do painel no celular: tocar ou puxar a aba para cima abre
+(() => {
+  const aba = $('#abaPainel');
+  let y0 = null;
+  aba.addEventListener('pointerdown', e => { y0 = e.clientY; });
+  aba.addEventListener('pointerup', e => {
+    if (y0 === null) return;
+    const dy = e.clientY - y0; y0 = null;
+    if (dy < -20 || Math.abs(dy) < 8) $('#painel').classList.add('aberto');
+  });
+})();
+
+/* =========================================================
    INÍCIO
    ========================================================= */
 Store.aoMudar(st => Diario.observar(st));
+Store.aoMudar(() => { verificarApagao(); focoInicialCelular(); });
 Store.aoMudar(() => {
   if (podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
   atualizarTudo();

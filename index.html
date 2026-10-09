@@ -70,9 +70,23 @@
       <button data-cam="menos" title="Afastar">−</button>
       <button data-cam="mover" id="btnModoMover" title="Arrastar move o mapa em vez de girar">✥</button>
       <button data-cam="centro" title="Centralizar">◎</button>
+      <button data-cam="eu" id="btnIrMinha" title="Ir até a minha ficha" hidden>◉</button>
     </div>
 
     <div class="dica" id="dica">Arraste para girar · botão direito ou dois dedos para mover · roda ou pinça para zoom</div>
+
+    <!-- Símbolo do Eco (tinge conforme a Balança) -->
+    <button id="ecoSimbolo" class="eco-simbolo" title="Eco" aria-label="Eco">
+      <img data-e="neutro" class="ativo" src="img/eco-neutro.jpg" alt="">
+      <img data-e="mae-t" src="img/eco-mae-tingido.jpg" alt="">
+      <img data-e="mae-c" src="img/eco-mae-consagrado.jpg" alt="">
+      <img data-e="rei-t" src="img/eco-rei-tingido.jpg" alt="">
+      <img data-e="rei-c" src="img/eco-rei-consagrado.jpg" alt="">
+      <span id="ecoNome" class="eco-nome">Eco</span>
+    </button>
+
+    <!-- Apagão -->
+    <div id="telaApagao" class="tela-apagao" hidden><span>SINAL PERDIDO</span></div>
 
     <!-- Cartão do ser selecionado -->
     <div id="cartao" class="cartao" hidden></div>
@@ -214,6 +228,40 @@
       </div>
     </section>
 
+    <section class="bloco mestre-only" id="blocoBalanca" hidden>
+      <h2>Balança do Eco</h2>
+      <p class="mini">Começa em 50/50. Cada ação marcante move 5 pontos. Só o Mestre vê os números. Todos veem o símbolo do Eco no canto do mapa mudar de forma; ao passar o mouse ou tocar, aparece só "Eco", "Eco Tingido" ou "Eco Consagrado".</p>
+      <div class="balanca">
+        <div class="bal-lado bal-mae" title="A Mãe">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 12 Q24 3 36 12 Q24 20 12 12 Z" fill="#E8DCC4"/><ellipse cx="24" cy="12" rx="5" ry="4.5" fill="#3a1414"/><circle cx="22.5" cy="10.5" r="1.3" fill="#E8DCC4"/><path d="M24 20 V46" stroke="#6E2A2A" stroke-width="3.2" stroke-linecap="round"/><g stroke="#E8DCC4" stroke-width="2.4" stroke-linecap="round"><path d="M16 27 L32 23"/><path d="M16 32 L32 28"/><path d="M16 37 L32 33"/><path d="M16 42 L32 38"/></g></svg>
+          <span>Mãe</span><b id="balMae">50%</b>
+        </div>
+        <div class="bal-meio">
+          <input id="balancaRange" type="range" min="0" max="100" step="5" value="50" aria-label="Balança do Eco: esquerda Mãe, direita Rei">
+          <p id="balancaEstado" class="bal-estado">Neutro</p>
+        </div>
+        <div class="bal-lado bal-rei" title="O Rei de Amarelo">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M13 16 L15 5 L20 11 L24 3 L28 11 L33 5 L35 16 Z" fill="#B8962E"/><circle cx="24" cy="31" r="13" fill="none" stroke="#B8962E" stroke-width="2.6"/><path d="M14 31 Q24 22 34 31 Q24 40 14 31 Z" fill="none" stroke="#B8962E" stroke-width="2.2"/><circle cx="24" cy="31" r="3.6" fill="#B8962E"/></svg>
+          <span>Rei</span><b id="balRei">50%</b>
+        </div>
+      </div>
+      <div class="bal-botoes">
+        <button id="btnBalMae" class="btn-fantasma">◀ 5 para a Mãe</button>
+        <button id="btnBalZerar" class="btn-fantasma" title="Voltar a 50/50">50/50</button>
+        <button id="btnBalRei" class="btn-fantasma">5 para o Rei ▶</button>
+      </div>
+      <p class="mini">Faixas: 50/50 a 60/40 neutro · 65/35 a 85/15 tingido · 90/10 a 100 consagrado.</p>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoApagao" hidden>
+      <h2>Apagão</h2>
+      <p class="mini">O sinal da Interface cai: a planta escurece e cada jogador passa a enxergar só a própria ficha, até o Mestre desligar. Os auxiliares não são afetados.</p>
+      <h3>Continuam enxergando no apagão</h3>
+      <div id="listaApagaoVe" class="lista-apagao"></div>
+      <p class="mini">Fica salvo só com o Mestre. O site não mostra o motivo a ninguém.</p>
+      <button id="btnApagao" class="btn-protocolo">Ligar apagão</button>
+    </section>
+
     <section class="bloco mestre-only" id="blocoDiario" hidden>
       <h2>Diário da sessão</h2>
       <p class="mini">Registro automático, só do Mestre: movimentos, rolagens, quebras, Protocolo, perseguição e revelações. Ele grava enquanto a sua tela de Mestre estiver aberta.</p>
@@ -271,6 +319,8 @@
 </div>
 <div id="faixaProtocolo" class="faixa-protocolo" hidden>⚠ PROTOCOLO FILHO DA O.R.F.E.U. EM CURSO</div>
 <div id="faixaPersg" class="faixa-persg" hidden></div>
+<div id="faixaApagao" class="faixa-apagao" hidden>APAGÃO ATIVO · os jogadores só enxergam a própria ficha</div>
+<button id="abaPainel" class="aba-painel so-celular" aria-label="Abrir painel"><span class="aba-alca"></span>Cobaias · Ruído · Perseguição</button>
 
 <!-- Tela de entrada: Jogador ou Mestre -->
 <div id="perfil" class="perfil" hidden>
