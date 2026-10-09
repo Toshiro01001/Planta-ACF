@@ -61,9 +61,26 @@ As funções nunca ficam no código (o repositório é público). O Mestre preen
 
 Diário, anotações, funções, Balança e a lista do apagão ficam em `segredos`, que só a conta do Mestre lê. As regras do Firebase não mudaram.
 
+## Chat, portas e ferramentas de mesa
+
+- **Chat** (botão 💬 no topo, painel próprio): **Geral** (todos), **Sussurro ao Mestre** (só o Mestre lê; a resposta dele chega só para quem mandou) e **Filhos** (Mestre e auxiliares). O Mestre apaga tudo com "Apagar todo o chat". As rolagens dos jogadores entram no Geral ou, se o Mestre desmarcar a opção, só no Sussurro; as dos auxiliares vão para o canal Filhos.
+- **Portas:** clique num corredor e escolha Trancada, Destruída ou Carne. Jogadores e auxiliares não passam; o Mestre passa sempre.
+- **Sinal no mapa:** o jogador segura o dedo (ou o botão do mouse) num ponto, e só o Mestre vê o sinal piscando.
+- **Relógio da Caixa:** o Mestre ajusta; todos veem. À 00:00 aparece o aviso dos robôs; opcionalmente liga o Apagão e começa um novo dia.
+- **Ficha resumida:** o Mestre preenche PV, SAN, PE e NEX no cartão da cobaia; o jogador vê a dele no painel.
+- **Sua vez:** na perseguição, o celular de quem está na vez vibra e mostra "SUA VEZ".
+- **Trilhas de Ausência:** no cartão da sala, "Sem sinal"; quem entrar vê só a própria ficha até sair.
+- **Exposição (NEX):** conta as entradas de cada cobaia em salas de cada elemento.
+- **Arquivos nas salas:** texto e imagem anexados pelo Mestre, revelados quando ele quiser; o jogador abre pelo cartão da sala.
+- **Tela da mesa:** `…/Planta-ACF/?tv=1` mostra só o mapa, com a visão dos jogadores, para uma TV.
+
+## Salas dos andares 2 a 5
+
+Nomes, elementos, subtítulos e elevadores desses andares não ficam no código. O Mestre importa o arquivo `salas-secretas.json` (botão "Importar salas" no painel) ou edita no cartão de cada sala. Os jogadores só recebem o nome de uma sala quando ela é revelada. Nunca envie esse arquivo ao GitHub.
+
 ## Perfis
 
-Ao abrir o site, a pessoa escolhe **Jogador**, **Mestre Auxiliar** ou **Mestre**. O Mestre Auxiliar entra com a senha dos auxiliares, escolhe o próprio robô e move os Filhos e o seu robô; ele não vê as cobaias, só os sons das salas, até o Mestre revelar. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
+Ao abrir o site, a pessoa escolhe **Jogador**, **Mestre Auxiliar** ou **Mestre**. O Mestre Auxiliar entra com a senha dos auxiliares (com Firebase, é a senha da conta `auxiliares@caixa-acf.com`), escolhe o próprio robô e move os Filhos e o seu robô; ele não vê as cobaias, só os sons das salas, até o Mestre revelar. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
 
 Cada aba guarda o próprio perfil e o próprio login. Dá para testar Mestre, auxiliar e jogador em abas do mesmo navegador. O Mestre precisa entrar de novo só ao abrir uma aba nova (recarregar a página mantém o login).
 
@@ -77,7 +94,8 @@ Sem Firebase, o site funciona em **modo local**: as posições ficam no navegado
 2. **Build › Realtime Database › Create database** (modo bloqueado).
 3. **Build › Authentication › Get started**. Ative **E-mail/senha** e também **Anônimo** (é o login invisível dos jogadores). Na aba **Users**, crie o usuário do Mestre e copie o **UID**.
 4. Em **Authentication › Settings › Authorized domains**, adicione `toshiro01001.github.io`.
-5. Em **Realtime Database › Rules**, cole e publique (troque o UID):
+5. Em **Authentication › Users**, crie também a conta dos auxiliares: e-mail `auxiliares@caixa-acf.com` e a senha dos auxiliares.
+6. Em **Realtime Database › Rules**, cole e publique (troque o UID nas linhas do Mestre):
 
 ```json
 {
@@ -91,14 +109,66 @@ Sem Firebase, o site funciona em **modo local**: as posições ficam no navegado
         }
       }
     },
+    "privado": {
+      ".read": "auth != null && (auth.uid === 'COLE_O_UID_AQUI' || auth.token.email === 'auxiliares@caixa-acf.com')",
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      "tokens": {
+        ".write": "auth != null && auth.token.email === 'auxiliares@caixa-acf.com'"
+      }
+    },
     "segredos": {
       ".read": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
       ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'"
+    },
+    "arquivos": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'"
+    },
+    "arquivosPriv": {
+      ".read": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'"
+    },
+    "sinais": {
+      ".read": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      "$s": {
+        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['a', 'x', 'y', 'ts'])"
+      }
+    },
+    "chat": {
+      ".write": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+      "limpo": {
+        ".read": "auth != null"
+      },
+      "geral": {
+        ".read": "auth != null",
+        "$m": {
+          ".write": "auth != null && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['a', 't', 'ts']) && newData.child('t').isString() && newData.child('t').val().length <= 500"
+        }
+      },
+      "sussurros": {
+        ".read": "auth != null && auth.uid === 'COLE_O_UID_AQUI'",
+        "$m": {
+          ".write": "auth != null && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['a', 't', 'ts']) && newData.child('t').isString() && newData.child('t').val().length <= 500"
+        }
+      },
+      "respostas": {
+        "$cx": {
+          ".read": "auth != null"
+        }
+      },
+      "filhos": {
+        ".read": "auth != null && (auth.uid === 'COLE_O_UID_AQUI' || auth.token.email === 'auxiliares@caixa-acf.com')",
+        ".write": "auth != null && (auth.uid === 'COLE_O_UID_AQUI' || auth.token.email === 'auxiliares@caixa-acf.com')"
+      }
     }
   }
 }
 ```
 
-6. Em **Configurações do projeto › Seus apps › Web (</>)**, registre um app e copie o objeto `firebaseConfig` para a linha `const FIREBASE` do `config.js`.
+7. Em **Configurações do projeto › Seus apps › Web (</>)**, registre um app e copie o objeto `firebaseConfig` para a linha `const FIREBASE` do `config.js`.
 
-Com isso: todo mundo vê o mapa; os jogadores só conseguem mudar a posição das 7 cobaias, sem trocá-las de andar nem revelar fichas ocultas; o resto só a conta do Mestre mexe.
+Com isso: todo mundo vê o mapa público; Filhos, NPCs e robôs ocultos, nomes secretos das salas e o canal Filhos só chegam ao Mestre e à conta dos auxiliares; funções, anotações, diário e Balança só ao Mestre; os jogadores só movem a própria cobaia.

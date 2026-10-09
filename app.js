@@ -16,6 +16,7 @@ const WH = 0.75; // altura das paredes
 const W  = 2 * M + 5 * R + 4 * G;  // largura total
 const H  = W;                       // altura total
 
+const TV = new URLSearchParams(location.search).has('tv');   // tela da mesa
 const $  = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const SER = Object.fromEntries(SERES.map(s => [s.id, s]));
@@ -38,9 +39,41 @@ for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
   if (r < 4) CORREDORES.push({ x: x + (R - CW) / 2, y: y + R, w: CW, h: G, eixo: 'v', p1: LAYOUT[r][c], p2: LAYOUT[r + 1][c] });
 }
 
-// sala do elevador/porta de cada andar (definida em data.js, campo "saida")
+/* ---------- Dados das salas ----------
+   1º andar: data.js (público). Andares 2 a 5: caminho privado (Mestre e
+   auxiliares). Jogadores recebem só o que foi revelado, em mapa/nomes. */
+const veTudo = () => mestre || !!aux;
+function infoSala(a, cn) {
+  const p = cn - 25 * (a - 1);
+  const padrao = p === 25 ? ['Zona Neutra', 'F'] : ['', '?'];
+  const base = (ANDARES[a - 1] && ANDARES[a - 1].salas[cn]) || null;
+  if (veTudo()) {
+    const e = (Priv.dados.salas || {})['c' + cn];
+    if (e) return [e.n || '', e.e || '?'];
+    return base || padrao;
+  }
+  const pub = (Store.state.nomes || {})['c' + cn];
+  if (pub) return [pub.n || '', pub.e || (base ? base[1] : '?')];
+  return base || padrao;
+}
+function saidaCN(a) {
+  if (veTudo()) {
+    const v = (Priv.dados.saidas || {})['a' + a];
+    if (v !== undefined && v !== null) return v || null;
+    return ANDARES[a - 1].saida || null;
+  }
+  const n = Store.state.nomes || {};
+  for (let p = 1; p <= 25; p++) { const e = n['c' + cnDe(a, p)]; if (e && e.s) return cnDe(a, p); }
+  return a === 1 ? (ANDARES[0].saida || null) : null;
+}
+function subtituloDe(a) {
+  if (veTudo()) return (Priv.dados.andares || {})['a' + a] || ANDARES[a - 1].subtitulo || '';
+  return (Store.state.nomes || {})['a' + a] || ANDARES[a - 1].subtitulo || '';
+}
+
+// sala do elevador/porta de cada andar
 function saidaDoAndar(a) {
-  const cn = ANDARES[a - 1].saida;
+  const cn = saidaCN(a);
   const p = cn - 25 * (a - 1);
   if (!cn || p < 1 || p > 25) return null;
   const { r, c } = POS[p];
@@ -79,6 +112,7 @@ function visivelPara(tk) {
   if (aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
   if (apagaoAtivo() && tk.s !== meu && (!apagaoIsento || apagaoQueda)) return false;
+  if (cegoEu() && tk.s !== meu) return false;
   return !tk.h || tk.s === meu;
 }
 const apagaoAtivo = () => !!(Store.state.ap && Store.state.ap.on);
@@ -91,7 +125,7 @@ function descreveLocal(tk) {
   if (!p) return `${nomeAndar(tk.a)} · Corredor`;
   const cn = cnDe(tk.a, p);
   if (!salaVisivel(tk.a, cn)) return `${nomeAndar(tk.a)} · Sala desconhecida`;
-  const [nome] = ANDARES[tk.a - 1].salas[cn] || [p === 25 ? 'Zona Neutra' : ''];
+  const [nome] = infoSala(tk.a, cn);
   return `${nomeAndar(tk.a)} · CN ${String(cn).padStart(2, '0')}${nome ? ' ' + nome : ''}`;
 }
 
@@ -109,7 +143,13 @@ function posicoesIniciais(andar = 1) {
   });
   return tokens;
 }
-const estadoPadrao = () => ({ tokens: posicoesIniciais(), rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null });
+const CAMPOS_VAZIOS = () => ({ rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null,
+  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {} });
+const estadoPadrao = () => ({ ...CAMPOS_VAZIOS(), tokens: posicoesIniciais() });
+// ficha que vai para o caminho privado (só Mestre e auxiliares leem): Filhos, NPCs e robôs ocultos
+const ehPrivado = tk => !!tk && !!tk.h && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia';
+const EMAIL_AUXILIARES = (typeof EMAIL_AUX !== 'undefined' ? EMAIL_AUX : 'auxiliares@caixa-acf.com').toLowerCase();
+let auxLogado = false;   // conta dos auxiliares conectada (Firebase)
 
 /* =========================================================
    SINCRONIA: modo local ou Firebase
@@ -134,6 +174,7 @@ const Store = {
       this.canal.onmessage = ev => { this.state = ev.data; this.avisar(); };
     } catch (e) {}
     setSync('modo local', '');
+    Arquivos.ligar();
     this.avisar();
   },
 
@@ -153,24 +194,45 @@ const Store = {
     // abertos no mesmo navegador sem um derrubar o outro
     try { await this.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch (e) {}
     this.auth.onAuthStateChanged(u => {
-      definirMestre(!!u && !u.isAnonymous);
+      const ehAux = !!u && !u.isAnonymous && (u.email || '').toLowerCase() === EMAIL_AUXILIARES;
+      auxLogado = ehAux;
+      definirMestre(!!u && !u.isAnonymous && !ehAux);
+      Priv.ligar(mestre || ehAux);
       // jogador precisa de um login anônimo para poder mover a própria ficha
-      if (!u && (meu || aux)) this.garantirLogin();
+      if (!u && meu) this.garantirLogin();
+      // auxiliar sem a conta dos auxiliares (aba nova): pede a senha de novo
+      if (!u && aux) { aux = null; salvarPerfil(''); atualizarBotaoPerfil(); mostrarPerfil(3); }
+      if (ehAux && !aux) {
+        const pf = lerPerfil();
+        if (pf.startsWith('aux:') && SER[pf.slice(4)]) { aux = pf.slice(4); atualizarBotaoPerfil(); montarAndar(); atualizarTudo(); }
+        else mostrarPerfil(4);
+      }
       if (!u && lerPerfil() === 'mestre') { salvarPerfil(''); mostrarPerfil(1); }
+      Chat.ligar();
     });
     this.db.ref('.info/connected').on('value', s => { this.conectado = !!s.val(); mostrarConexao(); });
     this.db.ref('mapa').on('value', snap => {
       const v = snap.val();
-      if (v && v.tokens !== undefined) {
-        this.state = { tokens: v.tokens || {}, rev: v.rev || {}, salas: v.salas || {}, ruido: v.ruido || { q: 0, p: false }, persg: v.persg || { on: false }, ap: v.ap || null, eco: v.eco || null };
+      if (v) {
+        this.pub = v;
         this.vazio = false;
+        this.compor();
       } else {
+        this.pub = null;
         this.state = estadoPadrao();
         this.vazio = true;
         if (mestre) { this.vazio = false; this.gravarTudo(); }
       }
       this.avisar();
     });
+    Arquivos.ligar();
+  },
+
+  // junta o mapa público com as fichas ocultas (estas só chegam ao Mestre e aos auxiliares)
+  pub: null, privTok: {},
+  compor() {
+    const v = this.pub || {};
+    this.state = { ...CAMPOS_VAZIOS(), ...v, tokens: { ...(v.tokens || {}), ...(this.privTok || {}) } };
   },
 
   // login invisível do jogador/auxiliar; quem chamar espera ele terminar
@@ -193,7 +255,17 @@ const Store = {
     if (valor === null) delete alvo[k]; else alvo[k] = valor;
 
     if (this.modo === 'firebase') {
-      const enviar = () => this.db.ref('mapa/' + caminho.join('/')).set(valor).catch(erroGravacao);
+      let ops = [['mapa/' + caminho.join('/'), valor]];
+      // fichas ocultas (Filhos, NPCs, robôs) moram no caminho privado
+      if (caminho[0] === 'tokens' && caminho.length === 2) {
+        const id = caminho[1];
+        const naPub = !!(this.pub && this.pub.tokens && this.pub.tokens[id]);
+        const naPriv = !!(this.privTok && this.privTok[id]);
+        if (valor === null) ops = [naPub || !naPriv ? ['mapa/tokens/' + id, null] : null, naPriv ? ['privado/tokens/' + id, null] : null].filter(Boolean);
+        else if (ehPrivado(valor)) ops = [['privado/tokens/' + id, valor]].concat(naPub ? [['mapa/tokens/' + id, null]] : []);
+        else ops = [['mapa/tokens/' + id, valor]].concat(naPriv ? [['privado/tokens/' + id, null]] : []);
+      }
+      const enviar = () => ops.forEach(([cam, v]) => this.db.ref(cam).set(v).catch(erroGravacao));
       if (mestre || this.auth.currentUser) enviar();
       else this.garantirLogin().then(enviar).catch(erroGravacao);
     } else {
@@ -203,8 +275,12 @@ const Store = {
   },
 
   gravarTudo() {
-    if (this.modo === 'firebase') this.db.ref('mapa').set(this.state).catch(erroGravacao);
-    else { this.salvarLocal(); this.avisar(); }
+    if (this.modo === 'firebase') {
+      const pub = { ...this.state, tokens: {} }, priv = {};
+      Object.entries(this.state.tokens || {}).forEach(([id, tk]) => { (ehPrivado(tk) ? priv : pub.tokens)[id] = tk; });
+      this.db.ref('mapa').set(pub).catch(erroGravacao);
+      this.db.ref('privado/tokens').set(priv).catch(erroGravacao);
+    } else { this.salvarLocal(); this.avisar(); }
   },
 
   salvarLocal() {
@@ -224,7 +300,7 @@ const Segredos = {
     if (Store.modo === 'firebase') {
       if (this.ref) return;
       this.ref = Store.db.ref('segredos');
-      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; atualizarTudo(); }, () => {});
+      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; atualizarTudo(); agendarSincMestre(); }, () => {});
     } else {
       try { this.dados = JSON.parse(localStorage.getItem('acf-segredos') || '{}'); } catch (e) { this.dados = {}; }
       this.pronto = true;
@@ -272,6 +348,113 @@ const Segredos = {
 };
 const notaDe = cn => (mestre && (Segredos.dados._notas || {})['c' + cn]) || '';
 const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+/* =========================================================
+   REDE: leitura e gravação fora do mapa (chat, sinais, arquivos, privado).
+   Com Firebase, vai direto ao banco. No modo local, imita o banco numa
+   árvore guardada no navegador e repassada entre as abas.
+   ========================================================= */
+const Rede = {
+  arvore: {}, ouv: [], canal: null, localPronto: false,
+  fb() { return Store.modo === 'firebase'; },
+  partes(c) { return String(c).split('/').filter(Boolean); },
+  iniciarLocal() {
+    if (this.localPronto) return;
+    this.localPronto = true;
+    try { this.arvore = JSON.parse(localStorage.getItem('acf-rede') || '{}') || {}; } catch (e) { this.arvore = {}; }
+    try {
+      this.canal = new BroadcastChannel('acf-rede');
+      this.canal.onmessage = ev => { this.arvore = ev.data.arvore || {}; this.notificar(ev.data.caminho); };
+    } catch (e) {}
+  },
+  ler(c) { let o = this.arvore; for (const k of this.partes(c)) { if (o == null || typeof o !== 'object') return null; o = o[k]; } return o === undefined ? null : o; },
+  copia(v) { return v == null ? null : JSON.parse(JSON.stringify(v)); },
+  // grava (valor null apaga); jogador e auxiliar esperam o login invisível
+  async set(c, v) {
+    if (v === undefined) v = null;
+    if (this.fb()) {
+      if (!mestre && !Store.auth.currentUser) await Store.garantirLogin();
+      return Store.db.ref(c).set(v);
+    }
+    this.iniciarLocal();
+    const ps = this.partes(c);
+    let o = this.arvore;
+    for (let i = 0; i < ps.length - 1; i++) { if (!o[ps[i]] || typeof o[ps[i]] !== 'object') o[ps[i]] = {}; o = o[ps[i]]; }
+    if (v === null) delete o[ps[ps.length - 1]]; else o[ps[ps.length - 1]] = this.copia(v);
+    try { localStorage.setItem('acf-rede', JSON.stringify(this.arvore)); } catch (e) { aviso('Sem espaço no navegador para guardar isso (modo local).'); }
+    try { this.canal && this.canal.postMessage({ arvore: this.arvore, caminho: c }); } catch (e) {}
+    this.notificar(c);
+  },
+  chave() {
+    if (this.fb()) return Store.db.ref('_').push().key;
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  },
+  push(c, v) { const k = this.chave(); const p = this.set(c + '/' + k, v); return { key: k, pronto: p }; },
+  // escuta um caminho; devolve a função que para de escutar
+  on(c, cb, erro) {
+    if (this.fb()) {
+      const r = Store.db.ref(c);
+      const h = s => cb(s.val());
+      r.on('value', h, erro || (() => {}));
+      return () => r.off('value', h);
+    }
+    this.iniciarLocal();
+    const o = { c, cb };
+    this.ouv.push(o);
+    cb(this.copia(this.ler(c)));
+    return () => { this.ouv = this.ouv.filter(x => x !== o); };
+  },
+  once(c) {
+    if (this.fb()) return Store.db.ref(c).once('value').then(s => s.val());
+    this.iniciarLocal();
+    return Promise.resolve(this.copia(this.ler(c)));
+  },
+  notificar(c) {
+    const ps = this.partes(c).join('/');
+    this.ouv.slice().forEach(o => {
+      const oc = this.partes(o.c).join('/');
+      if (ps === oc || ps.startsWith(oc + '/') || oc.startsWith(ps + '/') || !ps) o.cb(this.copia(this.ler(o.c)));
+    });
+  },
+};
+
+/* =========================================================
+   PRIVADO (Mestre e auxiliares): fichas ocultas, nomes e elementos das
+   salas, elevadores e subtítulos dos andares. Jogadores nunca leem isto;
+   recebem só o que o Mestre revela (mapa/nomes).
+   ========================================================= */
+const Priv = {
+  dados: {}, pronto: false, off: null,
+  ligar(sim) {
+    if (sim && !this.off) {
+      this.off = Rede.on('privado', v => {
+        if (!this.pronto) Diario.reiniciar = true;
+        this.dados = v || {};
+        this.pronto = true;
+        if (Store.modo === 'firebase') { Store.privTok = this.dados.tokens || {}; Store.compor(); }
+        migrarOcultos();
+        Store.avisar();
+      }, () => {});
+    }
+    if (!sim && this.off) {
+      this.off(); this.off = null; this.dados = {}; this.pronto = false;
+      if (Store.modo === 'firebase') { Store.privTok = {}; Store.compor(); Store.avisar(); }
+    }
+  },
+  gravar(caminho, valor) {
+    let o = this.dados;
+    for (let i = 0; i < caminho.length - 1; i++) { if (!o[caminho[i]] || typeof o[caminho[i]] !== 'object') o[caminho[i]] = {}; o = o[caminho[i]]; }
+    if (valor === null || valor === undefined || valor === '') delete o[caminho[caminho.length - 1]]; else o[caminho[caminho.length - 1]] = valor;
+    return Rede.set('privado/' + caminho.join('/'), valor === '' ? null : valor).catch(erroGravacao);
+  },
+};
+// fichas ocultas que ainda estejam no mapa público (versão antiga) vão para o privado
+let migrou = false;
+function migrarOcultos() {
+  if (migrou || !mestre || Store.modo !== 'firebase' || !Store.pub) return;
+  migrou = true;
+  Object.entries((Store.pub && Store.pub.tokens) || {}).forEach(([id, tk]) => { if (ehPrivado(tk)) Store.definir(['tokens', id], tk); });
+}
+
 // a função só existe na tela do Mestre
 const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
 
@@ -337,6 +520,9 @@ function definirMestre(sim) {
   atualizarBotaoPerfil();
   if (Store.modo === 'local') { try { sim ? localStorage.setItem('acf-mestre', '1') : localStorage.removeItem('acf-mestre'); } catch (e) {} }
   if (sim) Segredos.carregar(); else Segredos.parar();
+  if (Store.modo !== 'firebase') Priv.ligar(sim || !!aux);
+  if (sim) agendarSincMestre();
+  if (Store.modo !== 'firebase') Chat.ligar();
   if (sim && Store.modo === 'firebase' && Store.vazio) { Store.vazio = false; Store.gravarTudo(); }
   montarAndar();
   atualizarTudo();
@@ -443,7 +629,8 @@ function soltar(e) {
   if (gesto && !gesto.andou && ponteiros.size === 0) {
     const pt = telaParaPiso(e.clientX, e.clientY);
     const p = podeVer(andarAtual) ? salaEm(andarAtual, pt.x, pt.y) : null;
-    if (p) selecionarSala(cnDe(andarAtual, p)); else selecionar(null);
+    const ci = podeVer(andarAtual) && !p ? corredorEm(pt.x, pt.y) : -1;
+    if (p) selecionarSala(cnDe(andarAtual, p)); else if (ci >= 0) selecionarCorredor(ci); else selecionar(null);
   }
   if (ponteiros.size === 0) { gesto = null; viewport.classList.remove('arrastando'); }
   else if (ponteiros.size === 1) {
@@ -544,7 +731,7 @@ function montarAndar() {
   const andar = ANDARES[andarAtual - 1];
   $('#legendaAndar').textContent = andar.titulo;
   const algumaRevelada = Array.from({ length: 25 }, (_, i) => cnDe(andarAtual, i + 1)).some(cn => salaRevelada(andarAtual, cn));
-  $('#legendaSub').textContent = mestre || algumaRevelada ? andar.subtitulo : 'Setor não mapeado';
+  $('#legendaSub').textContent = (veTudo() || algumaRevelada) && subtituloDe(andarAtual) ? subtituloDe(andarAtual) : 'Setor não mapeado';
 
   const bloqueado = !podeVer(andarAtual);
   $('#bloqueio').hidden = !bloqueado;
@@ -590,7 +777,7 @@ function montarAndar() {
     const cn = cnDe(andarAtual, p);
     const revelada = salaRevelada(andarAtual, cn);
     const visivel = mestre || revelada;
-    let [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
+    let [nome, elm] = infoSala(andarAtual, cn);
     if (!visivel) { nome = ''; elm = '?'; }
     const elemento = ELEMENTOS[elm] || ELEMENTOS['?'];
     // grade do piso: 8 quadradinhos por lado (cada um com 0,88 m)
@@ -599,7 +786,7 @@ function montarAndar() {
     if (p === 25 && visivel) d.classList.add('neutra');
     if (!visivel) d.classList.add('desconhecida');
     if (mestre && !revelada) d.classList.add('oculta-jog');
-    if (!Object.keys(andar.salas).length) d.classList.add('vazia-planta');
+    if (!nome && p !== 25) d.classList.add('vazia-planta');
     d.style.setProperty('--el', elemento.cor);
     d.innerHTML = `<div class="sala-tinta"></div>
       <div class="sala-rotulo">
@@ -618,6 +805,7 @@ function montarAndar() {
     ladoComPorta(s.x + R, s.y, s.x + R, s.y + R, c < 4 || lado === 'dir', paredes);    // direita
   }
   if (saida) desenharSaida(saida, paredes);
+  desenharPortas(paredes);
   desenharMacico(saida, paredes);
   paredes.forEach(pw => stage.appendChild(pw));
 
@@ -725,7 +913,10 @@ function assinatura() {
   const s = Store.state.salas || {};
   let t = (mestre ? 'M' : aux ? 'A' : 'J') + andarAtual + ':';
   for (let p = 1; p <= 25; p++) t += salaRevelada(andarAtual, cnDe(andarAtual, p)) ? '1' : '0';
-  return t;
+  const nomes = [];
+  for (let p = 1; p <= 25; p++) nomes.push(infoSala(andarAtual, cnDe(andarAtual, p)).join('|'));
+  const portas = Object.entries(Store.state.portas || {}).filter(([k]) => k.startsWith('a' + andarAtual + 'c')).map(kv => kv.join('=')).sort();
+  return t + '|' + saidaCN(andarAtual) + '|' + subtituloDe(andarAtual) + '|' + nomes.join(';') + '|' + portas.join(',');
 }
 
 function atualizarElementos() {
@@ -920,6 +1111,7 @@ let salaSel = null;
 function selecionar(id) {
   selecionado = id;
   salaSel = null;
+  corredorSel = null;
   $$('.sala.sel').forEach(s => s.classList.remove('sel'));
   $$('.ficha').forEach(f => f.classList.toggle('selecionada', f.dataset.id === id));
   desenharCartao();
@@ -934,15 +1126,16 @@ function selecionarSala(cn) {
 
 function desenharCartaoSala() {
   const c = $('#cartao');
+  delete c.dataset.ficha;
   const cn = salaSel;
   // não atrapalha o Mestre enquanto ele escreve a anotação
-  const ta = $('textarea.nota-txt', c);
-  if (ta && document.activeElement === ta && +c.dataset.sala === cn) return;
+  if (+c.dataset.sala === cn && c.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return;
+  const abertos = +c.dataset.sala === cn ? $$('details', c).map(d => d.open) : [];
   c.dataset.sala = cn;
   const a = Math.ceil(cn / 25);
   const andar = ANDARES[a - 1];
   const p = cn - 25 * (a - 1);
-  const [nome, elm] = andar.salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?']);
+  const [nome, elm] = infoSala(a, cn);
   const el2 = ELEMENTOS[elm] || ELEMENTOS['?'];
   const saida = saidaDoAndar(a);
   const temSaida = saida && saida.p === p;
@@ -958,8 +1151,11 @@ function desenharCartaoSala() {
       <button data-acao="vfnao">Esconder dos Filhos quem está aqui</button></div>
     <label class="nota-sala">Anotações da sala <span class="so-mestre">só o Mestre vê</span>
       <textarea class="nota-txt" rows="4" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
-    <span class="nota-status" aria-live="polite"></span>`;
+    <span class="nota-status" aria-live="polite"></span>
+    ${htmlEdicaoSala(a, cn, p)}`;
   c.hidden = false;
+  $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
+  ligarEdicaoSala(c, a, cn);
   const caixaNota = $('textarea.nota-txt', c);
   let tNota = null;
   const salvarNota = () => {
@@ -987,11 +1183,12 @@ function desenharCartaoSala() {
 // cartão da sala para jogadores e auxiliares: nome completo e quem está ali
 function desenharCartaoSalaPublico() {
   const c = $('#cartao');
+  delete c.dataset.ficha;
   delete c.dataset.sala;
   const cn = salaSel;
   const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1);
   const vis = salaVisivel(a, cn);
-  const [nome, elm] = vis ? (ANDARES[a - 1].salas[cn] || (p === 25 ? ['Zona Neutra', 'F'] : ['', '?'])) : ['', '?'];
+  const [nome, elm] = vis ? infoSala(a, cn) : ['', '?'];
   const mostraEl = vis && !!(Store.state.rev || {})['a' + a] && elm !== '?' && elm !== 'N';
   const el2 = ELEMENTOS[mostraEl ? elm : '?'] || ELEMENTOS['?'];
   const aqui = Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
@@ -1001,13 +1198,16 @@ function desenharCartaoSalaPublico() {
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
       <h3>${vis ? 'CN ' + pad2(cn) : 'Sala desconhecida'}</h3><span class="cod">${vis ? (nome || 'sem nome registrado') : 'ainda não mapeada'}</span></div></div>
     ${mostraEl ? `<p>Elemento: ${el2.nome}</p>` : ''}
-    <p><strong>Aqui:</strong> ${aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>`;
+    <p><strong>Aqui:</strong> ${aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>
+    ${vis && Arquivos.daSala(cn).length ? `<p><strong>Arquivos encontrados:</strong></p><div class="acoes">${Arquivos.daSala(cn).map(([fid, t]) => `<button data-abrir="${fid}">📄 ${esc(t)}</button>`).join('')}</div>` : ''}`;
   c.hidden = false;
   $('.fechar', c).onclick = () => selecionar(null);
+  $$('[data-abrir]', c).forEach(b => b.onclick = () => Arquivos.abrir(b.dataset.abrir));
 }
 
 function desenharCartao() {
   const c = $('#cartao');
+  if (corredorSel !== null && corredorSel !== undefined && CORREDORES[corredorSel]) { desenharCartaoCorredor(); return; }
   if (salaSel && mestre) { desenharCartaoSala(); return; }
   if (salaSel) { desenharCartaoSalaPublico(); return; }
   delete c.dataset.sala;
@@ -1036,10 +1236,17 @@ function desenharCartao() {
     </div>`;
   }
 
+  const fichaMinha = !mestre && tk.s === meu ? `<div class="cartao-ficha">${barrasFicha(fichaDe(meu))}</div>` : '';
+  const fichaEdit = mestre && s.tipo === 'cobaia' ? htmlEditarFicha(s.id) : '';
+  if (c.dataset.ficha === selecionado && c.contains(document.activeElement) && document.activeElement.matches('input')) return;
+  const abertos = c.dataset.ficha === selecionado ? $$('details', c).map(d => d.open) : [];
+  c.dataset.ficha = selecionado;
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo">${foto}<div><h3>${titulo}</h3><span class="cod">${s.codigo}</span></div></div>
-    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${acoes}`;
+    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${fichaMinha}${acoes}${fichaEdit}`;
   c.hidden = false;
+  $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
+  if (fichaEdit) ligarEditarFicha(c, s.id);
 
   $('.fechar', c).onclick = () => selecionar(null);
   if (mestre) {
@@ -1230,8 +1437,15 @@ function atualizarTudo() {
   desenharFichas();
   desenharPainel();
   desenharCartao();
-  marcarNotas();
+  marcarSalasMestre();
   desenharExtrasMestre();
+  verificarSuaVez();
+  desenharExpo();
+  desenharRelogio();
+  desenharMinhaFicha();
+  desenharOpcoesMestre();
+  ligarSinais();
+  seguirAndarTV();
   atualizarDesfazer();
   desenharApagaoMestre();
   desenharBalanca();
@@ -1460,6 +1674,7 @@ function dentro(r, x, y, folga = 0) {
   return x >= r.x - folga && x <= r.x + r.w + folga && y >= r.y - folga && y <= r.y + r.h + folga;
 }
 function andavel(andar, x, y) {
+  if (bloqueadoPorPorta(andar, x, y)) return false;
   for (let p = 1; p <= 25; p++) if (dentro(retSala(p), x, y)) return true;
   for (const c of CORREDORES) if (dentro(c, x, y)) return true;
   const rs = retSaida(saidaDoAndar(andar));
@@ -1536,6 +1751,8 @@ function rolar() {
     // o resultado chega ao Mestre pela ficha de quem rolou
     const quem = meu || aux;
     if (quem && Store.state.tokens[quem]) Store.definir(['tokens', quem], { ...Store.state.tokens[quem], r: { t: total, d: dados, b: bonus, dv: desv, ts: Date.now() } });
+    const tit = $('#dadosTitulo').textContent;
+    postarRolagem(`rolou ${total} (${qtd}d20: ${dados.join(', ')}${desv ? ', desvantagem' : ''}; ${bonus >= 0 ? '+' : '−'}${Math.abs(bonus)})${tit && tit !== 'Rolar dados' ? ' · ' + tit.replace('O Mestre pediu: ', '') : ''}`);
   }
 }
 $('#btnRolar').addEventListener('click', rolar);
@@ -1544,6 +1761,7 @@ $('#btnFecharDados').addEventListener('click', fecharDados);
 $('#btnRolarFora').addEventListener('click', () => {
   const quem = meu || aux;
   if (quem && Store.state.tokens[quem]) Store.definir(['tokens', quem], { ...Store.state.tokens[quem], r: { fora: true, ts: Date.now() } });
+  if (quem) postarRolagem('vai rolar em outro lugar');
   fecharDados();
 });
 
@@ -1749,7 +1967,8 @@ function escolherPersonagem(id) {
   meu = id;
   salvarPerfil('jogador:' + id);
   $('#perfil').hidden = true;
-  if (Store.modo === 'firebase') Store.garantirLogin().catch(erroGravacao);
+  if (Store.modo === 'firebase') Store.garantirLogin().then(() => Chat.ligar()).catch(erroGravacao);
+  else Chat.ligar();
   atualizarBotaoPerfil();
   atualizarTudo();
   const tk = Store.state.tokens[id];
@@ -1761,8 +1980,9 @@ function escolherRobo(id) {
   aux = id; meu = null;
   salvarPerfil('aux:' + id);
   $('#perfil').hidden = true;
-  if (Store.modo === 'firebase') Store.garantirLogin().catch(erroGravacao);
+  if (Store.modo !== 'firebase') Priv.ligar(true);
   atualizarBotaoPerfil();
+  Chat.ligar();
   montarAndar();
   atualizarTudo();
 }
@@ -1779,7 +1999,9 @@ function trocarPerfil() {
   meu = null; aux = null;
   salvarPerfil('');
   if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
+  if (Store.modo !== 'firebase') Priv.ligar(false);
   definirMestre(false);
+  Chat.ligar();
   selecionar(null);
   mostrarPerfil(1);
 }
@@ -1791,7 +2013,21 @@ $$('.voltar-perfil').forEach(b => b.addEventListener('click', () => mostrarPerfi
 $('#btnSouAux').addEventListener('click', () => mostrarPerfil(3));
 $('#formAux').addEventListener('submit', async e => {
   e.preventDefault();
-  if (await hash($('#auxSenha').value.trim()) === SENHA_AUX) mostrarPerfil(4);
+  const senha = $('#auxSenha').value.trim();
+  if (Store.modo === 'firebase') {
+    // conta própria dos auxiliares: o Firebase confere a senha de verdade
+    try {
+      if (Store.auth.currentUser) await Store.auth.signOut();
+      await Store.auth.signInWithEmailAndPassword(EMAIL_AUXILIARES, senha);
+      mostrarPerfil(4);
+    } catch (err) {
+      $('#auxErro').textContent = /user-not-found|invalid-credential|INVALID_LOGIN/i.test(String(err && (err.code || err.message))) && senha
+        ? 'Senha recusada (ou a conta dos auxiliares ainda não foi criada no Firebase).' : 'Senha recusada.';
+      $('#auxErro').hidden = false;
+    }
+    return;
+  }
+  if (await hash(senha) === SENHA_AUX) mostrarPerfil(4);
   else $('#auxErro').hidden = false;
 });
 $('#btnMestre').addEventListener('click', trocarPerfil);
@@ -1871,7 +2107,7 @@ function lugarDe(tk) {
   const cnTxt = q => 'CN ' + pad2(cnDe(tk.a, q));
   if (p) {
     const cn = cnDe(tk.a, p);
-    const [nome] = ANDARES[tk.a - 1].salas[cn] || [p === 25 ? 'Zona Neutra' : ''];
+    const [nome] = infoSala(tk.a, cn);
     return `${cnTxt(p)}${nome ? ' ' + nome : ''}`;
   }
   const c = CORREDORES.find(k => dentro(k, tk.x, tk.y));
@@ -1911,7 +2147,7 @@ const Diario = {
 
   // chamado a cada mudança do mapa
   observar(st) {
-    const novo = JSON.parse(JSON.stringify({ tokens: st.tokens || {}, salas: st.salas || {}, rev: st.rev || {}, ruido: st.ruido || {}, persg: st.persg || {}, ap: st.ap || null }));
+    const novo = JSON.parse(JSON.stringify({ tokens: st.tokens || {}, salas: st.salas || {}, rev: st.rev || {}, ruido: st.ruido || {}, persg: st.persg || {}, ap: st.ap || null, portas: st.portas || {}, cego: st.cego || {} }));
     const ant = this.prev;
     this.prev = novo;
     if (!ant || this.reiniciar) { this.reiniciar = false; this.pend = {}; return; }
@@ -1926,6 +2162,17 @@ const Diario = {
       this.registrar('sala', `APAGÃO ligado${ve.length ? ' · continuam enxergando: ' + ve.join(', ') : ''}`);
     }
     if (apA && !apB) this.registrar('sala', 'Apagão desligado');
+    new Set([...Object.keys(ant.portas || {}), ...Object.keys(novo.portas || {})]).forEach(k => {
+      const a = (ant.portas || {})[k] || null, b = (novo.portas || {})[k] || null;
+      if (a === b) return;
+      const m = /^a(\d+)c(\d+)$/.exec(k); if (!m) return;
+      const c = CORREDORES[+m[2]], andar = +m[1];
+      this.registrar('sala', `Corredor entre CN ${pad2(cnDe(andar, c.p1))} e CN ${pad2(cnDe(andar, c.p2))}: ${b ? TIPOS_PORTA[b].toLowerCase() : 'porta aberta'}`);
+    });
+    new Set([...Object.keys(ant.cego || {}), ...Object.keys(novo.cego || {})]).forEach(id => {
+      const a = !!(ant.cego || {})[id], b = !!(novo.cego || {})[id];
+      if (a !== b && SER[id]) this.registrar('sala', `${SER[id].nome} ${b ? 'entrou numa Trilha de Ausência (sem sinal)' : 'saiu da Trilha de Ausência'}`);
+    });
   },
 
   difFichas(A, B) {
@@ -1967,6 +2214,7 @@ const Diario = {
     }
     if (p.antes.a === tk.a && p.antes.x === tk.x && p.antes.y === tk.y) return;
     if (de !== para) this.registrar('mov', `${rotuloBase(tk)}: ${de} → ${para}`, { quem: id });
+    contarExposicao(id, tk, p.antes);
     this.pilha.push({ id, antes: p.antes });
     if (this.pilha.length > 40) this.pilha.shift();
     atualizarDesfazer();
@@ -2063,7 +2311,7 @@ function desenharNotas() {
   const notas = Segredos.dados._notas || {};
   const doAndar = Object.keys(notas).map(k => +k.slice(1)).filter(cn => Math.ceil(cn / 25) === andarAtual).sort((a, b) => a - b);
   $('#listaNotas').innerHTML = doAndar.map(cn => {
-    const [nome] = ANDARES[andarAtual - 1].salas[cn] || [cn % 25 === 0 ? 'Zona Neutra' : ''];
+    const [nome] = infoSala(andarAtual, cn);
     const txt = notas['c' + cn];
     return `<li data-cn="${cn}"><strong>CN ${pad2(cn)}${nome ? ' ' + esc(nome) : ''}</strong><span>${esc(txt.length > 110 ? txt.slice(0, 110) + '…' : txt)}</span></li>`;
   }).join('');
@@ -2167,7 +2415,8 @@ function baixar(nome, conteudo, tipo) {
 }
 
 $('#btnBackup').addEventListener('click', () => {
-  const pacote = { tipo: 'planta-acf-backup', versao: 1, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados };
+  const privado = { ...Priv.dados }; delete privado.tokens;
+  const pacote = { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado };
   baixar(`backup-caixa-${carimbo()}.json`, JSON.stringify(pacote, null, 1), 'application/json');
   Diario.registrar('sessao', `Backup baixado · ${dataCurta(Date.now())} ${hora(Date.now())}`);
 });
@@ -2183,8 +2432,9 @@ $('#arqBackup').addEventListener('change', async e => {
   const m = pacote.mapa;
   Diario.reiniciar = true;
   Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
-  Store.state = { tokens: m.tokens || {}, rev: m.rev || {}, salas: m.salas || {}, ruido: m.ruido || { q: 0, p: false }, persg: m.persg || { on: false }, ap: m.ap || null, eco: m.eco || null };
+  Store.state = { ...CAMPOS_VAZIOS(), ...m, tokens: m.tokens || {} };
   Store.gravarTudo();
+  if (pacote.privado) ['salas', 'saidas', 'andares'].forEach(k => Priv.gravar([k], pacote.privado[k] || null));
   const seg = { ...(pacote.segredos || {}) };
   delete seg._diario;
   if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
@@ -2249,9 +2499,9 @@ let apagaoAntes = false;
 let apagaoTimer = null;
 async function verificarApagao() {
   const ap = Store.state.ap;
-  const ativo = !!(ap && ap.on);
-  // entrada no apagão: tudo some por alguns segundos e a tela pisca
-  if (ativo && !apagaoAntes && !mestre && !aux) {
+  const ativo = !!(ap && ap.on) || cegoEu();
+  // entrada no apagão (ou numa Trilha de Ausência): tudo some por alguns segundos e a tela pisca
+  if (ativo && !apagaoAntes && !mestre && !aux && !TV) {
     apagaoQueda = true;
     $('#telaApagao').hidden = false;
     document.body.classList.add('apagao-queda');
@@ -2266,9 +2516,9 @@ async function verificarApagao() {
   if (!ativo) { apagaoQueda = false; clearTimeout(apagaoTimer); $('#telaApagao').hidden = true; document.body.classList.remove('apagao-queda'); }
   apagaoAntes = ativo;
   document.body.classList.toggle('apagao', ativo && !mestre && !aux);
-  $('#faixaApagao').hidden = !(ativo && mestre);
+  $('#faixaApagao').hidden = !(apagaoAtivo() && mestre);
   // quem continua vendo
-  const chave = ativo && meu ? `${ap.n}:${meu}:${(ap.v || []).join(',')}` : '';
+  const chave = apagaoAtivo() && meu ? `${ap.n}:${meu}:${(ap.v || []).join(',')}` : '';
   if (chave === apagaoChave) return;
   apagaoChave = chave;
   let isento = false;
@@ -2421,10 +2671,705 @@ function atualizarBotaoMinha() {
 })();
 
 /* =========================================================
+   SINCRONIA FEITA PELA TELA DO MESTRE
+   Publica para os jogadores só o que foi revelado (nomes das salas,
+   elevador, subtítulo) e calcula quem está numa Trilha de Ausência.
+   ========================================================= */
+let sincTimer = null;
+function agendarSincMestre() {
+  if (!mestre) return;
+  clearTimeout(sincTimer);
+  sincTimer = setTimeout(sincronizarMestre, 250);
+}
+function sincronizarMestre() {
+  if (!mestre || !Segredos.pronto) return;
+  if (Priv.pronto || Store.modo !== 'firebase') for (let a = 1; a <= 5; a++) publicarNomes(a);
+  sincronizarCego();
+}
+const igualJSON = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
+function publicarNomes(a) {
+  const atual = Store.state.nomes || {};
+  const privSalas = Priv.dados.salas || {};
+  const saida = saidaCN(a);
+  const temSaidaPriv = (Priv.dados.saidas || {})['a' + a] !== undefined;
+  const rev = !!(Store.state.rev || {})['a' + a];
+  let algum = false;
+  for (let p = 1; p <= 25; p++) {
+    const cn = cnDe(a, p), k = 'c' + cn;
+    let val = null;
+    if (salaRevelada(a, cn)) {
+      const publicar = a > 1 || privSalas[k] || (temSaidaPriv && saida === cn);
+      if (a > 1) algum = true;
+      if (publicar) {
+        const [n, e] = infoSala(a, cn);
+        val = { n: n || '' };
+        if (rev && e && e !== '?') val.e = e;
+        if (saida === cn) val.s = true;
+      }
+    }
+    if (!igualJSON(atual[k], val)) Store.definir(['nomes', k], val);
+  }
+  if (a > 1) {
+    const sub = algum ? (subtituloDe(a) || null) : null;
+    if (!igualJSON(atual['a' + a], sub)) Store.definir(['nomes', 'a' + a], sub);
+  }
+}
+
+/* ---------- Trilhas de Ausência (zonas sem sinal) ----------
+   A lista das salas fica nos segredos do Mestre. O mapa público recebe só
+   quais cobaias estão "cegas" agora, e cada jogador cego vê só a própria ficha. */
+const semSinal = cn => !!(mestre && (Segredos.dados._semSinal || {})['c' + cn]);
+function sincronizarCego() {
+  const novo = {};
+  const ve = Segredos.dados._apagaoVe || {};
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (!SER[tk.s] || SER[tk.s].tipo !== 'cobaia' || ve[tk.s]) return;
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (p && semSinal(cnDe(tk.a, p))) novo[id] = true;
+  });
+  const atual = Store.state.cego || {};
+  if (!igualJSON(Object.keys(atual).sort(), Object.keys(novo).sort())) Store.definir(['cego'], Object.keys(novo).length ? novo : null);
+}
+const cegoEu = () => !!(meu && !mestre && (Store.state.cego || {})[meu]);
+
+/* ---------- Edição da sala pelo Mestre (cartão) ---------- */
+function htmlEdicaoSala(a, cn, p) {
+  const [nome, elm] = infoSala(a, cn);
+  const saida = saidaCN(a) === cn;
+  const opcoes = ['S', 'M', 'C', 'E', 'F', '?'].map(k => `<option value="${k}" ${k === elm ? 'selected' : ''}>${ELEMENTOS[k].nome}</option>`).join('');
+  return `<details class="cartao-sec" ${p === 25 ? '' : ''}><summary>Editar sala</summary>
+      <label class="campo-linha">Nome <input class="ed-nome" value="${esc(nome)}" placeholder="sem nome"></label>
+      <label class="campo-linha">Elemento <select class="ed-el">${opcoes}</select></label>
+      <label class="chave"><input type="checkbox" class="ed-saida" ${saida ? 'checked' : ''}><span>O elevador para o ${a < 5 ? (a + 1) + 'º andar' : 'fim'} fica nesta sala</span></label>
+      <label class="chave"><input type="checkbox" class="ed-semsinal" ${semSinal(cn) ? 'checked' : ''}><span>Sem sinal (Trilha de Ausência): quem entrar só vê a própria ficha</span></label>
+    </details>
+    <details class="cartao-sec arq-sec"><summary>Arquivos da sala <span class="arq-qtd">${Arquivos.daSalaMestre(cn).length || ''}</span></summary>
+      <ul class="arq-lista-mestre">${Arquivos.daSalaMestre(cn).map(([fid, f]) => `<li data-fid="${fid}">
+        <span class="arq-t">${esc(f.t)}${f.img ? ' 🖼' : ''}</span>
+        <button data-arq="abrir">Abrir</button>
+        <button data-arq="rev" class="${f.rev ? 'on' : ''}">${f.rev ? 'Revelado · esconder' : 'Revelar'}</button>
+        <button data-arq="apagar" class="perigo">Apagar</button></li>`).join('') || '<li class="vazio">Nenhum arquivo.</li>'}</ul>
+      <div class="arq-novo">
+        <input class="arq-titulo" placeholder="Título (ex.: Prontuário rasgado)">
+        <textarea class="arq-texto-novo" rows="3" placeholder="Texto do arquivo (opcional)"></textarea>
+        <input type="file" class="arq-img" accept="image/*">
+        <button class="btn-roxo arq-add">Adicionar arquivo (fica oculto)</button>
+      </div>
+    </details>`;
+}
+function ligarEdicaoSala(c, a, cn) {
+  const salvarSala = () => {
+    const n = $('.ed-nome', c).value.trim(), e = $('.ed-el', c).value;
+    Priv.gravar(['salas', 'c' + cn], { n, e });
+    agendarSincMestre();
+    montarAndar(); atualizarTudo();
+  };
+  $('.ed-nome', c).onchange = salvarSala;
+  $('.ed-el', c).onchange = salvarSala;
+  $('.ed-saida', c).onchange = e => {
+    Priv.gravar(['saidas', 'a' + a], e.target.checked ? cn : 0);
+    agendarSincMestre();
+    montarAndar(); atualizarTudo();
+  };
+  $('.ed-semsinal', c).onchange = e => {
+    Segredos.gravar(['_semSinal', 'c' + cn], e.target.checked ? true : null);
+    Diario.registrar('sala', `CN ${pad2(cn)} ${e.target.checked ? 'marcada como Trilha de Ausência (sem sinal)' : 'voltou a ter sinal'}`);
+    agendarSincMestre(); marcarSalasMestre();
+  };
+  $$('.arq-lista-mestre li[data-fid]', c).forEach(li => {
+    const fid = li.dataset.fid;
+    $('[data-arq="abrir"]', li).onclick = () => Arquivos.abrirMestre(fid);
+    $('[data-arq="rev"]', li).onclick = () => Arquivos.alternar(fid).then(() => { delete c.dataset.sala; desenharCartao(); });
+    $('[data-arq="apagar"]', li).onclick = () => { if (confirm('Apagar este arquivo?')) Arquivos.apagar(fid).then(() => { delete c.dataset.sala; desenharCartao(); }); };
+  });
+  $('.arq-add', c).onclick = async () => {
+    const t = $('.arq-titulo', c).value.trim();
+    if (!t) { aviso('Dê um título ao arquivo.'); return; }
+    const f = $('.arq-img', c).files[0];
+    $('.arq-add', c).disabled = true;
+    await Arquivos.criar(cn, t, $('.arq-texto-novo', c).value.trim(), f);
+    delete c.dataset.sala; desenharCartao();
+    const sec = $('.arq-sec', c); if (sec) sec.open = true;
+  };
+}
+
+// selos das salas na tela do Mestre: anotação e sem sinal
+function marcarSalasMestre() {
+  $$('.sala', stage).forEach(e => {
+    e.classList.toggle('com-nota', !!notaDe(+e.dataset.cn));
+    e.classList.toggle('sem-sinal', semSinal(+e.dataset.cn));
+  });
+}
+
+/* =========================================================
+   PORTAS NOS CORREDORES
+   ========================================================= */
+const TIPOS_PORTA = { t: 'Trancada', d: 'Destruída (escombros)', c: 'Bloqueada por carne' };
+const SINAL_PORTA = { t: '🔒', d: '⚠', c: '❦' };
+const chavePorta = (a, ci) => 'a' + a + 'c' + ci;
+const portaDe = (a, ci) => (Store.state.portas || {})[chavePorta(a, ci)] || null;
+// faixa no meio do corredor onde fica a porta
+function barreira(c) {
+  return c.eixo === 'h' ? { x: c.x + c.w / 2 - 0.3, y: c.y, w: 0.6, h: c.h } : { x: c.x, y: c.y + c.h / 2 - 0.3, w: c.w, h: 0.6 };
+}
+function bloqueadoPorPorta(andar, x, y) {
+  if (mestre) return false;   // o Mestre passa por qualquer porta
+  for (let ci = 0; ci < CORREDORES.length; ci++) {
+    if (portaDe(andar, ci) && dentro(barreira(CORREDORES[ci]), x, y)) return true;
+  }
+  return false;
+}
+function desenharPortas(paredes) {
+  CORREDORES.forEach((c, ci) => {
+    const t = portaDe(andarAtual, ci);
+    if (!t) return;
+    const b = barreira(c);
+    const chao = el('div', 'porta-chao porta-' + t, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
+    chao.innerHTML = `<span>${SINAL_PORTA[t]}</span>`;
+    stage.appendChild(chao);
+    const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
+    const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
+    pw.classList.add('porta-parede', 'porta-' + t);
+    paredes.push(pw);
+  });
+}
+const corredorEm = (x, y) => CORREDORES.findIndex(c => dentro(c, x, y));
+let corredorSel = null;
+function selecionarCorredor(ci) {
+  selecionar(null);
+  corredorSel = ci;
+  desenharCartao();
+}
+function desenharCartaoCorredor() {
+  const c = $('#cartao');
+  delete c.dataset.ficha;
+  delete c.dataset.sala;
+  const k = CORREDORES[corredorSel];
+  const t = portaDe(andarAtual, corredorSel);
+  const nomeC = `Corredor entre CN ${pad2(cnDe(andarAtual, k.p1))} e CN ${pad2(cnDe(andarAtual, k.p2))}`;
+  c.style.setProperty('--cor', t === 'c' ? '#8a2f2f' : t === 'd' ? '#8a6a3a' : t === 't' ? '#7a8597' : '#8b5cf6');
+  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+    <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div><h3>Corredor</h3><span class="cod">${nomeC}</span></div></div>
+    <p>Porta: <strong>${t ? TIPOS_PORTA[t] : 'aberta'}</strong> · 14 m</p>
+    ${mestre ? `<div class="acoes portas-acoes">
+      <button data-porta="" class="${!t ? 'on' : ''}">Aberta</button>
+      <button data-porta="t" class="${t === 't' ? 'on' : ''}">🔒 Trancada</button>
+      <button data-porta="d" class="${t === 'd' ? 'on' : ''}">⚠ Destruída</button>
+      <button data-porta="c" class="${t === 'c' ? 'on' : ''}">❦ Carne</button></div>` : ''}`;
+  c.hidden = false;
+  $('.fechar', c).onclick = () => selecionar(null);
+  $$('[data-porta]', c).forEach(b => b.onclick = () => {
+    Store.definir(['portas', chavePorta(andarAtual, corredorSel)], b.dataset.porta || null);
+    montarAndar(); atualizarTudo();
+  });
+}
+
+/* =========================================================
+   AVISO "SUA VEZ" (perseguição)
+   ========================================================= */
+let vezAvisada = '';
+function verificarSuaVez() {
+  const p = P();
+  const vez = vezAtual();
+  const tk = vez && (Store.state.tokens || {})[vez];
+  const minha = p.on && tk && !mestre && podeMover(tk);
+  const chave = minha ? `${p.rod || 1}:${p.vez || 0}:${vez}` : '';
+  if (!minha) { vezAvisada = ''; return; }
+  if (chave === vezAvisada) return;
+  vezAvisada = chave;
+  $('#suaVezQuem').textContent = vez === meu ? `Rodada ${p.rod || 1}` : `${rotuloBase(tk)} · rodada ${p.rod || 1}`;
+  const caixa = $('#suaVez');
+  caixa.hidden = false;
+  caixa.classList.remove('anima'); void caixa.offsetWidth; caixa.classList.add('anima');
+  setTimeout(() => { caixa.hidden = true; }, 2600);
+  try { navigator.vibrate && navigator.vibrate([250, 120, 250, 120, 400]); } catch (e) {}
+  Som.tom(660, 0, 0.15, 'triangle', 0.12); Som.tom(990, 0.18, 0.25, 'triangle', 0.12);
+}
+
+/* =========================================================
+   EXPOSIÇÃO (NEX)
+   ========================================================= */
+const ELEM_EXPO = ['S', 'M', 'C', 'E', 'F'];
+function contarExposicao(id, tk, antes) {
+  if (!mestre || !SER[tk.s] || SER[tk.s].tipo !== 'cobaia') return;
+  const pB = salaEm(tk.a, tk.x, tk.y);
+  if (!pB || pB === 25) return;
+  const pA = salaEm(antes.a, antes.x, antes.y);
+  if (pA === pB && antes.a === tk.a) return;
+  const cn = cnDe(tk.a, pB);
+  const el2 = infoSala(tk.a, cn)[1];
+  if (!ELEM_EXPO.includes(el2)) return;
+  const atual = ((Segredos.dados._expo || {})[tk.s] || {})[el2] || 0;
+  Segredos.gravar(['_expo', tk.s, el2], atual + 1);
+}
+function desenharExpo() {
+  if (!mestre) return;
+  const ex = Segredos.dados._expo || {};
+  const cob = SERES.filter(x => x.tipo === 'cobaia');
+  $('#tabelaExpo').innerHTML = `<table><thead><tr><th></th>${ELEM_EXPO.map(k => `<th title="${ELEMENTOS[k].nome}"><span class="el-ponto" style="--cor:${ELEMENTOS[k].cor}"></span>${ELEMENTOS[k].nome.slice(0, 4)}</th>`).join('')}</tr></thead>
+    <tbody>${cob.map(x => `<tr><td>${x.nome}</td>${ELEM_EXPO.map(k => `<td>${(ex[x.id] || {})[k] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+$('#btnZerarExpo').addEventListener('click', () => { if (confirm('Zerar a contagem de exposição de todas as cobaias?')) { Segredos.gravar(['_expo'], null); desenharExpo(); } });
+$('#btnCopiarExpo').addEventListener('click', async () => {
+  const ex = Segredos.dados._expo || {};
+  const linhas = SERES.filter(x => x.tipo === 'cobaia').map(x => {
+    const partes = ELEM_EXPO.filter(k => (ex[x.id] || {})[k]).map(k => `${ELEMENTOS[k].nome} ${ex[x.id][k]}x`);
+    return `${x.nome}: ${partes.length ? partes.join(', ') : 'nenhuma'}`;
+  });
+  const txt = 'Exposição por elemento (visitas)\n' + linhas.join('\n');
+  try { await navigator.clipboard.writeText(txt); aviso('Resumo copiado.'); } catch (e) { prompt('Copie o resumo:', txt); }
+});
+
+/* =========================================================
+   ARQUIVOS NAS SALAS
+   Mestre: segredos/_arquivos (texto) + arquivosPriv (imagem).
+   Revelado: arquivos/lista (títulos) e arquivos/dados (conteúdo), públicos.
+   ========================================================= */
+const Arquivos = {
+  lista: {}, off: null,
+  ligar() { if (!this.off) this.off = Rede.on('arquivos/lista', v => { this.lista = v || {}; if (salaSel && !mestre) desenharCartao(); }); },
+  daSala(cn) { return Object.entries(this.lista['c' + cn] || {}); },
+  daSalaMestre(cn) { return Object.entries(Segredos.dados._arquivos || {}).filter(([, f]) => f && f.cn === cn).sort((x, y) => x[1].ts - y[1].ts); },
+  async criar(cn, t, x, arquivo) {
+    const fid = Rede.chave();
+    let img = null;
+    if (arquivo) {
+      try { img = await imagemReduzida(arquivo); } catch (e) { aviso('Não consegui ler a imagem.'); }
+    }
+    if (img) await Rede.set('arquivosPriv/' + fid, img).catch(erroGravacao);
+    Segredos.gravar(['_arquivos', fid], { cn, t, x: x || '', img: !!img, rev: false, ts: Date.now() });
+    Diario.registrar('sala', `Arquivo criado na CN ${pad2(cn)}: "${t}" (oculto)`);
+  },
+  async alternar(fid) {
+    const f = (Segredos.dados._arquivos || {})[fid];
+    if (!f) return;
+    if (f.rev) {
+      await Rede.set('arquivos/lista/c' + f.cn + '/' + fid, null).catch(erroGravacao);
+      await Rede.set('arquivos/dados/' + fid, null).catch(erroGravacao);
+      Segredos.gravar(['_arquivos', fid, 'rev'], false);
+      Diario.registrar('sala', `Arquivo escondido: "${f.t}" (CN ${pad2(f.cn)})`);
+    } else {
+      const img = f.img ? await Rede.once('arquivosPriv/' + fid) : null;
+      const dados = { t: f.t, x: f.x || '' };
+      if (img) dados.img = img;
+      await Rede.set('arquivos/dados/' + fid, dados).catch(erroGravacao);
+      await Rede.set('arquivos/lista/c' + f.cn + '/' + fid, f.t).catch(erroGravacao);
+      Segredos.gravar(['_arquivos', fid, 'rev'], true);
+      Diario.registrar('sala', `Arquivo revelado aos jogadores: "${f.t}" (CN ${pad2(f.cn)})`);
+    }
+  },
+  async apagar(fid) {
+    const f = (Segredos.dados._arquivos || {})[fid];
+    if (f && f.rev) await this.alternar(fid);
+    await Rede.set('arquivosPriv/' + fid, null).catch(() => {});
+    Segredos.gravar(['_arquivos', fid], null);
+  },
+  async abrirMestre(fid) {
+    const f = (Segredos.dados._arquivos || {})[fid];
+    if (!f) return;
+    const img = f.img ? await Rede.once('arquivosPriv/' + fid) : null;
+    mostrarArquivo({ t: f.t, x: f.x, img });
+  },
+  async abrir(fid) {
+    const d = await Rede.once('arquivos/dados/' + fid).catch(() => null);
+    if (!d) { aviso('Este arquivo não está mais disponível.'); return; }
+    mostrarArquivo(d);
+  },
+};
+function mostrarArquivo(d) {
+  $('#arqTitulo').textContent = d.t || 'Arquivo';
+  const im = $('#arqImg');
+  im.hidden = !d.img;
+  if (d.img) im.src = d.img; else im.removeAttribute('src');
+  $('#arqTexto').textContent = d.x || '';
+  $('#dlgArquivo').showModal();
+}
+// reduz a foto para caber no banco gratuito (lado maior 1000 px, JPEG)
+function imagemReduzida(arquivo, max = 1000) {
+  return new Promise((ok, falha) => {
+    const leitor = new FileReader();
+    leitor.onerror = falha;
+    leitor.onload = () => {
+      const im = new Image();
+      im.onerror = falha;
+      im.onload = () => {
+        const k = Math.min(1, max / Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        ok(cv.toDataURL('image/jpeg', 0.8));
+      };
+      im.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+/* =========================================================
+   CHAT (Geral · Sussurro ao Mestre · Filhos)
+   ========================================================= */
+const Chat = {
+  msgs: { geral: {}, sus: {}, filhos: {} },
+  enviados: [],          // sussurros que este aparelho mandou (só ele guarda)
+  respostas: {},         // respostas do Mestre para este aparelho
+  offs: [], chaveLigada: '', canal: 'geral', aberto: false, visto: {}, resp: null,
+  autorId() { return mestre ? '_mestre' : (meu || aux || ''); },
+  autorNome() { return mestre ? 'Mestre' : (SER[meu || aux] ? SER[meu || aux].nome : 'Visitante'); },
+  // código secreto deste aparelho para receber respostas do Mestre
+  cx() {
+    const k = 'acf-cx-' + (meu ? 'j:' + meu : aux ? 'a:' + aux : 'x');
+    let v = null;
+    try { v = localStorage.getItem(k); } catch (e) {}
+    if (!v) { v = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join(''); try { localStorage.setItem(k, v); } catch (e) {} }
+    return v;
+  },
+  canais() { return mestre ? ['geral', 'sus', 'filhos'] : aux ? ['geral', 'sus', 'filhos'] : meu ? ['geral', 'sus'] : []; },
+  pronto() {
+    if (TV) return false;
+    if (Store.modo === 'firebase') return !!(Store.auth && Store.auth.currentUser) && (mestre || !!meu || !!aux);
+    return mestre || !!meu || !!aux;
+  },
+  ligar() {
+    const chave = this.pronto() ? `${mestre ? 'M' : aux ? 'A:' + aux : 'J:' + meu}` : '';
+    $('#btnChat').hidden = !chave;
+    if (chave === this.chaveLigada) return;
+    this.offs.forEach(f => f()); this.offs = [];
+    this.msgs = { geral: {}, sus: {}, filhos: {} }; this.respostas = {}; this.visto = {}; this.resp = null;
+    this.chaveLigada = chave;
+    if (!chave) { this.fechar(); return; }
+    this.carregarEnviados();
+    const agora = Date.now();
+    this.canais().forEach(c => { this.visto[c] = agora; });
+    this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; this.atualizar(); }, () => {}));
+    if (mestre) {
+      this.offs.push(Rede.on('chat/sussurros', v => { this.msgs.sus = v || {}; this.atualizar(); }, () => {}));
+    } else {
+      this.offs.push(Rede.on('chat/respostas/' + this.cx(), v => { this.respostas = v || {}; this.atualizar(); }, () => {}));
+    }
+    if (mestre || aux) this.offs.push(Rede.on('chat/filhos', v => { this.msgs.filhos = v || {}; this.atualizar(); }, () => {}));
+    this.offs.push(Rede.on('chat/limpo', ts => {
+      if (!ts) return;
+      const antes = this.enviados.length;
+      this.enviados = this.enviados.filter(m => m.ts > ts);
+      if (this.enviados.length !== antes) this.salvarEnviados();
+      this.atualizar();
+    }, () => {}));
+    this.atualizar();
+  },
+  chaveEnviados() { return 'acf-sus-' + this.cx(); },
+  carregarEnviados() { try { this.enviados = JSON.parse(localStorage.getItem(this.chaveEnviados()) || '[]'); } catch (e) { this.enviados = []; } },
+  salvarEnviados() { try { localStorage.setItem(this.chaveEnviados(), JSON.stringify(this.enviados.slice(-200))); } catch (e) {} },
+  // mensagens de um canal, em ordem
+  lista(c) {
+    let l;
+    if (c === 'sus' && !mestre) l = this.enviados.concat(Object.values(this.respostas || {}));
+    else l = Object.values(this.msgs[c] || {});
+    return l.filter(m => m && m.ts).sort((x, y) => x.ts - y.ts).slice(-250);
+  },
+  naoLidas(c) {
+    const eu = this.autorId();
+    return this.lista(c).filter(m => m.ts > (this.visto[c] || 0) && m.a !== eu).length;
+  },
+  atualizar() {
+    if (!this.chaveLigada) return;
+    const canais = this.canais();
+    $$('#chatAbas button').forEach(b => {
+      const c = b.dataset.canal;
+      b.hidden = !canais.includes(c);
+      b.classList.toggle('ativo', c === this.canal);
+      if (c === 'sus') b.firstChild.textContent = mestre ? 'Sussurros' : 'Sussurro ao Mestre';
+      const n = this.aberto && c === this.canal ? 0 : this.naoLidas(c);
+      const s = $('.n', b); s.hidden = !n; s.textContent = n;
+    });
+    if (this.aberto) this.visto[this.canal] = Date.now();
+    const total = canais.reduce((t, c) => t + (this.aberto && c === this.canal ? 0 : this.naoLidas(c)), 0);
+    $('#chatBadge').hidden = !total; $('#chatBadge').textContent = total;
+    $('#btnApagarChat').hidden = !mestre;
+    if (this.aberto) this.desenhar();
+  },
+  desenhar() {
+    const c = this.canal;
+    const dicas = {
+      geral: 'Todos leem: jogadores, auxiliares e o Mestre.',
+      sus: mestre ? 'Mensagens privadas que os jogadores e auxiliares mandaram a você. Toque em "responder".' : 'Só o Mestre lê o que você mandar aqui. As respostas dele aparecem só para você.',
+      filhos: 'Só o Mestre e os auxiliares leem este canal.',
+    };
+    $('#chatDica').textContent = dicas[c];
+    const lista = $('#chatLista');
+    const noFim = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 40;
+    const eu = this.autorId();
+    lista.innerHTML = this.lista(c).map(m => {
+      const s = SER[m.a];
+      const avatar = s ? `<span class="bola" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>` : '<span class="bola mestre-bola">M</span>';
+      const para = mestre && c === 'sus' && m.para ? ` <small>→ ${esc(this.nomeDoCx(m.para))}</small>` : '';
+      const btn = mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '';
+      return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
+        <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
+        <div class="msg-txt">${esc(m.t)}</div></div></li>`;
+    }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
+    $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
+    if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
+    this.mostrarResp();
+  },
+  nomeDoCx(cx) {
+    const m = Object.values(this.msgs.sus || {}).find(x => x.cx === cx && x.a !== '_mestre');
+    return m ? m.n : 'jogador';
+  },
+  mostrarResp() {
+    const on = mestre && this.canal === 'sus' && this.resp;
+    $('#chatResp').hidden = !on;
+    if (on) $('#chatRespNome').textContent = this.resp.nome;
+  },
+  abrir(c) {
+    this.aberto = true;
+    if (c) this.canal = c;
+    if (!this.canais().includes(this.canal)) this.canal = 'geral';
+    $('#painelChat').hidden = false;
+    document.body.classList.add('chat-aberto');
+    this.rolarFim = true;
+    this.atualizar();
+  },
+  fechar() { this.aberto = false; $('#painelChat').hidden = true; document.body.classList.remove('chat-aberto'); this.atualizar(); },
+  // envia para um canal; d marca rolagem de dado
+  enviar(texto, canal = this.canal, d = false) {
+    texto = String(texto || '').trim().slice(0, 500);
+    if (!texto || !this.chaveLigada) return;
+    const m = { a: this.autorId(), n: this.autorNome(), t: texto, ts: Date.now() };
+    if (d) m.d = true;
+    if (canal === 'geral') Rede.push('chat/geral', m).pronto.catch(erroGravacao);
+    else if (canal === 'filhos') Rede.push('chat/filhos', m).pronto.catch(erroGravacao);
+    else if (canal === 'sus') {
+      if (mestre) {
+        if (!this.resp) { aviso('Toque em "responder" numa mensagem para escolher a quem responder.'); return false; }
+        const r = { ...m, para: this.resp.cx };
+        Rede.push('chat/respostas/' + this.resp.cx, m).pronto.catch(erroGravacao);
+        Rede.push('chat/sussurros', r).pronto.catch(erroGravacao);
+      } else {
+        const r = { ...m, cx: this.cx() };
+        Rede.push('chat/sussurros', r).pronto.catch(erroGravacao);
+        this.enviados.push(r); this.salvarEnviados();
+        this.atualizar();
+      }
+    }
+    return true;
+  },
+};
+$('#btnChat').addEventListener('click', () => (Chat.aberto ? Chat.fechar() : Chat.abrir()));
+$('#btnFecharChat').addEventListener('click', () => Chat.fechar());
+$$('#chatAbas button').forEach(b => b.addEventListener('click', () => { Chat.canal = b.dataset.canal; Chat.rolarFim = true; Chat.atualizar(); }));
+$('#chatForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = $('#chatTexto');
+  if (Chat.enviar(inp.value) !== false) inp.value = '';
+});
+$('#btnCancelarResp').addEventListener('click', () => { Chat.resp = null; Chat.mostrarResp(); });
+$('#btnApagarChat').addEventListener('click', () => {
+  if (!confirm('Apagar TODO o chat (Geral, Sussurros e Filhos) para todo mundo?')) return;
+  Rede.set('chat', { limpo: Date.now() }).catch(erroGravacao);
+  Diario.registrar('sessao', 'Chat apagado pelo Mestre');
+});
+
+/* ---------- Rolagens no chat ---------- */
+const rolagensAbertas = () => !(Store.state.cfg || {}).rolSecreta;
+$('#chkRolAberta').addEventListener('change', e => Store.definir(['cfg', 'rolSecreta'], e.target.checked ? null : true));
+function postarRolagem(texto) {
+  if (mestre || !Chat.chaveLigada) return;
+  const canal = aux ? 'filhos' : rolagensAbertas() ? 'geral' : 'sus';
+  Chat.enviar('🎲 ' + texto, canal, true);
+}
+
+/* =========================================================
+   SINAL NO MAPA ("quero ir para cá")
+   Jogador ou auxiliar segura o dedo (ou o botão do mouse) num ponto;
+   só o Mestre vê o sinal piscando.
+   ========================================================= */
+let toqueLongo = null;
+function iniciarToqueLongo(e) {
+  clearTimeout(toqueLongo && toqueLongo.t);
+  if (mestre || TV || !(meu || aux) || !podeVer(andarAtual)) { toqueLongo = null; return; }
+  const x0 = e.clientX, y0 = e.clientY;
+  toqueLongo = { x0, y0, t: setTimeout(() => {
+    const pt = telaParaPiso(x0, y0);
+    if (!andavel(andarAtual, pt.x, pt.y)) return;
+    if (gesto) gesto.andou = true;
+    const de = meu || aux;
+    Rede.push('sinais', { a: andarAtual, x: +pt.x.toFixed(2), y: +pt.y.toFixed(2), ts: Date.now(), de, n: SER[de] ? SER[de].nome : '?' }).pronto.catch(erroGravacao);
+    mostrarSinal(pt.x, pt.y, 'enviado', '');
+    aviso('Sinal enviado ao Mestre.');
+    try { navigator.vibrate && navigator.vibrate(60); } catch (err) {}
+  }, 650) };
+}
+function cancelarToqueLongo(e) {
+  if (!toqueLongo) return;
+  if (!e || e.type !== 'pointermove' || Math.hypot(e.clientX - toqueLongo.x0, e.clientY - toqueLongo.y0) > 8) { clearTimeout(toqueLongo.t); toqueLongo = null; }
+}
+viewport.addEventListener('pointerdown', e => { if (!e.target.closest('.ficha') && e.isPrimary) iniciarToqueLongo(e); });
+viewport.addEventListener('pointermove', cancelarToqueLongo);
+viewport.addEventListener('pointerup', () => cancelarToqueLongo());
+viewport.addEventListener('pointercancel', () => cancelarToqueLongo());
+function mostrarSinal(x, y, cls, rotulo) {
+  const d = el('div', 'sinal-ponto ' + cls, { left: px(x), top: px(y) });
+  d.innerHTML = `<span class="sinal-anel"></span>${rotulo ? `<span class="sinal-nome">${esc(rotulo)}</span>` : ''}`;
+  stage.appendChild(d);
+  setTimeout(() => d.remove(), cls === 'enviado' ? 2500 : 10000);
+}
+// Mestre: recebe os sinais
+const sinaisVistos = new Set();
+let sinaisOff = null;
+function ligarSinais() {
+  if (mestre && !sinaisOff) {
+    sinaisOff = Rede.on('sinais', v => {
+      Object.entries(v || {}).forEach(([k, s]) => {
+        if (sinaisVistos.has(k)) return;
+        sinaisVistos.add(k);
+        if (!s || Date.now() - s.ts > 120000) { Rede.set('sinais/' + k, null).catch(() => {}); return; }
+        if (s.a === andarAtual) mostrarSinal(s.x, s.y, 'recebido', s.n);
+        const p = salaEm(s.a, s.x, s.y);
+        const onde = p ? 'CN ' + pad2(cnDe(s.a, p)) : lugarDe(s);
+        aviso(`${s.n} marcou um ponto: ${onde}${s.a !== andarAtual ? ' (' + nomeAndar(s.a) + ')' : ''}`);
+        Som.tom(880, 0, 0.12, 'sine', 0.1);
+        Diario.registrar('mov', `${s.n} marcou um ponto no mapa: ${onde}`, { quem: s.de });
+        setTimeout(() => Rede.set('sinais/' + k, null).catch(() => {}), 11000);
+      });
+    }, () => {});
+  }
+  if (!mestre && sinaisOff) { sinaisOff(); sinaisOff = null; }
+}
+
+/* =========================================================
+   RELÓGIO DA CAIXA
+   ========================================================= */
+const fmtHora = m => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+let meiaNoiteVista = null;
+function desenharRelogio() {
+  const r = Store.state.relogio;
+  const tem = r && typeof r.m === 'number';
+  $('#relogio').hidden = !tem;
+  if (tem) $('#relogioHora').textContent = fmtHora(r.m);
+  if (mestre) $('#relogioMestre').textContent = tem ? fmtHora(r.m) : '--:--';
+  // virada da meia-noite: aviso para todos
+  const z = tem ? r.z || 0 : 0;
+  if (meiaNoiteVista === null) { meiaNoiteVista = z; return; }
+  if (z && z !== meiaNoiteVista) {
+    meiaNoiteVista = z;
+    if (Date.now() - z < 60000) {
+      const f = $('#faixaMeiaNoite');
+      f.hidden = false; piscar(); Som.tom(220, 0, 0.6, 'sawtooth', 0.1, 110);
+      setTimeout(() => { f.hidden = true; }, 7000);
+    }
+  }
+}
+function avancarRelogio(delta) {
+  const r = Store.state.relogio || { m: 0 };
+  const antes = typeof r.m === 'number' ? r.m : 0;
+  let total = antes + delta;
+  const virou = total >= 1440;
+  total = ((total % 1440) + 1440) % 1440;
+  const novo = { m: total };
+  if (virou) novo.z = Date.now(); else if (r.z) novo.z = r.z;
+  Store.definir(['relogio'], novo);
+  if (virou) {
+    Diario.registrar('ruido', '00:00 · os robôs S.T.A.F.F. desligam');
+    if (Segredos.dados._apagao00 && !apagaoAtivo()) publicarApagao(true);
+    setTimeout(() => { $('#btnQuebraZerar').click(); }, 400);
+  }
+}
+$$('.relogio-botoes button').forEach(b => b.addEventListener('click', () => avancarRelogio(+b.dataset.min)));
+$('#btnDefinirHora').addEventListener('click', () => {
+  const r = Store.state.relogio;
+  const v = prompt('Que horas são na Caixa? (HH:MM)', r && typeof r.m === 'number' ? fmtHora(r.m) : '20:00');
+  const m = /^(\d{1,2}):(\d{2})$/.exec((v || '').trim());
+  if (!m || +m[1] > 23 || +m[2] > 59) { if (v) aviso('Use o formato HH:MM, por exemplo 23:40.'); return; }
+  Store.definir(['relogio'], { m: +m[1] * 60 + +m[2], ...(r && r.z ? { z: r.z } : {}) });
+  Diario.registrar('ruido', `Relógio da Caixa ajustado para ${v.trim()}`);
+});
+$('#btnEsconderRelogio').addEventListener('click', () => Store.definir(['relogio'], null));
+$('#chkApagao00').addEventListener('change', e => Segredos.gravar(['_apagao00'], e.target.checked ? true : null));
+
+/* =========================================================
+   FICHA RESUMIDA (PV, SAN, PE, NEX)
+   O Mestre edita; o jogador vê a da própria cobaia.
+   ========================================================= */
+const CAMPOS_FICHA = [['pv', 'PV'], ['san', 'SAN'], ['pe', 'PE']];
+const fichaDe = id => (Store.state.fichas || {})[id] || null;
+function barrasFicha(f) {
+  if (!f) return '<p class="vazio">O Mestre ainda não preencheu.</p>';
+  return CAMPOS_FICHA.map(([k, r]) => {
+    const v = f[k], m = f[k + 'm'];
+    if (v === undefined && m === undefined) return '';
+    const pct = m ? Math.max(0, Math.min(100, (v || 0) / m * 100)) : 0;
+    return `<div class="barra barra-${k}"><span class="barra-r">${r}</span><div class="barra-trilho"><div class="barra-cheia" style="width:${pct}%"></div></div><b>${v ?? '?'}${m ? '/' + m : ''}</b></div>`;
+  }).join('') + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '');
+}
+function htmlEditarFicha(id) {
+  const f = fichaDe(id) || {};
+  const inp = (k, ph) => `<input type="number" data-f="${k}" value="${f[k] ?? ''}" placeholder="${ph}">`;
+  return `<details class="cartao-sec"><summary>Ficha resumida (o jogador vê)</summary>
+    <div class="ficha-edit">${CAMPOS_FICHA.map(([k, r]) => `<label>${r}${inp(k, 'atual')}<span>/</span>${inp(k + 'm', 'máx')}</label>`).join('')}
+    <label>NEX %${inp('nex', '%')}</label></div></details>`;
+}
+function ligarEditarFicha(c, id) {
+  $$('.ficha-edit input', c).forEach(i => i.onchange = () => {
+    const f = { ...(fichaDe(id) || {}) };
+    const v = i.value === '' ? null : Math.round(+i.value);
+    if (v === null) delete f[i.dataset.f]; else f[i.dataset.f] = v;
+    Store.definir(['fichas', id], Object.keys(f).length ? f : null);
+  });
+}
+function desenharMinhaFicha() {
+  const bloco = $('#blocoMinha');
+  bloco.hidden = !meu || mestre || TV;
+  if (bloco.hidden) return;
+  const s = SER[meu];
+  $('#minhaFicha').innerHTML = `<div class="minha-topo">${bola(s)}<div><strong>${s.nome}</strong><span class="sub">${s.jogador || ''}</span></div></div>${barrasFicha(fichaDe(meu))}`;
+}
+
+/* =========================================================
+   TELA DA MESA (modo TV): ?tv=1
+   Só o mapa, com a visão dos jogadores; segue o andar onde estão as cobaias.
+   ========================================================= */
+function seguirAndarTV() {
+  if (!TV) return;
+  const cont = {};
+  Object.values(Store.state.tokens || {}).forEach(tk => {
+    if (SER[tk.s] && SER[tk.s].tipo === 'cobaia' && visivelPara(tk) && podeVer(tk.a)) cont[tk.a] = (cont[tk.a] || 0) + 1;
+  });
+  const melhor = Object.entries(cont).sort((x, y) => y[1] - x[1])[0];
+  if (melhor && +melhor[0] !== andarAtual) irParaAndar(+melhor[0]);
+}
+$('#btnTV').addEventListener('click', () => window.open(location.pathname + '?tv=1', '_blank'));
+
+/* ---------- Painel do Mestre: subtítulo, importação, opções ---------- */
+function desenharOpcoesMestre() {
+  if (!mestre) return;
+  const sub = $('#subAndar');
+  if (document.activeElement !== sub) sub.value = (Priv.dados.andares || {})['a' + andarAtual] || ANDARES[andarAtual - 1].subtitulo || '';
+  $('#chkRolAberta').checked = rolagensAbertas();
+  $('#chkApagao00').checked = !!Segredos.dados._apagao00;
+}
+$('#subAndar').addEventListener('change', e => { Priv.gravar(['andares', 'a' + andarAtual], e.target.value.trim() || null); agendarSincMestre(); montarAndar(); });
+$('#btnImportarSalas').addEventListener('click', () => { $('#arqSalas').value = ''; $('#arqSalas').click(); });
+$('#arqSalas').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  let d;
+  try { d = JSON.parse(await f.text()); } catch (err) { alert('Arquivo inválido.'); return; }
+  if (!d || d.tipo !== 'planta-acf-salas') { alert('Este arquivo não é uma lista de salas da Planta da Caixa.'); return; }
+  const n = Object.keys(d.salas || {}).length;
+  if (!confirm(`Importar ${n} salas, os elevadores e os subtítulos? Os nomes atuais dessas salas serão substituídos.`)) return;
+  Object.entries(d.salas || {}).forEach(([k, v]) => Priv.gravar(['salas', k], v));
+  Object.entries(d.saidas || {}).forEach(([k, v]) => Priv.gravar(['saidas', k], v));
+  Object.entries(d.andares || {}).forEach(([k, v]) => Priv.gravar(['andares', k], v));
+  Diario.registrar('sessao', `Salas importadas (${n})`);
+  agendarSincMestre(); montarAndar(); atualizarTudo();
+  aviso(`${n} salas importadas.`);
+});
+
+/* =========================================================
    INÍCIO
    ========================================================= */
 Store.aoMudar(st => Diario.observar(st));
-Store.aoMudar(() => { verificarApagao(); focoInicialCelular(); });
+Store.aoMudar(() => { verificarApagao(); focoInicialCelular(); agendarSincMestre(); });
 Store.aoMudar(() => {
   if (podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
   atualizarTudo();
@@ -2436,12 +3381,21 @@ window.addEventListener('resize', () => enquadrar());
   aplicarCamera();
   montarAndar();
   enquadrar();
+  // tela da mesa: sem perfil, sem painéis, só a visão dos jogadores
+  if (TV) {
+    document.body.classList.add('tv');
+    await Store.iniciar();
+    atualizarTudo();
+    return;
+  }
   const perfil = lerPerfil();
   if (perfil.startsWith('jogador:') && SER[perfil.slice(8)]) meu = perfil.slice(8);
   if (perfil.startsWith('aux:') && SER[perfil.slice(4)]) aux = perfil.slice(4);
   if (!FIREBASE && perfil === 'mestre') { try { if (localStorage.getItem('acf-mestre') === '1') mestre = true; } catch (e) {} }
   await Store.iniciar();
   if (mestre && Store.modo === 'local') definirMestre(true);
+  if (aux && Store.modo === 'local') Priv.ligar(true);
+  if (Store.modo === 'local') Chat.ligar();
   atualizarBotaoPerfil();
   atualizarTudo();
   // sem perfil salvo: pergunta quem é

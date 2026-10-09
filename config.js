@@ -19,8 +19,12 @@ const SENHAS_ANDARES = {
   5: 'ae92d66ed5035aee947afd5690361df5af5ec8bd72741cbd2443fdc3c5b4026a',
 };
 
-/* Senha dos Mestres Auxiliares (vale no modo local e com Firebase). */
+/* Senha dos Mestres Auxiliares.
+   Modo local: o site confere por este hash.
+   Com Firebase: os auxiliares entram numa conta própria do Firebase com este
+   e-mail (criada pelo Mestre em Authentication) e a senha dos auxiliares. */
 const SENHA_AUX = '69ed67323361e2f9b80a29085a884be5aef8e4ce745731b67f9a58d27fe227aa';
+const EMAIL_AUX = 'auxiliares@caixa-acf.com';
 
 /* Senha do Mestre (usada só no MODO LOCAL, sem Firebase).
    Com o Firebase ligado, o Mestre entra com o e-mail e a senha

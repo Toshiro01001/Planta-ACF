@@ -68,40 +68,13 @@ const ANDARES = [
       25: ['Zona Neutra', 'F'],
     },
   },
-  {
-    id: 2, titulo: '2º Andar', subtitulo: 'O Alojamento',
-    saida: 49,
-    salas: {
-      26: ['Doca de Chegada', 'E'],
-      27: ['Refeitório Coletivo', 'S'],
-      28: ['Lavanderia', 'M'],
-      29: ['Cozinha', 'S'],
-      30: ['Banheiros Coletivos', 'S'],
-      31: ['Dormitório 6', 'F'],
-      32: ['Fichário de Cobaias', 'C'],
-      33: ['Estufa SYMBIONT', 'E'],
-      34: ['Ginásio', 'S'],
-      35: ['Cinema', 'C'],
-      36: ['Corredor de Escuta', 'F'],
-      37: ['Enfermaria', 'M'],
-      38: ['Casa das Caldeiras', 'E'],
-      39: ['Sala de Recreação', 'E'],
-      40: ['Capela Amarela', 'F'],
-      41: ['Arquivo Morto', 'M'],
-      42: ['Sala de Interrogatório', 'C'],
-      43: ['Câmara Fria', 'M'],
-      44: ['Ateliê da Costureira', 'F'],
-      45: ['Sala de Triagem', 'S'],
-      46: ['Central de Rádio', 'E'],
-      47: ['Sala de Música', 'C'],
-      48: ['Sala do Eco', 'F'],
-      49: ['Poço Quebrado', 'M'],
-      50: ['Zona Neutra', 'F'],
-    },
-  },
-  { id: 3, titulo: '3º Andar', subtitulo: 'Planta não registrada', saida: 55, salas: {} },
-  { id: 4, titulo: '4º Andar', subtitulo: 'Planta não registrada', saida: 90, salas: {} },
-  { id: 5, titulo: '5º Andar', subtitulo: 'Planta não registrada', saida: 107, salas: {} },
+  /* Andares 2 a 5: nomes, elementos, subtítulo e elevador NÃO ficam aqui
+     (este arquivo é público). O Mestre importa ou edita pelo painel, e os
+     jogadores só recebem o nome de uma sala quando ela é revelada. */
+  { id: 2, titulo: '2º Andar', subtitulo: '', saida: null, salas: {} },
+  { id: 3, titulo: '3º Andar', subtitulo: '', saida: null, salas: {} },
+  { id: 4, titulo: '4º Andar', subtitulo: '', saida: null, salas: {} },
+  { id: 5, titulo: '5º Andar', subtitulo: '', saida: null, salas: {} },
 ];
 
 /* RUÍDO: a Zona Neutra (sala 25 de cada andar) não conta para o limite diário.
