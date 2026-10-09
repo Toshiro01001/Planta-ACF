@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009b';
+const VERSAO_SITE = '20261009c';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -147,7 +147,7 @@ function posicoesIniciais(andar = 1) {
   return tokens;
 }
 const CAMPOS_VAZIOS = () => ({ rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null,
-  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {}, melhorias: {} });
+  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {}, melhorias: {}, cond: {} });
 const estadoPadrao = () => ({ ...CAMPOS_VAZIOS(), tokens: posicoesIniciais() });
 // ficha que vai para o caminho privado (só Mestre e auxiliares leem): Filhos, NPCs e robôs ocultos
 const ehPrivado = tk => !!tk && !!tk.h && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia';
@@ -467,8 +467,15 @@ const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
 function recusaLocal(caminho, valor) {
   if (caminho[0] === 'portas' && caminho.length === 2) {
     const atual = (Store.state.portas || {})[caminho[1]] || null;
-    if ((valor === 'p' || valor === null) && (!atual || atual === 'a' || atual === 'p')) return '';
+    const txt = typeof valor === 'string' ? valor : '';
+    if (valor === null && (atual === 'a' || (typeof atual === 'string' && atual.startsWith('p')))) return '';
+    if (txt.startsWith('p:') && !atual) return '';
+    if (txt.startsWith('k:') && atual === 'tk') return '';
     return 'Essa porta não responde ao botão.';
+  }
+  if (caminho[0] === 'estoque' && caminho.length === 2) {
+    const n = (Store.state.estoque || {})[caminho[1]];
+    return typeof n === 'number' && valor === n - 1 && valor >= 0 ? '' : 'A despensa não tem mais isso hoje.';
   }
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
@@ -590,6 +597,7 @@ function focar(x, y) {
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let modoMover = false;
+let modoRegua = false;
 
 /* ---- Gestos ---- */
 const ponteiros = new Map();
@@ -602,7 +610,10 @@ viewport.addEventListener('pointerdown', e => {
   viewport.setPointerCapture(e.pointerId);
   ponteiros.set(e.pointerId, { x: e.clientX, y: e.clientY });
   esconderDica();
-  if (ponteiros.size === 1) {
+  if (ponteiros.size === 1 && modoRegua && e.button === 0) {
+    gesto = { tipo: 'regua', x: e.clientX, y: e.clientY, andou: true };
+    reguaInicio(telaParaPiso(e.clientX, e.clientY));
+  } else if (ponteiros.size === 1) {
     gesto = { tipo: (e.button === 2 || e.button === 1 || e.shiftKey || modoMover) ? 'mover' : 'girar', x: e.clientX, y: e.clientY, andou: false };
   } else if (ponteiros.size === 2) {
     const [a, b] = [...ponteiros.values()];
@@ -624,6 +635,7 @@ viewport.addEventListener('pointermove', e => {
     aplicarCamera();
     return;
   }
+  if (gesto.tipo === 'regua') { reguaPasso(telaParaPiso(e.clientX, e.clientY)); return; }
   const dx = e.clientX - gesto.x, dy = e.clientY - gesto.y;
   gesto.x = e.clientX; gesto.y = e.clientY;
   if (Math.abs(dx) + Math.abs(dy) > 2) gesto.andou = true;
@@ -639,6 +651,7 @@ viewport.addEventListener('pointermove', e => {
 function soltar(e) {
   if (!ponteiros.has(e.pointerId)) return;
   ponteiros.delete(e.pointerId);
+  if (gesto && gesto.tipo === 'regua') reguaFim();
   if (gesto && !gesto.andou && ponteiros.size === 0) {
     const pt = telaParaPiso(e.clientX, e.clientY);
     const p = podeVer(andarAtual) ? salaEm(andarAtual, pt.x, pt.y) : null;
@@ -686,6 +699,11 @@ $$('.camera button').forEach(b => b.addEventListener('click', () => {
     case 'mover':
       modoMover = !modoMover;
       b.classList.toggle('ativo', modoMover);
+      return;
+    case 'regua':
+      modoRegua = !modoRegua;
+      b.classList.toggle('ativo', modoRegua);
+      if (modoRegua) aviso('Régua ligada: arraste no mapa para medir. Toque no 📏 de novo para desligar.');
       return;
   }
   aplicarCamera();
@@ -1021,6 +1039,7 @@ function desenharFichas() {
       f.innerHTML = `<div class="ficha-sombra"></div>
         <div class="ficha-pino">
           <span class="ficha-nome"></span>
+          <span class="ficha-cond"></span>
           <div class="ficha-cabeca"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></div>
           <div class="ficha-haste"></div>
         </div>`;
@@ -1040,6 +1059,10 @@ function desenharFichas() {
     f.classList.toggle('vista-filhos', mestre && !!tk.vf);
     f.classList.toggle('selecionada', selecionado === id);
     f.classList.toggle('no-grupo', grupo.has(id));
+    const cs = condicoesVisiveis(id);
+    const cTxt = cs.map(c => COND[c].i).join('');
+    const cEl = $('.ficha-cond', f);
+    if (cEl.textContent !== cTxt) { cEl.textContent = cTxt; cEl.title = cs.map(c => COND[c].n).join(', '); }
   });
 
   fichasDom.forEach((f, id) => { if (!vistos.has(id)) { f.remove(); fichasDom.delete(id); } });
@@ -1267,6 +1290,9 @@ function desenharCartao() {
     </div>`;
   }
 
+  const cv = condicoesVisiveis(selecionado);
+  const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
+  const condMestre = mestre && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
   const fichaMinha = !mestre && tk.s === meu ? `<div class="cartao-ficha">${barrasFicha(fichaDe(meu))}</div>` : '';
   const fichaEdit = mestre && s.tipo === 'cobaia' ? htmlEditarFicha(s.id) : '';
   if (c.dataset.ficha === selecionado && c.contains(document.activeElement) && document.activeElement.matches('input')) return;
@@ -1274,10 +1300,11 @@ function desenharCartao() {
   c.dataset.ficha = selecionado;
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo">${foto}<div><h3>${titulo}</h3><span class="cod">${s.codigo}</span></div></div>
-    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${fichaMinha}${acoes}${fichaEdit}`;
+    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${condTxt}${fichaMinha}${acoes}${condMestre}${fichaEdit}`;
   c.hidden = false;
   $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
   if (fichaEdit) ligarEditarFicha(c, s.id);
+  if (condMestre) ligarCondMestre(c, selecionado);
 
   $('.fechar', c).onclick = () => selecionar(null);
   if (mestre) {
@@ -1433,7 +1460,7 @@ function desenharSons() {
   grupos.forEach((gr, k) => {
     if (gr.a !== andarAtual) return;
     const e = elDe(gr, k);
-    if (e) alvo.set(e, Math.max(alvo.get(e) || 0, nivelDe(gr.ids.length)));
+    if (e) alvo.set(e, Math.max(alvo.get(e) || 0, nivelDe(gr.ids.length + (gr.extra || 0))));
   });
   if (ouvinte) {
     $$('.sala, .corredor', stage).forEach(e => {
@@ -1472,6 +1499,9 @@ function atualizarTudo() {
   marcarSalasMestre();
   desenharExtrasMestre();
   verificarSuaVez();
+  verificarCodigos();
+  marcarVisitadas();
+  if ($('#tempoVez') && document.activeElement !== $('#tempoVez')) $('#tempoVez').value = tempoVez() || '';
   desenharExpo();
   desenharRelogio();
   desenharMinhaFicha();
@@ -1484,6 +1514,7 @@ function atualizarTudo() {
   desenharCaderno();
   desenharConectados();
   desenharOpcoesLoja();
+  desenharZonaJogador();
   aplicarAbas();
   Presenca.ligar();
   if ($('#dlgLoja').open) desenharLoja();
@@ -1524,7 +1555,10 @@ const NIVEIS = [
   { db: 68, nome: 'No limite' },
   { db: 83, nome: 'Limite rompido' },
 ];
-const nivelDe = n => n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : n === 5 ? 4 : 5;
+// com a Pressurização Reversa comprada, o limite só rompe com uma cobaia a mais
+const nivelDe = n => n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : n === 5 ? 4 : (n === 6 && melhoriaAtiva('limite')) ? 4 : 5;
+// porta aberta ou código errado há pouco: conta como uma cobaia a mais na sala
+const barulhoEm = (a, p) => { const ts = (Store.state.barulho || {})[a + ':' + p]; return ts && Date.now() - ts < BARULHO_MS ? 1 : 0; };
 
 // agrupa as cobaias por sala (andar + posição). No corredor, cada uma conta sozinha.
 const isentos = new Set();   // cobaias na Zona Neutra (não contam)
@@ -1539,6 +1573,8 @@ function gruposDeSala() {
     if (!g.has(k)) g.set(k, { a: tk.a, p, ids: [] });
     g.get(k).ids.push(id);
   });
+  // barulho de porta soma como se houvesse mais uma cobaia na sala
+  g.forEach(gr => { gr.extra = gr.p ? barulhoEm(gr.a, gr.p) : 0; });
   return g;
 }
 
@@ -1556,7 +1592,7 @@ function nomeGrupo(gr) {
 function desenharRuido() {
   const grupos = gruposDeSala();
   const nivelDoId = {};
-  grupos.forEach(gr => gr.ids.forEach(id => { nivelDoId[id] = { n: nivelDe(gr.ids.length), qtd: gr.ids.length }; }));
+  grupos.forEach(gr => gr.ids.forEach(id => { nivelDoId[id] = { n: nivelDe(gr.ids.length + (gr.extra || 0)), qtd: gr.ids.length }; }));
   const tokens = Store.state.tokens || {};
 
   $('#listaRuido').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
@@ -1571,16 +1607,16 @@ function desenharRuido() {
   if (!mestre) return;
   // decibelímetro do Mestre: mostra a sala mais barulhenta da Caixa
   let pior = null;
-  grupos.forEach(gr => { if (!pior || gr.ids.length > pior.ids.length) pior = gr; });
-  const nMax = pior ? nivelDe(pior.ids.length) : 0;
+  grupos.forEach(gr => { if (!pior || gr.ids.length + (gr.extra || 0) > pior.ids.length + (pior.extra || 0)) pior = gr; });
+  const nMax = pior ? nivelDe(pior.ids.length + (pior.extra || 0)) : 0;
   let col = '';
   for (let i = 5; i >= 1; i--) col += `<div class="dq${i <= nMax ? ' on n' + i : ''}"><span>${NIVEIS[i].db} dB</span><em>${NIVEIS[i].nome}</em></div>`;
   $('#decibelimetro').innerHTML = col;
-  $('#decibelInfo').textContent = pior ? `Mais barulho: ${nomeGrupo(pior)} (${pior.ids.length} cobaia${pior.ids.length > 1 ? 's' : ''})` : 'Nenhuma cobaia no mapa.';
+  $('#decibelInfo').textContent = pior ? `Mais barulho: ${nomeGrupo(pior)} (${pior.ids.length} cobaia${pior.ids.length > 1 ? 's' : ''}${pior.extra ? ' + barulho de porta' : ''})` : 'Nenhuma cobaia no mapa.';
 
-  const rompidas = [...grupos.values()].filter(gr => nivelDe(gr.ids.length) >= 5);
+  const rompidas = [...grupos.values()].filter(gr => nivelDe(gr.ids.length + (gr.extra || 0)) >= 5);
   $('#alertaRuido').hidden = rompidas.length === 0;
-  $('#alertaRuidoTxt').textContent = rompidas.map(gr => `${nomeGrupo(gr)}: ${gr.ids.length} cobaias`).join(' · ');
+  $('#alertaRuidoTxt').textContent = rompidas.map(gr => `${nomeGrupo(gr)}: ${gr.ids.length} cobaias${gr.extra ? ' + porta' : ''}`).join(' · ');
 
   const r = Store.state.ruido || { q: 0, p: false };
   desenharCiclo(r);
@@ -1596,7 +1632,7 @@ function desenharRuido() {
 let salasRompidas = null;
 function verificarAlarme() {
   const agora = new Set();
-  gruposDeSala().forEach((gr, k) => { if (nivelDe(gr.ids.length) >= 5) agora.add(k); });
+  gruposDeSala().forEach((gr, k) => { if (nivelDe(gr.ids.length + (gr.extra || 0)) >= 5) agora.add(k); });
   if (salasRompidas) {
     const nova = [...agora].some(k => !salasRompidas.has(k));
     if (nova) { Som.alarme(); piscar(); }
@@ -1678,6 +1714,9 @@ $('#btnQuebraZerar').addEventListener('click', () => {
   const r = ruido(), d = r.d || 1;
   if (!confirm(`Encerrar o Dia ${d} e começar o Dia ${d + 1}? As quebras voltam a 0.`)) return;
   mudarRuido({ q: 0, qd: 0, d: d + 1, hist: { ...(r.hist || {}), ['d' + d]: hojeDe(r) } });
+  encherEstoque(); Store.definir(['usos'], null);
+  const cap = capacidadeEstoque();
+  if (Object.keys(cap).length) Chat.enviar(`☀ Dia ${d + 1} na Caixa. A despensa da Zona Neutra foi reabastecida: ${Object.entries(cap).map(([k, n]) => `${n} ${NOME_ESTOQUE[k] || k}`).join(', ')}.`, 'geral');
 });
 $('#btnDia').addEventListener('click', () => {
   const r = ruido();
@@ -1945,20 +1984,131 @@ $('#btnIniciarPersg').addEventListener('click', () => {
     lim: Math.max(1, parseFloat($('input.lim', l).value) || 9),
   })).sort((x, y) => y.ini - x.ini);
   if (!ordem.length) { aviso('Marque quem participa da perseguição.'); return; }
-  Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1 });
+  Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1, vts: Date.now() });
   iniciarTurno(ordem[0].id);
 });
 $('#btnProxTurno').addEventListener('click', () => {
   const o = ordemP(); if (!o.length) return;
   let v = (P().vez || 0) + 1, rod = P().rod || 1;
   if (v >= o.length) { v = 0; rod++; }
-  Store.definir(['persg'], { ...P(), vez: v, rod });
+  Store.definir(['persg'], { ...P(), vez: v, rod, vts: Date.now() });
   iniciarTurno(o[v].id);
 });
 $('#btnRefazerVez').addEventListener('click', () => { const v = vezAtual(); if (v) refazerRota(v); });
 $('#btnRefazerMinha').addEventListener('click', () => { const v = vezAtual(); const tk = v && Store.state.tokens[v]; if (tk && podeMover(tk)) refazerRota(v); });
 $('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição?')) Store.definir(['persg'], { on: false, req: P().req || 0 }); });
 $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; });
+
+/* ---------- Cronômetro de decisão (perseguição) ----------
+   cfg.tempoVez = segundos por vez (0 = desligado). persg.vts = quando a vez começou. */
+const tempoVez = () => +((Store.state.cfg || {}).tempoVez || 0);
+let cronoAvisado = 0;
+function restanteVez() {
+  const p = P(), t = tempoVez();
+  if (!p.on || !t || !p.vts) return null;
+  return Math.max(0, Math.ceil(t - (Date.now() - p.vts) / 1000));
+}
+function tickCrono() {
+  const r = restanteVez();
+  const el2 = $('#cronoVez');
+  el2.hidden = r === null;
+  if (r === null) return;
+  const vez = vezAtual();
+  el2.textContent = `⏱ ${r}s · ${vez ? nomeParticipante(vez, !mestre) : ''}`;
+  el2.classList.toggle('acabando', r <= 10 && r > 0);
+  el2.classList.toggle('esgotado', r === 0);
+  const tkv = vez && Store.state.tokens[vez];
+  const minha = !mestre && tkv && podeMover(tkv);
+  if (minha && r > 0 && r <= 5) Som.tom(660, 0, 0.08, 'square', 0.06);
+  if (r === 0 && cronoAvisado !== P().vts) {
+    cronoAvisado = P().vts;
+    if (mestre) alertaMestre(`Tempo esgotado na perseguição: ${vez ? nomeParticipante(vez) : 'ninguém'}`);
+    if (minha) { aviso('Seu tempo acabou. O Mestre decide o que acontece.'); Som.tom(330, 0, 0.4, 'sawtooth', 0.12); }
+  }
+}
+setInterval(tickCrono, 1000);
+$('#tempoVez').addEventListener('change', e => { const v = Math.max(0, parseInt(e.target.value, 10) || 0); Store.definir(['cfg', 'tempoVez'], v || null); });
+$('#btnReiniciarCrono').addEventListener('click', () => { if (P().on) Store.definir(['persg', 'vts'], Date.now()); });
+
+/* ---------- Condições nas fichas ----------
+   mapa/cond/<ficha>/<condição> = 1 (todos veem) ou 2 (só o dono e o Mestre) */
+const COND = {
+  sangrando: { i: '🩸', n: 'Sangrando' }, morrendo: { i: '💀', n: 'Morrendo' }, enlouquecendo: { i: '🌀', n: 'Enlouquecendo' },
+  envenenada: { i: '🧪', n: 'Envenenada' }, inconsciente: { i: '💤', n: 'Inconsciente' }, assustada: { i: '😱', n: 'Apavorada' },
+};
+function condicoesVisiveis(id) {
+  const c = (Store.state.cond || {})[id] || {};
+  return Object.keys(COND).filter(k => c[k] === 1 || (c[k] === 2 && (V().mestre || id === meu)));
+}
+function htmlCondMestre(id) {
+  const c = (Store.state.cond || {})[id] || {};
+  return `<details class="cartao-sec cond-mestre"><summary>Condições</summary>
+    <p class="mini">Toque para alternar: desligada → todos veem → só o dono vê.</p>
+    <div class="cond-botoes">${Object.entries(COND).map(([k, v]) => `<button data-cond="${k}" class="c${c[k] || 0}">${v.i} ${v.n}<small>${c[k] === 1 ? 'todos' : c[k] === 2 ? 'só o dono' : ''}</small></button>`).join('')}</div></details>`;
+}
+function ligarCondMestre(raiz, id) {
+  $$('[data-cond]', raiz).forEach(b => b.onclick = () => {
+    const k = b.dataset.cond, at = (((Store.state.cond || {})[id]) || {})[k] || 0;
+    const nv = (at + 1) % 3;
+    Store.definir(['cond', id, k], nv || null);
+    Diario.registrar('sala', `${SER[(Store.state.tokens[id] || {}).s] ? SER[Store.state.tokens[id].s].nome : id}: ${COND[k].n} ${nv === 1 ? '(todos veem)' : nv === 2 ? '(só o dono)' : 'removida'}`);
+  });
+}
+
+/* ---------- Salas já visitadas (cada jogador, neste aparelho) ---------- */
+let visitadas = null;
+function chaveVisitadas() { return 'acf-visitadas-' + meu; }
+function marcarVisitadas() {
+  const ver = !!meu && !mestre;
+  if (!ver) { $$('.sala.visitada', stage).forEach(e => e.classList.remove('visitada')); return; }
+  if (!visitadas || visitadas.dono !== meu) {
+    let l = [];
+    try { l = JSON.parse(localStorage.getItem(chaveVisitadas()) || '[]'); } catch (e) {}
+    visitadas = { dono: meu, set: new Set(l) };
+  }
+  const tk = (Store.state.tokens || {})[meu];
+  if (tk) {
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (p) {
+      const cn = cnDe(tk.a, p);
+      if (!visitadas.set.has(cn)) { visitadas.set.add(cn); try { localStorage.setItem(chaveVisitadas(), JSON.stringify([...visitadas.set])); } catch (e) {} }
+    }
+  }
+  $$('.sala', stage).forEach(e => e.classList.toggle('visitada', visitadas.set.has(+e.dataset.cn)));
+}
+
+/* ---------- Régua (só nesta tela) ---------- */
+let regua = null;
+function reguaInicio(pt) {
+  reguaFim(true);
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'previa-svg regua-svg');
+  svg.setAttribute('width', W * T); svg.setAttribute('height', H * T);
+  svg.style.width = px(W); svg.style.height = px(H);
+  const linha = document.createElementNS(SVGNS, 'line');
+  linha.setAttribute('class', 'regua-linha');
+  svg.appendChild(linha);
+  const rot = el('div', 'previa-rotulo regua-rotulo');
+  rot.innerHTML = '<span></span>';
+  stage.appendChild(svg); stage.appendChild(rot);
+  regua = { svg, linha, rot, a: pt };
+  reguaPasso(pt);
+}
+function reguaPasso(pt) {
+  if (!regua) return;
+  const a = regua.a;
+  regua.linha.setAttribute('x1', a.x * T); regua.linha.setAttribute('y1', a.y * T);
+  regua.linha.setAttribute('x2', pt.x * T); regua.linha.setAttribute('y2', pt.y * T);
+  regua.rot.style.left = px(pt.x); regua.rot.style.top = px(pt.y);
+  $('span', regua.rot).textContent = `📏 ${fmtM(custoMetros(a, pt))} m`;
+}
+function reguaFim(ja) {
+  if (!regua) return;
+  const r = regua; regua = null;
+  if (ja) { r.svg.remove(); r.rot.remove(); return; }
+  setTimeout(() => { r.svg.classList.add('some'); r.rot.classList.add('some'); }, 2500);
+  setTimeout(() => { r.svg.remove(); r.rot.remove(); }, 4000);
+}
 
 /* ---------- Perfil: Jogador ou Mestre ---------- */
 let meu = null;   // id da cobaia do jogador neste navegador
@@ -2210,7 +2360,7 @@ const Diario = {
       if (a === b) return;
       const m = /^a(\d+)c(\d+)$/.exec(k); if (!m) return;
       const c = CORREDORES[+m[2]], andar = +m[1];
-      if (b === 'p') return;
+      if (typeof b === 'string' && (b.startsWith('p') || b.startsWith('k:'))) return;
       this.registrar('sala', `Corredor entre CN ${pad2(cnDe(andar, c.p1))} e CN ${pad2(cnDe(andar, c.p2))}: porta ${textoPorta(b)}`);
     });
     new Set([...Object.keys(ant.cego || {}), ...Object.keys(novo.cego || {})]).forEach(id => {
@@ -2257,7 +2407,7 @@ const Diario = {
       return;
     }
     if (p.antes.a === tk.a && p.antes.x === tk.x && p.antes.y === tk.y) return;
-    if (de !== para) this.registrar('mov', `${rotuloBase(tk)}: ${de} → ${para}`, { quem: id });
+    if (de !== para) this.registrar('mov', `${rotuloBase(tk)}: ${de} → ${para}`, { quem: id, s: tk.s, a0: p.antes.a, x0: p.antes.x, y0: p.antes.y, a1: tk.a, x1: tk.x, y1: tk.y });
     contarExposicao(id, tk, p.antes);
     this.pilha.push({ id, antes: p.antes });
     if (this.pilha.length > 40) this.pilha.shift();
@@ -2442,6 +2592,94 @@ window.addEventListener('keydown', e => {
     desfazer();
   }
 });
+
+/* =========================================================
+   ATALHOS DE TECLADO
+   Todos: Q/E giram · R régua · C chat · ? ajuda
+   Mestre: N próximo turno · A apagão · L loja · V revelar/esconder a sala aberta · P replay
+   Ctrl+Z desfaz (já existia)
+   ========================================================= */
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, textarea, select') || $('dialog[open]')) return;
+  const k = e.key.toLowerCase();
+  const clicar = id => { const b = $(id); if (b && !b.disabled) b.click(); };
+  if (k === 'r') clicar('#btnRegua');
+  else if (k === 'c') clicar('#btnChat');
+  else if (k === '?') clicar('#btnAjuda');
+  if (!mestre) return;
+  if (k === 'n' && P().on) { clicar('#btnProxTurno'); aviso('Próximo turno.'); }
+  else if (k === 'a') clicar('#btnApagao');
+  else if (k === 'l') abrirLoja();
+  else if (k === 'v' && salaSel) { Store.definir(['salas', 'c' + salaSel], !salaRevelada(Math.ceil(salaSel / 25), salaSel)); aviso(`CN ${pad2(salaSel)}: ${salaRevelada(Math.ceil(salaSel / 25), salaSel) ? 'revelada' : 'escondida'}.`); }
+  else if (k === 'p') clicar('#btnReplay');
+});
+
+/* =========================================================
+   REPLAY DA SESSÃO (só na tela do Mestre, não mexe no mapa)
+   Usa os movimentos anotados no Diário e anima "fantasmas" das fichas.
+   ========================================================= */
+let replay = null;
+function movimentosParaReplay(qual) {
+  const todas = Diario.entradas();
+  let ini = 0;
+  if (qual === 'sessao') { for (let i = todas.length - 1; i >= 0; i--) if (todas[i].k === 'sessao') { ini = i; break; } }
+  const dia = ruido().d || 1;
+  return todas.slice(ini).filter(e => e.k === 'mov' && e.x1 !== undefined && (qual !== 'dia' || e.dia === dia));
+}
+function pararReplay() {
+  if (!replay) return;
+  clearTimeout(replay.timer);
+  replay.fantasmas.forEach(f => f.remove());
+  replay = null;
+  document.body.classList.remove('em-replay');
+  $('#faixaReplay').hidden = true;
+}
+function iniciarReplay() {
+  pararReplay();
+  const movs = movimentosParaReplay($('#replayQual').value);
+  if (!movs.length) { aviso('Não há movimentos anotados nesse trecho do Diário (os movimentos antigos, de antes desta versão, não guardavam posição).'); return; }
+  const vel = +$('#replayVel').value || 1;
+  replay = { movs, i: 0, vel, fantasmas: new Map(), timer: null };
+  document.body.classList.add('em-replay');
+  $('#faixaReplay').hidden = false;
+  // cada ficha começa onde estava no primeiro movimento do trecho
+  movs.forEach(m => {
+    if (replay.fantasmas.has(m.quem) || m.a0 !== andarAtual) return;
+    replay.fantasmas.set(m.quem, criarFantasma(m, m.x0, m.y0));
+  });
+  passoReplay();
+}
+function criarFantasma(m, x, y) {
+  const s = SER[m.s] || {};
+  const f = el('div', 'fantasma', { left: px(x), top: px(y) });
+  f.style.setProperty('--cor', s.cor || '#8b5cf6');
+  f.innerHTML = `<span class="fantasma-bola"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></span><em>${esc(s.nome || m.quem)}</em>`;
+  stage.appendChild(f);
+  return f;
+}
+function passoReplay() {
+  if (!replay) return;
+  if (replay.i >= replay.movs.length) {
+    $('#faixaReplayTxt').textContent = `Replay terminado · ${replay.movs.length} movimentos`;
+    replay.timer = setTimeout(pararReplay, 3500);
+    return;
+  }
+  const m = replay.movs[replay.i++];
+  const dur = 900 / replay.vel;
+  $('#faixaReplayTxt').textContent = `REPLAY · ${replay.i}/${replay.movs.length} · ${hora(m.ts).slice(0, 5)} · Dia ${m.dia || '?'} · ${m.txt}`;
+  let f = replay.fantasmas.get(m.quem);
+  if (m.a1 === andarAtual) {
+    if (!f) { f = criarFantasma(m, m.a0 === andarAtual ? m.x0 : m.x1, m.a0 === andarAtual ? m.y0 : m.y1); replay.fantasmas.set(m.quem, f); }
+    f.hidden = false;
+    f.style.transitionDuration = dur + 'ms';
+    requestAnimationFrame(() => { f.style.left = px(m.x1); f.style.top = px(m.y1); });
+    f.classList.add('andando');
+    setTimeout(() => f && f.classList.remove('andando'), dur);
+  } else if (f) f.hidden = true;   // foi para outro andar
+  replay.timer = setTimeout(passoReplay, dur + 250 / replay.vel);
+}
+$('#btnReplay').addEventListener('click', iniciarReplay);
+$('#btnPararReplay').addEventListener('click', pararReplay);
 
 /* =========================================================
    BACKUP (baixar e restaurar o estado inteiro)
@@ -2732,6 +2970,7 @@ function sincronizarMestre() {
   sincronizarCego();
   semearLoja();
   semearMelhorias();
+  ajustarEstoque();
   resolverPortas();
 }
 const igualJSON = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
@@ -2772,11 +3011,23 @@ function sincronizarCego() {
   const ve = Segredos.dados._apagaoVe || {};
   Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
     if (!SER[tk.s] || SER[tk.s].tipo !== 'cobaia' || ve[tk.s]) return;
-    const p = salaEm(tk.a, tk.x, tk.y);
+    const p = salaOuMetade(tk.a, tk.x, tk.y);
     if (p && semSinal(cnDe(tk.a, p))) novo[id] = true;
   });
   const atual = Store.state.cego || {};
   if (!igualJSON(Object.keys(atual).sort(), Object.keys(novo).sort())) Store.definir(['cego'], Object.keys(novo).length ? novo : null);
+}
+// sala onde a ficha está; no corredor, vale a sala da metade em que ela pisa
+function salaOuMetade(a, x, y) {
+  const p = salaEm(a, x, y);
+  if (p) return p;
+  const ci = corredorEm(x, y);
+  if (ci >= 0) {
+    const c = CORREDORES[ci];
+    return (c.eixo === 'h' ? x < c.x + c.w / 2 : y < c.y + c.h / 2) ? c.p1 : c.p2;
+  }
+  const s = saidaDoAndar(a), rs = retSaida(s);
+  return rs && dentro(rs, x, y) ? s.p : null;
 }
 const cegoEu = () => !!(meu && !mestre && (Store.state.cego || {})[meu]);
 
@@ -2865,17 +3116,22 @@ function marcarSalasMestre() {
    Valores públicos (mapa/portas): vazio = fechada · p = abrindo
    a = aberta · t / d / c = o que foi encontrado ao tentar abrir.
    ========================================================= */
-const TIPOS_PORTA = { t: 'Trancada', d: 'Destruída (escombros)', c: 'Bloqueada por carne' };
-const SINAL_PORTA = { t: '🔒', d: '⚠', c: '❦' };
-const OBSTACULOS = ['t', 'd', 'c'];
+const TIPOS_PORTA = { t: 'Trancada', tk: 'Trancada, com teclado', d: 'Destruída (escombros)', c: 'Bloqueada por carne' };
+const SINAL_PORTA = { t: '🔒', tk: '🔢', d: '⚠', c: '❦' };
+const OBSTACULOS = ['t', 'tk', 'd', 'c'];
 const chavePorta = (a, ci) => 'a' + a + 'c' + ci;
 const portaDe = (a, ci) => (Store.state.portas || {})[chavePorta(a, ci)] || null;
-// o que está de verdade atrás da porta (só Mestre e auxiliares leem)
+// o que está de verdade atrás da porta e o código do teclado (só Mestre e auxiliares leem)
 const obstaculoDe = (a, ci) => ((Priv.dados && Priv.dados.portas) || {})[chavePorta(a, ci)] || null;
+const codigoDe = (a, ci) => ((Priv.dados && Priv.dados.codigos) || {})[chavePorta(a, ci)] || '';
 const portaAberta = (a, ci) => portaDe(a, ci) === 'a';
+// "p:<quem>" = botão apertado · "k:<quem>:<código>" = código digitado no teclado
+const apertada = v => typeof v === 'string' && v.startsWith('p');
+const digitada = v => typeof v === 'string' && v.startsWith('k:');
 function textoPorta(v) {
   if (!v) return 'fechada';
-  if (v === 'p') return 'abrindo…';
+  if (apertada(v)) return 'abrindo…';
+  if (digitada(v)) return 'trancada · conferindo o código…';
   if (v === 'a') return 'aberta';
   return TIPOS_PORTA[v] ? TIPOS_PORTA[v].toLowerCase() : 'fechada';
 }
@@ -2886,7 +3142,8 @@ function barreira(c) {
 function bloqueadoPorPorta(andar, x, y) {
   if (mestre) return false;   // o Mestre passa por qualquer porta
   for (let ci = 0; ci < CORREDORES.length; ci++) {
-    if (!portaAberta(andar, ci) && dentro(barreira(CORREDORES[ci]), x, y)) return true;
+    // porta fechada: nem o corredor dá para pisar (folga negativa: a borda da sala continua livre)
+    if (!portaAberta(andar, ci) && dentro(CORREDORES[ci], x, y, -0.05)) return true;
   }
   return false;
 }
@@ -2897,17 +3154,32 @@ function desenharPortas(paredes) {
     const corr = $(`.corredor[data-ci="${ci}"]`, stage);
     if (corr) corr.classList.toggle('corr-fechado', pub !== 'a');
     if (pub === 'a') return;
-    const t = OBSTACULOS.includes(pub) ? pub : (pub === 'p' ? 'p' : 'f');
-    const secreto = verSegredo && !OBSTACULOS.includes(pub) ? obstaculoDe(andarAtual, ci) : null;
+    const t = apertada(pub) ? 'p' : digitada(pub) || pub === 'tk' ? 't' : OBSTACULOS.includes(pub) ? pub : 'f';
+    const revelado = OBSTACULOS.includes(pub) || digitada(pub);
+    const secreto = verSegredo && !revelado ? obstaculoDe(andarAtual, ci) : null;
     const b = barreira(c);
     const chao = el('div', 'porta-chao porta-' + t, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
-    chao.innerHTML = SINAL_PORTA[t] ? `<span>${SINAL_PORTA[t]}</span>` : '<i class="botao-vermelho"></i>';
+    chao.innerHTML = revelado ? `<span>${SINAL_PORTA[digitada(pub) ? 'tk' : pub]}</span>` : '';
     if (secreto) chao.innerHTML += `<em class="porta-secreta" title="Só você vê: ${TIPOS_PORTA[secreto]}">${SINAL_PORTA[secreto]}</em>`;
     stage.appendChild(chao);
     const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
     const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
     pw.classList.add('porta-parede', 'porta-' + t);
     paredes.push(pw);
+    // botão vermelho em 3D, preso nas paredes do corredor dos dois lados da porta
+    if (t === 'f' || t === 'p' || pub === 'tk' || digitada(pub)) {
+      const placas = c.eixo === 'v'
+        ? [c.x + 0.03, c.x + c.w - 0.03].flatMap(xp => [[xp, ym - 0.55, xp, ym - 0.25], [xp, ym + 0.25, xp, ym + 0.55]])
+        : [c.y + 0.03, c.y + c.h - 0.03].flatMap(yp => [[xm - 0.55, yp, xm - 0.25, yp], [xm + 0.25, yp, xm + 0.55, yp]]);
+      placas.forEach(([x1, y1, x2, y2]) => {
+        const pl = parede(x1, y1, x2, y2);
+        pl.classList.add('botao-parede');
+        if (t === 'p') pl.classList.add('apertado');
+        if (pub === 'tk' || digitada(pub)) pl.classList.add('teclado');
+        pl.innerHTML = '<i class="botao-3d"></i>';
+        paredes.push(pl);
+      });
+    }
   });
 }
 // a cobaia precisa estar numa das duas salas ligadas pelo corredor (ou dentro dele)
@@ -2925,24 +3197,68 @@ function quemApertaPorta(ci) {
   if (!pertoDaPorta(tk, ci)) return { ok: false, motivo: 'Chegue até uma das salas ligadas por este corredor para apertar o botão da porta.' };
   return { ok: true };
 }
+const quemSou = () => meu || aux || 'x';
 function abrirPorta(a, ci) {
   const k = chavePorta(a, ci), pub = portaDe(a, ci);
-  if (pub && pub !== 'p') return;
-  if (mestre) { Store.definir(['portas', k], obstaculoDe(a, ci) || 'a'); return; }
-  Store.definir(['portas', k], 'p');   // a tela do Mestre responde se abriu ou não
+  if (pub) return;
+  if (mestre) { Store.definir(['portas', k], resultadoAbrir(a, ci)); return; }
+  Store.definir(['portas', k], 'p:' + quemSou());   // a tela do Mestre responde se abriu ou não
 }
 function fecharPorta(a, ci) {
   const pub = portaDe(a, ci);
-  if (pub !== 'a' && pub !== 'p') return;
+  if (pub !== 'a' && !apertada(pub)) return;
   Store.definir(['portas', chavePorta(a, ci)], null);
 }
-// tela do Mestre: responde aos botões apertados
+let codigoEnviado = {};   // portas em que este aparelho digitou um código (para avisar se errou)
+function digitarCodigo(a, ci, codigo) {
+  codigo = String(codigo || '').replace(/[^0-9A-Za-z]/g, '').slice(0, 12);
+  if (!codigo) return;
+  const k = chavePorta(a, ci);
+  codigoEnviado[k] = Date.now();
+  Store.definir(['portas', k], `k:${quemSou()}:${codigo}`);
+}
+function resultadoAbrir(a, ci) {
+  const o = obstaculoDe(a, ci);
+  if (o === 't' && codigoDe(a, ci)) return 'tk';
+  return o || 'a';
+}
+// barulho de porta: soma 1 cobaia no ruído da sala por 2 minutos
+const BARULHO_MS = 120000;
+function fazerBarulho(quem) {
+  const tk = (Store.state.tokens || {})[quem];
+  if (!tk) return;
+  const p = salaOuMetade(tk.a, tk.x, tk.y);
+  if (p) Store.definir(['barulho', tk.a + ':' + p], Date.now());
+}
+// tela do Mestre: responde aos botões apertados e aos códigos digitados
 function resolverPortas() {
   if (!mestre || (Store.modo === 'firebase' && !Priv.pronto)) return;
   const priv = (Priv.dados && Priv.dados.portas) || {};
+  const cods = (Priv.dados && Priv.dados.codigos) || {};
   Object.entries(Store.state.portas || {}).forEach(([k, v]) => {
-    if (v === 'p') Store.definir(['portas', k], priv[k] || 'a');
+    const m = /^a(\d+)c(\d+)$/.exec(k); if (!m) return;
+    const a = +m[1], ci = +m[2], c = CORREDORES[ci];
+    const nomeC = c ? `Corredor entre CN ${pad2(cnDe(a, c.p1))} e CN ${pad2(cnDe(a, c.p2))}` : k;
+    if (apertada(v)) {
+      const quem = v.split(':')[1];
+      Store.definir(['portas', k], resultadoAbrir(a, ci));
+      if (quem && SER[quem]) fazerBarulho(quem);
+    } else if (digitada(v)) {
+      const [, quem, cod] = v.split(':');
+      if (cods[k] && String(cods[k]).toLowerCase() === String(cod || '').toLowerCase()) {
+        Priv.gravar(['portas', k], null);
+        Store.definir(['portas', k], 'a');
+        if (quem && SER[quem]) fazerBarulho(quem);
+        Diario.registrar('sala', `${nomeC}: código certo, porta destrancada por ${SER[quem] ? SER[quem].nome : 'alguém'}`);
+      } else {
+        Store.definir(['portas', k], 'tk');
+        if (quem && SER[quem]) fazerBarulho(quem);
+        Diario.registrar('sala', `${nomeC}: código errado (${cod}) digitado por ${SER[quem] ? SER[quem].nome : 'alguém'}`);
+      }
+    }
   });
+  // barulhos vencidos saem do mapa
+  Object.entries(Store.state.barulho || {}).forEach(([k, ts]) => { if (Date.now() - ts > BARULHO_MS) Store.definir(['barulho', k], null); });
   // versões antigas: obstáculos marcados direto no mapa público viram segredo
   if (!(Store.state.cfg || {}).portasV2) {
     Object.entries(Store.state.portas || {}).forEach(([k, v]) => {
@@ -2951,6 +3267,19 @@ function resolverPortas() {
     Store.definir(['cfg', 'portasV2'], true);
   }
 }
+// código errado: quem digitou recebe o aviso
+let portasAntes = {};
+function verificarCodigos() {
+  const atual = Store.state.portas || {};
+  Object.keys(codigoEnviado).forEach(k => {
+    const antes = portasAntes[k], agora = atual[k];
+    if (digitada(antes) && agora === 'tk') { aviso('Código errado. O teclado apitou alto.'); Som.tom(220, 0, 0.35, 'square', 0.15); delete codigoEnviado[k]; }
+    else if (digitada(antes) && agora === 'a') { aviso('Código certo. A porta destrancou.'); delete codigoEnviado[k]; }
+    else if (Date.now() - codigoEnviado[k] > 300000) delete codigoEnviado[k];
+  });
+  portasAntes = { ...atual };
+}
+setInterval(() => { if (Object.keys(Store.state.barulho || {}).length) { desenharRuido(); if (mestre) agendarSincMestre(); } }, 10000);
 const corredorEm = (x, y) => CORREDORES.findIndex(c => dentro(c, x, y));
 let corredorSel = null;
 function selecionarCorredor(ci) {
@@ -2967,16 +3296,27 @@ function desenharCartaoCorredor() {
   const pub = portaDe(andarAtual, ci);
   const obst = V().mestre ? obstaculoDe(andarAtual, ci) : null;
   const nomeC = `Corredor entre CN ${pad2(cnDe(andarAtual, k.p1))} e CN ${pad2(cnDe(andarAtual, k.p2))}`;
-  const corDe = v => v === 'c' ? '#8a2f2f' : v === 'd' ? '#8a6a3a' : v === 't' ? '#7a8597' : v === 'a' ? '#8b5cf6' : '#c0392b';
+  const corDe = v => v === 'c' ? '#8a2f2f' : v === 'd' ? '#8a6a3a' : v === 't' || v === 'tk' || digitada(v) ? '#7a8597' : v === 'a' ? '#8b5cf6' : '#c0392b';
   c.style.setProperty('--cor', corDe(pub));
+  // foco no campo do teclado não pode ser perdido a cada atualização
+  const focoTeclado = document.activeElement && document.activeElement.id === 'tecladoCodigo' ? $('#tecladoCodigo').value : null;
   const podeApertar = quemApertaPorta(ci);
+  const semMestre = !mestre && !Presenca.online('_mestre');
   let acoes = '';
-  if (pub === 'p') acoes = '<p class="dica-porta">O botão foi apertado. A porta de ferro está se mexendo…</p>';
-  else if (OBSTACULOS.includes(pub)) acoes = `<p class="dica-porta">${pub === 't' ? 'O botão vermelho não responde: a porta não abre.' : 'A porta abriu, mas não dá para passar.'}</p>`;
+  if (apertada(pub) || digitada(pub)) {
+    acoes = `<p class="dica-porta">${apertada(pub) ? 'O botão foi apertado. A porta de ferro está se mexendo…' : 'O teclado está conferindo o código…'}</p>`;
+    if (semMestre) acoes += '<p class="dica-porta alerta">Aguardando o Mestre: a tela dele está fechada agora. A porta responde assim que ele voltar.</p>';
+  } else if (pub === 'tk' && !mestre) {
+    acoes = podeApertar.ok
+      ? `<p class="dica-porta">O botão vermelho não responde. Ao lado dele há um teclado.</p>
+         <form class="teclado-porta" autocomplete="off"><input id="tecladoCodigo" inputmode="text" maxlength="12" placeholder="Código"><button class="btn-botao-vermelho">Digitar</button></form>`
+      : `<p class="dica-porta">A porta está trancada e tem um teclado. ${podeApertar.motivo}</p>`;
+  } else if (OBSTACULOS.includes(pub)) acoes = `<p class="dica-porta">${pub === 't' || pub === 'tk' ? 'O botão vermelho não responde: a porta não abre.' : 'A porta abriu, mas não dá para passar.'}</p>`;
   else if (!mestre) {
     acoes = podeApertar.ok
       ? `<div class="acoes portas-acoes">${pub === 'a' ? '<button data-acao="fechar">Fechar a porta</button>' : '<button data-acao="abrir" class="btn-botao-vermelho">● Apertar o botão vermelho</button>'}</div>`
       : `<p class="dica-porta">${podeApertar.motivo}</p>`;
+    if (pub !== 'a' && semMestre && podeApertar.ok) acoes += '<p class="dica-porta alerta">A tela do Mestre está fechada agora: a porta só responde quando ele voltar.</p>';
   }
   const blocoMestre = mestre ? `
     <div class="acoes portas-acoes">
@@ -2988,6 +3328,8 @@ function desenharCartaoCorredor() {
       <button data-obst="t" class="${obst === 't' ? 'on' : ''}">🔒 Trancada</button>
       <button data-obst="d" class="${obst === 'd' ? 'on' : ''}">⚠ Destruída</button>
       <button data-obst="c" class="${obst === 'c' ? 'on' : ''}">❦ Carne</button></div>
+    ${obst === 't' ? `<label class="campo-linha so-mestre-txt">Código do teclado (vazio = sem teclado)
+      <input id="codigoPorta" value="${esc(codigoDe(andarAtual, ci))}" maxlength="12" placeholder="ex.: 0451"></label>` : ''}
     ${obst && !OBSTACULOS.includes(pub) ? '<p class="so-mestre-txt">Os jogadores ainda não sabem. Aparece quando alguém apertar o botão.</p>' : ''}
     <div class="acoes portas-acoes"><button data-todas="a">Abrir todas do andar</button><button data-todas="">Fechar todas do andar</button></div>` : '';
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
@@ -2997,11 +3339,30 @@ function desenharCartaoCorredor() {
   c.hidden = false;
   $('.fechar', c).onclick = () => selecionar(null);
   const refazer = () => { montarAndar(); atualizarTudo(); };
+  const form = $('.teclado-porta', c);
+  if (form) {
+    if (focoTeclado !== null) { $('#tecladoCodigo').value = focoTeclado; $('#tecladoCodigo').focus(); }
+    form.onsubmit = e => {
+      e.preventDefault();
+      const ok = quemApertaPorta(ci);
+      if (!ok.ok) { aviso(ok.motivo); return; }
+      digitarCodigo(andarAtual, ci, $('#tecladoCodigo').value);
+      refazer();
+    };
+  }
+  const cod = $('#codigoPorta', c);
+  if (cod) cod.onchange = () => {
+    const v = cod.value.trim();
+    Priv.gravar(['codigos', chavePorta(andarAtual, ci)], v || null);
+    // porta já revelada como trancada: o teclado aparece ou some na hora
+    if (pub === 't' || pub === 'tk') Store.definir(['portas', chavePorta(andarAtual, ci)], v ? 'tk' : 't');
+    aviso(v ? 'Código do teclado salvo.' : 'Teclado removido.');
+  };
   $$('[data-acao]', c).forEach(b => b.onclick = () => {
     const ok = quemApertaPorta(ci);
     if (!ok.ok) { aviso(ok.motivo); return; }
     if (b.dataset.acao === 'abrir') {
-      if (mestre && pub && pub !== 'p') Store.definir(['portas', chavePorta(andarAtual, ci)], 'a');
+      if (mestre && pub) Store.definir(['portas', chavePorta(andarAtual, ci)], 'a');
       else abrirPorta(andarAtual, ci);
     } else if (mestre) Store.definir(['portas', chavePorta(andarAtual, ci)], null);
     else fecharPorta(andarAtual, ci);
@@ -3009,11 +3370,12 @@ function desenharCartaoCorredor() {
   });
   $$('[data-obst]', c).forEach(b => b.onclick = () => {
     const v = b.dataset.obst || null;
-    Priv.gravar(['portas', chavePorta(andarAtual, ci)], v);
+    const kk = chavePorta(andarAtual, ci);
+    Priv.gravar(['portas', kk], v);
+    if (v !== 't') Priv.gravar(['codigos', kk], null);
     // tirou o obstáculo que os jogadores já viam: escombros e carne liberam a passagem, a tranca deixa a porta só fechada
-    if (!v && OBSTACULOS.includes(pub)) Store.definir(['portas', chavePorta(andarAtual, ci)], pub === 't' ? null : 'a');
-    if (v && OBSTACULOS.includes(pub)) Store.definir(['portas', chavePorta(andarAtual, ci)], v);
-    if (v && pub === 'a') Store.definir(['portas', chavePorta(andarAtual, ci)], v);
+    if (!v && OBSTACULOS.includes(pub)) Store.definir(['portas', kk], pub === 't' || pub === 'tk' ? null : 'a');
+    if (v && (OBSTACULOS.includes(pub) || pub === 'a')) Store.definir(['portas', kk], v);
     Diario.registrar('sala', `${nomeC}: atrás da porta, ${v ? TIPOS_PORTA[v].toLowerCase() : 'nada'} (segredo)`);
     refazer();
   });
@@ -3021,9 +3383,9 @@ function desenharCartaoCorredor() {
     const abrir = b.dataset.todas === 'a';
     if (!confirm(abrir ? 'Abrir todas as portas deste andar? Onde houver tranca, escombros ou carne, os jogadores vão ver.' : 'Fechar todas as portas deste andar?')) return;
     CORREDORES.forEach((_, i) => {
-      const k2 = chavePorta(andarAtual, i), o = obstaculoDe(andarAtual, i), atual = portaDe(andarAtual, i);
-      if (abrir) Store.definir(['portas', k2], o || 'a');
-      else if (atual === 'a' || atual === 'p') Store.definir(['portas', k2], null);
+      const k2 = chavePorta(andarAtual, i), atual = portaDe(andarAtual, i);
+      if (abrir) { if (!atual || apertada(atual)) Store.definir(['portas', k2], resultadoAbrir(andarAtual, i)); }
+      else if (atual === 'a' || apertada(atual)) Store.definir(['portas', k2], null);
     });
     refazer();
   });
@@ -3929,7 +4291,11 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Girar:</b> arraste no mapa. <b>Mover a vista:</b> botão direito, dois dedos ou o botão ✥. <b>Zoom:</b> roda do mouse ou pinça.</li>
     <li><b>ISO / TOPO / ◎:</b> vistas prontas. <b>◉</b> leva até a sua ficha.</li>
     <li><b>Tocar numa sala</b> mostra o nome, quem está ali e os arquivos encontrados. <b>Portas:</b> toda porta de ferro começa fechada. Leve sua cobaia até uma das salas ligadas pelo corredor, toque nele e aperte o botão vermelho para abrir (ou feche de novo). Só ao tentar abrir você descobre se ela está trancada ou se há algo do outro lado.</li>
-    <li><b>Loja:</b> o botão da loja tem duas abas, as vendas do Maurício e as Melhorias ZN. Os pedidos vão para o Mestre.</li></ul>
+    <li><b>Loja:</b> o botão da loja tem duas abas, as vendas do Maurício e as Melhorias ZN. Os pedidos vão para o Mestre, e a resposta (aprovado ou recusado) chega no seu Sussurro.</li>
+    <li><b>Despensa e cofre:</b> abaixo do botão da loja aparecem o cofre de sucatas do grupo e a despensa da Zona Neutra. Toque em "Pegar 1" para levar uma água ou comida (todos veem no chat).</li>
+    <li><b>Teclado:</b> algumas portas trancadas têm um teclado ao lado do botão. Digite o código que vocês encontraram. Errar faz barulho.</li>
+    <li><b>Régua 📏:</b> ligue no canto do mapa e arraste para medir a distância em metros.</li>
+    <li><b>Atalhos:</b> Q/E giram o mapa, R liga a régua, C abre o chat.</li></ul>
     <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre.</li></ul>`;
   const jog = `<h3>Sua cobaia</h3><ul>
     <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
@@ -3945,7 +4311,11 @@ $('#btnAjuda').addEventListener('click', () => {
     <li>No painel, <b>rolar iniciativa dos Filhos</b> do andar aberto de uma vez. O canal <b>Filhos</b> do chat é só de vocês e do Mestre.</li></ul>`;
   const mes = `<h3>Mestre</h3><ul>
     <li><b>Abas:</b> Mapa, Sessão, Registro e Segredos.</li>
-    <li><b>Clique numa sala:</b> revelar, editar, gatilho, sem sinal, arquivos, trazer cobaias. <b>Num corredor:</b> abrir ou fechar a porta e escolher em segredo o que há atrás dela (tranca, escombros, carne). Os jogadores só descobrem quando apertarem o botão. Também abre ou fecha todas do andar.</li>
+    <li><b>Clique numa sala:</b> revelar, editar, gatilho, sem sinal, arquivos, trazer cobaias. <b>Num corredor:</b> abrir ou fechar a porta e escolher em segredo o que há atrás dela (tranca, escombros, carne). Os jogadores só descobrem quando apertarem o botão. Na tranca você pode pôr um código de teclado. Também abre ou fecha todas do andar.</li>
+    <li><b>Pedidos:</b> na aba Sessão, aprove ou recuse cada pedido. Aprovar desconta as sucatas da ficha ou do cofre do grupo e responde no Sussurro do jogador.</li>
+    <li><b>Condições:</b> no cartão da ficha, toque em "Condições" e alterne cada uma: todos veem, só o dono vê ou desligada.</li>
+    <li><b>Replay:</b> na aba Registro, "Replay no mapa" refaz os movimentos da sessão em velocidade acelerada, só na sua tela.</li>
+    <li><b>Atalhos do Mestre:</b> N próximo turno · A apagão · L loja · V revelar ou esconder a sala aberta · P replay · Ctrl+Z desfazer · R régua · C chat.</li>
     <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
     <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
     <li><b>Ctrl+Z</b> desfaz o último movimento de qualquer ficha.</li></ul>`;
@@ -4014,8 +4384,9 @@ $$('[data-aba-loja]').forEach(b => b.addEventListener('click', () => trocarAbaLo
 let lojaSig = '';
 function desenharLoja(forcar) {
   if (abaLoja === 'melhorias') { desenharMelhorias(forcar); return; }
+  $('#lojaZona').innerHTML = htmlCofre();
   const s = minhasSucatas();
-  const sig = JSON.stringify([itensLoja(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, s, mestre]);
+  const sig = JSON.stringify([itensLoja(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, s, mestre, Store.state.cofre]);
   if (!forcar && sig === lojaSig) return;
   lojaSig = sig;
   let avisoTxt = '';
@@ -4061,7 +4432,8 @@ function pedirItem(it, op) {
   if (!podePagar(custo) && !confirm('Pelas suas sucatas anotadas, não dá para pagar. Pedir mesmo assim?')) return;
   if (!Chat.chaveLigada) { aviso('Sem conexão com o chat.'); return; }
   Chat.enviar(`🛒 Pedido ao Maurício: ${op.n} (${it.t}) · ${txtCusto(custo)}`, 'sus');
-  aviso('Pedido enviado ao Mestre.');
+  criarPedido({ tipo: 'loja', item: it.id, t: `${op.n} (${it.t})`, custo: custo || null, pg: 'ficha' });
+  aviso('Pedido enviado ao Mestre. A resposta chega no seu Sussurro.');
 }
 function limparFormLoja() {
   ['lojaEditId', 'lojaT', 'lojaOp', 'lojaDesc'].forEach(i => { $('#' + i).value = ''; });
@@ -4133,8 +4505,15 @@ $('#chkLojaZN').addEventListener('change', e => Store.definir(['cfg', 'lojaQualq
    Mesmas regras da loja: aberta/fechada e "só na Zona Neutra".
    Públicas em mapa/melhorias; as ocultas ficam nos segredos do Mestre. */
 function itensMelhorias() {
-  const pub = Object.entries(((Store.state.melhorias || {}).itens) || {}).map(([id, it]) => ({ ...it, id, oculto: false }));
-  const ocultos = mestre ? Object.entries(Segredos.dados._melhOculta || {}).map(([id, it]) => ({ ...it, id, oculto: true })) : [];
+  // vendas do catálogo padrão herdam os efeitos automáticos (estoque, uso por dia, drone, limite)
+  const comPadrao = (id, it) => {
+    const p = MELHORIAS_PADRAO.find(x => x.id === id) || {};
+    const r = { ...it, id };
+    ['estoque', 'usoDia', 'drone', 'limite'].forEach(k => { if (r[k] === undefined && p[k] !== undefined) r[k] = p[k]; });
+    return r;
+  };
+  const pub = Object.entries(((Store.state.melhorias || {}).itens) || {}).map(([id, it]) => ({ ...comPadrao(id, it), oculto: false }));
+  const ocultos = mestre ? Object.entries(Segredos.dados._melhOculta || {}).map(([id, it]) => ({ ...comPadrao(id, it), oculto: true })) : [];
   return pub.concat(ocultos).sort((a, b) => (!!a.comprado - !!b.comprado) || (a.ordem || 0) - (b.ordem || 0));
 }
 function imagemDaMelhoria(it, imgEl) {
@@ -4144,7 +4523,7 @@ function imagemDaMelhoria(it, imgEl) {
   imagemDoItem({ imgId: it.imgId }, imgEl);
 }
 function desenharMelhorias(forcar) {
-  const sig = JSON.stringify(['m', itensMelhorias(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, mestre]);
+  const sig = JSON.stringify(['m', itensMelhorias(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, mestre, Store.state.usos, Store.state.estoque, Store.state.cofre, diaAtual()]);
   if (!forcar && sig === lojaSig) return;
   lojaSig = sig;
   const lista = itensMelhorias();
@@ -4152,6 +4531,8 @@ function desenharMelhorias(forcar) {
   $('#lojaAviso').textContent = mestre
     ? `${feitas} melhoria${feitas === 1 ? '' : 's'} comprada${feitas === 1 ? '' : 's'}. ${lojaAberta() ? 'Loja aberta' : 'Loja FECHADA'} aos jogadores. Pedidos chegam no seu Sussurro.`
     : `Melhorias da Zona Neutra. ${feitas} já instalada${feitas === 1 ? '' : 's'}. ${lojaSoZN() ? 'Peça na Zona Neutra; ' : ''}o pedido vai para o Mestre.`;
+  $('#lojaZona').innerHTML = htmlCofre() + htmlDespensa();
+  ligarDespensa($('#lojaZona'));
   const grade = $('#lojaGrade');
   grade.innerHTML = '';
   lista.forEach(it => {
@@ -4161,7 +4542,11 @@ function desenharMelhorias(forcar) {
         <h3>${esc(it.t)}${it.oculto ? ' <span class="so-mestre">oculta</span>' : ''}</h3>
         ${it.comprado ? '<p class="loja-preco ok">Instalada na Zona Neutra</p>' : (it.custo ? `<p class="loja-preco">${txtCusto(it.custo)}</p>` : '')}
         ${it.desc ? `<p class="loja-desc">${esc(it.desc)}</p>` : ''}
+        ${it.comprado && it.estoque ? `<p class="loja-desc melh-efeito">Despensa: ${Object.entries(it.estoque).map(([k, n]) => `${n} ${NOME_ESTOQUE[k] || k} por dia`).join(', ')}</p>` : ''}
+        ${it.comprado && it.usoDia ? `<p class="melh-uso ${usadaHoje(it.id) ? 'usada' : ''}">${usadaHoje(it.id) ? 'Já usada hoje' : 'Disponível hoje'}</p>` : ''}
+        ${it.comprado && it.limite ? '<p class="melh-uso">Ativa: o limite de barulho subiu</p>' : ''}
         ${!mestre && !it.comprado ? '<div class="loja-acoes"><button class="btn-pedir">Pedir esta melhoria</button></div>' : ''}
+        ${mestre && it.comprado && it.usoDia ? `<div class="loja-acoes"><button data-a="usar" ${usadaHoje(it.id) ? 'disabled' : ''}>${it.drone ? '🛸 Usar o drone' : 'Usar hoje'}</button>${usadaHoje(it.id) ? '<button data-a="desusar">Desfazer uso</button>' : ''}</div>` : ''}
         ${mestre ? `<div class="loja-acoes"><button data-a="editar">Editar</button><button data-a="comprar">${it.comprado ? 'Desmarcar compra' : 'Marcar como comprada'}</button><button data-a="ocultar">${it.oculto ? 'Mostrar aos jogadores' : 'Ocultar'}</button><button data-a="apagar" class="perigo">Apagar</button></div>` : ''}
       </div>`;
     imagemDaMelhoria(it, $('img', card));
@@ -4169,6 +4554,8 @@ function desenharMelhorias(forcar) {
     if (pedir) pedir.onclick = () => pedirMelhoria(it);
     if (mestre) {
       $('[data-a="editar"]', card).onclick = () => editarMelhoria(it);
+      const bUsar = $('[data-a="usar"]', card); if (bUsar) bUsar.onclick = () => usarMelhoria(it);
+      const bDes = $('[data-a="desusar"]', card); if (bDes) bDes.onclick = () => { Store.definir(['usos', it.id], null); desenharLoja(true); };
       $('[data-a="comprar"]', card).onclick = () => {
         salvarMelhoria({ ...it, comprado: !it.comprado }, it.oculto);
         Diario.registrar('sala', `Melhoria ZN ${it.comprado ? 'desmarcada' : 'comprada'}: ${it.t}`);
@@ -4185,12 +4572,13 @@ function pedirMelhoria(it) {
   if (lojaSoZN() && (!tk || tk.a !== 1 || salaEm(tk.a, tk.x, tk.y) !== 25)) { aviso('As melhorias só podem ser pedidas na Zona Neutra.'); return; }
   if (!Chat.chaveLigada) { aviso('Sem conexão com o chat.'); return; }
   Chat.enviar(`🛠 Pedido de melhoria da ZN: ${it.t}${it.custo ? ' · ' + txtCusto(it.custo) : ''}`, 'sus');
-  aviso('Pedido enviado ao Mestre.');
+  criarPedido({ tipo: 'melh', item: it.id, t: it.t, custo: it.custo || null, pg: 'cofre' });
+  aviso('Pedido enviado ao Mestre. A resposta chega no seu Sussurro.');
 }
 function limparFormMelh() {
   ['melhEditId', 'melhT', 'melhDesc'].forEach(i => { $('#' + i).value = ''; });
   $('#melhM').value = 0; $('#melhm').value = 0; $('#melhImg').value = '';
-  $('#melhOculta').checked = false; $('#melhComprada').checked = false;
+  $('#melhOculta').checked = false; $('#melhComprada').checked = false; $('#melhUsoDia').checked = false;
   $('#melhFormTitulo').textContent = 'Nova melhoria';
 }
 function editarMelhoria(it) {
@@ -4198,7 +4586,7 @@ function editarMelhoria(it) {
   $('#melhT').value = it.t || '';
   $('#melhM').value = (it.custo && it.custo.M) || 0; $('#melhm').value = (it.custo && it.custo.m) || 0;
   $('#melhDesc').value = it.desc || '';
-  $('#melhOculta').checked = !!it.oculto; $('#melhComprada').checked = !!it.comprado;
+  $('#melhOculta').checked = !!it.oculto; $('#melhComprada').checked = !!it.comprado; $('#melhUsoDia').checked = !!it.usoDia;
   $('#melhFormTitulo').textContent = 'Editando: ' + it.t;
   $('#melhForm').open = true;
   $('#melhForm').scrollIntoView({ behavior: 'smooth' });
@@ -4211,6 +4599,7 @@ function salvarMelhoria(it, oculto) {
   if (it.img) limpo.img = it.img;
   if (it.imgId) limpo.imgId = it.imgId;
   if (it.comprado) limpo.comprado = true;
+  ['estoque', 'usoDia', 'drone', 'limite'].forEach(k => { if (it[k]) limpo[k] = it[k]; });
   if (oculto) {
     Segredos.gravar(['_melhOculta', id], limpo);
     Store.definir(['melhorias', 'itens', id], null);
@@ -4218,6 +4607,7 @@ function salvarMelhoria(it, oculto) {
     Store.definir(['melhorias', 'itens', id], limpo);
     Segredos.gravar(['_melhOculta', id], null);
   }
+  ajustarEstoque();
   desenharLoja(true);
 }
 function apagarMelhoria(it) {
@@ -4233,7 +4623,7 @@ $('#btnMelhSalvar').addEventListener('click', async () => {
   const antigo = idExist ? itensMelhorias().find(i => i.id === idExist) : null;
   const id = idExist || Rede.chave();
   const it = { ...(antigo || {}), id, t, custo: { M: Math.max(0, +$('#melhM').value || 0), m: Math.max(0, +$('#melhm').value || 0) },
-    desc: $('#melhDesc').value.trim(), comprado: $('#melhComprada').checked };
+    desc: $('#melhDesc').value.trim(), comprado: $('#melhComprada').checked, usoDia: $('#melhUsoDia').checked || undefined };
   const f = $('#melhImg').files[0];
   if (f) {
     try { const d = await imagemReduzida(f, 700); await Rede.set('lojaImg/' + id, d); it.imgId = id; delete it.img; imgsLoja[id] = d; }
@@ -4253,6 +4643,176 @@ function semearMelhorias() {
   });
   Store.definir(['cfg', 'melhoriasSemeadas'], true);
 }
+
+/* ---------- COFRE DO GRUPO, DESPENSA DA ZN E USOS POR DIA ----------
+   mapa/cofre    sucatas do grupo (só o Mestre mexe; todos veem)
+   mapa/estoque  águas e comidas que sobram hoje (jogador pega 1 por vez)
+   mapa/usos     melhorias de uso diário já usadas (guarda o número do dia) */
+const NOME_ESTOQUE = { agua: 'águas', comida: 'comidas' };
+const UM_ESTOQUE = { agua: 'água', comida: 'comida' };
+const ICONE_ESTOQUE = { agua: '💧', comida: '🥫' };
+const diaAtual = () => (Store.state.ruido || {}).d || 1;
+const cofre = () => Store.state.cofre || { M: 0, m: 0 };
+const usadaHoje = id => (Store.state.usos || {})[id] === diaAtual();
+const melhoriaAtiva = flag => itensMelhorias().some(i => i.comprado && !i.oculto && i[flag]);
+function capacidadeEstoque() {
+  const cap = {};
+  itensMelhorias().forEach(i => { if (i.comprado && !i.oculto && i.estoque) Object.entries(i.estoque).forEach(([k, n]) => { cap[k] = (cap[k] || 0) + (+n || 0); }); });
+  return cap;
+}
+function encherEstoque() { if (mestre) Store.definir(['estoque'], Object.keys(capacidadeEstoque()).length ? capacidadeEstoque() : null); }
+// comprou ou desfez uma melhoria de despensa: ajusta sem apagar o que já foi pego
+function ajustarEstoque() {
+  if (!mestre) return;
+  const cap = capacidadeEstoque(), at = Store.state.estoque || {};
+  const novo = {};
+  Object.entries(cap).forEach(([k, n]) => { novo[k] = at[k] === undefined ? n : Math.min(at[k], n); });
+  if (!igualJSON(novo, at)) Store.definir(['estoque'], Object.keys(novo).length ? novo : null);
+}
+function pegarEstoque(k) {
+  const tk = (Store.state.tokens || {})[meu];
+  if (!mestre && lojaSoZN() && (!tk || tk.a !== 1 || salaEm(tk.a, tk.x, tk.y) !== 25)) { aviso('A despensa fica na Zona Neutra.'); return; }
+  const n = (Store.state.estoque || {})[k] || 0;
+  if (n <= 0) { aviso(`Acabaram as ${NOME_ESTOQUE[k]} de hoje.`); return; }
+  Store.definir(['estoque', k], n - 1);
+  const cap = capacidadeEstoque()[k] || n;
+  Chat.enviar(`${ICONE_ESTOQUE[k]} ${Chat.autorNome()} pegou 1 ${UM_ESTOQUE[k]} da despensa (${n - 1}/${cap}).`, 'geral');
+}
+function htmlDespensa() {
+  const cap = capacidadeEstoque();
+  if (!Object.keys(cap).length) return '';
+  const est = Store.state.estoque || {};
+  return `<div class="despensa"><b>Despensa da Zona Neutra · Dia ${diaAtual()}</b>${Object.entries(cap).map(([k, max]) => {
+    const n = est[k] === undefined ? max : est[k];
+    return `<div class="despensa-linha"><span>${ICONE_ESTOQUE[k]} ${NOME_ESTOQUE[k][0].toUpperCase() + NOME_ESTOQUE[k].slice(1)} <strong>${n}/${max}</strong></span>${meu || mestre ? `<button data-pegar="${k}" ${n <= 0 ? 'disabled' : ''}>Pegar 1</button>` : ''}</div>`;
+  }).join('')}</div>`;
+}
+function htmlCofre() {
+  const c = cofre();
+  return `<p class="cofre-linha">🪙 Cofre do grupo: <strong>${txtCusto(c) === 'grátis' ? 'vazio' : txtCusto(c)}</strong></p>`;
+}
+function ligarDespensa(raiz) { $$('[data-pegar]', raiz).forEach(b => b.onclick = () => pegarEstoque(b.dataset.pegar)); }
+let zonaSig = '';
+function desenharZonaJogador() {
+  Pedidos.ligar(mestre);
+  const alvo = $('#zonaJogador');
+  if (!alvo) return;
+  const sig = JSON.stringify([capacidadeEstoque(), Store.state.estoque, Store.state.cofre, diaAtual(), !!meu]);
+  if (sig === zonaSig) return;
+  zonaSig = sig;
+  alvo.innerHTML = meu ? htmlCofre() + htmlDespensa() : '';
+  ligarDespensa(alvo);
+  if (mestre) {
+    const c = cofre();
+    if (document.activeElement !== $('#cofreM')) $('#cofreM').value = c.M || 0;
+    if (document.activeElement !== $('#cofrem')) $('#cofrem').value = c.m || 0;
+    $('#despensaMestre').innerHTML = htmlDespensa() || '<p class="mini">Nenhuma melhoria de despensa comprada.</p>';
+    ligarDespensa($('#despensaMestre'));
+  }
+}
+function gravarCofre() {
+  const M = Math.max(0, +$('#cofreM').value || 0), m = Math.max(0, +$('#cofrem').value || 0);
+  Store.definir(['cofre'], M || m ? { M, m } : null);
+}
+$('#cofreM').addEventListener('change', gravarCofre);
+$('#cofrem').addEventListener('change', gravarCofre);
+$('#btnEncherDespensa').addEventListener('click', () => { encherEstoque(); aviso('Despensa reabastecida.'); });
+function usarMelhoria(it) {
+  if (it.drone) {
+    const v = prompt('Qual sala o drone vai sobrevoar? Digite o número da CN (ex.: 18).');
+    const cn = parseInt(v, 10);
+    if (!(cn >= 1 && cn <= 125)) return;
+    const a = Math.ceil(cn / 25);
+    Store.definir(['salas', 'c' + cn], true);
+    const [nome] = infoSala(a, cn);
+    Chat.enviar(`🛸 O drone de vigilância sobrevoou a CN ${pad2(cn)}${nome ? ': ' + nome : ''}.`, 'geral');
+    Diario.registrar('sala', `Drone usado na CN ${pad2(cn)}`);
+  } else {
+    Chat.enviar(`🛠 ${it.t} foi usado hoje.`, 'geral');
+    Diario.registrar('sala', `Melhoria usada: ${it.t}`);
+  }
+  Store.definir(['usos', it.id], diaAtual());
+  desenharLoja(true);
+}
+
+/* ---------- FILA DE PEDIDOS (loja e melhorias) ----------
+   O jogador cria o pedido; só o Mestre lê a fila, aprova ou recusa.
+   Aprovar desconta as sucatas (da ficha ou do cofre) e responde no Sussurro. */
+const Pedidos = {
+  dados: {}, off: null,
+  ligar(sim) {
+    if (sim && !this.off) this.off = Rede.on('pedidos', v => { this.dados = v || {}; desenharPedidos(); }, () => { this.off = null; });
+    if (!sim && this.off) { this.off(); this.off = null; this.dados = {}; }
+  },
+};
+function criarPedido(p) {
+  if (!meu) return;
+  const ped = { ...p, de: meu, n: SER[meu] ? SER[meu].nome : meu, cx: Chat.cx(), ts: Date.now(), st: 'pend' };
+  if (!ped.custo) delete ped.custo;
+  Rede.push('pedidos', ped).pronto.catch(erroGravacao);
+}
+function responderSussurro(cx, texto) {
+  if (!cx) return;
+  const m = { a: '_mestre', n: 'Mestre', t: texto, ts: Date.now() };
+  Rede.push('chat/respostas/' + cx, m).pronto.catch(erroGravacao);
+  Rede.push('chat/sussurros', { ...m, para: cx }).pronto.catch(erroGravacao);
+}
+function saldoDe(pg, de) {
+  if (pg === 'cofre') return cofre();
+  const f = fichaDe(de) || {};
+  return { M: f.sM || 0, m: f.sm || 0 };
+}
+function cabe(saldo, c) { return !c || ((saldo.M || 0) >= (c.M || 0) && (saldo.m || 0) >= (c.m || 0)); }
+function desenharPedidos() {
+  if (!mestre) return;
+  const lista = Object.entries(Pedidos.dados || {}).filter(([, p]) => p && p.st === 'pend').sort((x, y) => x[1].ts - y[1].ts);
+  $('#qtdPedidos').textContent = lista.length ? `(${lista.length})` : '';
+  $('#listaPedidos').innerHTML = lista.map(([k, p]) => {
+    const s = SER[p.de];
+    const sf = saldoDe('ficha', p.de), sc = cofre();
+    return `<li data-k="${k}"><div class="ped-topo">${s ? bola(s) : ''}<span><b>${esc(p.n || '?')}</b> pede <b>${esc(p.t)}</b><small>${p.tipo === 'melh' ? 'Melhoria da ZN' : 'Loja do Maurício'} · ${p.custo ? txtCusto(p.custo) : 'sem custo'} · ${hora(p.ts).slice(0, 5)}</small></span></div>
+      <label class="campo-linha">Pagar com <select class="ped-pg">
+        <option value="ficha" ${p.pg === 'ficha' ? 'selected' : ''}>Ficha de ${esc(p.n || '?')} (${txtCusto(sf) === 'grátis' ? 'sem sucatas' : txtCusto(sf)})${cabe(sf, p.custo) ? '' : ' · não dá'}</option>
+        <option value="cofre" ${p.pg === 'cofre' ? 'selected' : ''}>Cofre do grupo (${txtCusto(sc) === 'grátis' ? 'vazio' : txtCusto(sc)})${cabe(sc, p.custo) ? '' : ' · não dá'}</option>
+        <option value="nada">Sem cobrar</option></select></label>
+      <div class="ferramentas duas"><button class="btn-roxo" data-ped="ok">Aprovar</button><button class="btn-fantasma" data-ped="nao">Recusar</button></div></li>`;
+  }).join('') || '<li class="vazio">Nenhum pedido esperando.</li>';
+  $$('#listaPedidos [data-ped]').forEach(b => b.onclick = () => {
+    const li = b.closest('li'), k = li.dataset.k, p = Pedidos.dados[k];
+    if (!p) return;
+    if (b.dataset.ped === 'ok') aprovarPedido(k, p, $('.ped-pg', li).value);
+    else {
+      const motivo = prompt('Recusar o pedido. Quer mandar um motivo? (opcional)', '');
+      if (motivo === null) return;
+      Rede.set('pedidos/' + k + '/st', 'nao').catch(erroGravacao);
+      responderSussurro(p.cx, `❌ Pedido recusado: ${p.t}${motivo ? '. ' + motivo : ''}`);
+    }
+  });
+}
+function aprovarPedido(k, p, pg) {
+  const c = p.custo || null;
+  if (pg !== 'nada' && c) {
+    const s = saldoDe(pg, p.de);
+    if (!cabe(s, c) && !confirm('As sucatas não cobrem o custo. Aprovar mesmo assim? O saldo fica em 0 onde faltar.')) return;
+    const novo = { M: Math.max(0, (s.M || 0) - (c.M || 0)), m: Math.max(0, (s.m || 0) - (c.m || 0)) };
+    if (pg === 'cofre') Store.definir(['cofre'], novo.M || novo.m ? novo : null);
+    else Store.definir(['fichas', p.de], { ...(fichaDe(p.de) || {}), sM: novo.M, sm: novo.m });
+  }
+  if (p.tipo === 'melh') {
+    const it = itensMelhorias().find(i => i.id === p.item);
+    if (it && !it.comprado) {
+      salvarMelhoria({ ...it, comprado: true }, it.oculto);
+      Chat.enviar(`🛠 Nova melhoria instalada na Zona Neutra: ${it.t}.`, 'geral');
+    }
+  }
+  Rede.set('pedidos/' + k + '/st', 'ok').catch(erroGravacao);
+  responderSussurro(p.cx, `✅ Pedido aprovado: ${p.t}${pg !== 'nada' && c ? ` · pago com ${pg === 'cofre' ? 'o cofre do grupo' : 'suas sucatas'} (${txtCusto(c)})` : ''}`);
+  Diario.registrar('sala', `Pedido aprovado: ${p.n} · ${p.t}`);
+}
+$('#btnLimparPedidos').addEventListener('click', () => {
+  Object.entries(Pedidos.dados || {}).forEach(([k, p]) => { if (p && p.st !== 'pend') Rede.set('pedidos/' + k, null).catch(() => {}); });
+  aviso('Pedidos resolvidos apagados.');
+});
 
 // primeira vez: o Mestre coloca o catálogo do PDF na loja
 function semearLoja() {

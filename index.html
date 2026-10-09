@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261009b">
+<link rel="stylesheet" href="style.css?v=20261009c">
 </head>
 <body>
 
@@ -83,6 +83,7 @@
       <button data-cam="mais" title="Aproximar">+</button>
       <button data-cam="menos" title="Afastar">−</button>
       <button data-cam="mover" id="btnModoMover" title="Arrastar move o mapa em vez de girar">✥</button>
+      <button data-cam="regua" id="btnRegua" title="Régua: arraste no mapa para medir em metros">📏</button>
       <button data-cam="centro" title="Centralizar">◎</button>
       <button data-cam="eu" id="btnIrMinha" title="Ir até a minha ficha" hidden>◉</button>
     </div>
@@ -130,6 +131,7 @@
       <h2>Sua cobaia</h2>
       <div id="minhaFicha" class="minha-ficha"></div>
       <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
+      <div id="zonaJogador" class="zona-jogador"></div>
     </section>
 
     <section class="bloco" id="blocoCaderno" hidden>
@@ -253,6 +255,8 @@
         <p class="mini"><b id="persgRodada">Rodada 1</b> · a ordem vai da maior iniciativa para a menor.</p>
         <ol id="ordemPersg" class="ordem-persg"></ol>
         <label class="chave"><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
+        <div class="crono-mestre"><label>⏱ Tempo por vez <input id="tempoVez" type="number" min="0" step="5" placeholder="0"> s</label><button id="btnReiniciarCrono" class="btn-fantasma">Reiniciar tempo</button></div>
+        <p class="mini">0 ou vazio desliga o cronômetro. Ele recomeça a cada "Próximo turno".</p>
         <div class="ferramentas">
           <button id="btnProxTurno" class="btn-roxo">Próximo turno</button>
           <button id="btnRefazerVez" class="btn-fantasma">Refazer rota de quem está na vez</button>
@@ -266,9 +270,21 @@
       <label class="chave"><input type="checkbox" id="chkLojaAberta"><span>Loja aberta aos jogadores</span></label>
       <label class="chave"><input type="checkbox" id="chkLojaZN"><span>O Maurício só atende quem está na Zona Neutra</span></label>
       <p class="mini">As Melhorias ZN ficam numa aba dentro da loja e seguem as mesmas regras.</p>
+      <div class="cofre-mestre"><span>🪙 Cofre do grupo</span>
+        <label>Maiores <input id="cofreM" type="number" min="0" value="0"></label>
+        <label>Menores <input id="cofrem" type="number" min="0" value="0"></label></div>
+      <div id="despensaMestre"></div>
+      <div class="ferramentas"><button id="btnEncherDespensa" class="btn-fantasma">Reabastecer a despensa agora</button></div>
+      <p class="mini">A despensa e as melhorias de uso diário se renovam sozinhas no botão "Novo dia".</p>
       <div class="ferramentas">
         <button id="btnAbrirLojaM" class="btn-roxo">Abrir a loja (vendas e melhorias da ZN)</button>
       </div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoPedidos" data-aba="sessao" hidden>
+      <h2>Pedidos <span id="qtdPedidos"></span></h2>
+      <ul id="listaPedidos" class="lista-pedidos"></ul>
+      <div class="ferramentas"><button id="btnLimparPedidos" class="btn-fantasma">Apagar pedidos já resolvidos</button></div>
     </section>
 
     <section class="bloco mestre-only" id="blocoMesa" data-aba="sessao" hidden>
@@ -375,6 +391,12 @@
         </select>
         <button id="btnSessao" class="btn-fantasma">Marcar nova sessão</button>
       </div>
+      <div class="replay-ctrl">
+        <select id="replayQual" aria-label="Trecho do replay"><option value="sessao">Desde a última sessão marcada</option><option value="dia">Só o dia atual na Caixa</option><option value="tudo">O diário inteiro</option></select>
+        <select id="replayVel" aria-label="Velocidade"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select>
+        <button id="btnReplay" class="btn-roxo">▶ Replay no mapa</button>
+      </div>
+      <p class="mini">O replay mostra, no andar aberto, "fantasmas" das fichas refazendo os movimentos. Só aparece na sua tela e não muda nada no mapa.</p>
       <ol id="listaDiario" class="lista-diario"></ol>
       <p id="diarioVazio" class="vazio">Nada registrado ainda.</p>
       <div class="ferramentas duas">
@@ -442,6 +464,8 @@
 </div>
 <div id="faixaProtocolo" class="faixa-protocolo" hidden>⚠ PROTOCOLO FILHO DA O.R.F.E.U. EM CURSO</div>
 <div id="faixaPersg" class="faixa-persg" hidden></div>
+<div id="cronoVez" class="crono-vez" hidden></div>
+<div id="faixaReplay" class="faixa-replay" hidden><span id="faixaReplayTxt">REPLAY</span><button id="btnPararReplay">Parar</button></div>
 <div id="faixaApagao" class="faixa-apagao" hidden>APAGÃO ATIVO · os jogadores só enxergam a própria ficha</div>
 <button id="abaPainel" class="aba-painel so-celular" aria-label="Abrir painel"><span class="aba-alca"></span>Cobaias · Ruído · Perseguição</button>
 
@@ -533,6 +557,7 @@
     <button data-aba-loja="melhorias" role="tab">🛠 Melhorias ZN</button>
   </div>
   <p id="lojaAviso" class="loja-aviso"></p>
+  <div id="lojaZona" class="loja-zona"></div>
   <div id="melhMestre" class="loja-mestre" hidden>
     <details id="melhForm" class="cartao-sec"><summary id="melhFormTitulo">Nova melhoria</summary>
       <input type="hidden" id="melhEditId">
@@ -542,6 +567,7 @@
       <label class="campo-linha">Efeito <textarea id="melhDesc" rows="3" placeholder="O que a melhoria faz na Zona Neutra"></textarea></label>
       <label class="campo-linha">Imagem (opcional) <input id="melhImg" type="file" accept="image/*"></label>
       <label class="chave"><input type="checkbox" id="melhComprada"><span>Já comprada</span></label>
+      <label class="chave"><input type="checkbox" id="melhUsoDia"><span>Uso 1 vez por dia (botão "Usar hoje")</span></label>
       <label class="chave"><input type="checkbox" id="melhOculta"><span>Oculta dos jogadores (aparece só quando você liberar)</span></label>
       <div class="ferramentas duas"><button id="btnMelhSalvar" class="btn-roxo">Salvar melhoria</button><button id="btnMelhCancelar" class="btn-fantasma">Limpar</button></div>
     </details>
@@ -585,8 +611,8 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261009b"></script>
-<script src="config.js?v=20261009b"></script>
-<script src="app.js?v=20261009b"></script>
+<script src="data.js?v=20261009c"></script>
+<script src="config.js?v=20261009c"></script>
+<script src="app.js?v=20261009c"></script>
 </body>
 </html>

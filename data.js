@@ -175,17 +175,17 @@ const LOJA_PADRAO = [
    O Mestre gerencia tudo pelo site: marcar como comprada, ocultar, editar e criar novas.
    Depois da primeira vez, o que vale é o que está gravado no banco. */
 const MELHORIAS_PADRAO = [
-  { id: 'drone', t: 'Drone de vigilância danificado', img: 'img/zn-drone.jpg', custo: { M: 1, m: 8 },
+  { id: 'drone', t: 'Drone de vigilância danificado', img: 'img/zn-drone.jpg', custo: { M: 1, m: 8 }, usoDia: true, drone: true,
     desc: 'Escolha uma sala conectada ao próximo limiar e revele previamente algumas informações.' },
-  { id: 'filtro-agua', t: 'Filtro de água', img: 'img/zn-filtro-agua.jpg', comprado: true,
+  { id: 'filtro-agua', t: 'Filtro de água', img: 'img/zn-filtro-agua.jpg', comprado: true, estoque: { agua: 6 },
     desc: 'Concede 6 águas por dia.' },
-  { id: 'geladeira', t: 'Geladeira chique', img: 'img/zn-geladeira.jpg', comprado: true,
+  { id: 'geladeira', t: 'Geladeira chique', img: 'img/zn-geladeira.jpg', comprado: true, estoque: { comida: 6 },
     desc: 'Concede 6 comidas por dia.' },
   { id: 'camas-normais', t: 'Camas normais', img: 'img/zn-camas-normais.jpg', comprado: true,
     desc: "Concedem 'Descanso Normal'." },
   { id: 'camas-confortaveis', t: 'Camas confortáveis', img: 'img/zn-camas-confortaveis.jpg', custo: { M: 1, m: 6 },
     desc: "Concedem 'Descanso Luxuoso'." },
-  { id: 'painel-anticolapso', t: 'Painel anti-colapso', img: 'img/zn-painel-anticolapso.jpg', custo: { M: 5, m: 15 },
+  { id: 'painel-anticolapso', t: 'Painel anti-colapso', img: 'img/zn-painel-anticolapso.jpg', custo: { M: 5, m: 15 }, usoDia: true,
     desc: 'Uma vez por dia, previne um colapso de sala. Funciona como um "escudo" contra falhas graves.' },
   { id: 'cortina-seguranca', t: 'Cortina de segurança anti-Faísca', img: 'img/zn-cortina-seguranca.jpg', custo: { M: 2, m: 8 },
     desc: 'Uma barreira de luz vermelha impede que a Faísca marque alguém na Zona Neutra.' },
@@ -195,6 +195,6 @@ const MELHORIAS_PADRAO = [
     desc: "Concede bônus de +10 para os jogadores dentro da 'Zona Segura'." },
   { id: 'hidropressao', t: 'Painel de hidropressão manual', img: 'img/zn-hidropressao.jpg', custo: { M: 0, m: 4 },
     desc: '+2 em qualquer teste físico feito na próxima sala visitada.' },
-  { id: 'pressurizacao', t: 'Sistema de pressurização reversa', img: 'img/zn-pressurizacao.jpg', custo: { M: 3, m: 14 },
+  { id: 'pressurizacao', t: 'Sistema de pressurização reversa', img: 'img/zn-pressurizacao.jpg', custo: { M: 3, m: 14 }, limite: true,
     desc: 'Aumenta o limite de barulho necessário para atrair uma ameaça.' },
 ];
