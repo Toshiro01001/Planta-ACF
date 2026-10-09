@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009c';
+const VERSAO_SITE = '20261009d';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1097,7 +1097,25 @@ function ligarArraste(f) {
     let alvo = { x: clamp(p.x + arrastando.dx, 0.3, W - 0.3), y: clamp(p.y + arrastando.dy, 0.3, H - 0.3) };
     const atual = { x: tk.x, y: tk.y };
     // paredes: não atravessa blocos maciços (só se a ficha já está num lugar andável)
-    if (andavel(tk.a, atual.x, atual.y) && !caminhoLivre(tk.a, atual, alvo)) return;
+    // bateu na parede: desliza ao longo dela (só no eixo que estiver livre)
+    if (andavel(tk.a, atual.x, atual.y) && !caminhoLivre(tk.a, atual, alvo)) {
+      const soX = { x: alvo.x, y: atual.y }, soY = { x: atual.x, y: alvo.y };
+      // perto da boca de um corredor: puxa a ficha para dentro dele (mais fácil de acertar)
+      const funil = [];
+      CORREDORES.forEach(c => {
+        if (!dentro(c, alvo.x, alvo.y, 0.7)) return;
+        funil.push({ x: clamp(alvo.x, c.x + 0.2, c.x + c.w - 0.2), y: clamp(alvo.y, c.y + 0.2, c.y + c.h - 0.2) });
+      });
+      const eixoX = Math.abs(alvo.x - atual.x) >= Math.abs(alvo.y - atual.y);
+      const opcoes = [...funil, ...(eixoX ? [soX, soY] : [soY, soX])];
+      // vale o caminho direto ou em "L" (primeiro um eixo, depois o outro), para contornar a quina da parede
+      const chega = q => caminhoLivre(tk.a, atual, q)
+        || (caminhoLivre(tk.a, atual, { x: atual.x, y: q.y }) && caminhoLivre(tk.a, { x: atual.x, y: q.y }, q))
+        || (caminhoLivre(tk.a, atual, { x: q.x, y: atual.y }) && caminhoLivre(tk.a, { x: q.x, y: atual.y }, q));
+      const livre = opcoes.find(chega);
+      if (!livre) return;
+      alvo = livre;
+    }
     // perseguição: limite de deslocamento do turno
     const lim = limiteDe(arrastando.id);
     if (lim) {
@@ -3140,10 +3158,13 @@ function barreira(c) {
   return c.eixo === 'h' ? { x: c.x + c.w / 2 - 0.3, y: c.y, w: 0.6, h: c.h } : { x: c.x, y: c.y + c.h / 2 - 0.3, w: c.w, h: 0.6 };
 }
 function bloqueadoPorPorta(andar, x, y) {
-  if (mestre) return false;   // o Mestre passa por qualquer porta
   for (let ci = 0; ci < CORREDORES.length; ci++) {
-    // porta fechada: nem o corredor dá para pisar (folga negativa: a borda da sala continua livre)
-    if (!portaAberta(andar, ci) && dentro(CORREDORES[ci], x, y, -0.05)) return true;
+    // porta fechada: nem o corredor dá para pisar. Só a ponta encostada na sala fica livre
+    // (no sentido do comprimento); na largura, o corredor inteiro fica bloqueado
+    if (portaAberta(andar, ci)) continue;
+    const c = CORREDORES[ci];
+    const r = c.eixo === 'h' ? { x: c.x + 0.05, y: c.y - 0.01, w: c.w - 0.1, h: c.h + 0.02 } : { x: c.x - 0.01, y: c.y + 0.05, w: c.w + 0.02, h: c.h - 0.1 };
+    if (dentro(r, x, y)) return true;
   }
   return false;
 }
