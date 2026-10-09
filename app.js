@@ -5,6 +5,8 @@
    ========================================================= */
 (() => {
 'use strict';
+// muda a cada atualização do site: força o navegador a buscar as imagens novas
+const VERSAO_SITE = '20261009';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -3615,6 +3617,9 @@ function previaInicio(tk) {
   svg.appendChild(linha);
   const rot = el('div', 'previa-rotulo');
   rot.innerHTML = '<span></span>';
+  // a trilha tem a cor da ficha que está andando
+  const cor = (SER[tk.s] || {}).cor;
+  if (cor) { svg.style.setProperty('--cor-trilha', cor); rot.style.setProperty('--cor-trilha', cor); }
   stage.appendChild(svg); stage.appendChild(rot);
   previa = { svg, linha, rot, pts: [{ x: tk.x, y: tk.y }], total: 0 };
 }
@@ -3842,7 +3847,17 @@ function itensLoja() {
 const imgsLoja = {};
 function imagemDoItem(it, imgEl) {
   // as imagens da loja ficam direto em img/ (versões antigas gravaram img/loja/)
-  if (it.img) { imgEl.src = it.img.replace('img/loja/', 'img/'); return; }
+  // vendas padrão: a imagem vem sempre do próprio site (img/<id>.jpg), não do banco
+  const padrao = LOJA_PADRAO.find(p => p.id === it.id);
+  const caminhos = [padrao && padrao.img, it.img && it.img.replace('img/loja/', 'img/'), it.img]
+    .filter((c, i, l) => c && l.indexOf(c) === i);
+  if (caminhos.length) {
+    let n = 0;
+    const versao = 'v=' + VERSAO_SITE;
+    imgEl.onerror = () => { n++; if (n < caminhos.length) imgEl.src = caminhos[n] + '?' + versao; else imgEl.onerror = null; };
+    imgEl.src = caminhos[0] + '?' + versao;
+    return;
+  }
   if (!it.imgId) { imgEl.remove(); return; }
   if (imgsLoja[it.imgId]) { imgEl.src = imgsLoja[it.imgId]; return; }
   Rede.once('lojaImg/' + it.imgId).then(d => { if (d) { imgsLoja[it.imgId] = d; imgEl.src = d; } else imgEl.remove(); }).catch(() => imgEl.remove());
