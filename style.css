@@ -1253,22 +1253,17 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
 .loja-preco.ok { color: #8ef0b0; }
 .melhoria-card .btn-pedir { border-color: var(--roxo) !important; }
 
-/* botão vermelho 3D nas paredes do corredor, ao lado da porta de ferro */
-.parede.botao-parede { background: none !important; border: 0 !important; pointer-events: none; }
-.botao-3d { position: absolute; width: 12px; height: 12px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffb0b0, #ff2a3a 35%, #b30d1a 65%, #4a0309);
-  box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 12px 3px rgba(255,40,60,.75); }
-.parede.h.botao-parede .botao-3d { left: 50%; top: 42%; transform: translate(-50%, -50%); }
-.parede.v.botao-parede .botao-3d { left: 58%; top: 50%; transform: translate(-50%, -50%); }
-.parede.botao-parede .botao-3d { animation: botao-pulsa 1.6s ease-in-out infinite; }
-.parede.botao-parede.apertado .botao-3d { animation: none; filter: brightness(1.6); box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 22px 8px rgba(255,60,80,.95); }
-@keyframes botao-pulsa { 50% { box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 4px 1px rgba(255,40,60,.4); } }
+/* botão vermelho 2D acima da porta fechada (leve: sem 3D e sem animação) */
+.porta-chao { transform-style: preserve-3d; }
+.porta-chao .botao-2d { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffb0b0, #ff2a3a 40%, #9e0b17 75%); border: 2px solid #2a2d33; box-shadow: 0 0 6px rgba(255,40,60,.8);
+  transform: translateZ(34px) rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)); pointer-events: none; }
+.porta-chao .botao-2d.apertado { background: #ff6b7a; box-shadow: 0 0 14px 4px rgba(255,60,80,.95); }
 
 /* teclado das portas e aviso de Mestre ausente */
 .teclado-porta { display: flex; gap: 6px; margin: 6px 0; }
 .teclado-porta input { flex: 1; min-width: 0; font: 16px var(--mono); letter-spacing: .2em; background: #0b0910; color: #fff; border: 1px solid #6b7280; border-radius: 5px; padding: 6px 8px; }
 .dica-porta.alerta { color: #ffcf7a; }
-.parede.botao-parede.teclado .botao-3d { border-radius: 2px; background: repeating-linear-gradient(0deg, #1c1f24 0 2px, #9aa3b2 2px 3px), repeating-linear-gradient(90deg, transparent 0 2px, #1c1f24 2px 3px); box-shadow: 0 0 0 2px #2a2d33, 0 0 8px 2px rgba(120,200,255,.5); animation: none; }
 
 /* cofre, despensa e pedidos */
 .zona-jogador:empty, .loja-zona:empty { display: none; }
