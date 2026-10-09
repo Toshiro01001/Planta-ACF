@@ -29,6 +29,8 @@
   </button>
   <div class="topo-dir">
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
+    <button id="btnSom" class="btn-fantasma btn-icone" title="Ligar ou desligar os sons neste aparelho" aria-label="Som">🔊</button>
+    <button id="btnAjuda" class="btn-fantasma btn-icone" title="Ajuda rápida" aria-label="Ajuda">?</button>
     <button id="btnChat" class="btn-fantasma btn-chat" hidden aria-label="Abrir o chat">💬 Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
     <button id="btnMestre" class="btn-fantasma">Entrar</button>
     <button id="btnRecolher" class="btn-fantasma so-desktop" title="Esconder ou mostrar o painel lateral">Painel ⟩</button>
@@ -117,17 +119,31 @@
     <button class="painel-alca so-celular" id="btnAlca" aria-label="Fechar painel"><span></span></button>
     <button class="fechar-painel so-celular" id="btnFecharPainel" aria-label="Fechar painel">×</button>
 
+    <nav id="abasMestre" class="abas-mestre mestre-only" hidden aria-label="Abas do Mestre">
+      <button data-aba="mapa" class="ativo">Mapa</button>
+      <button data-aba="sessao">Sessão</button>
+      <button data-aba="registro">Registro</button>
+      <button data-aba="segredos">Segredos</button>
+    </nav>
+
     <section class="bloco" id="blocoMinha" hidden>
       <h2>Sua cobaia</h2>
       <div id="minhaFicha" class="minha-ficha"></div>
+      <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
     </section>
 
-    <section class="bloco" id="blocoCobaias">
+    <section class="bloco" id="blocoCaderno" hidden>
+      <h2>Caderno</h2>
+      <p class="mini">Só fica neste aparelho. Ninguém mais lê, nem o Mestre.</p>
+      <textarea id="caderno" class="caderno" rows="6" placeholder="Códigos de porta, pistas, nomes ouvidos…"></textarea>
+    </section>
+
+    <section class="bloco" id="blocoCobaias" data-aba="mapa">
       <h2>Cobaias</h2>
       <ul id="listaCobaias" class="lista-seres"></ul>
     </section>
 
-    <section class="bloco" id="blocoPersg" hidden>
+    <section class="bloco" id="blocoPersg" data-aba="sessao" hidden>
       <h2>Perseguição</h2>
       <ol id="listaPersg" class="lista-persg"></ol>
       <div id="minhaVez" class="minha-vez" hidden>
@@ -138,43 +154,43 @@
 
     <section class="bloco" id="blocoSons" hidden>
       <h2>Sons na Caixa</h2>
-      <p class="mini">Você não enxerga as cobaias. As salas com gente pulsam em vermelho, mais forte quanto mais barulho, e piscam quando alguém se move ali.</p>
+      <p class="mini">Você não enxerga as cobaias. As salas com gente pulsam em vermelho, mais forte quanto mais barulho, e piscam quando alguém se move ali. As marcas apagadas são o rastro: onde algo foi ouvido nos últimos minutos.</p>
+      <p class="mini">Segure o dedo (ou o botão do mouse) num ponto do mapa para marcar um lugar para os outros auxiliares e o Mestre.</p>
+      <div class="lote-filhos"><button id="btnIniFilhosAux" class="btn-fantasma">🎲 Rolar iniciativa dos Filhos deste andar</button><label>bônus <input id="bonusFilhosAux" type="number" value="0"></label></div>
     </section>
 
-    <section class="bloco" id="blocoRuido">
+    <section class="bloco" id="blocoRuido" data-aba="sessao">
       <h2>Medidor de ruído</h2>
       <p class="mini">Barulho que cada cobaia faz pela sala em que está.</p>
       <ul id="listaRuido" class="lista-ruido"></ul>
     </section>
 
-    <section class="bloco" id="blocoPresencas">
+    <section class="bloco" id="blocoPresencas" data-aba="mapa">
       <h2>Presenças neste andar</h2>
       <ul id="listaPresencas" class="lista-seres"></ul>
       <p id="semPresencas" class="vazio">Nada à vista. Por enquanto.</p>
     </section>
 
-    <!-- Só para o Mestre -->
-    <section class="bloco mestre-only" id="blocoMestre" hidden>
-      <h2>Mestre</h2>
-
+    <!-- Só para o Mestre (organizado em abas) -->
+    <section class="bloco mestre-only" id="blocoFichasM" data-aba="mapa" hidden>
+      <h2>Colocar no mapa</h2>
       <label class="chave">
         <input type="checkbox" id="chkElementos">
         <span>Mostrar elementos das salas aos jogadores neste andar</span>
       </label>
-
-      <h3>Cobaias e NPCs</h3>
+      <h3>Cobaias, NPCs e robôs</h3>
       <div id="trayNpc" class="tray"></div>
-
       <h3>Filhos da O.R.F.E.U.</h3>
-      <p class="mini">Cada clique coloca mais um no centro do andar aberto.</p>
+      <p class="mini">Cada clique coloca mais um, oculto, numa sala sorteada do andar aberto.</p>
       <div id="trayFilhos" class="tray"></div>
+      <h3>Mover em grupo</h3>
+      <p class="mini">Shift+clique nas fichas para selecionar várias; arraste uma delas e o grupo vai junto. Esc limpa a seleção. No cartão de uma sala, "Trazer o grupo para cá" e "Trazer todas as cobaias para cá".</p>
+      <p id="grupoInfo" class="mini grupo-info" hidden></p>
+    </section>
 
-      <h3>Funções (só o Mestre vê)</h3>
-      <p class="mini">Não ficam no código do site. Ficam salvas só no seu navegador (ou na sua conta do Firebase).</p>
-      <div id="listaFuncoes" class="lista-funcoes"></div>
-
-      <h3>Salas</h3>
-      <p class="mini">Clique numa sala do mapa para revelar, esconder, editar o nome, o elemento, o elevador, marcar "sem sinal" e anexar arquivos. Clique num corredor para fechar a porta.</p>
+    <section class="bloco mestre-only" id="blocoSalasM" data-aba="mapa" hidden>
+      <h2>Salas e portas</h2>
+      <p class="mini">Clique numa sala para revelar, esconder, editar nome, elemento e elevador, marcar "sem sinal", criar gatilho e anexar arquivos. Clique num corredor para fechar a porta.</p>
       <label class="campo-linha">Subtítulo deste andar <input id="subAndar" placeholder="ex.: O Alojamento"></label>
       <div class="ferramentas">
         <button id="btnImportarSalas" class="btn-fantasma">Importar salas de arquivo (.json)…</button>
@@ -182,8 +198,17 @@
         <button id="btnRevelarAndar" class="btn-fantasma">Revelar todas as salas deste andar</button>
         <button id="btnEsconderAndar" class="btn-fantasma">Esconder todas as salas deste andar</button>
       </div>
+    </section>
 
-      <h3>Ferramentas</h3>
+    <section class="bloco mestre-only" id="blocoCenas" data-aba="mapa" hidden>
+      <h2>Cenas prontas</h2>
+      <p class="mini">Guarda onde estão os Filhos e NPCs deste andar e as portas fechadas. Ao carregar, tudo volta para o lugar, oculto aos jogadores.</p>
+      <div class="cena-nova"><input id="cenaNome" placeholder="Nome da cena (ex.: Emboscada do Refeitório)"><button id="btnSalvarCena" class="btn-roxo">Salvar</button></div>
+      <ul id="listaCenas" class="lista-cenas"></ul>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoRuidoM" data-aba="sessao" hidden>
+      <h2>Ruído e Protocolo</h2>
       <div class="decibel">
         <div id="decibelimetro" class="decibel-coluna"></div>
         <div class="decibel-lado">
@@ -211,12 +236,15 @@
         <p id="cicloHist" class="mini ciclo-hist"></p>
       </div>
       <button id="btnProtocolo" class="btn-protocolo" disabled>Iniciar Protocolo Filho da O.R.F.E.U.</button>
+    </section>
 
-      <h3>Perseguição</h3>
+    <section class="bloco mestre-only" id="blocoPersgM" data-aba="sessao" hidden>
+      <h2>Perseguição (Mestre)</h2>
       <div id="persgSetup">
         <p class="mini">Marque quem participa, preencha a iniciativa (ou role no 🎲) e o deslocamento por turno. Os jogadores podem rolar no site: o resultado aparece aqui.</p>
         <div id="setupPersg" class="setup-persg"></div>
         <div class="ferramentas">
+          <div class="lote-filhos"><button id="btnIniFilhos" class="btn-fantasma">🎲 Rolar iniciativa de todos os Filhos</button><label>bônus <input id="bonusFilhos" type="number" value="0"></label></div>
           <button id="btnPedirIni" class="btn-fantasma">Pedir iniciativa aos jogadores</button>
           <button id="btnIniciarPersg" class="btn-roxo">Iniciar perseguição</button>
         </div>
@@ -231,7 +259,22 @@
           <button id="btnEncerrarPersg" class="btn-fantasma perigo">Encerrar perseguição</button>
         </div>
       </div>
-      <h3>Chat e rolagens</h3>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoLojaM" data-aba="sessao" hidden>
+      <h2>Loja do Maurício</h2>
+      <label class="chave"><input type="checkbox" id="chkLojaAberta"><span>Loja aberta aos jogadores</span></label>
+      <label class="chave"><input type="checkbox" id="chkLojaZN"><span>O Maurício só atende quem está na Zona Neutra</span></label>
+      <div class="ferramentas">
+        <button id="btnAbrirLojaM" class="btn-roxo">Abrir a loja (ver, editar e criar vendas)</button>
+      </div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoMesa" data-aba="sessao" hidden>
+      <h2>Mesa</h2>
+      <label class="campo-linha">Ver pelos olhos de
+        <select id="selEspiar"><option value="">Ninguém (visão do Mestre)</option></select>
+      </label>
       <label class="chave"><input type="checkbox" id="chkRolAberta"><span>Rolagens dos jogadores aparecem no chat Geral (desmarcado: só você vê, no Sussurro)</span></label>
       <div class="ferramentas">
         <button id="btnTV" class="btn-fantasma">Abrir a tela da mesa (modo TV)</button>
@@ -243,7 +286,18 @@
       </div>
     </section>
 
-    <section class="bloco mestre-only" id="blocoRelogio" hidden>
+    <section class="bloco mestre-only" id="blocoFuncoes" data-aba="segredos" hidden>
+      <h2>Funções (só o Mestre vê)</h2>
+      <p class="mini">Não ficam no código do site. Ficam salvas só no seu navegador (ou na sua conta do Firebase).</p>
+      <div id="listaFuncoes" class="lista-funcoes"></div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoConectados" data-aba="registro" hidden>
+      <h2>Conectados agora</h2>
+      <ul id="listaConectados" class="lista-conectados"></ul>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoRelogio" data-aba="sessao" hidden>
       <h2>Relógio da Caixa</h2>
       <p class="mini">Todos veem a hora no topo do mapa. À 00:00, todos recebem o aviso de que os robôs S.T.A.F.F. desligam.</p>
       <div class="relogio-ctrl">
@@ -262,7 +316,7 @@
       <label class="chave"><input type="checkbox" id="chkApagao00"><span>À 00:00, ligar o Apagão automaticamente</span></label>
     </section>
 
-    <section class="bloco mestre-only" id="blocoExpo" hidden>
+    <section class="bloco mestre-only" id="blocoExpo" data-aba="registro" hidden>
       <h2>Exposição (NEX)</h2>
       <p class="mini">Quantas vezes cada cobaia entrou em sala de cada elemento (a Zona Neutra não conta). Conta enquanto a sua tela de Mestre estiver aberta.</p>
       <div id="tabelaExpo" class="tabela-expo"></div>
@@ -272,7 +326,7 @@
       </div>
     </section>
 
-    <section class="bloco mestre-only" id="blocoBalanca" hidden>
+    <section class="bloco mestre-only" id="blocoBalanca" data-aba="segredos" hidden>
       <h2>Balança do Eco</h2>
       <p class="mini">Começa em 50/50. Cada ação marcante move 5 pontos. Só o Mestre vê os números. Todos veem o símbolo do Eco no canto do mapa mudar de forma; ao passar o mouse ou tocar, aparece só "Eco", "Eco Tingido" ou "Eco Consagrado".</p>
       <div class="balanca">
@@ -297,7 +351,7 @@
       <p class="mini">Faixas: 50/50 a 60/40 neutro · 65/35 a 85/15 tingido · 90/10 a 100 consagrado.</p>
     </section>
 
-    <section class="bloco mestre-only" id="blocoApagao" hidden>
+    <section class="bloco mestre-only" id="blocoApagao" data-aba="sessao" hidden>
       <h2>Apagão</h2>
       <p class="mini">O sinal da Interface cai: a planta escurece e cada jogador passa a enxergar só a própria ficha, até o Mestre desligar. Os auxiliares não são afetados.</p>
       <h3>Continuam enxergando no apagão</h3>
@@ -306,7 +360,7 @@
       <button id="btnApagao" class="btn-protocolo">Ligar apagão</button>
     </section>
 
-    <section class="bloco mestre-only" id="blocoDiario" hidden>
+    <section class="bloco mestre-only" id="blocoDiario" data-aba="registro" hidden>
       <h2>Diário da sessão</h2>
       <p class="mini">Registro automático, só do Mestre: movimentos, rolagens, quebras, Protocolo, perseguição e revelações. Ele grava enquanto a sua tela de Mestre estiver aberta.</p>
       <div class="diario-ctrl">
@@ -323,26 +377,27 @@
       <ol id="listaDiario" class="lista-diario"></ol>
       <p id="diarioVazio" class="vazio">Nada registrado ainda.</p>
       <div class="ferramentas duas">
+        <button id="btnResumo" class="btn-roxo">Resumo da sessão (imprimir ou PDF)</button>
         <button id="btnBaixarDiario" class="btn-fantasma">Baixar diário (.txt)</button>
         <button id="btnLimparDiario" class="btn-fantasma perigo">Limpar diário</button>
       </div>
     </section>
 
-    <section class="bloco mestre-only" id="blocoRolagens" hidden>
+    <section class="bloco mestre-only" id="blocoRolagens" data-aba="registro" hidden>
       <h2>Rolagens recentes</h2>
       <p class="mini">As últimas 5 rolagens de cada um, da mais nova para a mais antiga. ⚠ marca quem rolou de novo em menos de 1 minuto.</p>
       <div id="listaRolagens" class="lista-rolagens"></div>
       <p id="rolagensVazio" class="vazio">Ninguém rolou ainda.</p>
     </section>
 
-    <section class="bloco mestre-only" id="blocoNotas" hidden>
+    <section class="bloco mestre-only" id="blocoNotas" data-aba="mapa" hidden>
       <h2>Anotações das salas</h2>
       <p class="mini">Clique numa sala do mapa para escrever pistas, armadilhas ou o que já foi revelado. Só o Mestre vê.</p>
       <ul id="listaNotas" class="lista-notas"></ul>
       <p id="notasVazio" class="vazio">Nenhuma anotação neste andar.</p>
     </section>
 
-    <section class="bloco mestre-only" id="blocoBackup" hidden>
+    <section class="bloco mestre-only" id="blocoBackup" data-aba="segredos" hidden>
       <h2>Backup</h2>
       <p class="mini">Baixe ao fim de cada sessão: guarda a posição de todas as fichas, salas reveladas, ruído, dia, funções, anotações e o diário. Restaurar volta tudo a esse ponto (o diário atual é mantido).</p>
       <p class="mini alerta-mini">O arquivo contém as funções das cobaias. Guarde só com você e nunca envie ao GitHub.</p>
@@ -373,6 +428,9 @@
   <button id="btnApagarChat" class="btn-fantasma perigo apagar-chat" hidden>Apagar todo o chat</button>
 </aside>
 
+<div id="faixaConexao" class="faixa-conexao" hidden>SEM CONEXÃO · seus movimentos não estão sendo enviados</div>
+<div id="faixaEspiar" class="faixa-espiar" hidden>Vendo pelos olhos de <b id="espiarNome"></b> · <button id="btnSairEspiar">voltar à visão do Mestre</button></div>
+<div id="alertasMestre" class="alertas-mestre" aria-live="polite"></div>
 <div id="faixaMeiaNoite" class="faixa-meianoite" hidden>00:00 · OS ROBÔS S.T.A.F.F. DESLIGAM</div>
 
 <!-- Protocolo Filho da O.R.F.E.U. -->
@@ -454,6 +512,37 @@
     <div id="listaReset" class="ferramentas"></div>
     <div class="dlg-acoes"><button class="btn-fantasma" value="cancel">Cancelar</button></div>
   </form>
+</dialog>
+
+<dialog id="dlgAjuda" class="dlg dlg-ajuda">
+  <form method="dialog">
+    <h2>Ajuda rápida</h2>
+    <div id="ajudaTexto" class="ajuda-texto"></div>
+    <div class="dlg-acoes"><button class="btn-roxo" value="ok">Entendi</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgLoja" class="dlg dlg-loja">
+  <div class="loja-topo">
+    <div><p class="arq-kicker">Zona Neutra</p><h2>Loja do Maurício</h2></div>
+    <button id="btnFecharLoja" class="fechar" aria-label="Fechar a loja">×</button>
+  </div>
+  <p id="lojaAviso" class="loja-aviso"></p>
+  <div id="lojaMestre" class="loja-mestre" hidden>
+    <details id="lojaForm" class="cartao-sec"><summary id="lojaFormTitulo">Nova venda</summary>
+      <input type="hidden" id="lojaEditId">
+      <label class="campo-linha">Nome da venda <input id="lojaT" placeholder="ex.: Armas exóticas"></label>
+      <div class="loja-custo"><label class="campo-linha">Sucatas Maiores <input id="lojaM" type="number" min="0" value="0"></label>
+        <label class="campo-linha">Sucatas Menores <input id="lojam" type="number" min="0" value="0"></label></div>
+      <label class="campo-linha">Opções (uma por linha: nome ; dano ; crítico)
+        <textarea id="lojaOp" rows="4" placeholder="Arpão ; 1d10 ; x3&#10;Lança ; 1d8 ; x2"></textarea></label>
+      <label class="campo-linha">Descrição (opcional) <textarea id="lojaDesc" rows="2"></textarea></label>
+      <label class="campo-linha">Imagem (opcional) <input id="lojaImg" type="file" accept="image/*"></label>
+      <label class="chave"><input type="checkbox" id="lojaOculta"><span>Oculta dos jogadores (aparece só quando você liberar)</span></label>
+      <div class="ferramentas duas"><button id="btnLojaSalvar" class="btn-roxo">Salvar venda</button><button id="btnLojaCancelar" class="btn-fantasma">Limpar</button></div>
+    </details>
+  </div>
+  <div id="lojaGrade" class="loja-grade"></div>
 </dialog>
 
 <dialog id="dlgArquivo" class="dlg dlg-arquivo">

@@ -135,3 +135,38 @@ const SERES = [
   { id: 'f20', tipo: 'filho', codigo: 'F-20', nome: 'Pele-Alheia',    cor: '#e76f51' },
   { id: 'f21', tipo: 'filho', codigo: 'F-21', nome: 'O Ouvinte',   cor: '#1b263b' },
 ];
+
+/* ---------------------------------------------------------
+   LOJA DO MAURÍCIO: catálogo inicial (do PDF "Itens do Maurício").
+   O Mestre edita, oculta e cria vendas novas pelo painel; este é só
+   o ponto de partida. Custo em Sucatas: M = Maiores, m = Menores.
+   Cada opção: n = nome, d = dano, c = crítico, p = custo próprio (se tiver).
+   --------------------------------------------------------- */
+const LOJA_PADRAO = [
+  { id: 'simples', t: 'Armas simples', img: 'img/loja/simples.jpg', custo: { M: 0, m: 2 },
+    op: [{ n: 'Arma simples', d: '1d4 / 1d6', c: '2x' }] },
+  { id: 'arremesso', t: 'Armas de arremesso (duas mãos)', img: 'img/loja/arremesso.jpg', custo: { M: 1, m: 5 },
+    op: [{ n: 'Balestra', d: '1d12', c: '19' }, { n: 'Arco Composto', d: '1d10', c: '3x' }] },
+  { id: 'fogo-leves', t: 'Armas de fogo (leves)', img: 'img/loja/fogo-leves.jpg', custo: { M: 1, m: 8 },
+    op: [{ n: 'Pistola', d: '1d12', c: '18' }, { n: 'Revólver', d: '2d6', c: '19 (x3)' }, { n: 'Fuzil de Caça', d: '2d8', c: '19 (x3)' }] },
+  { id: 'cac-leves', t: 'Corpo a corpo (leves)', img: 'img/loja/cac-leves.jpg', custo: { M: 0, m: 2 },
+    op: [{ n: 'Nunchako', d: '1d8', c: '2x' }, { n: 'Machadinha', d: '1d6', c: '3x' }] },
+  { id: 'cac-uma-mao', t: 'Corpo a corpo (uma mão)', img: 'img/loja/cac-uma-mao.jpg', custo: { M: 0, m: 5 },
+    op: [{ n: 'Espada', d: '1d10', c: '19' }, { n: 'Machado', d: '1d8', c: 'x3' }, { n: 'Maça', d: '2d4', c: 'x2' }] },
+  { id: 'cac-duas-maos', t: 'Corpo a corpo (duas mãos)', img: 'img/loja/cac-duas-maos.jpg', custo: { M: 1, m: 3 },
+    op: [{ n: 'Katana', d: '1d10', c: '19' }, { n: 'Gadanho', d: '2d4', c: 'x4' }, { n: 'Marreta', d: '3d4', c: 'x2' }, { n: 'Montante', d: '2d6', c: '19' }, { n: 'Motossera', d: '3d6', c: 'x2' }] },
+  { id: 'fogo-uma-mao', t: 'Armas de fogo (uma mão)', img: 'img/loja/fogo-uma-mao.jpg', custo: { M: 1, m: 10 },
+    op: [{ n: 'Submetralhadora', d: '2d6', c: '19 (x3)' }, { n: 'Desert Eagle', d: '2d8', c: '18' }] },
+  { id: 'fogo-duas-maos', t: 'Armas de fogo (duas mãos)', img: 'img/loja/fogo-duas-maos.jpg', custo: { M: 3, m: 15 },
+    op: [{ n: 'Espingarda', d: '4d6', c: 'x3' }, { n: 'Fuzil de Assalto', d: '2d10', c: '19 (x3)' }, { n: 'Fuzil de Precisão', d: '2d10', c: '19 (x3)' }, { n: 'Espingarda Cano Duplo', d: '4d6', c: 'x3' }] },
+  { id: 'pesadas', t: 'Armas pesadas', img: 'img/loja/pesadas.jpg', custo: { M: 10, m: 25 },
+    op: [{ n: 'Bazuca', d: '10d8', c: 'x2' }, { n: 'Lança Chamas', d: '6d6', c: 'x2' }, { n: 'Metralhadora', d: '2d12', c: '19 (x3)' }] },
+  { id: 'municoes', t: 'Munições variadas', img: 'img/loja/municoes.jpg', custo: null,
+    op: [{ n: 'Bala Curta', p: { M: 0, m: 1 } }, { n: 'Bala Longa', p: { M: 0, m: 2 } }, { n: 'Flechas', p: { M: 0, m: 2 } }, { n: 'Foguete', p: { M: 2, m: 0 } }, { n: 'Combustível', p: { M: 2, m: 0 } }] },
+  { id: 'modificacoes', t: 'Modificações (armas e vestimentas)', img: 'img/loja/modificacoes.jpg', custo: { M: 2, m: 6 },
+    op: [{ n: 'Calibre Grosso' }, { n: 'Discreta' }, { n: 'Cruel' }, { n: 'Certeira' }, { n: 'Tática' }, { n: 'Silenciador' }, { n: 'Ferrolho Automático' }, { n: 'Perigosa' }] },
+  { id: 'maldicoes', t: 'Maldições paranormais (armas e vestimentas)', img: 'img/loja/maldicoes.jpg', custo: { M: 15, m: 0 },
+    op: [{ n: 'Maldição paranormal' }] },
+  { id: 'itens-paranormais', t: 'Itens paranormais', img: 'img/loja/itens-paranormais.jpg', custo: { M: 20, m: 0 },
+    op: [{ n: 'Item paranormal' }] },
+];

@@ -1081,3 +1081,150 @@ body.tv .andar-legenda span { font-size: 34px; }
   .eco-simbolo { position: fixed; top: calc(var(--topo-h) + 4px); right: 10px; height: 56px; margin: 0; }
 }
 body.tv .eco-simbolo { margin-right: 0; }
+
+/* =========================================================
+   ABAS DO MESTRE
+   ========================================================= */
+.abas-mestre {
+  position: sticky; top: -16px; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  margin: -16px -16px 14px; padding: 10px 12px 8px; background: var(--painel); border-bottom: 1px solid var(--roxo);
+}
+.abas-mestre button {
+  background: #1b1526; border: 1px solid var(--linha); border-radius: 6px; padding: 7px 2px;
+  font: 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--texto-dim);
+}
+.abas-mestre button.ativo { background: var(--roxo-escuro); border-color: var(--roxo); color: #fff; }
+.painel section.fora-da-aba { display: none !important; }
+.painel .abas-mestre + .bloco, .painel section.bloco:not(.fora-da-aba) ~ section.bloco { }
+body.mestre .painel .bloco + .bloco { margin-top: 18px; }
+
+/* topo: botões redondos de som e ajuda */
+.btn-icone { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 15px; border-radius: 50%; }
+
+/* =========================================================
+   ALERTAS, FAIXAS (conexão e "ver como")
+   ========================================================= */
+.alertas-mestre { position: fixed; right: 16px; top: calc(var(--topo-h) + 12px); z-index: 66; display: grid; gap: 8px; width: min(360px, 92vw); pointer-events: none; }
+.alerta-mestre {
+  pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px;
+  background: #2a1016; border: 1px solid #ff9f43; box-shadow: 0 0 22px rgba(255,159,67,.35); font-size: 14px;
+  animation: vezPop .3s ease-out;
+}
+.alerta-mestre span { flex: 1; }
+.alerta-mestre span::before { content: '⚑ '; color: #ffb37a; }
+.alerta-mestre button { background: none; border: 0; color: var(--texto-dim); font-size: 18px; line-height: 1; }
+.faixa-conexao {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 64; text-align: center; padding: 10px;
+  font: 13px var(--mono); letter-spacing: .1em; color: #fff; background: #8f1d2c; border-top: 1px solid #ff6b7f;
+}
+.faixa-espiar {
+  position: fixed; left: 50%; top: calc(var(--topo-h) + 8px); transform: translateX(-50%); z-index: 33;
+  padding: 6px 12px; border-radius: 999px; font: 13px var(--mono); background: #0b3b36; border: 1px solid #3ddc97; color: #c8ffe9;
+}
+.faixa-espiar button { background: none; border: 0; color: #fff; text-decoration: underline; font: inherit; }
+body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
+
+/* =========================================================
+   PRÉVIA DO CAMINHO
+   ========================================================= */
+.previa-svg { position: absolute; left: 0; top: 0; transform: translateZ(1.8px); pointer-events: none; overflow: visible; }
+.previa-linha { fill: none; stroke: #f5c84c; stroke-width: 4; stroke-dasharray: 10 8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px #f5c84c); }
+.previa-rotulo { position: absolute; width: 0; height: 0; transform: translateZ(4px); pointer-events: none; }
+.previa-rotulo span {
+  position: absolute; left: 22px; top: -36px; white-space: nowrap; font: 15px var(--mono); padding: 2px 8px; border-radius: 5px;
+  background: rgba(7,6,10,.92); border: 1px solid #f5c84c; color: #fff;
+  transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)) scale(var(--k, 1)); transform-origin: 0 100%;
+}
+.previa-rotulo.no-limite span { border-color: #ff3b5c; color: #ffb3c0; }
+.previa-svg.some, .previa-rotulo.some { opacity: 0; transition: opacity 1.2s; }
+
+/* =========================================================
+   GRUPO, GATILHOS, RASTRO, SINAL DOS FILHOS
+   ========================================================= */
+.ficha.no-grupo .ficha-cabeca { outline: 3px solid #3ddc97; outline-offset: 3px; }
+.grupo-info { color: #3ddc97; }
+.sala.com-gatilho .sala-rotulo::after { content: '⚑ gatilho'; display: inline-block; margin: 6px 0 0 6px; font: 13px var(--mono); color: #ffb37a; background: rgba(0,0,0,.45); padding: 1px 6px; border-radius: 4px; border: 1px solid #8a5a2a; }
+.sala.com-nota.com-gatilho .sala-rotulo::after { content: '✎ anotação · ⚑ gatilho'; }
+.sala.rastro, .corredor.rastro { box-shadow: inset 0 0 0 2px rgba(255,80,100, calc(var(--rastro, 0) * .8)), inset 0 0 26px rgba(255,40,60, calc(var(--rastro, 0) * .45)); }
+.sala.rastro .sala-tinta { opacity: calc(var(--rastro, 0) * .25) !important; background: repeating-radial-gradient(circle at 30% 70%, rgba(255,60,80,.5) 0 3px, transparent 3px 14px) !important; }
+.sinal-ponto.filhos .sinal-anel { border-color: #ff3b5c; box-shadow: 0 0 18px #ff3b5c; }
+.sinal-ponto.filhos .sinal-nome { border-color: #ff3b5c; }
+.lote-filhos { display: flex; gap: 8px; align-items: center; }
+.lote-filhos .btn-fantasma { flex: 1; }
+.lote-filhos label { font: 12px var(--mono); color: var(--texto-dim); display: flex; gap: 4px; align-items: center; }
+.lote-filhos input { width: 52px; background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 4px; padding: 4px; font: 13px var(--mono); }
+
+/* cenas */
+.cena-nova { display: flex; gap: 6px; margin-bottom: 8px; }
+.cena-nova input { flex: 1; background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px; padding: 7px; font: 13px var(--corpo); }
+.lista-cenas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lista-cenas li { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 6px; background: #17121f; }
+.lista-cenas li span { flex: 1; min-width: 0; }
+.lista-cenas b { display: block; font-size: 14px; }
+.lista-cenas small { font: 11px var(--mono); color: var(--texto-dim); }
+.lista-cenas .btn-fantasma { padding: 4px 9px; font-size: 12px; }
+
+/* conectados */
+.lista-conectados { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 13px; color: var(--texto-dim); }
+.lista-conectados li.on { color: var(--texto); }
+.ponto-on { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3a3247; margin-right: 6px; vertical-align: middle; }
+.ponto-on.on, .lista-conectados li.on .ponto-on { background: #3ddc97; box-shadow: 0 0 6px #3ddc97; }
+
+/* caderno */
+.caderno { width: 100%; background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px; padding: 8px; font: 14px/1.5 var(--corpo); resize: vertical; }
+
+/* ajuda */
+.dlg-ajuda { width: min(560px, 94vw); }
+.ajuda-texto h3 { font: 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--roxo-claro); margin: 14px 0 6px; }
+.ajuda-texto ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 14px; }
+
+/* =========================================================
+   LOJA DO MAURÍCIO
+   ========================================================= */
+.btn-loja { width: 100%; margin-top: 10px; border-color: #b8962e; color: #f1d98a; }
+.dlg-loja { width: min(1100px, 96vw); max-height: 92vh; padding: 0; overflow: hidden; }
+.dlg-loja[open] { display: flex; flex-direction: column; }
+.loja-topo { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 6px; }
+.loja-topo h2 { margin: 0; font: 700 22px var(--display); letter-spacing: .05em; }
+.loja-topo .fechar { background: none; border: 0; font-size: 26px; color: var(--texto-dim); }
+.loja-aviso { margin: 0 18px 8px; font-size: 13px; color: #f1d98a; }
+.loja-mestre { padding: 0 18px; }
+.loja-mestre .cartao-sec { border: 1px solid var(--linha); border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; }
+.loja-custo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.loja-mestre textarea { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 5px; padding: 6px 8px; font: 13px var(--corpo); resize: vertical; }
+.loja-grade { overflow-y: auto; padding: 4px 18px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.loja-card { background: #17121f; border: 1px solid var(--linha); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.loja-card.oculto { opacity: .65; border-style: dashed; }
+.loja-card img { width: 100%; height: 170px; object-fit: cover; object-position: center 30%; display: block; background: #0b0910; }
+.loja-corpo { padding: 10px 12px 12px; display: grid; gap: 6px; }
+.loja-corpo h3 { margin: 0; font: 700 15px var(--display); letter-spacing: .03em; }
+.loja-preco { margin: 0; font: 13px var(--mono); color: #f1d98a; }
+.loja-desc { margin: 0; font-size: 13px; color: var(--texto-dim); white-space: pre-wrap; }
+.loja-op { width: 100%; border-collapse: collapse; font-size: 13px; }
+.loja-op th { font: 10px var(--mono); color: var(--texto-dim); text-align: left; font-weight: 400; padding: 2px 4px; }
+.loja-op td { padding: 4px; border-top: 1px solid #221b2e; vertical-align: middle; }
+.loja-op td small { display: block; font: 11px var(--mono); color: #f1d98a; }
+.loja-op tr.caro td:first-child { color: var(--texto-dim); }
+.btn-pedir { background: #2b2410; border: 1px solid #b8962e; color: #f1d98a; border-radius: 4px; padding: 3px 9px; font-size: 12px; }
+.loja-op tr.caro .btn-pedir { opacity: .5; }
+.loja-acoes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.loja-acoes button { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #1b1526; border: 1px solid var(--linha); color: var(--texto); }
+.loja-acoes button.perigo:hover { border-color: var(--perigo); color: var(--perigo); }
+
+@media (max-width: 860px) {
+  .btn-icone { width: 30px; height: 30px; font-size: 13px; }
+  .topo-dir { gap: 6px; }
+  .loja-grade { grid-template-columns: 1fr; }
+  .alertas-mestre { right: 8px; }
+}
+/* celular estreito: o título vira a sigla para caber os botões */
+@media (max-width: 480px) {
+  .marca h1 { font-size: 0; }
+  .marca h1::before { content: 'A.C.F.'; font-size: 17px; letter-spacing: .12em; }
+  .topo { padding: 0 8px; }
+  .topo-dir .btn-fantasma { padding: 7px 9px; font-size: 13px; }
+}
+.loja-grade { grid-auto-rows: max-content; align-content: start; flex: 1; min-height: 0; }
+.loja-card { min-height: max-content; }
+.loja-op td:first-child { overflow-wrap: anywhere; }
+.loja-op td:last-child { text-align: right; width: 1%; }

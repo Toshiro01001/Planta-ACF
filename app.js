@@ -42,7 +42,7 @@ for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
 /* ---------- Dados das salas ----------
    1º andar: data.js (público). Andares 2 a 5: caminho privado (Mestre e
    auxiliares). Jogadores recebem só o que foi revelado, em mapa/nomes. */
-const veTudo = () => mestre || !!aux;
+const veTudo = () => V().mestre || !!V().aux;
 function infoSala(a, cn) {
   const p = cn - 25 * (a - 1);
   const padrao = p === 25 ? ['Zona Neutra', 'F'] : ['', '?'];
@@ -98,7 +98,7 @@ function salaRevelada(andar, cn) {
   const v = (Store.state.salas || {})['c' + cn];
   return v === undefined ? andar === 1 : !!v;
 }
-const salaVisivel = (andar, cn) => mestre || !!aux || salaRevelada(andar, cn);
+const salaVisivel = (andar, cn) => V().mestre || !!V().aux || salaRevelada(andar, cn);
 
 /* Quem enxerga cada ficha.
    h  = Ocultação geral: escondida dos jogadores.
@@ -107,13 +107,14 @@ const salaVisivel = (andar, cn) => mestre || !!aux || salaRevelada(andar, cn);
    Jogador vê o que não está oculto e a própria cobaia. */
 function visivelPara(tk) {
   if (!tk || !SER[tk.s]) return false;
-  if (mestre) return true;
+  const v = V();
+  if (v.mestre) return true;
   const tipo = SER[tk.s].tipo;
-  if (aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
+  if (v.aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
-  if (apagaoAtivo() && tk.s !== meu && (!apagaoIsento || apagaoQueda)) return false;
-  if (cegoEu() && tk.s !== meu) return false;
-  return !tk.h || tk.s === meu;
+  if (apagaoAtivo() && tk.s !== v.meu && (!isentoDe(v.meu) || apagaoQueda)) return false;
+  if (cegoDe(v.meu) && tk.s !== v.meu) return false;
+  return !tk.h || tk.s === v.meu;
 }
 const apagaoAtivo = () => !!(Store.state.ap && Store.state.ap.on);
 let apagaoIsento = false;   // calculado em verificarApagao()
@@ -144,7 +145,7 @@ function posicoesIniciais(andar = 1) {
   return tokens;
 }
 const CAMPOS_VAZIOS = () => ({ rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null,
-  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {} });
+  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {} });
 const estadoPadrao = () => ({ ...CAMPOS_VAZIOS(), tokens: posicoesIniciais() });
 // ficha que vai para o caminho privado (só Mestre e auxiliares leem): Filhos, NPCs e robôs ocultos
 const ehPrivado = tk => !!tk && !!tk.h && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia';
@@ -480,8 +481,11 @@ function erroGravacao(e) {
   clearTimeout(erroTimer);
   erroTimer = setTimeout(mostrarConexao, 4000);
 }
+let jaConectou = false;
 function mostrarConexao() {
   if (Store.modo !== 'firebase') return;
+  if (Store.conectado) jaConectou = true;
+  $('#faixaConexao').hidden = !jaConectou || !!Store.conectado || TV;
   setSync(Store.conectado ? 'ao vivo' : 'reconectando…', Store.conectado ? 'vivo' : '');
 }
 
@@ -523,6 +527,8 @@ function definirMestre(sim) {
   if (Store.modo !== 'firebase') Priv.ligar(sim || !!aux);
   if (sim) agendarSincMestre();
   if (Store.modo !== 'firebase') Chat.ligar();
+  if (sim) preencherEspiar(); else if (espiar) { espiar = null; $('#faixaEspiar').hidden = true; document.body.classList.remove('espiando'); }
+  aplicarAbas();
   if (sim && Store.modo === 'firebase' && Store.vazio) { Store.vazio = false; Store.gravarTudo(); }
   montarAndar();
   atualizarTudo();
@@ -776,7 +782,7 @@ function montarAndar() {
     const s = retSala(p);
     const cn = cnDe(andarAtual, p);
     const revelada = salaRevelada(andarAtual, cn);
-    const visivel = mestre || revelada;
+    const visivel = V().mestre || revelada;
     let [nome, elm] = infoSala(andarAtual, cn);
     if (!visivel) { nome = ''; elm = '?'; }
     const elemento = ELEMENTOS[elm] || ELEMENTOS['?'];
@@ -785,13 +791,13 @@ function montarAndar() {
     d.dataset.cn = cn;
     if (p === 25 && visivel) d.classList.add('neutra');
     if (!visivel) d.classList.add('desconhecida');
-    if (mestre && !revelada) d.classList.add('oculta-jog');
+    if (V().mestre && !revelada) d.classList.add('oculta-jog');
     if (!nome && p !== 25) d.classList.add('vazia-planta');
     d.style.setProperty('--el', elemento.cor);
     d.innerHTML = `<div class="sala-tinta"></div>
       <div class="sala-rotulo">
         ${visivel ? `<span class="sala-cn">CN ${String(cn).padStart(2, '0')}</span>` : '<span class="sala-cn">Desconhecido</span>'}
-        ${mestre && !revelada ? '<span class="sala-oculta">oculta aos jogadores</span>' : ''}
+        ${V().mestre && !revelada ? '<span class="sala-oculta">oculta aos jogadores</span>' : ''}
         ${nome ? `<span class="sala-nome">${nome}</span>` : ''}
         ${elm !== '?' && elm !== 'N' ? `<span class="sala-el">${elemento.nome}</span>` : ''}
       </div>`;
@@ -911,7 +917,8 @@ function desenharSaida(saida, paredes) {
 let assinaturaAndar = '';
 function assinatura() {
   const s = Store.state.salas || {};
-  let t = (mestre ? 'M' : aux ? 'A' : 'J') + andarAtual + ':';
+  const vv = V();
+  let t = (vv.mestre ? 'M' : vv.aux ? 'A' : 'J') + (espiar ? espiar.id : '') + andarAtual + ':';
   for (let p = 1; p <= 25; p++) t += salaRevelada(andarAtual, cnDe(andarAtual, p)) ? '1' : '0';
   const nomes = [];
   for (let p = 1; p <= 25; p++) nomes.push(infoSala(andarAtual, cnDe(andarAtual, p)).join('|'));
@@ -1024,6 +1031,7 @@ function desenharFichas() {
     f.classList.toggle('minha', !mestre && podeMover(tk));
     f.classList.toggle('vista-filhos', mestre && !!tk.vf);
     f.classList.toggle('selecionada', selecionado === id);
+    f.classList.toggle('no-grupo', grupo.has(id));
   });
 
   fichasDom.forEach((f, id) => { if (!vistos.has(id)) { f.remove(); fichasDom.delete(id); } });
@@ -1036,6 +1044,8 @@ function ligarArraste(f) {
     esconderDica();
     const id = f.dataset.id;
     const tk = Store.state.tokens[id];
+    if (espiar) { selecionar(id); aviso('Volte à visão do Mestre para mover fichas.'); return; }
+    if (mestre && e.shiftKey) { alternarGrupo(id); return; }
     if (!podeMover(tk)) { selecionar(id); return; }
     const motivo = bloqueioPerseguicao(id, tk);
     if (motivo) { aviso(motivo); selecionar(id); return; }
@@ -1044,7 +1054,8 @@ function ligarArraste(f) {
     // ficha em fileira: o arraste começa de onde ela aparece na tela
     const vista = posTela.get(id);
     if (vista) { tk.x = vista.x; tk.y = vista.y; }
-    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0, limitado: !!limiteDe(id), antes };
+    arrastando = { id, dx: tk.x - p.x, dy: tk.y - p.y, andou: false, ultimo: 0, limitado: !!limiteDe(id), antes, outros: grupoInicio(id) };
+    previaInicio(tk);
     cabeca.setPointerCapture(e.pointerId);
     f.classList.add('arrastada');
   });
@@ -1078,6 +1089,8 @@ function ligarArraste(f) {
     arrastando.andou = true;
     tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2);
     f.style.left = px(tk.x); f.style.top = px(tk.y);
+    previaPasso(tk, lim);
+    if (arrastando.outros) grupoPasso(arrastando.outros, tk, arrastando.antes);
     $('.ficha-nome', f).textContent = rotuloFicha(tk, arrastando.id);
     const agora = performance.now();
     if (agora - arrastando.ultimo > 120) {   // envia aos jogadores enquanto arrasta
@@ -1087,8 +1100,10 @@ function ligarArraste(f) {
   });
   const fim = () => {
     if (!arrastando || arrastando.id !== f.dataset.id) return;
-    const { id, andou, limitado, antes } = arrastando;
+    const { id, andou, limitado, antes, outros } = arrastando;
     arrastando = null;
+    previaFim();
+    if (andou && outros) grupoFim(outros);
     f.classList.remove('arrastada');
     const tk = Store.state.tokens[id];
     // voltou ao ponto de partida do turno: zera o que andou
@@ -1148,7 +1163,9 @@ function desenharCartaoSala() {
     <p>Para os jogadores: <strong>${rev ? 'revelada' : 'desconhecida'}</strong></p>
     <div class="acoes"><button data-acao="revelar">${rev ? 'Esconder dos jogadores' : 'Revelar aos jogadores'}</button>
       <button data-acao="vfsim">Revelar aos Filhos quem está aqui</button>
-      <button data-acao="vfnao">Esconder dos Filhos quem está aqui</button></div>
+      <button data-acao="vfnao">Esconder dos Filhos quem está aqui</button>
+      <button data-acao="trazcob">Trazer todas as cobaias para cá</button>
+      ${grupo.size ? `<button data-acao="trazgrupo">Trazer o grupo (${grupo.size}) para cá</button>` : ''}</div>
     <label class="nota-sala">Anotações da sala <span class="so-mestre">só o Mestre vê</span>
       <textarea class="nota-txt" rows="4" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
     <span class="nota-status" aria-live="polite"></span>
@@ -1177,6 +1194,12 @@ function desenharCartaoSala() {
     aviso(lista.length ? `${lista.length} ficha(s) ${sim ? 'reveladas aos' : 'escondidas dos'} Filhos.` : 'Nenhuma cobaia ou NPC nesta sala.');
   };
   $('[data-acao="vfsim"]', c).onclick = () => marcar(true);
+  $('[data-acao="trazcob"]', c).onclick = () => {
+    const ids = SERES.filter(x => x.tipo === 'cobaia' && Store.state.tokens[x.id]).map(x => x.id);
+    if (confirm(`Levar as ${ids.length} cobaias para a CN ${pad2(cn)}?`)) levarParaSala(ids, a, p);
+  };
+  const btg = $('[data-acao="trazgrupo"]', c);
+  if (btg) btg.onclick = () => levarParaSala([...grupo], a, p);
   $('[data-acao="vfnao"]', c).onclick = () => marcar(false);
 }
 
@@ -1208,7 +1231,7 @@ function desenharCartaoSalaPublico() {
 function desenharCartao() {
   const c = $('#cartao');
   if (corredorSel !== null && corredorSel !== undefined && CORREDORES[corredorSel]) { desenharCartaoCorredor(); return; }
-  if (salaSel && mestre) { desenharCartaoSala(); return; }
+  if (salaSel && mestre && !espiar) { desenharCartaoSala(); return; }
   if (salaSel) { desenharCartaoSalaPublico(); return; }
   delete c.dataset.sala;
   const tk = selecionado && Store.state.tokens[selecionado];
@@ -1277,7 +1300,7 @@ function desenharPainel() {
     const tk = tokens[s.id];
     const visivel = tk && visivelPara(tk);
     return `<li data-id="${s.id}">${bola(s)}<span class="info">
-      <strong>${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
+      <strong>${Presenca.online(s.id) ? '<span class="ponto-on on" title="conectado agora"></span>' : ''}${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
       <span class="sub">${s.jogador}${funcaoDe(s.id) ? ' · ' + funcaoDe(s.id) : ''}</span>
       <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span></span></li>`;
   }).join('');
@@ -1389,7 +1412,7 @@ function irParaAndar(a) {
 // O que o Mestre Auxiliar "ouve": salas com cobaias pulsam em vermelho
 const ultimaPos = {};
 function desenharSons() {
-  const ouvinte = aux && !mestre;
+  const ouvinte = !!V().aux && !V().mestre;
   if (!ouvinte) $$('.sala.som, .corredor.som').forEach(e => e.classList.remove('som'));
   const grupos = gruposDeSala();
   const alvo = new Map();
@@ -1422,6 +1445,7 @@ function desenharSons() {
     let e = p ? $(`.sala[data-cn="${cnDe(andarAtual, p)}"]`, stage) : null;
     if (!p) { const ci = CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)); e = ci >= 0 ? $(`.corredor[data-ci="${ci}"]`, stage) : null; }
     if (e) { e.classList.remove('pulso'); void e.offsetWidth; e.classList.add('pulso'); }
+    marcarRastro(tk.a, p, p ? null : CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)));
   });
 }
 
@@ -1446,6 +1470,15 @@ function atualizarTudo() {
   desenharOpcoesMestre();
   ligarSinais();
   seguirAndarTV();
+  desenharCenas();
+  desenharGrupo();
+  desenharRastros();
+  desenharCaderno();
+  desenharConectados();
+  desenharOpcoesLoja();
+  aplicarAbas();
+  Presenca.ligar();
+  if ($('#dlgLoja').open) desenharLoja();
   atualizarDesfazer();
   desenharApagaoMestre();
   desenharBalanca();
@@ -1591,6 +1624,7 @@ const Som = {
     return this.ctx;
   },
   tom(freq, ini, dur, tipo = 'square', vol = 0.12, freqFim) {
+    if (typeof mudo !== 'undefined' && mudo) return;
     const c = this.pronto(); if (!c) return;
     const o = c.createOscillator(), g = c.createGain();
     o.type = tipo; o.frequency.setValueAtTime(freq, c.currentTime + ini);
@@ -1996,6 +2030,7 @@ function abrirLoginMestre() {
 }
 
 function trocarPerfil() {
+  if (Presenca.quem) { Rede.set('presenca/' + Presenca.id, null).catch(() => {}); Presenca.quem = ''; clearInterval(Presenca.timer); }
   meu = null; aux = null;
   salvarPerfil('');
   if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
@@ -2185,7 +2220,7 @@ const Diario = {
         if (SER[a.s]) this.registrar('sala', `${rotuloBase(a)} saiu do mapa (estava em ${lugarDe(a)})`);
         return;
       }
-      if (a.x !== b.x || a.y !== b.y || a.a !== b.a) this.moveu(id, a);
+      if (a.x !== b.x || a.y !== b.y || a.a !== b.a) { this.moveu(id, a); verificarGatilho(id, a, b); }
       if (!!a.h !== !!b.h) this.registrar('sala', `${rotuloBase(b)} ${b.h ? 'ocultado dos jogadores' : 'revelado aos jogadores'}`);
       if (!!a.vf !== !!b.vf) this.registrar('sala', `${rotuloBase(b)} ${b.vf ? 'revelado aos Filhos' : 'escondido dos Filhos'}`);
       if (b.r && b.r.ts && (!a.r || a.r.ts !== b.r.ts)) this.dado(id, b.r);
@@ -2499,9 +2534,10 @@ let apagaoAntes = false;
 let apagaoTimer = null;
 async function verificarApagao() {
   const ap = Store.state.ap;
-  const ativo = !!(ap && ap.on) || cegoEu();
+  const vv = V();
+  const ativo = !!(ap && ap.on) || cegoDe(vv.meu);
   // entrada no apagão (ou numa Trilha de Ausência): tudo some por alguns segundos e a tela pisca
-  if (ativo && !apagaoAntes && !mestre && !aux && !TV) {
+  if (ativo && !apagaoAntes && !vv.mestre && !vv.aux && !TV) {
     apagaoQueda = true;
     $('#telaApagao').hidden = false;
     document.body.classList.add('apagao-queda');
@@ -2515,7 +2551,7 @@ async function verificarApagao() {
   }
   if (!ativo) { apagaoQueda = false; clearTimeout(apagaoTimer); $('#telaApagao').hidden = true; document.body.classList.remove('apagao-queda'); }
   apagaoAntes = ativo;
-  document.body.classList.toggle('apagao', ativo && !mestre && !aux);
+  document.body.classList.toggle('apagao', ativo && !vv.mestre && !vv.aux);
   $('#faixaApagao').hidden = !(apagaoAtivo() && mestre);
   // quem continua vendo
   const chave = apagaoAtivo() && meu ? `${ap.n}:${meu}:${(ap.v || []).join(',')}` : '';
@@ -2685,6 +2721,7 @@ function sincronizarMestre() {
   if (!mestre || !Segredos.pronto) return;
   if (Priv.pronto || Store.modo !== 'firebase') for (let a = 1; a <= 5; a++) publicarNomes(a);
   sincronizarCego();
+  semearLoja();
 }
 const igualJSON = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
 function publicarNomes(a) {
@@ -2742,6 +2779,7 @@ function htmlEdicaoSala(a, cn, p) {
       <label class="campo-linha">Elemento <select class="ed-el">${opcoes}</select></label>
       <label class="chave"><input type="checkbox" class="ed-saida" ${saida ? 'checked' : ''}><span>O elevador para o ${a < 5 ? (a + 1) + 'º andar' : 'fim'} fica nesta sala</span></label>
       <label class="chave"><input type="checkbox" class="ed-semsinal" ${semSinal(cn) ? 'checked' : ''}><span>Sem sinal (Trilha de Ausência): quem entrar só vê a própria ficha</span></label>
+      <label class="campo-linha">Gatilho (avisa você quando uma cobaia entrar) <input class="ed-gatilho" value="${esc(gatilhoDe(cn))}" placeholder="ex.: armadilha do armário"></label>
     </details>
     <details class="cartao-sec arq-sec"><summary>Arquivos da sala <span class="arq-qtd">${Arquivos.daSalaMestre(cn).length || ''}</span></summary>
       <ul class="arq-lista-mestre">${Arquivos.daSalaMestre(cn).map(([fid, f]) => `<li data-fid="${fid}">
@@ -2771,6 +2809,10 @@ function ligarEdicaoSala(c, a, cn) {
     agendarSincMestre();
     montarAndar(); atualizarTudo();
   };
+  $('.ed-gatilho', c).onchange = e => {
+    Segredos.gravar(['_gatilhos', 'c' + cn], e.target.value.trim() || null);
+    marcarSalasMestre();
+  };
   $('.ed-semsinal', c).onchange = e => {
     Segredos.gravar(['_semSinal', 'c' + cn], e.target.checked ? true : null);
     Diario.registrar('sala', `CN ${pad2(cn)} ${e.target.checked ? 'marcada como Trilha de Ausência (sem sinal)' : 'voltou a ter sinal'}`);
@@ -2798,6 +2840,7 @@ function marcarSalasMestre() {
   $$('.sala', stage).forEach(e => {
     e.classList.toggle('com-nota', !!notaDe(+e.dataset.cn));
     e.classList.toggle('sem-sinal', semSinal(+e.dataset.cn));
+    e.classList.toggle('com-gatilho', !!gatilhoDe(+e.dataset.cn));
   });
 }
 
@@ -3194,9 +3237,17 @@ function iniciarToqueLongo(e) {
     if (!andavel(andarAtual, pt.x, pt.y)) return;
     if (gesto) gesto.andou = true;
     const de = meu || aux;
-    Rede.push('sinais', { a: andarAtual, x: +pt.x.toFixed(2), y: +pt.y.toFixed(2), ts: Date.now(), de, n: SER[de] ? SER[de].nome : '?' }).pronto.catch(erroGravacao);
-    mostrarSinal(pt.x, pt.y, 'enviado', '');
-    aviso('Sinal enviado ao Mestre.');
+    const sinal = { a: andarAtual, x: +pt.x.toFixed(2), y: +pt.y.toFixed(2), ts: Date.now(), de, n: SER[de] ? SER[de].nome : '?' };
+    if (aux) {
+      const r = Rede.push('sinaisFilhos', sinal);
+      r.pronto.catch(erroGravacao);
+      setTimeout(() => Rede.set('sinaisFilhos/' + r.key, null).catch(() => {}), 12000);
+      aviso('Sinal enviado aos Filhos e ao Mestre.');
+    } else {
+      Rede.push('sinais', sinal).pronto.catch(erroGravacao);
+      mostrarSinal(pt.x, pt.y, 'enviado', '');
+      aviso('Sinal enviado ao Mestre.');
+    }
     try { navigator.vibrate && navigator.vibrate(60); } catch (err) {}
   }, 650) };
 }
@@ -3235,7 +3286,24 @@ function ligarSinais() {
     }, () => {});
   }
   if (!mestre && sinaisOff) { sinaisOff(); sinaisOff = null; }
+  // sinais dos auxiliares: Mestre e auxiliares veem
+  const querFilhos = (mestre || (aux && (Store.modo !== 'firebase' || auxLogado))) && !TV;
+  if (querFilhos && !sinaisFilhosOff) {
+    sinaisFilhosOff = Rede.on('sinaisFilhos', v => {
+      Object.entries(v || {}).forEach(([k, s]) => {
+        if (sinaisFilhosVistos.has(k) || !s || Date.now() - s.ts > 60000) { sinaisFilhosVistos.add(k); return; }
+        sinaisFilhosVistos.add(k);
+        if (s.a === andarAtual) mostrarSinal(s.x, s.y, 'filhos', s.n);
+        const p = salaEm(s.a, s.x, s.y);
+        aviso(`${s.n} marcou um ponto para os Filhos: ${p ? 'CN ' + pad2(cnDe(s.a, p)) : lugarDe(s)}`);
+        Som.tom(523, 0, 0.12, 'sine', 0.08);
+      });
+    }, () => {});
+  }
+  if (!querFilhos && sinaisFilhosOff) { sinaisFilhosOff(); sinaisFilhosOff = null; }
 }
+let sinaisFilhosOff = null;
+const sinaisFilhosVistos = new Set();
 
 /* =========================================================
    RELÓGIO DA CAIXA
@@ -3300,14 +3368,16 @@ function barrasFicha(f) {
     if (v === undefined && m === undefined) return '';
     const pct = m ? Math.max(0, Math.min(100, (v || 0) / m * 100)) : 0;
     return `<div class="barra barra-${k}"><span class="barra-r">${r}</span><div class="barra-trilho"><div class="barra-cheia" style="width:${pct}%"></div></div><b>${v ?? '?'}${m ? '/' + m : ''}</b></div>`;
-  }).join('') + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '');
+  }).join('') + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '')
+    + (f.sM !== undefined || f.sm !== undefined ? `<div class="barra barra-nex"><span class="barra-r">Sucatas</span><b>${f.sM || 0} maiores · ${f.sm || 0} menores</b></div>` : '');
 }
 function htmlEditarFicha(id) {
   const f = fichaDe(id) || {};
   const inp = (k, ph) => `<input type="number" data-f="${k}" value="${f[k] ?? ''}" placeholder="${ph}">`;
   return `<details class="cartao-sec"><summary>Ficha resumida (o jogador vê)</summary>
     <div class="ficha-edit">${CAMPOS_FICHA.map(([k, r]) => `<label>${r}${inp(k, 'atual')}<span>/</span>${inp(k + 'm', 'máx')}</label>`).join('')}
-    <label>NEX %${inp('nex', '%')}</label></div></details>`;
+    <label>NEX %${inp('nex', '%')}</label>
+    <label>Sucatas${inp('sM', 'maiores')}<span>·</span>${inp('sm', 'menores')}</label></div></details>`;
 }
 function ligarEditarFicha(c, id) {
   $$('.ficha-edit input', c).forEach(i => i.onchange = () => {
@@ -3365,6 +3435,562 @@ $('#arqSalas').addEventListener('change', async e => {
   agendarSincMestre(); montarAndar(); atualizarTudo();
   aviso(`${n} salas importadas.`);
 });
+
+/* =========================================================
+   VISÃO ATIVA: o Mestre pode "ver pelos olhos" de um jogador ou auxiliar.
+   ========================================================= */
+let espiar = null;   // { t: 'j' | 'a', id }
+function V() { return espiar ? { mestre: false, meu: espiar.t === 'j' ? espiar.id : null, aux: espiar.t === 'a' ? espiar.id : null } : { mestre, meu, aux }; }
+const isentoDe = id => espiar ? !!(Segredos.dados._apagaoVe || {})[id] : apagaoIsento;
+const cegoDe = id => !!(id && (Store.state.cego || {})[id]);
+function preencherEspiar() {
+  const sel = $('#selEspiar');
+  if (sel.options.length > 1) return;
+  SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'robo').forEach(s => {
+    const o = document.createElement('option');
+    o.value = (s.tipo === 'cobaia' ? 'j:' : 'a:') + s.id;
+    o.textContent = `${s.nome} (${s.tipo === 'cobaia' ? 'jogador' : 'auxiliar'} · ${s.jogador || ''})`;
+    sel.appendChild(o);
+  });
+}
+function definirEspiar(v) {
+  espiar = v ? { t: v.slice(0, 1), id: v.slice(2) } : null;
+  $('#selEspiar').value = v || '';
+  $('#faixaEspiar').hidden = !espiar;
+  if (espiar) $('#espiarNome').textContent = SER[espiar.id].nome;
+  document.body.classList.toggle('espiando', !!espiar);
+  selecionar(null);
+  montarAndar();
+  atualizarTudo();
+}
+$('#selEspiar').addEventListener('change', e => definirEspiar(e.target.value));
+$('#btnSairEspiar').addEventListener('click', () => definirEspiar(''));
+
+/* =========================================================
+   ABAS DO PAINEL DO MESTRE
+   ========================================================= */
+let abaMestre = 'mapa';
+try { abaMestre = localStorage.getItem('acf-aba') || 'mapa'; } catch (e) {}
+function aplicarAbas() {
+  $$('#abasMestre button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === abaMestre));
+  $$('.painel section[data-aba]').forEach(s => s.classList.toggle('fora-da-aba', mestre && s.dataset.aba !== abaMestre));
+}
+$$('#abasMestre button').forEach(b => b.addEventListener('click', () => {
+  abaMestre = b.dataset.aba;
+  try { localStorage.setItem('acf-aba', abaMestre); } catch (e) {}
+  aplicarAbas();
+  $('#painel').scrollTop = 0;
+}));
+
+/* =========================================================
+   ALERTAS DO MESTRE (gatilhos e avisos importantes)
+   ========================================================= */
+function alertaMestre(txt) {
+  const d = el('div', 'alerta-mestre');
+  d.innerHTML = `<span>${esc(txt)}</span><button aria-label="Fechar">×</button>`;
+  $('button', d).onclick = () => d.remove();
+  $('#alertasMestre').prepend(d);
+  setTimeout(() => d.remove(), 25000);
+  Som.tom(740, 0, 0.18, 'square', 0.1); Som.tom(988, 0.2, 0.25, 'square', 0.1);
+}
+
+/* ---------- Gatilhos nas salas ---------- */
+const gatilhoDe = cn => (mestre && (Segredos.dados._gatilhos || {})['c' + cn]) || '';
+const gatilhosVistos = {};
+function verificarGatilho(id, a, b) {
+  if (!mestre || !SER[b.s] || SER[b.s].tipo !== 'cobaia') return;
+  const pB = salaEm(b.a, b.x, b.y);
+  if (!pB) return;
+  const pA = a ? salaEm(a.a, a.x, a.y) : null;
+  if (a && pA === pB && a.a === b.a) return;
+  const cn = cnDe(b.a, pB);
+  const g = gatilhoDe(cn);
+  if (!g) return;
+  const k = id + ':' + cn;
+  if (gatilhosVistos[k] && Date.now() - gatilhosVistos[k] < 20000) return;
+  gatilhosVistos[k] = Date.now();
+  alertaMestre(`${SER[b.s].nome} entrou na CN ${pad2(cn)}: ${g}`);
+  Diario.registrar('sala', `Gatilho da CN ${pad2(cn)} disparado por ${SER[b.s].nome}: ${g}`);
+}
+
+/* =========================================================
+   CENAS PRONTAS
+   ========================================================= */
+function desenharCenas() {
+  if (!mestre) return;
+  const cenas = Object.entries(Segredos.dados._cenas || {}).sort((x, y) => x[1].ts - y[1].ts);
+  $('#listaCenas').innerHTML = cenas.map(([k, c]) => `<li data-k="${k}"><span><b>${esc(c.nome)}</b><small>${nomeAndar(c.andar)} · ${Object.keys(c.tokens || {}).length} fichas · ${Object.keys(c.portas || {}).length} portas</small></span>
+    <button data-c="carregar" class="btn-fantasma">Carregar</button><button data-c="apagar" class="btn-fantasma perigo">×</button></li>`).join('') || '<li class="vazio">Nenhuma cena salva.</li>';
+  $$('#listaCenas li[data-k]').forEach(li => {
+    $('[data-c="carregar"]', li).onclick = () => carregarCena(li.dataset.k);
+    $('[data-c="apagar"]', li).onclick = () => { if (confirm('Apagar esta cena?')) { Segredos.gravar(['_cenas', li.dataset.k], null); desenharCenas(); } };
+  });
+}
+$('#btnSalvarCena').addEventListener('click', () => {
+  const nome = $('#cenaNome').value.trim();
+  if (!nome) { aviso('Dê um nome à cena.'); return; }
+  const tokens = {}, portas = {};
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (SER[tk.s] && tk.a === andarAtual && (SER[tk.s].tipo === 'filho' || SER[tk.s].tipo === 'npc')) tokens[id] = { s: tk.s, a: tk.a, x: tk.x, y: tk.y, n: tk.n || 1 };
+  });
+  Object.entries(Store.state.portas || {}).forEach(([k, v]) => { if (k.startsWith('a' + andarAtual + 'c')) portas[k] = v; });
+  Segredos.gravar(['_cenas', Rede.chave()], { nome, andar: andarAtual, ts: Date.now(), tokens, portas });
+  $('#cenaNome').value = '';
+  aviso(`Cena "${nome}" salva.`);
+  desenharCenas();
+});
+function carregarCena(k) {
+  const c = (Segredos.dados._cenas || {})[k];
+  if (!c) return;
+  if (!confirm(`Carregar "${c.nome}"? Os Filhos e NPCs do ${nomeAndar(c.andar)} saem e entram os da cena, ocultos. As portas do andar voltam como na cena.`)) return;
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (SER[tk.s] && tk.a === c.andar && (SER[tk.s].tipo === 'filho' || SER[tk.s].tipo === 'npc') && !(c.tokens || {})[id]) Store.definir(['tokens', id], null);
+  });
+  Object.entries(c.tokens || {}).forEach(([id, tk]) => Store.definir(['tokens', id], { ...tk, h: true, vf: false }));
+  Object.keys(Store.state.portas || {}).forEach(pk => { if (pk.startsWith('a' + c.andar + 'c') && !(c.portas || {})[pk]) Store.definir(['portas', pk], null); });
+  Object.entries(c.portas || {}).forEach(([pk, v]) => Store.definir(['portas', pk], v));
+  Diario.registrar('sessao', `Cena carregada: ${c.nome}`);
+  irParaAndar(c.andar);
+  montarAndar(); atualizarTudo();
+}
+
+/* =========================================================
+   MOVER EM GRUPO (Mestre)
+   ========================================================= */
+const grupo = new Set();
+function alternarGrupo(id) {
+  if (grupo.has(id)) grupo.delete(id); else grupo.add(id);
+  desenharGrupo();
+}
+function desenharGrupo() {
+  $$('.ficha').forEach(f => f.classList.toggle('no-grupo', grupo.has(f.dataset.id)));
+  const info = $('#grupoInfo');
+  info.hidden = !grupo.size;
+  info.textContent = grupo.size ? `${grupo.size} ficha${grupo.size > 1 ? 's' : ''} no grupo: ${[...grupo].map(nomeDoId).join(', ')} · Esc limpa` : '';
+}
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && grupo.size && !e.target.matches('input, textarea, select')) { grupo.clear(); desenharGrupo(); } });
+function grupoInicio(id) {
+  if (!mestre || !grupo.has(id) || grupo.size < 2) return null;
+  const lead = Store.state.tokens[id];
+  return [...grupo].filter(g => g !== id && Store.state.tokens[g] && Store.state.tokens[g].a === lead.a)
+    .map(g => ({ id: g, x0: Store.state.tokens[g].x, y0: Store.state.tokens[g].y, x: Store.state.tokens[g].x, y: Store.state.tokens[g].y }));
+}
+function grupoPasso(outros, lead, antes) {
+  const dx = lead.x - antes.x, dy = lead.y - antes.y;
+  outros.forEach(o => {
+    const alvo = { x: clamp(o.x0 + dx, 0.3, W - 0.3), y: clamp(o.y0 + dy, 0.3, H - 0.3) };
+    if (caminhoLivre(lead.a, { x: o.x, y: o.y }, alvo)) { o.x = +alvo.x.toFixed(2); o.y = +alvo.y.toFixed(2); }
+    const f = fichasDom.get(o.id);
+    if (f) { f.style.left = px(o.x); f.style.top = px(o.y); }
+  });
+}
+function grupoFim(outros) {
+  outros.forEach(o => { const tk = Store.state.tokens[o.id]; if (tk && (o.x !== tk.x || o.y !== tk.y)) Store.definir(['tokens', o.id], { ...tk, x: o.x, y: o.y }); });
+}
+// arruma fichas numa sala (fileiras de 4 no rodapé)
+function levarParaSala(ids, a, p) {
+  const r = retSala(p);
+  ids.forEach((id, i) => {
+    const tk = Store.state.tokens[id];
+    if (!tk) return;
+    const fila = Math.floor(i / 4), col = i % 4, nessa = Math.min(4, ids.length - fila * 4);
+    Store.definir(['tokens', id], { ...tk, a, x: +(r.x + R * (col + 0.5) / nessa).toFixed(2), y: +(r.y + R - 0.75 - fila * 1.1).toFixed(2) });
+  });
+  if (a !== andarAtual) irParaAndar(a);
+}
+
+/* =========================================================
+   PRÉVIA DO CAMINHO (linha tracejada e metros enquanto arrasta)
+   ========================================================= */
+const SVGNS = 'http://www.w3.org/2000/svg';
+let previa = null;
+function previaInicio(tk) {
+  previaFim(true);
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'previa-svg');
+  svg.setAttribute('width', W * T); svg.setAttribute('height', H * T);
+  svg.style.width = px(W); svg.style.height = px(H);
+  const linha = document.createElementNS(SVGNS, 'polyline');
+  linha.setAttribute('class', 'previa-linha');
+  svg.appendChild(linha);
+  const rot = el('div', 'previa-rotulo');
+  rot.innerHTML = '<span></span>';
+  stage.appendChild(svg); stage.appendChild(rot);
+  previa = { svg, linha, rot, pts: [{ x: tk.x, y: tk.y }], total: 0 };
+}
+function previaPasso(tk, lim) {
+  if (!previa) return;
+  const ult = previa.pts[previa.pts.length - 1];
+  if (Math.hypot(tk.x - ult.x, tk.y - ult.y) > 0.05) {
+    previa.total += custoMetros(ult, tk);
+    previa.pts.push({ x: tk.x, y: tk.y });
+  }
+  previa.linha.setAttribute('points', previa.pts.map(q => `${q.x * T},${q.y * T}`).join(' '));
+  previa.rot.style.left = px(tk.x); previa.rot.style.top = px(tk.y);
+  const usado = lim ? (tk.m || 0) : previa.total;
+  $('span', previa.rot).textContent = lim ? `${fmtM(usado)} de ${lim} m` : `${fmtM(usado)} m`;
+  previa.rot.classList.toggle('no-limite', !!lim && usado >= lim - 0.05);
+}
+function previaFim(ja) {
+  if (!previa) return;
+  const p = previa; previa = null;
+  if (ja) { p.svg.remove(); p.rot.remove(); return; }
+  p.svg.classList.add('some'); p.rot.classList.add('some');
+  setTimeout(() => { p.svg.remove(); p.rot.remove(); }, 1400);
+}
+
+/* =========================================================
+   RESUMO DA SESSÃO (página para imprimir ou salvar em PDF)
+   ========================================================= */
+$('#btnResumo').addEventListener('click', () => {
+  const todas = Diario.entradas();
+  let ini = 0;
+  todas.forEach((e, i) => { if (e.k === 'sessao' && /^Nova sessão/.test(e.txt)) ini = i; });
+  const ent = todas.slice(ini);
+  const r = ruido(), b = balanca();
+  const ex = Segredos.dados._expo || {};
+  const rel = Store.state.relogio;
+  const linhaD = e => e.k === 'sessao' ? `<tr class="sep"><td colspan="3">${esc(e.txt)}</td></tr>` : `<tr><td>${hora(e.ts)}</td><td>${ROTULO_K[e.k] || ''}</td><td>${esc(e.txt)}</td></tr>`;
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Resumo da sessão · A Caixa de Fósforos</title>
+<style>body{background:#0b0910;color:#ece6f7;font:14px/1.5 Georgia,serif;margin:28px}h1{font:700 26px Georgia;letter-spacing:.06em;margin:0}h2{color:#c4a8ff;font:700 15px Georgia;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid #3b2366;padding-bottom:4px;margin-top:26px}
+small{color:#9c90b3;font-family:monospace}table{width:100%;border-collapse:collapse}td,th{padding:4px 6px;border-bottom:1px solid #221b2e;text-align:left;vertical-align:top}td:first-child{white-space:nowrap;font-family:monospace;color:#9c90b3}
+tr.sep td{color:#fff;background:#3b2366;font-family:monospace;text-align:center}.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.card{border:1px solid #3b2366;border-radius:8px;padding:10px}.card b{font-size:20px;display:block}
+button{background:#8b5cf6;color:#fff;border:0;border-radius:6px;padding:8px 14px;font:inherit;cursor:pointer}@media print{button{display:none}body{background:#fff;color:#000}h2{color:#3b2366}td:first-child,small{color:#555}.card{border-color:#999}tr.sep td{background:#ddd;color:#000}}</style></head><body>
+<button onclick="print()">Imprimir ou salvar em PDF</button>
+<p><small>O.R.F.E.U. · documento do Mestre</small></p><h1>A Caixa de Fósforos · Resumo da sessão</h1>
+<p><small>${dataCurta(Date.now())} · Dia ${r.d || 1} na Caixa${rel && typeof rel.m === 'number' ? ' · relógio ' + fmtHora(rel.m) : ''}</small></p>
+<div class="cards"><div class="card"><small>Quebras hoje</small><b>${hojeDe(r)}</b></div><div class="card"><small>Rumo ao Protocolo</small><b>${r.q || 0}/3${r.p ? ' · em curso' : ''}</b></div>
+<div class="card"><small>Balança do Eco</small><b>Rei ${b}% · Mãe ${100 - b}%</b></div><div class="card"><small>Registros</small><b>${ent.length}</b></div></div>
+<h2>Exposição por elemento</h2><table><tr><th>Cobaia</th>${ELEM_EXPO.map(k => `<th>${ELEMENTOS[k].nome}</th>`).join('')}</tr>
+${SERES.filter(x => x.tipo === 'cobaia').map(x => `<tr><td>${x.nome}</td>${ELEM_EXPO.map(k => `<td>${(ex[x.id] || {})[k] || ''}</td>`).join('')}</tr>`).join('')}</table>
+<h2>Rolagens</h2><table>${ent.filter(e => e.k === 'dado').map(linhaD).join('') || '<tr><td colspan="3">Nenhuma.</td></tr>'}</table>
+<h2>Diário</h2><table>${ent.map(linhaD).join('') || '<tr><td colspan="3">Nada registrado.</td></tr>'}</table>
+</body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+
+/* =========================================================
+   RASTRO DE SOM (Mestres Auxiliares)
+   ========================================================= */
+const rastros = {};   // "andar:sala:cn" ou "andar:corr:ci" -> horário
+const RASTRO_MS = 180000;
+function marcarRastro(a, p, ci) { rastros[p ? `${a}:sala:${cnDe(a, p)}` : `${a}:corr:${ci}`] = Date.now(); }
+function desenharRastros() {
+  const ouvinte = V().aux && !V().mestre;
+  const agora = Date.now();
+  $$('.sala, .corredor', stage).forEach(e => {
+    const k = e.dataset.cn ? `${andarAtual}:sala:${e.dataset.cn}` : `${andarAtual}:corr:${e.dataset.ci}`;
+    const t = rastros[k];
+    const vivo = ouvinte && t && agora - t < RASTRO_MS;
+    e.classList.toggle('rastro', !!vivo);
+    if (vivo) e.style.setProperty('--rastro', (1 - (agora - t) / RASTRO_MS).toFixed(2));
+  });
+}
+setInterval(() => { if (aux && !mestre) desenharRastros(); }, 5000);
+
+/* =========================================================
+   INICIATIVA DOS FILHOS EM LOTE
+   ========================================================= */
+$('#btnIniFilhosAux').addEventListener('click', rolarIniFilhosAux);
+$('#btnIniFilhos').addEventListener('click', () => {
+  const bonus = parseInt($('#bonusFilhos').value, 10) || 0;
+  let n = 0;
+  $$('#setupPersg .setup-linha').forEach(l => {
+    const tk = Store.state.tokens[l.dataset.id];
+    if (!tk || !SER[tk.s] || SER[tk.s].tipo !== 'filho') return;
+    const d = 1 + Math.floor(Math.random() * 20);
+    $('input.ini', l).value = d + bonus;
+    $('input.ck', l).checked = true;
+    n++;
+    Diario.dado(l.dataset.id, { t: d + bonus, d: [d], b: bonus, dv: false }, 'iniciativa em lote');
+  });
+  aviso(n ? `Iniciativa rolada para ${n} Filho(s).` : 'Nenhum Filho neste andar.');
+});
+// auxiliar: rola para os Filhos do andar aberto; o resultado chega ao Mestre
+function rolarIniFilhosAux() {
+  const bonus = parseInt($('#bonusFilhosAux').value, 10) || 0;
+  const linhas = [];
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (!SER[tk.s] || SER[tk.s].tipo !== 'filho' || tk.a !== andarAtual) return;
+    const d = 1 + Math.floor(Math.random() * 20);
+    Store.definir(['tokens', id], { ...tk, r: { t: d + bonus, d: [d], b: bonus, dv: false, ts: Date.now() } });
+    linhas.push(`${rotuloBase(tk)}: ${d + bonus}`);
+  });
+  if (!linhas.length) { aviso('Nenhum Filho neste andar.'); return; }
+  Chat.enviar('🎲 Iniciativa dos Filhos · ' + linhas.join(' · '), 'filhos', true);
+  aviso('Iniciativa enviada ao Mestre.');
+}
+
+/* =========================================================
+   QUEM ESTÁ CONECTADO
+   ========================================================= */
+const Presenca = {
+  id: Math.random().toString(36).slice(2, 12), quem: '', timer: null, off: null, lista: {},
+  ligar() {
+    const quem = TV ? '' : mestre ? '_mestre' : (meu || aux || '');
+    const autenticado = Store.modo !== 'firebase' || !!(Store.auth && Store.auth.currentUser);
+    if (!autenticado) return;
+    if (quem !== this.quem) {
+      this.quem = quem;
+      const cam = 'presenca/' + this.id;
+      if (quem) {
+        Rede.set(cam, { a: quem, ts: Date.now() }).catch(() => {});
+        if (Store.modo === 'firebase') { try { Store.db.ref(cam).onDisconnect().remove(); } catch (e) {} }
+        clearInterval(this.timer);
+        this.timer = setInterval(() => Rede.set(cam + '/ts', Date.now()).catch(() => {}), 20000);
+      } else { clearInterval(this.timer); Rede.set(cam, null).catch(() => {}); }
+    }
+    if (!this.off) this.off = Rede.on('presenca', v => { this.lista = v || {}; desenharConectados(); desenharPainel(); }, () => { this.off = null; });
+  },
+  online(id) {
+    const agora = Date.now();
+    return Object.values(this.lista || {}).some(p => p && p.a === id && agora - (p.ts || 0) < 120000);
+  },
+};
+window.addEventListener('beforeunload', () => { if (Presenca.quem) Rede.set('presenca/' + Presenca.id, null).catch(() => {}); });
+function desenharConectados() {
+  if (!mestre) return;
+  const nomes = ['_mestre', ...SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'robo').map(s => s.id)];
+  $('#listaConectados').innerHTML = nomes.map(id => {
+    const on = Presenca.online(id);
+    const nome = id === '_mestre' ? 'Mestre' : SER[id].nome + (SER[id].jogador ? ` · ${SER[id].jogador}` : '');
+    return `<li class="${on ? 'on' : ''}"><span class="ponto-on"></span>${esc(nome)}</li>`;
+  }).join('');
+}
+
+/* =========================================================
+   SOM LIGADO / DESLIGADO (por aparelho)
+   ========================================================= */
+let mudo = false;
+try { mudo = localStorage.getItem('acf-mudo') === '1'; } catch (e) {}
+function aplicarMudo() { $('#btnSom').textContent = mudo ? '🔇' : '🔊'; $('#btnSom').classList.toggle('ativo', mudo); }
+$('#btnSom').addEventListener('click', () => {
+  mudo = !mudo;
+  try { mudo ? localStorage.setItem('acf-mudo', '1') : localStorage.removeItem('acf-mudo'); } catch (e) {}
+  aplicarMudo();
+  aviso(mudo ? 'Sons desligados neste aparelho.' : 'Sons ligados.');
+});
+aplicarMudo();
+
+/* =========================================================
+   CADERNO (só neste aparelho)
+   ========================================================= */
+let cadernoChave = '';
+function desenharCaderno() {
+  const quem = meu || aux;
+  const bloco = $('#blocoCaderno');
+  bloco.hidden = !quem || mestre || TV;
+  if (bloco.hidden) return;
+  const k = 'acf-caderno-' + quem;
+  if (k === cadernoChave) return;
+  cadernoChave = k;
+  try { $('#caderno').value = localStorage.getItem(k) || ''; } catch (e) {}
+}
+$('#caderno').addEventListener('input', e => { try { localStorage.setItem(cadernoChave, e.target.value); } catch (err) {} });
+
+/* =========================================================
+   AJUDA RÁPIDA
+   ========================================================= */
+$('#btnAjuda').addEventListener('click', () => {
+  const comum = `<h3>Mapa</h3><ul>
+    <li><b>Girar:</b> arraste no mapa. <b>Mover a vista:</b> botão direito, dois dedos ou o botão ✥. <b>Zoom:</b> roda do mouse ou pinça.</li>
+    <li><b>ISO / TOPO / ◎:</b> vistas prontas. <b>◉</b> leva até a sua ficha.</li>
+    <li><b>Tocar numa sala</b> mostra o nome, quem está ali e os arquivos encontrados. <b>Tocar num corredor</b> mostra se a porta está fechada.</li></ul>
+    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre.</li></ul>`;
+  const jog = `<h3>Sua cobaia</h3><ul>
+    <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
+    <li><b>↶ Desfazer</b> (ou Ctrl+Z) volta o último movimento.</li>
+    <li><b>Segure o dedo num ponto</b> do mapa para avisar o Mestre: "quero ir para cá".</li>
+    <li><b>🎲 Dados:</b> quantos d20, bônus e desvantagem.</li>
+    <li><b>Perseguição:</b> só quem está na vez se move, até o limite de metros. O celular vibra na sua vez.</li>
+    <li><b>Painel:</b> sua ficha, a Loja do Maurício e o seu Caderno (só fica no seu aparelho).</li></ul>`;
+  const auxT = `<h3>Mestre Auxiliar</h3><ul>
+    <li>Você move os <b>Filhos</b> e o seu robô. As cobaias ficam invisíveis até o Mestre revelar.</li>
+    <li>As salas com cobaias <b>brilham em vermelho</b> conforme o barulho; o <b>rastro</b> marca onde algo foi ouvido nos últimos minutos.</li>
+    <li><b>Segure o dedo num ponto</b> para marcar um lugar para os outros auxiliares e o Mestre.</li>
+    <li>No painel, <b>rolar iniciativa dos Filhos</b> do andar aberto de uma vez. O canal <b>Filhos</b> do chat é só de vocês e do Mestre.</li></ul>`;
+  const mes = `<h3>Mestre</h3><ul>
+    <li><b>Abas:</b> Mapa, Sessão, Registro e Segredos.</li>
+    <li><b>Clique numa sala:</b> revelar, editar, gatilho, sem sinal, arquivos, trazer cobaias. <b>Num corredor:</b> portas.</li>
+    <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
+    <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
+    <li><b>Ctrl+Z</b> desfaz o último movimento de qualquer ficha.</li></ul>`;
+  $('#ajudaTexto').innerHTML = comum + (mestre ? mes : aux ? auxT : jog);
+  $('#dlgAjuda').showModal();
+});
+
+/* =========================================================
+   LOJA DO MAURÍCIO
+   ========================================================= */
+const cfgLoja = () => Store.state.cfg || {};
+const lojaAberta = () => !cfgLoja().lojaFechada;
+const lojaSoZN = () => !cfgLoja().lojaQualquerLugar;
+const txtCusto = c => {
+  if (!c) return '';
+  const p = [];
+  if (c.M) p.push(`${c.M} Sucata${c.M > 1 ? 's' : ''} Maior${c.M > 1 ? 'es' : ''}`);
+  if (c.m) p.push(`${c.m} Sucata${c.m > 1 ? 's' : ''} Menor${c.m > 1 ? 'es' : ''}`);
+  return p.join(', ') || 'grátis';
+};
+function itensLoja() {
+  const pub = Object.entries(((Store.state.loja || {}).itens) || {}).map(([id, it]) => ({ ...it, id, oculto: false }));
+  const ocultos = mestre ? Object.entries(Segredos.dados._lojaOculta || {}).map(([id, it]) => ({ ...it, id, oculto: true })) : [];
+  return pub.concat(ocultos).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+const imgsLoja = {};
+function imagemDoItem(it, imgEl) {
+  if (it.img) { imgEl.src = it.img; return; }
+  if (!it.imgId) { imgEl.remove(); return; }
+  if (imgsLoja[it.imgId]) { imgEl.src = imgsLoja[it.imgId]; return; }
+  Rede.once('lojaImg/' + it.imgId).then(d => { if (d) { imgsLoja[it.imgId] = d; imgEl.src = d; } else imgEl.remove(); }).catch(() => imgEl.remove());
+}
+function minhasSucatas() { const f = fichaDe(meu) || {}; return { M: f.sM, m: f.sm }; }
+function podePagar(c) {
+  const s = minhasSucatas();
+  if (!c || s.M === undefined && s.m === undefined) return true;
+  return (s.M || 0) >= (c.M || 0) && (s.m || 0) >= (c.m || 0);
+}
+function abrirLoja() {
+  if (!mestre && !lojaAberta()) { aviso('A loja do Maurício está fechada agora.'); return; }
+  $('#lojaMestre').hidden = !mestre;
+  desenharLoja(true);
+  $('#dlgLoja').showModal();
+}
+let lojaSig = '';
+function desenharLoja(forcar) {
+  const s = minhasSucatas();
+  const sig = JSON.stringify([itensLoja(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, s, mestre]);
+  if (!forcar && sig === lojaSig) return;
+  lojaSig = sig;
+  let avisoTxt = '';
+  if (!mestre) {
+    avisoTxt = (s.M !== undefined || s.m !== undefined) ? `Suas sucatas: ${s.M || 0} maiores · ${s.m || 0} menores. ` : '';
+    avisoTxt += lojaSoZN() ? 'O Maurício atende na Zona Neutra. O pedido vai para o Mestre.' : 'O pedido vai para o Mestre.';
+  } else avisoTxt = `${lojaAberta() ? 'Loja aberta' : 'Loja FECHADA'} aos jogadores · ${lojaSoZN() ? 'só na Zona Neutra' : 'em qualquer lugar'}. Pedidos chegam no seu Sussurro.`;
+  $('#lojaAviso').textContent = avisoTxt;
+  const grade = $('#lojaGrade');
+  grade.innerHTML = '';
+  itensLoja().forEach(it => {
+    const card = el('article', 'loja-card' + (it.oculto ? ' oculto' : ''));
+    const temDano = (it.op || []).some(o => o.d || o.c);
+    card.innerHTML = `<img alt="">
+      <div class="loja-corpo">
+        <h3>${esc(it.t)}${it.oculto ? ' <span class="so-mestre">oculta</span>' : ''}</h3>
+        ${it.custo ? `<p class="loja-preco">${txtCusto(it.custo)}</p>` : ''}
+        ${it.desc ? `<p class="loja-desc">${esc(it.desc)}</p>` : ''}
+        <table class="loja-op">${temDano ? '<tr><th>Opção</th><th>Dano</th><th>Crítico</th><th></th></tr>' : ''}
+        ${(it.op || []).map((o, i) => {
+          const custo = o.p || it.custo;
+          const ok = mestre || podePagar(custo);
+          return `<tr class="${ok ? '' : 'caro'}"><td>${esc(o.n)}${o.p ? `<small>${txtCusto(o.p)}</small>` : ''}</td>${temDano ? `<td>${esc(o.d || '')}</td><td>${esc(o.c || '')}</td>` : ''}
+            <td>${mestre ? '' : `<button data-i="${i}" class="btn-pedir"${ok ? '' : ' title="Sucatas insuficientes"'}>Pedir</button>`}</td></tr>`;
+        }).join('')}</table>
+        ${mestre ? `<div class="loja-acoes"><button data-a="editar">Editar</button><button data-a="ocultar">${it.oculto ? 'Mostrar aos jogadores' : 'Ocultar'}</button><button data-a="apagar" class="perigo">Apagar</button></div>` : ''}
+      </div>`;
+    imagemDoItem(it, $('img', card));
+    $$('.btn-pedir', card).forEach(b => b.onclick = () => pedirItem(it, it.op[+b.dataset.i]));
+    if (mestre) {
+      $('[data-a="editar"]', card).onclick = () => editarItemLoja(it);
+      $('[data-a="ocultar"]', card).onclick = () => salvarItemLoja({ ...it }, !it.oculto);
+      $('[data-a="apagar"]', card).onclick = () => { if (confirm(`Apagar "${it.t}" da loja?`)) apagarItemLoja(it); };
+    }
+    grade.appendChild(card);
+  });
+  if (!grade.children.length) grade.innerHTML = '<p class="vazio">O Maurício não tem nada à venda agora.</p>';
+}
+function pedirItem(it, op) {
+  const tk = (Store.state.tokens || {})[meu];
+  if (lojaSoZN() && (!tk || salaEm(tk.a, tk.x, tk.y) !== 25)) { aviso('O Maurício só atende na Zona Neutra.'); return; }
+  const custo = op.p || it.custo;
+  if (!podePagar(custo) && !confirm('Pelas suas sucatas anotadas, não dá para pagar. Pedir mesmo assim?')) return;
+  if (!Chat.chaveLigada) { aviso('Sem conexão com o chat.'); return; }
+  Chat.enviar(`🛒 Pedido ao Maurício: ${op.n} (${it.t}) · ${txtCusto(custo)}`, 'sus');
+  aviso('Pedido enviado ao Mestre.');
+}
+function limparFormLoja() {
+  ['lojaEditId', 'lojaT', 'lojaOp', 'lojaDesc'].forEach(i => { $('#' + i).value = ''; });
+  $('#lojaM').value = 0; $('#lojam').value = 0; $('#lojaImg').value = ''; $('#lojaOculta').checked = false;
+  $('#lojaFormTitulo').textContent = 'Nova venda';
+}
+function editarItemLoja(it) {
+  $('#lojaEditId').value = it.id;
+  $('#lojaT').value = it.t || '';
+  $('#lojaM').value = (it.custo && it.custo.M) || 0; $('#lojam').value = (it.custo && it.custo.m) || 0;
+  $('#lojaOp').value = (it.op || []).map(o => [o.n, o.d || '', o.c || ''].join(' ; ').replace(/( ; )+$/, '')).join('\n');
+  $('#lojaDesc').value = it.desc || '';
+  $('#lojaOculta').checked = !!it.oculto;
+  $('#lojaFormTitulo').textContent = 'Editando: ' + it.t;
+  $('#lojaForm').open = true;
+  $('#lojaForm').scrollIntoView({ behavior: 'smooth' });
+}
+async function salvarItemLoja(it, oculto) {
+  const id = it.id;
+  const limpo = { t: it.t, custo: it.custo || null, op: it.op || [], ordem: it.ordem || Date.now() };
+  if (it.desc) limpo.desc = it.desc;
+  if (it.img) limpo.img = it.img;
+  if (it.imgId) limpo.imgId = it.imgId;
+  if (!limpo.custo) delete limpo.custo;
+  if (oculto) {
+    Segredos.gravar(['_lojaOculta', id], limpo);
+    Store.definir(['loja', 'itens', id], null);
+  } else {
+    Store.definir(['loja', 'itens', id], limpo);
+    Segredos.gravar(['_lojaOculta', id], null);
+  }
+  Diario.registrar('sala', `Loja do Maurício: "${it.t}" ${oculto ? 'oculta' : 'à venda'}`);
+  desenharLoja();
+}
+async function apagarItemLoja(it) {
+  Store.definir(['loja', 'itens', it.id], null);
+  Segredos.gravar(['_lojaOculta', it.id], null);
+  if (it.imgId) Rede.set('lojaImg/' + it.imgId, null).catch(() => {});
+  desenharLoja();
+}
+$('#btnLojaSalvar').addEventListener('click', async () => {
+  const t = $('#lojaT').value.trim();
+  if (!t) { aviso('Dê um nome à venda.'); return; }
+  const op = $('#lojaOp').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [n, d, c] = l.split(';').map(x => (x || '').trim());
+    const o = { n: n || t }; if (d) o.d = d; if (c) o.c = c; return o;
+  });
+  const idExist = $('#lojaEditId').value;
+  const antigo = idExist ? itensLoja().find(i => i.id === idExist) : null;
+  const id = idExist || Rede.chave();
+  const it = { ...(antigo || {}), id, t, custo: { M: Math.max(0, +$('#lojaM').value || 0), m: Math.max(0, +$('#lojam').value || 0) }, op: op.length ? op : [{ n: t }], desc: $('#lojaDesc').value.trim() };
+  if (!it.custo.M && !it.custo.m && antigo && !antigo.custo) delete it.custo;
+  const f = $('#lojaImg').files[0];
+  if (f) {
+    try { const d = await imagemReduzida(f, 700); await Rede.set('lojaImg/' + id, d); it.imgId = id; delete it.img; imgsLoja[id] = d; }
+    catch (e) { aviso('Não consegui salvar a imagem.'); }
+  }
+  await salvarItemLoja(it, $('#lojaOculta').checked);
+  limparFormLoja();
+  aviso('Venda salva.');
+});
+$('#btnLojaCancelar').addEventListener('click', limparFormLoja);
+$('#btnFecharLoja').addEventListener('click', () => $('#dlgLoja').close());
+$('#btnAbrirLoja').addEventListener('click', abrirLoja);
+$('#btnAbrirLojaM').addEventListener('click', abrirLoja);
+$('#chkLojaAberta').addEventListener('change', e => Store.definir(['cfg', 'lojaFechada'], e.target.checked ? null : true));
+$('#chkLojaZN').addEventListener('change', e => Store.definir(['cfg', 'lojaQualquerLugar'], e.target.checked ? null : true));
+// primeira vez: o Mestre coloca o catálogo do PDF na loja
+function semearLoja() {
+  if (!mestre || cfgLoja().lojaSemeada) return;
+  LOJA_PADRAO.forEach((it, i) => {
+    const { id, ...resto } = it;
+    const limpo = { ...resto, ordem: i + 1 };
+    if (!limpo.custo) delete limpo.custo;
+    Store.definir(['loja', 'itens', id], limpo);
+  });
+  Store.definir(['cfg', 'lojaSemeada'], true);
+}
+function desenharOpcoesLoja() {
+  if (!mestre) return;
+  $('#chkLojaAberta').checked = lojaAberta();
+  $('#chkLojaZN').checked = lojaSoZN();
+}
 
 /* =========================================================
    INÍCIO
