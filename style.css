@@ -223,7 +223,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute; left: -20px; bottom: 0; width: 40px;
   display: flex; flex-direction: column; align-items: center;
   transform-origin: 50% 100%;
-  transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)) scale(var(--k, 1));
+  transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)) scale(calc(var(--k, 1) * var(--kf, 1)));
 }
 .ficha-cabeca {
   width: 34px; height: 34px; border-radius: 50%;
@@ -777,3 +777,122 @@ body.painel-fechado .painel { display: none; }
   .lista-diario { max-height: 260px; }
 }
 .quebras.ciclo { padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #0b0910; border: 1px solid var(--linha); }
+
+/* =========================================================
+   SÍMBOLO DO ECO (todos veem; troca de forma conforme a Balança)
+   ========================================================= */
+.eco-simbolo {
+  position: absolute; right: 16px; top: 14px; width: 70px; aspect-ratio: 2 / 3; z-index: 3;
+  padding: 0; border: 0; background: transparent; cursor: help;
+  mix-blend-mode: screen;   /* o preto da imagem some no fundo do mapa */
+}
+.eco-simbolo img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+  opacity: 0; transition: opacity 1.6s ease;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at center, #000 78%, transparent 100%);
+          mask-image: radial-gradient(ellipse 50% 50% at center, #000 78%, transparent 100%);
+}
+.eco-simbolo img.ativo { opacity: 1; }
+.eco-simbolo.consagrado { animation: ecoPulso 2.8s ease-in-out infinite; }
+@keyframes ecoPulso { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.eco-nome {
+  position: absolute; right: 0; top: 100%; margin-top: 4px;
+  white-space: nowrap; font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texto); background: rgba(7,6,10,.92); border: 1px solid var(--linha);
+  padding: 2px 8px; border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.eco-simbolo:hover .eco-nome, .eco-simbolo:focus-visible .eco-nome, .eco-simbolo.mostra .eco-nome { opacity: 1; }
+body.em-persg .eco-simbolo { top: 46px; }
+
+/* =========================================================
+   BALANÇA DO ECO (painel do Mestre)
+   ========================================================= */
+.balanca { display: grid; grid-template-columns: 54px 1fr 54px; gap: 8px; align-items: center; margin-bottom: 10px; }
+.bal-lado { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.bal-lado svg { width: 44px; height: 44px; }
+.bal-lado span { font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.bal-lado b { font: 15px var(--mono); }
+.bal-mae span, .bal-mae b { color: #d9a3a3; }
+.bal-rei span, .bal-rei b { color: #e3c56a; }
+.bal-meio { display: grid; gap: 6px; }
+.bal-meio input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 10px; border-radius: 5px;
+  background: linear-gradient(90deg, #6E2A2A 0%, #6E2A2A 10%, #3b2366 40%, #3b2366 60%, #B8962E 90%, #B8962E 100%);
+  outline: none;
+}
+.bal-meio input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: #ece6f7; border: 3px solid #8b5cf6; cursor: pointer;
+}
+.bal-meio input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #ece6f7; border: 3px solid #8b5cf6; cursor: pointer; }
+.bal-estado { margin: 0; text-align: center; font: 13px var(--mono); color: var(--roxo-claro); }
+.bal-estado.rei { color: #e3c56a; }
+.bal-estado.mae { color: #e08a8a; }
+.bal-botoes { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; margin-bottom: 10px; }
+.bal-botoes .btn-fantasma { padding: 6px 8px; font-size: 13px; }
+
+/* =========================================================
+   APAGÃO
+   ========================================================= */
+.lista-apagao { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; }
+.lista-apagao small { display: block; font: 10px var(--mono); color: var(--texto-dim); }
+#btnApagao { margin-top: 6px; }
+/* só a planta escurece; as fichas visíveis continuam acesas */
+body.apagao .stage-base, body.apagao .sala, body.apagao .corredor, body.apagao .macico,
+body.apagao .parede, body.apagao .saida { opacity: .3; transition: opacity .6s; }
+body.apagao .palco-area::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.6) 100%);
+}
+body.apagao-queda .ficha { opacity: 0 !important; transition: opacity .3s; }
+.tela-apagao {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none;
+  background: #000; animation: queda 3.2s steps(1) forwards;
+}
+.tela-apagao span { font: 20px var(--mono); letter-spacing: .4em; color: #ff3b5c; text-shadow: 0 0 12px #ff3b5c; }
+@keyframes queda {
+  0% { opacity: 1; } 8% { opacity: .2; } 14% { opacity: 1; } 22% { opacity: .5; } 30% { opacity: 1; }
+  70% { opacity: .9; } 85% { opacity: .5; } 100% { opacity: 0; }
+}
+.faixa-apagao {
+  position: fixed; left: 0; right: 0; top: var(--topo-h); z-index: 28;
+  text-align: center; padding: 6px; font-family: var(--mono); letter-spacing: .12em; font-size: 13px;
+  background: #0b0b0b; color: #ff9fb2; border-bottom: 1px solid #5a1f2a;
+}
+body.em-persg .faixa-apagao { top: calc(var(--topo-h) + 28px); }
+
+/* fichas em fileira: só mostram o nome quando selecionadas, ao passar o mouse ou se forem do próprio jogador */
+.ficha.em-fila .ficha-nome { display: none; }
+.ficha.em-fila.selecionada .ficha-nome, .ficha.em-fila.minha .ficha-nome, .ficha.em-fila:hover .ficha-nome { display: block; }
+
+/* aba da gaveta (celular) */
+.aba-painel { display: none; }
+
+@media (max-width: 860px) {
+  /* nomes curtos: no celular a sala mostra só o CN; tocar abre o cartão */
+  .sala-nome, .sala-el, .mostra-elementos .sala-el, .sala-oculta { display: none !important; }
+  .sala-cn { font-size: 40px; }
+  .sala.desconhecida .sala-cn { font-size: 22px; }
+  .aba-painel {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; height: 48px;
+    background: #17121f; border: 0; border-top: 1px solid var(--roxo); border-radius: 14px 14px 0 0;
+    font: 13px var(--mono); letter-spacing: .08em; color: var(--roxo-claro); touch-action: none;
+  }
+  .aba-alca { display: block; width: 44px; height: 4px; border-radius: 2px; background: var(--roxo); margin: 0 auto 6px; opacity: .8; }
+  .palco-area { padding-bottom: 48px; }
+  .camera { bottom: 58px; }
+  .btn-dados, .btn-desfazer { bottom: 162px; }
+  .painel-dados { bottom: 218px; }
+  .cartao { bottom: 216px; }
+  .eco-simbolo { width: 48px; right: 10px; top: 10px; }
+  body.em-persg .eco-simbolo { top: 40px; }
+  .faixa-apagao { font-size: 11px; letter-spacing: .05em; }
+}
+
+/* câmera com o botão "minha ficha" */
+.camera { grid-template-columns: repeat(5, 44px); }
+@media (max-width: 860px) { .camera { grid-template-columns: repeat(5, 46px); } .camera button { height: 44px; } }
+
+/* fichas em fileira ficam um pouco menores para caber mais por fila */
+.ficha.em-fila { --kf: .7; }
+.ficha.em-fila.selecionada, .ficha.em-fila.arrastada { --kf: 1; }
