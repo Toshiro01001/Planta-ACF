@@ -980,6 +980,18 @@ body.em-persg .relogio { top: 46px; }
 .parede.porta-parede.v.porta-d { border-right: 2px dashed #c9a46a; clip-path: none; }
 .parede.porta-parede.porta-c { background: linear-gradient(180deg, #c04848, #5a1414); border-top-color: #ffb3b3; }
 .parede.porta-parede.v.porta-c { background: linear-gradient(90deg, #5a1414, #c04848); border-right-color: #ffb3b3; }
+/* porta de ferro fechada (padrão) e abrindo */
+.porta-chao.porta-f, .porta-chao.porta-p { background: linear-gradient(180deg, #4a4f58, #24272d); box-shadow: inset 0 0 0 1px #7b818c; }
+.porta-chao.porta-p { animation: porta-abrindo .5s ease-in-out infinite alternate; }
+@keyframes porta-abrindo { to { background: linear-gradient(180deg, #6b7280, #33373f); } }
+.porta-chao .botao-vermelho { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff8a8a, #d1121f 60%, #6a0710); box-shadow: 0 0 6px #ff2a3a; }
+.porta-chao .porta-secreta { position: absolute; font-style: normal; font-size: 13px; top: -14px; right: -14px; opacity: .85; transform: rotateZ(calc(var(--rot) * -1)); filter: drop-shadow(0 0 3px #000); }
+.parede.porta-parede.porta-f, .parede.porta-parede.porta-p { background: linear-gradient(180deg, #8a909b, #3a3e46); border-top-color: #c9ced6; }
+.parede.porta-parede.v.porta-f, .parede.porta-parede.v.porta-p { background: linear-gradient(90deg, #3a3e46, #8a909b); border-right-color: #c9ced6; }
+.corredor.corr-fechado { filter: brightness(.55) saturate(.6); }
+.dica-porta { font-size: 13px; color: var(--texto-dim); margin: 6px 0; }
+.btn-botao-vermelho { border-color: #d1121f !important; color: #ffd5d8 !important; }
+.so-mestre-txt { font-size: 12px; color: #c9a7ff; margin: 8px 0 2px; }
 .portas-acoes button.on, .arq-lista-mestre button.on { background: var(--roxo-escuro) !important; border-color: var(--roxo) !important; }
 
 /* =========================================================
@@ -1228,3 +1240,16 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
 .loja-card { min-height: max-content; }
 .loja-op td:first-child { overflow-wrap: anywhere; }
 .loja-op td:last-child { text-align: right; width: 1%; }
+
+/* abas da loja: Vendas do Maurício · Melhorias ZN */
+.loja-abas { display: flex; gap: 6px; padding: 4px 18px 10px; flex-wrap: wrap; }
+.loja-abas button { font: 12px var(--mono); letter-spacing: .06em; padding: 6px 12px; border-radius: 6px; background: #1b1526; border: 1px solid var(--linha); color: var(--texto-dim); cursor: pointer; }
+.loja-abas button.on { background: var(--roxo-escuro); border-color: var(--roxo); color: var(--texto); }
+/* cartões das melhorias: a imagem é a própria placa, mostrada inteira */
+.melhoria-card .melh-img { position: relative; aspect-ratio: 1 / 1; background: #0b0910; }
+.melhoria-card .melh-img img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.melhoria-card.comprada .melh-img img { filter: saturate(.55) brightness(.8); }
+.selo-comprado { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); font: 700 22px var(--display); letter-spacing: .12em; text-transform: uppercase;
+  color: #8ef0b0; border: 3px solid #8ef0b0; padding: 4px 14px; border-radius: 6px; background: rgba(7,20,12,.72); box-shadow: 0 0 18px rgba(80,220,140,.35); }
+.loja-preco.ok { color: #8ef0b0; }
+.melhoria-card .btn-pedir { border-color: var(--roxo) !important; }

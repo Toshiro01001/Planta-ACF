@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009';
+const VERSAO_SITE = '20261009b';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -147,7 +147,7 @@ function posicoesIniciais(andar = 1) {
   return tokens;
 }
 const CAMPOS_VAZIOS = () => ({ rev: {}, salas: {}, ruido: { q: 0, p: false }, persg: { on: false }, ap: null, eco: null,
-  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {} });
+  portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {}, melhorias: {} });
 const estadoPadrao = () => ({ ...CAMPOS_VAZIOS(), tokens: posicoesIniciais() });
 // ficha que vai para o caminho privado (só Mestre e auxiliares leem): Filhos, NPCs e robôs ocultos
 const ehPrivado = tk => !!tk && !!tk.h && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia';
@@ -465,6 +465,11 @@ const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
    Jogador: só a própria cobaia. Auxiliar: os Filhos e o próprio robô.
    Ninguém além do Mestre troca andar, ocultação, coloca ou tira fichas. */
 function recusaLocal(caminho, valor) {
+  if (caminho[0] === 'portas' && caminho.length === 2) {
+    const atual = (Store.state.portas || {})[caminho[1]] || null;
+    if ((valor === 'p' || valor === null) && (!atual || atual === 'a' || atual === 'p')) return '';
+    return 'Essa porta não responde ao botão.';
+  }
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
   if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar fichas do mapa.';
@@ -925,7 +930,8 @@ function assinatura() {
   const nomes = [];
   for (let p = 1; p <= 25; p++) nomes.push(infoSala(andarAtual, cnDe(andarAtual, p)).join('|'));
   const portas = Object.entries(Store.state.portas || {}).filter(([k]) => k.startsWith('a' + andarAtual + 'c')).map(kv => kv.join('=')).sort();
-  return t + '|' + saidaCN(andarAtual) + '|' + subtituloDe(andarAtual) + '|' + nomes.join(';') + '|' + portas.join(',');
+  const obst = vv.mestre ? Object.entries((Priv.dados && Priv.dados.portas) || {}).filter(([k]) => k.startsWith('a' + andarAtual + 'c')).map(kv => kv.join('=')).sort().join(',') : '';
+  return t + '|' + saidaCN(andarAtual) + '|' + subtituloDe(andarAtual) + '|' + nomes.join(';') + '|' + portas.join(',') + '|' + obst;
 }
 
 function atualizarElementos() {
@@ -2204,7 +2210,8 @@ const Diario = {
       if (a === b) return;
       const m = /^a(\d+)c(\d+)$/.exec(k); if (!m) return;
       const c = CORREDORES[+m[2]], andar = +m[1];
-      this.registrar('sala', `Corredor entre CN ${pad2(cnDe(andar, c.p1))} e CN ${pad2(cnDe(andar, c.p2))}: ${b ? TIPOS_PORTA[b].toLowerCase() : 'porta aberta'}`);
+      if (b === 'p') return;
+      this.registrar('sala', `Corredor entre CN ${pad2(cnDe(andar, c.p1))} e CN ${pad2(cnDe(andar, c.p2))}: porta ${textoPorta(b)}`);
     });
     new Set([...Object.keys(ant.cego || {}), ...Object.keys(novo.cego || {})]).forEach(id => {
       const a = !!(ant.cego || {})[id], b = !!(novo.cego || {})[id];
@@ -2724,6 +2731,8 @@ function sincronizarMestre() {
   if (Priv.pronto || Store.modo !== 'firebase') for (let a = 1; a <= 5; a++) publicarNomes(a);
   sincronizarCego();
   semearLoja();
+  semearMelhorias();
+  resolverPortas();
 }
 const igualJSON = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
 function publicarNomes(a) {
@@ -2848,11 +2857,28 @@ function marcarSalasMestre() {
 
 /* =========================================================
    PORTAS NOS CORREDORES
+   Toda porta começa FECHADA. Para passar, a cobaia aperta o botão
+   vermelho (toca no corredor e escolhe "Abrir a porta").
+   O que existe atrás da porta (tranca, escombros, carne) fica guardado
+   no caminho privado e só aparece para os jogadores quando alguém
+   tenta abrir. Quem decide o resultado é a tela do Mestre.
+   Valores públicos (mapa/portas): vazio = fechada · p = abrindo
+   a = aberta · t / d / c = o que foi encontrado ao tentar abrir.
    ========================================================= */
 const TIPOS_PORTA = { t: 'Trancada', d: 'Destruída (escombros)', c: 'Bloqueada por carne' };
 const SINAL_PORTA = { t: '🔒', d: '⚠', c: '❦' };
+const OBSTACULOS = ['t', 'd', 'c'];
 const chavePorta = (a, ci) => 'a' + a + 'c' + ci;
 const portaDe = (a, ci) => (Store.state.portas || {})[chavePorta(a, ci)] || null;
+// o que está de verdade atrás da porta (só Mestre e auxiliares leem)
+const obstaculoDe = (a, ci) => ((Priv.dados && Priv.dados.portas) || {})[chavePorta(a, ci)] || null;
+const portaAberta = (a, ci) => portaDe(a, ci) === 'a';
+function textoPorta(v) {
+  if (!v) return 'fechada';
+  if (v === 'p') return 'abrindo…';
+  if (v === 'a') return 'aberta';
+  return TIPOS_PORTA[v] ? TIPOS_PORTA[v].toLowerCase() : 'fechada';
+}
 // faixa no meio do corredor onde fica a porta
 function barreira(c) {
   return c.eixo === 'h' ? { x: c.x + c.w / 2 - 0.3, y: c.y, w: 0.6, h: c.h } : { x: c.x, y: c.y + c.h / 2 - 0.3, w: c.w, h: 0.6 };
@@ -2860,23 +2886,70 @@ function barreira(c) {
 function bloqueadoPorPorta(andar, x, y) {
   if (mestre) return false;   // o Mestre passa por qualquer porta
   for (let ci = 0; ci < CORREDORES.length; ci++) {
-    if (portaDe(andar, ci) && dentro(barreira(CORREDORES[ci]), x, y)) return true;
+    if (!portaAberta(andar, ci) && dentro(barreira(CORREDORES[ci]), x, y)) return true;
   }
   return false;
 }
 function desenharPortas(paredes) {
+  const verSegredo = V().mestre;
   CORREDORES.forEach((c, ci) => {
-    const t = portaDe(andarAtual, ci);
-    if (!t) return;
+    const pub = portaDe(andarAtual, ci);
+    const corr = $(`.corredor[data-ci="${ci}"]`, stage);
+    if (corr) corr.classList.toggle('corr-fechado', pub !== 'a');
+    if (pub === 'a') return;
+    const t = OBSTACULOS.includes(pub) ? pub : (pub === 'p' ? 'p' : 'f');
+    const secreto = verSegredo && !OBSTACULOS.includes(pub) ? obstaculoDe(andarAtual, ci) : null;
     const b = barreira(c);
     const chao = el('div', 'porta-chao porta-' + t, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
-    chao.innerHTML = `<span>${SINAL_PORTA[t]}</span>`;
+    chao.innerHTML = SINAL_PORTA[t] ? `<span>${SINAL_PORTA[t]}</span>` : '<i class="botao-vermelho"></i>';
+    if (secreto) chao.innerHTML += `<em class="porta-secreta" title="Só você vê: ${TIPOS_PORTA[secreto]}">${SINAL_PORTA[secreto]}</em>`;
     stage.appendChild(chao);
     const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
     const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
     pw.classList.add('porta-parede', 'porta-' + t);
     paredes.push(pw);
   });
+}
+// a cobaia precisa estar numa das duas salas ligadas pelo corredor (ou dentro dele)
+function pertoDaPorta(tk, ci) {
+  if (!tk || tk.a !== andarAtual) return false;
+  const k = CORREDORES[ci];
+  const p = salaEm(tk.a, tk.x, tk.y);
+  return p === k.p1 || p === k.p2 || corredorEm(tk.x, tk.y) === ci;
+}
+function quemApertaPorta(ci) {
+  if (mestre) return { ok: true };
+  if (aux) return { ok: true };   // auxiliares abrem por qualquer Filho
+  const tk = meu && (Store.state.tokens || {})[meu];
+  if (!tk) return { ok: false, motivo: 'Só quem tem uma cobaia no mapa pode apertar o botão.' };
+  if (!pertoDaPorta(tk, ci)) return { ok: false, motivo: 'Chegue até uma das salas ligadas por este corredor para apertar o botão da porta.' };
+  return { ok: true };
+}
+function abrirPorta(a, ci) {
+  const k = chavePorta(a, ci), pub = portaDe(a, ci);
+  if (pub && pub !== 'p') return;
+  if (mestre) { Store.definir(['portas', k], obstaculoDe(a, ci) || 'a'); return; }
+  Store.definir(['portas', k], 'p');   // a tela do Mestre responde se abriu ou não
+}
+function fecharPorta(a, ci) {
+  const pub = portaDe(a, ci);
+  if (pub !== 'a' && pub !== 'p') return;
+  Store.definir(['portas', chavePorta(a, ci)], null);
+}
+// tela do Mestre: responde aos botões apertados
+function resolverPortas() {
+  if (!mestre || (Store.modo === 'firebase' && !Priv.pronto)) return;
+  const priv = (Priv.dados && Priv.dados.portas) || {};
+  Object.entries(Store.state.portas || {}).forEach(([k, v]) => {
+    if (v === 'p') Store.definir(['portas', k], priv[k] || 'a');
+  });
+  // versões antigas: obstáculos marcados direto no mapa público viram segredo
+  if (!(Store.state.cfg || {}).portasV2) {
+    Object.entries(Store.state.portas || {}).forEach(([k, v]) => {
+      if (OBSTACULOS.includes(v)) { if (!priv[k]) Priv.gravar(['portas', k], v); Store.definir(['portas', k], null); }
+    });
+    Store.definir(['cfg', 'portasV2'], true);
+  }
 }
 const corredorEm = (x, y) => CORREDORES.findIndex(c => dentro(c, x, y));
 let corredorSel = null;
@@ -2889,23 +2962,70 @@ function desenharCartaoCorredor() {
   const c = $('#cartao');
   delete c.dataset.ficha;
   delete c.dataset.sala;
-  const k = CORREDORES[corredorSel];
-  const t = portaDe(andarAtual, corredorSel);
+  const ci = corredorSel;
+  const k = CORREDORES[ci];
+  const pub = portaDe(andarAtual, ci);
+  const obst = V().mestre ? obstaculoDe(andarAtual, ci) : null;
   const nomeC = `Corredor entre CN ${pad2(cnDe(andarAtual, k.p1))} e CN ${pad2(cnDe(andarAtual, k.p2))}`;
-  c.style.setProperty('--cor', t === 'c' ? '#8a2f2f' : t === 'd' ? '#8a6a3a' : t === 't' ? '#7a8597' : '#8b5cf6');
+  const corDe = v => v === 'c' ? '#8a2f2f' : v === 'd' ? '#8a6a3a' : v === 't' ? '#7a8597' : v === 'a' ? '#8b5cf6' : '#c0392b';
+  c.style.setProperty('--cor', corDe(pub));
+  const podeApertar = quemApertaPorta(ci);
+  let acoes = '';
+  if (pub === 'p') acoes = '<p class="dica-porta">O botão foi apertado. A porta de ferro está se mexendo…</p>';
+  else if (OBSTACULOS.includes(pub)) acoes = `<p class="dica-porta">${pub === 't' ? 'O botão vermelho não responde: a porta não abre.' : 'A porta abriu, mas não dá para passar.'}</p>`;
+  else if (!mestre) {
+    acoes = podeApertar.ok
+      ? `<div class="acoes portas-acoes">${pub === 'a' ? '<button data-acao="fechar">Fechar a porta</button>' : '<button data-acao="abrir" class="btn-botao-vermelho">● Apertar o botão vermelho</button>'}</div>`
+      : `<p class="dica-porta">${podeApertar.motivo}</p>`;
+  }
+  const blocoMestre = mestre ? `
+    <div class="acoes portas-acoes">
+      <button data-acao="abrir" class="${pub === 'a' ? 'on' : ''}">Abrir</button>
+      <button data-acao="fechar" class="${!pub ? 'on' : ''}">Fechar</button></div>
+    <p class="so-mestre-txt">Atrás da porta (só você e os auxiliares sabem):</p>
+    <div class="acoes portas-acoes">
+      <button data-obst="" class="${!obst ? 'on' : ''}">Nada</button>
+      <button data-obst="t" class="${obst === 't' ? 'on' : ''}">🔒 Trancada</button>
+      <button data-obst="d" class="${obst === 'd' ? 'on' : ''}">⚠ Destruída</button>
+      <button data-obst="c" class="${obst === 'c' ? 'on' : ''}">❦ Carne</button></div>
+    ${obst && !OBSTACULOS.includes(pub) ? '<p class="so-mestre-txt">Os jogadores ainda não sabem. Aparece quando alguém apertar o botão.</p>' : ''}
+    <div class="acoes portas-acoes"><button data-todas="a">Abrir todas do andar</button><button data-todas="">Fechar todas do andar</button></div>` : '';
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div><h3>Corredor</h3><span class="cod">${nomeC}</span></div></div>
-    <p>Porta: <strong>${t ? TIPOS_PORTA[t] : 'aberta'}</strong> · 14 m</p>
-    ${mestre ? `<div class="acoes portas-acoes">
-      <button data-porta="" class="${!t ? 'on' : ''}">Aberta</button>
-      <button data-porta="t" class="${t === 't' ? 'on' : ''}">🔒 Trancada</button>
-      <button data-porta="d" class="${t === 'd' ? 'on' : ''}">⚠ Destruída</button>
-      <button data-porta="c" class="${t === 'c' ? 'on' : ''}">❦ Carne</button></div>` : ''}`;
+    <p>Porta de ferro: <strong>${textoPorta(pub)}</strong> · 14 m</p>
+    ${acoes}${blocoMestre}`;
   c.hidden = false;
   $('.fechar', c).onclick = () => selecionar(null);
-  $$('[data-porta]', c).forEach(b => b.onclick = () => {
-    Store.definir(['portas', chavePorta(andarAtual, corredorSel)], b.dataset.porta || null);
-    montarAndar(); atualizarTudo();
+  const refazer = () => { montarAndar(); atualizarTudo(); };
+  $$('[data-acao]', c).forEach(b => b.onclick = () => {
+    const ok = quemApertaPorta(ci);
+    if (!ok.ok) { aviso(ok.motivo); return; }
+    if (b.dataset.acao === 'abrir') {
+      if (mestre && pub && pub !== 'p') Store.definir(['portas', chavePorta(andarAtual, ci)], 'a');
+      else abrirPorta(andarAtual, ci);
+    } else if (mestre) Store.definir(['portas', chavePorta(andarAtual, ci)], null);
+    else fecharPorta(andarAtual, ci);
+    refazer();
+  });
+  $$('[data-obst]', c).forEach(b => b.onclick = () => {
+    const v = b.dataset.obst || null;
+    Priv.gravar(['portas', chavePorta(andarAtual, ci)], v);
+    // tirou o obstáculo que os jogadores já viam: escombros e carne liberam a passagem, a tranca deixa a porta só fechada
+    if (!v && OBSTACULOS.includes(pub)) Store.definir(['portas', chavePorta(andarAtual, ci)], pub === 't' ? null : 'a');
+    if (v && OBSTACULOS.includes(pub)) Store.definir(['portas', chavePorta(andarAtual, ci)], v);
+    if (v && pub === 'a') Store.definir(['portas', chavePorta(andarAtual, ci)], v);
+    Diario.registrar('sala', `${nomeC}: atrás da porta, ${v ? TIPOS_PORTA[v].toLowerCase() : 'nada'} (segredo)`);
+    refazer();
+  });
+  $$('[data-todas]', c).forEach(b => b.onclick = () => {
+    const abrir = b.dataset.todas === 'a';
+    if (!confirm(abrir ? 'Abrir todas as portas deste andar? Onde houver tranca, escombros ou carne, os jogadores vão ver.' : 'Fechar todas as portas deste andar?')) return;
+    CORREDORES.forEach((_, i) => {
+      const k2 = chavePorta(andarAtual, i), o = obstaculoDe(andarAtual, i), atual = portaDe(andarAtual, i);
+      if (abrir) Store.definir(['portas', k2], o || 'a');
+      else if (atual === 'a' || atual === 'p') Store.definir(['portas', k2], null);
+    });
+    refazer();
   });
 }
 
@@ -3536,7 +3656,9 @@ $('#btnSalvarCena').addEventListener('click', () => {
     if (SER[tk.s] && tk.a === andarAtual && (SER[tk.s].tipo === 'filho' || SER[tk.s].tipo === 'npc')) tokens[id] = { s: tk.s, a: tk.a, x: tk.x, y: tk.y, n: tk.n || 1 };
   });
   Object.entries(Store.state.portas || {}).forEach(([k, v]) => { if (k.startsWith('a' + andarAtual + 'c')) portas[k] = v; });
-  Segredos.gravar(['_cenas', Rede.chave()], { nome, andar: andarAtual, ts: Date.now(), tokens, portas });
+  const obst = {};
+  Object.entries((Priv.dados && Priv.dados.portas) || {}).forEach(([k, v]) => { if (k.startsWith('a' + andarAtual + 'c')) obst[k] = v; });
+  Segredos.gravar(['_cenas', Rede.chave()], { nome, andar: andarAtual, ts: Date.now(), tokens, portas, obst });
   $('#cenaNome').value = '';
   aviso(`Cena "${nome}" salva.`);
   desenharCenas();
@@ -3551,6 +3673,10 @@ function carregarCena(k) {
   Object.entries(c.tokens || {}).forEach(([id, tk]) => Store.definir(['tokens', id], { ...tk, h: true, vf: false }));
   Object.keys(Store.state.portas || {}).forEach(pk => { if (pk.startsWith('a' + c.andar + 'c') && !(c.portas || {})[pk]) Store.definir(['portas', pk], null); });
   Object.entries(c.portas || {}).forEach(([pk, v]) => Store.definir(['portas', pk], v));
+  if (c.obst) {
+    Object.keys((Priv.dados && Priv.dados.portas) || {}).forEach(pk => { if (pk.startsWith('a' + c.andar + 'c') && !c.obst[pk]) Priv.gravar(['portas', pk], null); });
+    Object.entries(c.obst).forEach(([pk, v]) => Priv.gravar(['portas', pk], v));
+  }
   Diario.registrar('sessao', `Cena carregada: ${c.nome}`);
   irParaAndar(c.andar);
   montarAndar(); atualizarTudo();
@@ -3802,7 +3928,8 @@ $('#btnAjuda').addEventListener('click', () => {
   const comum = `<h3>Mapa</h3><ul>
     <li><b>Girar:</b> arraste no mapa. <b>Mover a vista:</b> botão direito, dois dedos ou o botão ✥. <b>Zoom:</b> roda do mouse ou pinça.</li>
     <li><b>ISO / TOPO / ◎:</b> vistas prontas. <b>◉</b> leva até a sua ficha.</li>
-    <li><b>Tocar numa sala</b> mostra o nome, quem está ali e os arquivos encontrados. <b>Tocar num corredor</b> mostra se a porta está fechada.</li></ul>
+    <li><b>Tocar numa sala</b> mostra o nome, quem está ali e os arquivos encontrados. <b>Portas:</b> toda porta de ferro começa fechada. Leve sua cobaia até uma das salas ligadas pelo corredor, toque nele e aperte o botão vermelho para abrir (ou feche de novo). Só ao tentar abrir você descobre se ela está trancada ou se há algo do outro lado.</li>
+    <li><b>Loja:</b> o botão da loja tem duas abas, as vendas do Maurício e as Melhorias ZN. Os pedidos vão para o Mestre.</li></ul>
     <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre.</li></ul>`;
   const jog = `<h3>Sua cobaia</h3><ul>
     <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
@@ -3818,7 +3945,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li>No painel, <b>rolar iniciativa dos Filhos</b> do andar aberto de uma vez. O canal <b>Filhos</b> do chat é só de vocês e do Mestre.</li></ul>`;
   const mes = `<h3>Mestre</h3><ul>
     <li><b>Abas:</b> Mapa, Sessão, Registro e Segredos.</li>
-    <li><b>Clique numa sala:</b> revelar, editar, gatilho, sem sinal, arquivos, trazer cobaias. <b>Num corredor:</b> portas.</li>
+    <li><b>Clique numa sala:</b> revelar, editar, gatilho, sem sinal, arquivos, trazer cobaias. <b>Num corredor:</b> abrir ou fechar a porta e escolher em segredo o que há atrás dela (tranca, escombros, carne). Os jogadores só descobrem quando apertarem o botão. Também abre ou fecha todas do andar.</li>
     <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
     <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
     <li><b>Ctrl+Z</b> desfaz o último movimento de qualquer ficha.</li></ul>`;
@@ -3868,14 +3995,25 @@ function podePagar(c) {
   if (!c || s.M === undefined && s.m === undefined) return true;
   return (s.M || 0) >= (c.M || 0) && (s.m || 0) >= (c.m || 0);
 }
+let abaLoja = 'vendas';
 function abrirLoja() {
   if (!mestre && !lojaAberta()) { aviso('A loja do Maurício está fechada agora.'); return; }
-  $('#lojaMestre').hidden = !mestre;
-  desenharLoja(true);
+  trocarAbaLoja(abaLoja);
   $('#dlgLoja').showModal();
 }
+function trocarAbaLoja(aba) {
+  abaLoja = aba;
+  $$('[data-aba-loja]').forEach(b => b.classList.toggle('on', b.dataset.abaLoja === aba));
+  $('#lojaMestre').hidden = !mestre || aba !== 'vendas';
+  $('#melhMestre').hidden = !mestre || aba !== 'melhorias';
+  $('#dlgLoja').classList.toggle('aba-melhorias', aba === 'melhorias');
+  lojaSig = '';
+  desenharLoja(true);
+}
+$$('[data-aba-loja]').forEach(b => b.addEventListener('click', () => trocarAbaLoja(b.dataset.abaLoja)));
 let lojaSig = '';
 function desenharLoja(forcar) {
+  if (abaLoja === 'melhorias') { desenharMelhorias(forcar); return; }
   const s = minhasSucatas();
   const sig = JSON.stringify([itensLoja(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, s, mestre]);
   if (!forcar && sig === lojaSig) return;
@@ -3991,6 +4129,131 @@ $('#btnAbrirLoja').addEventListener('click', abrirLoja);
 $('#btnAbrirLojaM').addEventListener('click', abrirLoja);
 $('#chkLojaAberta').addEventListener('change', e => Store.definir(['cfg', 'lojaFechada'], e.target.checked ? null : true));
 $('#chkLojaZN').addEventListener('change', e => Store.definir(['cfg', 'lojaQualquerLugar'], e.target.checked ? null : true));
+/* ---------- MELHORIAS DA ZONA NEUTRA (aba da loja) ----------
+   Mesmas regras da loja: aberta/fechada e "só na Zona Neutra".
+   Públicas em mapa/melhorias; as ocultas ficam nos segredos do Mestre. */
+function itensMelhorias() {
+  const pub = Object.entries(((Store.state.melhorias || {}).itens) || {}).map(([id, it]) => ({ ...it, id, oculto: false }));
+  const ocultos = mestre ? Object.entries(Segredos.dados._melhOculta || {}).map(([id, it]) => ({ ...it, id, oculto: true })) : [];
+  return pub.concat(ocultos).sort((a, b) => (!!a.comprado - !!b.comprado) || (a.ordem || 0) - (b.ordem || 0));
+}
+function imagemDaMelhoria(it, imgEl) {
+  const padrao = MELHORIAS_PADRAO.find(p => p.id === it.id);
+  const caminho = (padrao && padrao.img) || it.img;
+  if (caminho) { imgEl.onerror = () => { imgEl.onerror = null; if (it.img && it.img !== caminho) imgEl.src = it.img; }; imgEl.src = caminho + '?v=' + VERSAO_SITE; return; }
+  imagemDoItem({ imgId: it.imgId }, imgEl);
+}
+function desenharMelhorias(forcar) {
+  const sig = JSON.stringify(['m', itensMelhorias(), cfgLoja().lojaFechada, cfgLoja().lojaQualquerLugar, mestre]);
+  if (!forcar && sig === lojaSig) return;
+  lojaSig = sig;
+  const lista = itensMelhorias();
+  const feitas = lista.filter(i => i.comprado && !i.oculto).length;
+  $('#lojaAviso').textContent = mestre
+    ? `${feitas} melhoria${feitas === 1 ? '' : 's'} comprada${feitas === 1 ? '' : 's'}. ${lojaAberta() ? 'Loja aberta' : 'Loja FECHADA'} aos jogadores. Pedidos chegam no seu Sussurro.`
+    : `Melhorias da Zona Neutra. ${feitas} já instalada${feitas === 1 ? '' : 's'}. ${lojaSoZN() ? 'Peça na Zona Neutra; ' : ''}o pedido vai para o Mestre.`;
+  const grade = $('#lojaGrade');
+  grade.innerHTML = '';
+  lista.forEach(it => {
+    const card = el('article', 'loja-card melhoria-card' + (it.oculto ? ' oculto' : '') + (it.comprado ? ' comprada' : ''));
+    card.innerHTML = `<div class="melh-img"><img alt="">${it.comprado ? '<span class="selo-comprado">Comprado</span>' : ''}</div>
+      <div class="loja-corpo">
+        <h3>${esc(it.t)}${it.oculto ? ' <span class="so-mestre">oculta</span>' : ''}</h3>
+        ${it.comprado ? '<p class="loja-preco ok">Instalada na Zona Neutra</p>' : (it.custo ? `<p class="loja-preco">${txtCusto(it.custo)}</p>` : '')}
+        ${it.desc ? `<p class="loja-desc">${esc(it.desc)}</p>` : ''}
+        ${!mestre && !it.comprado ? '<div class="loja-acoes"><button class="btn-pedir">Pedir esta melhoria</button></div>' : ''}
+        ${mestre ? `<div class="loja-acoes"><button data-a="editar">Editar</button><button data-a="comprar">${it.comprado ? 'Desmarcar compra' : 'Marcar como comprada'}</button><button data-a="ocultar">${it.oculto ? 'Mostrar aos jogadores' : 'Ocultar'}</button><button data-a="apagar" class="perigo">Apagar</button></div>` : ''}
+      </div>`;
+    imagemDaMelhoria(it, $('img', card));
+    const pedir = $('.btn-pedir', card);
+    if (pedir) pedir.onclick = () => pedirMelhoria(it);
+    if (mestre) {
+      $('[data-a="editar"]', card).onclick = () => editarMelhoria(it);
+      $('[data-a="comprar"]', card).onclick = () => {
+        salvarMelhoria({ ...it, comprado: !it.comprado }, it.oculto);
+        Diario.registrar('sala', `Melhoria ZN ${it.comprado ? 'desmarcada' : 'comprada'}: ${it.t}`);
+      };
+      $('[data-a="ocultar"]', card).onclick = () => salvarMelhoria({ ...it }, !it.oculto);
+      $('[data-a="apagar"]', card).onclick = () => { if (confirm(`Apagar a melhoria "${it.t}"?`)) apagarMelhoria(it); };
+    }
+    grade.appendChild(card);
+  });
+  if (!grade.children.length) grade.innerHTML = '<p class="vazio">Nenhuma melhoria disponível agora.</p>';
+}
+function pedirMelhoria(it) {
+  const tk = (Store.state.tokens || {})[meu];
+  if (lojaSoZN() && (!tk || tk.a !== 1 || salaEm(tk.a, tk.x, tk.y) !== 25)) { aviso('As melhorias só podem ser pedidas na Zona Neutra.'); return; }
+  if (!Chat.chaveLigada) { aviso('Sem conexão com o chat.'); return; }
+  Chat.enviar(`🛠 Pedido de melhoria da ZN: ${it.t}${it.custo ? ' · ' + txtCusto(it.custo) : ''}`, 'sus');
+  aviso('Pedido enviado ao Mestre.');
+}
+function limparFormMelh() {
+  ['melhEditId', 'melhT', 'melhDesc'].forEach(i => { $('#' + i).value = ''; });
+  $('#melhM').value = 0; $('#melhm').value = 0; $('#melhImg').value = '';
+  $('#melhOculta').checked = false; $('#melhComprada').checked = false;
+  $('#melhFormTitulo').textContent = 'Nova melhoria';
+}
+function editarMelhoria(it) {
+  $('#melhEditId').value = it.id;
+  $('#melhT').value = it.t || '';
+  $('#melhM').value = (it.custo && it.custo.M) || 0; $('#melhm').value = (it.custo && it.custo.m) || 0;
+  $('#melhDesc').value = it.desc || '';
+  $('#melhOculta').checked = !!it.oculto; $('#melhComprada').checked = !!it.comprado;
+  $('#melhFormTitulo').textContent = 'Editando: ' + it.t;
+  $('#melhForm').open = true;
+  $('#melhForm').scrollIntoView({ behavior: 'smooth' });
+}
+function salvarMelhoria(it, oculto) {
+  const id = it.id;
+  const limpo = { t: it.t, ordem: it.ordem || Date.now() };
+  if (it.custo && (it.custo.M || it.custo.m)) limpo.custo = it.custo;
+  if (it.desc) limpo.desc = it.desc;
+  if (it.img) limpo.img = it.img;
+  if (it.imgId) limpo.imgId = it.imgId;
+  if (it.comprado) limpo.comprado = true;
+  if (oculto) {
+    Segredos.gravar(['_melhOculta', id], limpo);
+    Store.definir(['melhorias', 'itens', id], null);
+  } else {
+    Store.definir(['melhorias', 'itens', id], limpo);
+    Segredos.gravar(['_melhOculta', id], null);
+  }
+  desenharLoja(true);
+}
+function apagarMelhoria(it) {
+  Store.definir(['melhorias', 'itens', it.id], null);
+  Segredos.gravar(['_melhOculta', it.id], null);
+  if (it.imgId) Rede.set('lojaImg/' + it.imgId, null).catch(() => {});
+  desenharLoja(true);
+}
+$('#btnMelhSalvar').addEventListener('click', async () => {
+  const t = $('#melhT').value.trim();
+  if (!t) { aviso('Dê um nome à melhoria.'); return; }
+  const idExist = $('#melhEditId').value;
+  const antigo = idExist ? itensMelhorias().find(i => i.id === idExist) : null;
+  const id = idExist || Rede.chave();
+  const it = { ...(antigo || {}), id, t, custo: { M: Math.max(0, +$('#melhM').value || 0), m: Math.max(0, +$('#melhm').value || 0) },
+    desc: $('#melhDesc').value.trim(), comprado: $('#melhComprada').checked };
+  const f = $('#melhImg').files[0];
+  if (f) {
+    try { const d = await imagemReduzida(f, 700); await Rede.set('lojaImg/' + id, d); it.imgId = id; delete it.img; imgsLoja[id] = d; }
+    catch (e) { aviso('Não consegui salvar a imagem.'); }
+  }
+  salvarMelhoria(it, $('#melhOculta').checked);
+  Diario.registrar('sala', `Melhoria ZN salva: ${t}`);
+  limparFormMelh();
+  aviso('Melhoria salva.');
+});
+$('#btnMelhCancelar').addEventListener('click', limparFormMelh);
+function semearMelhorias() {
+  if (!mestre || cfgLoja().melhoriasSemeadas) return;
+  MELHORIAS_PADRAO.forEach((it, i) => {
+    const { id, ...resto } = it;
+    Store.definir(['melhorias', 'itens', id], { ...resto, ordem: i + 1 });
+  });
+  Store.definir(['cfg', 'melhoriasSemeadas'], true);
+}
+
 // primeira vez: o Mestre coloca o catálogo do PDF na loja
 function semearLoja() {
   if (!mestre || cfgLoja().lojaSemeada) return;
