@@ -20,6 +20,7 @@
   </div>
   <div class="topo-dir">
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
+    <button id="btnChat" class="btn-fantasma btn-chat" hidden aria-label="Abrir o chat">💬 Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
     <button id="btnMestre" class="btn-fantasma">Entrar</button>
     <button id="btnRecolher" class="btn-fantasma so-desktop" title="Esconder ou mostrar o painel lateral">Painel ⟩</button>
     <button id="btnPainel" class="btn-fantasma btn-painel so-celular" aria-label="Abrir painel">☰ Painel</button>
@@ -54,6 +55,8 @@
         <button class="btn-roxo" type="submit">Liberar</button>
       </form>
     </div>
+
+    <div id="relogio" class="relogio" hidden title="Relógio da Caixa">⏱ <b id="relogioHora">00:00</b></div>
 
     <div class="andar-legenda">
       <span id="legendaAndar">1º Andar</span>
@@ -106,12 +109,18 @@
       <button id="btnRolarFora" class="btn-fantasma">Vou rolar em outro lugar</button>
     </div>
     <div id="aviso" class="aviso" hidden></div>
+    <div id="suaVez" class="sua-vez" hidden><span>SUA VEZ</span><small id="suaVezQuem"></small></div>
   </section>
 
   <!-- Painel lateral -->
   <aside id="painel" class="painel">
     <button class="painel-alca so-celular" id="btnAlca" aria-label="Fechar painel"><span></span></button>
     <button class="fechar-painel so-celular" id="btnFecharPainel" aria-label="Fechar painel">×</button>
+
+    <section class="bloco" id="blocoMinha" hidden>
+      <h2>Sua cobaia</h2>
+      <div id="minhaFicha" class="minha-ficha"></div>
+    </section>
 
     <section class="bloco" id="blocoCobaias">
       <h2>Cobaias</h2>
@@ -165,8 +174,11 @@
       <div id="listaFuncoes" class="lista-funcoes"></div>
 
       <h3>Salas</h3>
-      <p class="mini">Clique numa sala do mapa para revelar ou esconder dos jogadores.</p>
+      <p class="mini">Clique numa sala do mapa para revelar, esconder, editar o nome, o elemento, o elevador, marcar "sem sinal" e anexar arquivos. Clique num corredor para fechar a porta.</p>
+      <label class="campo-linha">Subtítulo deste andar <input id="subAndar" placeholder="ex.: O Alojamento"></label>
       <div class="ferramentas">
+        <button id="btnImportarSalas" class="btn-fantasma">Importar salas de arquivo (.json)…</button>
+        <input type="file" id="arqSalas" accept=".json,application/json" hidden>
         <button id="btnRevelarAndar" class="btn-fantasma">Revelar todas as salas deste andar</button>
         <button id="btnEsconderAndar" class="btn-fantasma">Esconder todas as salas deste andar</button>
       </div>
@@ -219,12 +231,44 @@
           <button id="btnEncerrarPersg" class="btn-fantasma perigo">Encerrar perseguição</button>
         </div>
       </div>
+      <h3>Chat e rolagens</h3>
+      <label class="chave"><input type="checkbox" id="chkRolAberta"><span>Rolagens dos jogadores aparecem no chat Geral (desmarcado: só você vê, no Sussurro)</span></label>
       <div class="ferramentas">
+        <button id="btnTV" class="btn-fantasma">Abrir a tela da mesa (modo TV)</button>
         <button id="btnTesteSom" class="btn-fantasma">Testar o som do alarme</button>
         <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
         <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra…</button>
         <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
         <button id="btnSair" class="btn-fantasma">Sair do modo Mestre</button>
+      </div>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoRelogio" hidden>
+      <h2>Relógio da Caixa</h2>
+      <p class="mini">Todos veem a hora no topo do mapa. À 00:00, todos recebem o aviso de que os robôs S.T.A.F.F. desligam.</p>
+      <div class="relogio-ctrl">
+        <b id="relogioMestre" class="relogio-grande">--:--</b>
+        <div class="relogio-botoes">
+          <button class="btn-fantasma" data-min="-10">−10 min</button>
+          <button class="btn-fantasma" data-min="10">+10 min</button>
+          <button class="btn-fantasma" data-min="30">+30 min</button>
+          <button class="btn-fantasma" data-min="60">+1 h</button>
+        </div>
+      </div>
+      <div class="ferramentas duas">
+        <button id="btnDefinirHora" class="btn-fantasma">Definir hora…</button>
+        <button id="btnEsconderRelogio" class="btn-fantasma">Esconder relógio</button>
+      </div>
+      <label class="chave"><input type="checkbox" id="chkApagao00"><span>À 00:00, ligar o Apagão automaticamente</span></label>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoExpo" hidden>
+      <h2>Exposição (NEX)</h2>
+      <p class="mini">Quantas vezes cada cobaia entrou em sala de cada elemento (a Zona Neutra não conta). Conta enquanto a sua tela de Mestre estiver aberta.</p>
+      <div id="tabelaExpo" class="tabela-expo"></div>
+      <div class="ferramentas duas">
+        <button id="btnCopiarExpo" class="btn-fantasma">Copiar resumo</button>
+        <button id="btnZerarExpo" class="btn-fantasma perigo">Zerar contagem</button>
       </div>
     </section>
 
@@ -311,6 +355,26 @@
   </aside>
 </main>
 
+<!-- Chat -->
+<aside id="painelChat" class="painel-chat" hidden aria-label="Chat">
+  <div class="chat-topo"><h2>Chat</h2><button id="btnFecharChat" class="fechar" aria-label="Fechar o chat">×</button></div>
+  <div id="chatAbas" class="chat-abas">
+    <button data-canal="geral" class="ativo">Geral<span class="n" hidden></span></button>
+    <button data-canal="sus">Sussurro ao Mestre<span class="n" hidden></span></button>
+    <button data-canal="filhos">Filhos<span class="n" hidden></span></button>
+  </div>
+  <p id="chatDica" class="chat-dica"></p>
+  <ol id="chatLista" class="chat-lista"></ol>
+  <div id="chatResp" class="chat-resp" hidden>Respondendo a <b id="chatRespNome"></b> <button id="btnCancelarResp" aria-label="Cancelar resposta">×</button></div>
+  <form id="chatForm" class="chat-form" autocomplete="off">
+    <input id="chatTexto" maxlength="500" placeholder="Escreva…" aria-label="Mensagem">
+    <button class="btn-roxo">Enviar</button>
+  </form>
+  <button id="btnApagarChat" class="btn-fantasma perigo apagar-chat" hidden>Apagar todo o chat</button>
+</aside>
+
+<div id="faixaMeiaNoite" class="faixa-meianoite" hidden>00:00 · OS ROBÔS S.T.A.F.F. DESLIGAM</div>
+
 <!-- Protocolo Filho da O.R.F.E.U. -->
 <div id="telaProtocolo" class="tela-protocolo" hidden>
   <p class="tp-kicker">O.R.F.E.U. · limite diário de ruído excedido</p>
@@ -389,6 +453,16 @@
     <p class="mini">Escolha o andar. As 7 cobaias vão para a Zona Neutra dele.</p>
     <div id="listaReset" class="ferramentas"></div>
     <div class="dlg-acoes"><button class="btn-fantasma" value="cancel">Cancelar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgArquivo" class="dlg dlg-arquivo">
+  <form method="dialog">
+    <p class="arq-kicker">Arquivo encontrado</p>
+    <h2 id="arqTitulo"></h2>
+    <img id="arqImg" alt="" hidden>
+    <div id="arqTexto" class="arq-texto"></div>
+    <div class="dlg-acoes"><button class="btn-roxo" value="ok">Fechar</button></div>
   </form>
 </dialog>
 

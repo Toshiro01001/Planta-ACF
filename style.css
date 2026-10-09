@@ -896,3 +896,182 @@ body.em-persg .faixa-apagao { top: calc(var(--topo-h) + 28px); }
 /* fichas em fileira ficam um pouco menores para caber mais por fila */
 .ficha.em-fila { --kf: .7; }
 .ficha.em-fila.selecionada, .ficha.em-fila.arrastada { --kf: 1; }
+
+/* =========================================================
+   CHAT
+   ========================================================= */
+.btn-chat { position: relative; }
+.chat-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: #ff3b5c; color: #fff; font: 11px/18px var(--mono); text-align: center;
+}
+.painel-chat {
+  position: fixed; right: 0; top: var(--topo-h); bottom: 0; width: 370px; z-index: 40;
+  background: var(--painel); border-left: 1px solid var(--roxo);
+  display: flex; flex-direction: column; box-shadow: -10px 0 40px rgba(0,0,0,.5);
+}
+.chat-topo { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 6px; }
+.chat-topo h2 { margin: 0; font: 700 15px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--roxo-claro); }
+.chat-topo .fechar { background: none; border: 0; font-size: 22px; color: var(--texto-dim); }
+.chat-abas { display: flex; gap: 4px; padding: 0 10px; border-bottom: 1px solid var(--linha); }
+.chat-abas button {
+  flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 4px;
+  font-size: 13px; color: var(--texto-dim); position: relative;
+}
+.chat-abas button.ativo { color: #fff; border-bottom-color: var(--roxo); }
+.chat-abas .n { margin-left: 5px; background: #ff3b5c; color: #fff; border-radius: 8px; padding: 0 5px; font: 10px/15px var(--mono); }
+.chat-dica { margin: 6px 14px; font-size: 12px; color: var(--texto-dim); }
+.chat-lista { list-style: none; margin: 0; padding: 4px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.chat-lista li { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: start; }
+.chat-lista li.vazio { display: block; font-style: italic; color: var(--texto-dim); font-size: 13px; }
+.chat-lista .bola { width: 30px; height: 30px; border-radius: 50%; background: var(--cor) center / cover; border: 2px solid var(--cor); display: inline-block; }
+.chat-lista .msg { background: #17121f; border-radius: 8px; padding: 6px 9px; min-width: 0; }
+.chat-lista li.meu .msg { background: #22183a; }
+.chat-lista li.dado .msg { border-left: 3px solid #f5c84c; }
+.msg-topo { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.msg-topo b { font-size: 13px; }
+.msg-topo small { font: 11px var(--mono); color: var(--roxo-claro); }
+.msg-topo time { font: 11px var(--mono); color: var(--texto-dim); margin-left: auto; }
+.msg-txt { font-size: 14px; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+.responder { background: #221b2e; border: 1px solid var(--linha); border-radius: 4px; font-size: 11px; padding: 1px 6px; }
+.chat-resp { margin: 0 12px; padding: 5px 8px; font-size: 12px; border-radius: 6px; background: rgba(139,92,246,.15); border: 1px solid var(--roxo); }
+.chat-resp button { background: none; border: 0; color: var(--texto-dim); float: right; }
+.chat-form { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--linha); }
+.chat-form input { flex: 1; background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px; padding: 9px; font: 15px var(--corpo); }
+.apagar-chat { margin: 0 12px 12px; }
+
+/* =========================================================
+   RELÓGIO, SUA VEZ, MEIA-NOITE
+   ========================================================= */
+.relogio {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 3;
+  font: 15px var(--mono); letter-spacing: .1em; padding: 4px 12px; border-radius: 999px;
+  background: rgba(7,6,10,.85); border: 1px solid var(--linha); color: var(--roxo-claro);
+}
+.relogio b { color: #fff; font-weight: 400; }
+body.em-persg .relogio { top: 46px; }
+.relogio-ctrl { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.relogio-grande { font: 30px var(--mono); color: #fff; letter-spacing: .06em; }
+.relogio-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; flex: 1; }
+.relogio-botoes .btn-fantasma { padding: 5px 6px; font-size: 13px; }
+.sua-vez {
+  position: absolute; inset: 0; z-index: 9; display: grid; place-content: center; text-align: center; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(139,92,246,.35), rgba(7,6,10,.2) 70%);
+}
+.sua-vez span { font: 700 clamp(42px, 9vw, 92px) var(--display); color: #fff; letter-spacing: .08em; text-shadow: 0 0 30px var(--roxo); }
+.sua-vez small { font: 15px var(--mono); color: var(--roxo-claro); letter-spacing: .2em; text-transform: uppercase; }
+.sua-vez.anima span { animation: vezPop .5s ease-out; }
+@keyframes vezPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.faixa-meianoite {
+  position: fixed; left: 0; right: 0; top: 40%; z-index: 65; text-align: center; padding: 18px;
+  font: 22px var(--mono); letter-spacing: .25em; color: #fff; background: rgba(10,0,4,.92);
+  border-top: 1px solid #ff3b5c; border-bottom: 1px solid #ff3b5c; text-shadow: 0 0 14px #ff3b5c;
+}
+
+/* =========================================================
+   PORTAS NOS CORREDORES
+   ========================================================= */
+.porta-chao { position: absolute; transform: translateZ(1.6px); display: grid; place-items: center; }
+.porta-chao span { font-size: 22px; transform: rotateZ(calc(var(--rot) * -1)); }
+.porta-chao.porta-t { background: repeating-linear-gradient(45deg, #59606b 0 6px, #3a3f47 6px 12px); }
+.porta-chao.porta-d { background: repeating-linear-gradient(45deg, #6b5136 0 5px, #3f2e1d 5px 11px); }
+.porta-chao.porta-c { background: radial-gradient(circle, #a33a3a, #4a1212); }
+.parede.porta-parede.porta-t { background: linear-gradient(180deg, #9aa3b2, #4b525e); border-top-color: #e2e8f0; }
+.parede.porta-parede.v.porta-t { background: linear-gradient(90deg, #4b525e, #9aa3b2); border-right-color: #e2e8f0; }
+.parede.porta-parede.porta-d { background: linear-gradient(180deg, #8a6a3a, #3f2e1d); border-top: 2px dashed #c9a46a; clip-path: polygon(0 30%, 18% 0, 35% 25%, 55% 5%, 75% 30%, 100% 10%, 100% 100%, 0 100%); }
+.parede.porta-parede.v.porta-d { border-right: 2px dashed #c9a46a; clip-path: none; }
+.parede.porta-parede.porta-c { background: linear-gradient(180deg, #c04848, #5a1414); border-top-color: #ffb3b3; }
+.parede.porta-parede.v.porta-c { background: linear-gradient(90deg, #5a1414, #c04848); border-right-color: #ffb3b3; }
+.portas-acoes button.on, .arq-lista-mestre button.on { background: var(--roxo-escuro) !important; border-color: var(--roxo) !important; }
+
+/* =========================================================
+   SALAS (selos do Mestre), SINAIS NO MAPA
+   ========================================================= */
+.sala.sem-sinal .sala-tinta { opacity: .5 !important; background: repeating-linear-gradient(135deg, rgba(0,0,0,.6) 0 8px, rgba(255,59,92,.18) 8px 16px); }
+.sala.sem-sinal .sala-rotulo::before {
+  content: '⌁ sem sinal'; display: block; margin-bottom: 4px; font: 13px var(--mono); color: #ff9fb2;
+}
+.sinal-ponto { position: absolute; width: 0; height: 0; transform: translateZ(3px); pointer-events: none; }
+.sinal-anel {
+  position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #f5c84c; box-shadow: 0 0 18px #f5c84c; animation: sinalPulso 1.1s ease-out infinite;
+}
+.sinal-ponto.enviado .sinal-anel { border-color: var(--roxo-claro); box-shadow: 0 0 18px var(--roxo); }
+.sinal-nome {
+  position: absolute; left: 26px; top: -10px; white-space: nowrap; font: 14px var(--mono);
+  background: rgba(7,6,10,.9); border: 1px solid #f5c84c; padding: 1px 6px; border-radius: 4px;
+  transform: rotateZ(calc(var(--rot) * -1));
+}
+@keyframes sinalPulso { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+
+/* =========================================================
+   CARTÃO: seções do Mestre, ficha, arquivos
+   ========================================================= */
+.cartao { max-height: calc(100% - 110px); overflow-y: auto; }
+.cartao-sec { margin-top: 10px; border-top: 1px solid var(--linha); padding-top: 8px; }
+.cartao-sec summary { cursor: pointer; font: 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--roxo-claro); }
+.cartao-sec[open] summary { margin-bottom: 8px; }
+.campo-linha { display: grid; gap: 3px; font-size: 12px; color: var(--texto-dim); margin-bottom: 8px; }
+.campo-linha input, .campo-linha select {
+  background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 5px; padding: 6px 8px; font: 13px var(--corpo);
+}
+.cartao .chave { font-size: 13px; margin-bottom: 6px; }
+.arq-lista-mestre { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.arq-lista-mestre li { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; }
+.arq-lista-mestre .arq-t { flex: 1 1 100%; }
+.arq-lista-mestre button { font-size: 11px; padding: 3px 7px; border-radius: 4px; background: #1b1526; border: 1px solid var(--linha); }
+.arq-lista-mestre button.perigo:hover { border-color: var(--perigo); color: var(--perigo); }
+.arq-novo { display: grid; gap: 6px; }
+.arq-novo input, .arq-novo textarea { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 5px; padding: 6px 8px; font: 13px var(--corpo); }
+.arq-novo input[type=file] { font-size: 12px; padding: 4px; }
+.arq-qtd { color: #fff; }
+.dlg-arquivo { width: min(620px, 94vw); }
+.arq-kicker { margin: 0 0 4px; font: 11px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--roxo-claro); }
+#arqImg { display: block; max-width: 100%; max-height: 60vh; margin: 0 auto 12px; border-radius: 6px; border: 1px solid var(--linha); }
+.arq-texto { white-space: pre-wrap; font: 15px/1.55 var(--corpo); max-height: 40vh; overflow-y: auto; }
+
+.ficha-edit { display: grid; gap: 6px; }
+.ficha-edit label { display: grid; grid-template-columns: 38px 1fr 10px 1fr; gap: 4px; align-items: center; font: 12px var(--mono); color: var(--texto-dim); }
+.ficha-edit label:last-child { grid-template-columns: 38px 1fr; }
+.ficha-edit input { width: 100%; background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 4px; padding: 4px 6px; font: 13px var(--mono); }
+.barra { display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; align-items: center; margin-top: 6px; font: 12px var(--mono); }
+.barra-nex { grid-template-columns: 36px auto; }
+.barra-r { color: var(--texto-dim); }
+.barra-trilho { height: 9px; border-radius: 5px; background: #221b2e; overflow: hidden; }
+.barra-cheia { height: 100%; border-radius: 5px; transition: width .4s; }
+.barra-pv .barra-cheia { background: linear-gradient(90deg, #8f1d2c, #ff3b5c); }
+.barra-san .barra-cheia { background: linear-gradient(90deg, #3b2366, #8b5cf6); }
+.barra-pe .barra-cheia { background: linear-gradient(90deg, #8a6a14, #f5c84c); }
+.barra b { color: #fff; font-weight: 400; }
+.minha-topo { display: flex; gap: 10px; align-items: center; }
+.minha-topo .bola { width: 38px; height: 38px; border-radius: 50%; background: var(--cor) center / cover; border: 3px solid var(--cor); display: inline-block; }
+.minha-topo strong { display: block; }
+.minha-topo .sub { font: 12px var(--mono); color: var(--texto-dim); }
+.cartao-ficha { margin-top: 6px; }
+
+/* exposição */
+.tabela-expo table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+.tabela-expo th { font: 10px var(--mono); color: var(--texto-dim); font-weight: 400; padding: 3px 2px; text-align: center; }
+.tabela-expo td { padding: 4px 2px; text-align: center; border-top: 1px solid #1a1424; font-family: var(--mono); }
+.tabela-expo td:first-child { text-align: left; font-family: var(--corpo); }
+.el-ponto { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--cor); margin: 0 auto 2px; }
+
+/* =========================================================
+   TELA DA MESA (modo TV)
+   ========================================================= */
+body.tv .corpo { grid-template-columns: 0 1fr 0; }
+body.tv .elevador, body.tv .painel, body.tv .topo-dir, body.tv .camera, body.tv .btn-dados,
+body.tv .btn-desfazer, body.tv .dica, body.tv .aba-painel, body.tv #perfil, body.tv .cartao { display: none !important; }
+body.tv .andar-legenda span { font-size: 34px; }
+
+@media (max-width: 860px) {
+  .painel-chat { width: auto; left: 0; top: var(--topo-h); z-index: 45; border-left: 0; }
+  .btn-chat { padding: 9px 10px; }
+  .relogio { top: 10px; font-size: 13px; }
+  body.tv .corpo { grid-template-rows: 0 1fr; }
+}
+/* chat aberto no computador: o símbolo do Eco e o cartão não ficam por baixo */
+@media (min-width: 861px) {
+  body.chat-aberto .eco-simbolo { right: 386px; }
+}
+.cartao { max-height: calc(100% - 190px); }
