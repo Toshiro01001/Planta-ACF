@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261009">
+<link rel="stylesheet" href="style.css?v=20261009b">
 </head>
 <body>
 
@@ -265,8 +265,9 @@
       <h2>Loja do Maurício</h2>
       <label class="chave"><input type="checkbox" id="chkLojaAberta"><span>Loja aberta aos jogadores</span></label>
       <label class="chave"><input type="checkbox" id="chkLojaZN"><span>O Maurício só atende quem está na Zona Neutra</span></label>
+      <p class="mini">As Melhorias ZN ficam numa aba dentro da loja e seguem as mesmas regras.</p>
       <div class="ferramentas">
-        <button id="btnAbrirLojaM" class="btn-roxo">Abrir a loja (ver, editar e criar vendas)</button>
+        <button id="btnAbrirLojaM" class="btn-roxo">Abrir a loja (vendas e melhorias da ZN)</button>
       </div>
     </section>
 
@@ -527,7 +528,24 @@
     <div><p class="arq-kicker">Zona Neutra</p><h2>Loja do Maurício</h2></div>
     <button id="btnFecharLoja" class="fechar" aria-label="Fechar a loja">×</button>
   </div>
+  <div class="loja-abas" role="tablist">
+    <button data-aba-loja="vendas" class="on" role="tab">🛒 Vendas do Maurício</button>
+    <button data-aba-loja="melhorias" role="tab">🛠 Melhorias ZN</button>
+  </div>
   <p id="lojaAviso" class="loja-aviso"></p>
+  <div id="melhMestre" class="loja-mestre" hidden>
+    <details id="melhForm" class="cartao-sec"><summary id="melhFormTitulo">Nova melhoria</summary>
+      <input type="hidden" id="melhEditId">
+      <label class="campo-linha">Nome da melhoria <input id="melhT" placeholder="ex.: Gerador reserva"></label>
+      <div class="loja-custo"><label class="campo-linha">Sucatas Maiores <input id="melhM" type="number" min="0" value="0"></label>
+        <label class="campo-linha">Sucatas Menores <input id="melhm" type="number" min="0" value="0"></label></div>
+      <label class="campo-linha">Efeito <textarea id="melhDesc" rows="3" placeholder="O que a melhoria faz na Zona Neutra"></textarea></label>
+      <label class="campo-linha">Imagem (opcional) <input id="melhImg" type="file" accept="image/*"></label>
+      <label class="chave"><input type="checkbox" id="melhComprada"><span>Já comprada</span></label>
+      <label class="chave"><input type="checkbox" id="melhOculta"><span>Oculta dos jogadores (aparece só quando você liberar)</span></label>
+      <div class="ferramentas duas"><button id="btnMelhSalvar" class="btn-roxo">Salvar melhoria</button><button id="btnMelhCancelar" class="btn-fantasma">Limpar</button></div>
+    </details>
+  </div>
   <div id="lojaMestre" class="loja-mestre" hidden>
     <details id="lojaForm" class="cartao-sec"><summary id="lojaFormTitulo">Nova venda</summary>
       <input type="hidden" id="lojaEditId">
@@ -567,8 +585,8 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261009"></script>
-<script src="config.js?v=20261009"></script>
-<script src="app.js?v=20261009"></script>
+<script src="data.js?v=20261009b"></script>
+<script src="config.js?v=20261009b"></script>
+<script src="app.js?v=20261009b"></script>
 </body>
 </html>
