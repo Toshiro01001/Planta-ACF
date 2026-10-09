@@ -984,7 +984,6 @@ body.em-persg .relogio { top: 46px; }
 .porta-chao.porta-f, .porta-chao.porta-p { background: linear-gradient(180deg, #4a4f58, #24272d); box-shadow: inset 0 0 0 1px #7b818c; }
 .porta-chao.porta-p { animation: porta-abrindo .5s ease-in-out infinite alternate; }
 @keyframes porta-abrindo { to { background: linear-gradient(180deg, #6b7280, #33373f); } }
-.porta-chao .botao-vermelho { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff8a8a, #d1121f 60%, #6a0710); box-shadow: 0 0 6px #ff2a3a; }
 .porta-chao .porta-secreta { position: absolute; font-style: normal; font-size: 13px; top: -14px; right: -14px; opacity: .85; transform: rotateZ(calc(var(--rot) * -1)); filter: drop-shadow(0 0 3px #000); }
 .parede.porta-parede.porta-f, .parede.porta-parede.porta-p { background: linear-gradient(180deg, #8a909b, #3a3e46); border-top-color: #c9ced6; }
 .parede.porta-parede.v.porta-f, .parede.porta-parede.v.porta-p { background: linear-gradient(90deg, #3a3e46, #8a909b); border-right-color: #c9ced6; }
@@ -1253,3 +1252,83 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
   color: #8ef0b0; border: 3px solid #8ef0b0; padding: 4px 14px; border-radius: 6px; background: rgba(7,20,12,.72); box-shadow: 0 0 18px rgba(80,220,140,.35); }
 .loja-preco.ok { color: #8ef0b0; }
 .melhoria-card .btn-pedir { border-color: var(--roxo) !important; }
+
+/* botão vermelho 3D nas paredes do corredor, ao lado da porta de ferro */
+.parede.botao-parede { background: none !important; border: 0 !important; pointer-events: none; }
+.botao-3d { position: absolute; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffb0b0, #ff2a3a 35%, #b30d1a 65%, #4a0309);
+  box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 12px 3px rgba(255,40,60,.75); }
+.parede.h.botao-parede .botao-3d { left: 50%; top: 42%; transform: translate(-50%, -50%); }
+.parede.v.botao-parede .botao-3d { left: 58%; top: 50%; transform: translate(-50%, -50%); }
+.parede.botao-parede .botao-3d { animation: botao-pulsa 1.6s ease-in-out infinite; }
+.parede.botao-parede.apertado .botao-3d { animation: none; filter: brightness(1.6); box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 22px 8px rgba(255,60,80,.95); }
+@keyframes botao-pulsa { 50% { box-shadow: 0 0 0 2px #2a2d33, 0 0 0 3px #6b7280, 0 0 4px 1px rgba(255,40,60,.4); } }
+
+/* teclado das portas e aviso de Mestre ausente */
+.teclado-porta { display: flex; gap: 6px; margin: 6px 0; }
+.teclado-porta input { flex: 1; min-width: 0; font: 16px var(--mono); letter-spacing: .2em; background: #0b0910; color: #fff; border: 1px solid #6b7280; border-radius: 5px; padding: 6px 8px; }
+.dica-porta.alerta { color: #ffcf7a; }
+.parede.botao-parede.teclado .botao-3d { border-radius: 2px; background: repeating-linear-gradient(0deg, #1c1f24 0 2px, #9aa3b2 2px 3px), repeating-linear-gradient(90deg, transparent 0 2px, #1c1f24 2px 3px); box-shadow: 0 0 0 2px #2a2d33, 0 0 8px 2px rgba(120,200,255,.5); animation: none; }
+
+/* cofre, despensa e pedidos */
+.zona-jogador:empty, .loja-zona:empty { display: none; }
+.zona-jogador { margin-top: 10px; display: grid; gap: 8px; }
+.loja-zona { margin: 0 18px 10px; display: grid; gap: 8px; }
+.cofre-linha { margin: 0; font-size: 13px; color: #f1d98a; }
+.despensa { border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; background: #120e19; display: grid; gap: 6px; font-size: 13px; }
+.despensa > b { font: 11px var(--mono); letter-spacing: .08em; color: var(--texto-dim); text-transform: uppercase; }
+.despensa-linha { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.despensa-linha button { font-size: 12px; padding: 3px 10px; border-radius: 5px; background: #1b1526; border: 1px solid var(--roxo); color: var(--texto); cursor: pointer; }
+.despensa-linha button:disabled { opacity: .4; border-color: var(--linha); }
+.cofre-mestre { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
+.cofre-mestre input { width: 64px; background: #0b0910; color: #fff; border: 1px solid var(--linha); border-radius: 4px; padding: 3px 6px; }
+.melh-uso { margin: 0; font: 12px var(--mono); color: #8ef0b0; }
+.melh-uso.usada { color: var(--texto-dim); }
+.lista-pedidos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lista-pedidos li { background: #17121f; border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; font-size: 13px; }
+.lista-pedidos li.vazio { background: none; border: 0; color: var(--texto-dim); font-style: italic; }
+.ped-topo { display: flex; gap: 8px; align-items: center; }
+.ped-topo .bola { width: 28px; height: 28px; flex: none; }
+.ped-topo small { display: block; color: var(--texto-dim); font: 11px var(--mono); }
+.lista-pedidos select { width: 100%; background: #0b0910; color: var(--texto); border: 1px solid var(--linha); border-radius: 4px; padding: 4px; }
+
+/* condições nas fichas */
+.ficha-cond { position: absolute; bottom: 74px; white-space: nowrap; font-size: 15px; pointer-events: none; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000); }
+.ficha-cond:empty { display: none; }
+.cond-lista { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.cond-lista span { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #2a1520; border: 1px solid #7a2a3a; }
+.cond-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cond-botoes button { font-size: 12px; padding: 4px 6px; border-radius: 5px; background: #1b1526; border: 1px solid var(--linha); color: var(--texto-dim); text-align: left; }
+.cond-botoes button small { display: block; font: 10px var(--mono); }
+.cond-botoes button.c1 { border-color: #ff6b81; color: #fff; background: #3a1622; }
+.cond-botoes button.c2 { border-color: #c9a7ff; color: #fff; background: #241838; }
+
+/* salas visitadas: pegadas discretas no canto */
+.sala.visitada .sala-cn::after { content: ' 👣'; font-size: .7em; opacity: .55; }
+
+/* régua */
+.regua-linha { stroke: #7dd3fc; stroke-width: 3; stroke-dasharray: 2 6; stroke-linecap: round; filter: drop-shadow(0 0 4px #38bdf8); }
+.regua-rotulo span { border-color: #7dd3fc !important; }
+.camera button.ativo { background: var(--roxo-escuro); border-color: var(--roxo); }
+
+/* cronômetro de decisão */
+.crono-vez { position: fixed; top: calc(var(--topo-h) + 34px); left: 50%; transform: translateX(-50%); z-index: 29;
+  font: 700 15px var(--mono); padding: 4px 14px; border-radius: 0 0 8px 8px; background: #241838; border: 1px solid var(--roxo); border-top: 0; color: #fff; }
+.crono-vez.acabando { background: #5a3a00; border-color: #ffb020; animation: crono-pisca .5s steps(2) infinite; }
+.crono-vez.esgotado { background: #5a0f1c; border-color: #ff3b5c; }
+@keyframes crono-pisca { 50% { opacity: .55; } }
+.crono-mestre { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; margin: 6px 0; }
+.crono-mestre input { width: 64px; background: #0b0910; color: #fff; border: 1px solid var(--linha); border-radius: 4px; padding: 3px 6px; }
+
+/* replay */
+.replay-ctrl { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 4px; }
+.replay-ctrl select { background: #0b0910; color: var(--texto); border: 1px solid var(--linha); border-radius: 4px; padding: 4px; }
+.faixa-replay { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 40; display: flex; gap: 10px; align-items: center;
+  max-width: calc(100vw - 32px); padding: 8px 12px; border-radius: 8px; background: rgba(20,14,32,.95); border: 1px solid #7dd3fc; font: 12px var(--mono); color: #e0f2fe; }
+.faixa-replay span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.faixa-replay button { flex: none; background: #1b1526; border: 1px solid #7dd3fc; color: #fff; border-radius: 5px; padding: 3px 10px; }
+body.em-replay .ficha { opacity: .12; }
+.fantasma { position: absolute; width: 0; height: 0; transform: translateZ(3px); transition-property: left, top; transition-timing-function: ease-in-out; pointer-events: none; }
+.fantasma-bola { position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--cor); background: #222 center/cover; box-shadow: 0 0 14px var(--cor); transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)); }
+.fantasma em { position: absolute; left: 18px; top: -30px; font: 11px var(--mono); font-style: normal; white-space: nowrap; padding: 1px 5px; border-radius: 4px; background: rgba(7,6,10,.85); border: 1px solid var(--cor); color: #fff; transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)); }
+.fantasma.andando .fantasma-bola { box-shadow: 0 0 24px 6px var(--cor); }
