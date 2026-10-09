@@ -638,3 +638,142 @@ body.em-persg .cartao { top: 112px; }
 .aux-form { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
 .aux-form input { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 8px; padding: 10px 12px; font: 16px var(--mono); width: 260px; }
 @media (max-width: 860px) { .perfil-opcoes { grid-template-columns: 1fr; } .aux-form { flex-direction: column; align-items: center; } }
+
+/* =========================================================
+   FERRAMENTAS DO MESTRE: diário, rolagens, anotações, backup
+   ========================================================= */
+.diario-ctrl { display: flex; gap: 8px; margin-bottom: 8px; }
+.diario-ctrl select {
+  flex: 1; background: #0b0910; border: 1px solid var(--linha); color: var(--texto);
+  border-radius: 6px; padding: 6px; font: 13px var(--mono);
+}
+.diario-ctrl .btn-fantasma { padding: 5px 10px; font-size: 13px; }
+.lista-diario {
+  list-style: none; margin: 0 0 10px; padding: 0; max-height: 340px; overflow-y: auto;
+  border: 1px solid var(--linha); border-radius: 8px; background: #0b0910;
+}
+.lista-diario li {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline;
+  padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #1a1424;
+}
+.lista-diario .d-txt { grid-column: 1 / -1; line-height: 1.35; }
+.lista-diario .d-tag { justify-self: start; }
+.lista-diario time { font: 11px var(--mono); color: var(--texto-dim); white-space: nowrap; }
+.d-tag { font: 10px var(--mono); padding: 0 4px; border-radius: 3px; background: #221b2e; color: var(--roxo-claro); }
+.d-dado .d-tag { color: #f5c84c; }
+.d-ruido .d-tag { color: #ff6b6b; }
+.d-persg .d-tag { color: #7fe3d6; }
+.d-sala .d-tag { color: #9be15d; }
+.lista-diario li.d-sessao {
+  display: block; text-align: center; font: 11px var(--mono); letter-spacing: .1em;
+  color: #fff; background: var(--roxo-escuro); text-transform: uppercase;
+}
+.ferramentas.duas { grid-template-columns: 1fr 1fr; }
+
+.lista-rolagens { display: grid; gap: 10px; }
+.rolagem { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: start; }
+.rolagem .bola {
+  width: 30px; height: 30px; border-radius: 50%; display: inline-block;
+  background: var(--cor) center / cover no-repeat; border: 2px solid var(--cor);
+}
+.rolagem .bola.filho { border: 2px dashed #fff; box-shadow: 0 0 0 1px var(--cor); }
+.mestre-bola { display: grid !important; place-items: center; background: var(--roxo-escuro) !important; border-color: var(--roxo) !important; font: 13px var(--display); }
+.rolagem-info strong { font-size: 14px; }
+.rolagem ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.rolagem li { display: grid; grid-template-columns: 58px auto 1fr; gap: 6px; font-size: 12px; align-items: baseline; padding: 1px 3px; }
+.rolagem li time { font: 11px var(--mono); color: var(--texto-dim); }
+.rolagem li b { font: 15px var(--mono); color: #fff; min-width: 26px; text-align: right; white-space: nowrap; }
+.rolagem li span { color: var(--texto-dim); font-family: var(--mono); font-size: 11px; }
+.rolagem li.repetiu { background: rgba(255,140,66,.12); border-radius: 4px; }
+.rolagem li.repetiu span { color: #ffb37a; }
+
+.lista-notas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lista-notas li { padding: 7px 9px; border-radius: 6px; background: #17121f; cursor: pointer; border-left: 3px solid var(--roxo); }
+.lista-notas li:hover { background: #1f1830; }
+.lista-notas strong { display: block; font-size: 13px; color: var(--roxo-claro); }
+.lista-notas span { font-size: 13px; color: var(--texto-dim); white-space: pre-wrap; }
+.nota-sala { display: grid; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--texto-dim); }
+.nota-sala textarea {
+  background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px;
+  padding: 7px; font: 13px var(--corpo); resize: vertical; min-height: 70px;
+}
+.nota-sala textarea:focus { outline: none; border-color: var(--roxo); }
+.nota-status { display: block; font: 11px var(--mono); color: var(--ok); min-height: 14px; margin-top: 2px; }
+.sala.com-nota .sala-rotulo::after {
+  content: '✎ anotação'; display: inline-block; margin-top: 6px;
+  font: 13px var(--mono); color: #ffe08a; background: rgba(0,0,0,.45);
+  padding: 1px 6px; border-radius: 4px; border: 1px solid #806a2a;
+}
+.alerta-mini { color: #ff9fb2; }
+
+/* ciclo diário */
+.ciclo-topo { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.ciclo-dia {
+  background: #1b1526; border: 1px solid var(--roxo); border-radius: 6px;
+  padding: 3px 10px; font: 13px var(--mono); color: var(--roxo-claro);
+}
+.ciclo-dia b { font: 18px var(--display); color: #fff; margin-left: 2px; }
+.ciclo-hoje { font-size: 13px; color: var(--texto-dim); }
+.ciclo-hoje b { color: #fff; }
+.ciclo-info { margin: 0; }
+.ciclo-hist { margin: 0; font-family: var(--mono); font-size: 11px; }
+
+/* desfazer */
+.btn-desfazer {
+  position: absolute; left: 132px; bottom: 44px; z-index: 6;
+  background: rgba(18,15,26,.95); border: 1px solid var(--linha); border-radius: 8px;
+  padding: 8px 14px; font-family: var(--mono); font-size: 15px;
+}
+.btn-desfazer:hover { border-color: var(--roxo); color: var(--roxo-claro); }
+
+/* seções do painel que abrem e fecham */
+.bloco h2.dobra { cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.bloco h2.dobra::after { content: '▾'; font-size: 13px; color: var(--texto-dim); transition: transform .15s; }
+.bloco.fechado h2.dobra { margin-bottom: 0; }
+.bloco.fechado h2.dobra::after { transform: rotate(-90deg); }
+.bloco.fechado > :not(h2) { display: none !important; }
+
+/* painel lateral escondido (computador) */
+.so-desktop { display: inline-block; }
+body.painel-fechado .corpo { grid-template-columns: 92px 1fr 0; }
+body.painel-fechado .painel { display: none; }
+
+/* alça do painel no celular */
+.painel-alca { display: none; }
+
+/* toque: alvos maiores em qualquer tela de toque */
+@media (pointer: coarse) {
+  .ficha-cabeca { position: relative; }
+  .ficha-cabeca::before { content: ''; position: absolute; inset: -14px; border-radius: 50%; }
+  .camera button { height: 46px; font-size: 17px; }
+  .btn-fantasma { padding: 9px 14px; }
+  .quebras-botoes .btn-fantasma, .diario-ctrl .btn-fantasma { padding: 8px 12px; }
+  .ordem-persg button { height: 30px; font-size: 12px; }
+  .lista-seres li { padding: 9px 6px; }
+}
+
+@media (max-width: 860px) {
+  .so-desktop { display: none !important; }
+  body.painel-fechado .corpo { grid-template-columns: 1fr; }
+  body.painel-fechado .painel { display: block; }
+  .btn-painel { font-size: 15px; padding: 9px 14px; border-color: var(--roxo); background: var(--roxo-escuro); }
+  .painel { height: 80%; padding-top: 30px; }
+  .painel-alca {
+    display: block; position: absolute; left: 0; right: 0; top: 0; height: 26px;
+    background: none; border: 0; touch-action: none;
+  }
+  .painel-alca span { display: block; width: 52px; height: 5px; border-radius: 3px; background: var(--roxo); margin: 9px auto 0; opacity: .8; }
+  .camera { grid-template-columns: repeat(4, 48px); gap: 6px; }
+  .camera button { height: 46px; font-size: 17px; }
+  .btn-dados { left: 10px; bottom: 112px; padding: 11px 16px; font-size: 16px; }
+  .btn-desfazer { left: 128px; bottom: 112px; padding: 11px 14px; font-size: 16px; }
+  .painel-dados { bottom: 168px; }
+  .painel-dados input, .dados-campos input { font-size: 18px; padding: 10px; }
+  .painel-dados .btn-roxo, .painel-dados .btn-fantasma { padding: 12px; font-size: 16px; }
+  .cartao { bottom: 166px; max-height: 45vh; overflow-y: auto; }
+  .cartao .acoes button, .cartao .acoes select { font-size: 14px; padding: 8px 10px; }
+  .faixa-persg, .faixa-protocolo { font-size: 12px; letter-spacing: .06em; }
+  .minha-vez .btn-fantasma { width: 100%; padding: 12px; }
+  .lista-diario { max-height: 260px; }
+}
+.quebras.ciclo { padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #0b0910; border: 1px solid var(--linha); }
