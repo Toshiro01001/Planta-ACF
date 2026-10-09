@@ -92,12 +92,12 @@ const ZONA_NEUTRA_ISENTA = true;
 const SERES = [
   // Cobaias dos jogadores
   { id: 'faca',     tipo: 'cobaia', codigo: 'FHP-001', nome: 'Faca',     jogador: 'Nathalie Costa',  cor: '#27c46b', img: 'img/faca.jpg' },
-  { id: 'sabonete', tipo: 'cobaia', codigo: 'FHP-002', nome: 'Sabonete', jogador: 'Lucas Matheus',   cor: '#ff7a45', img: 'img/sabonete.jpg' },
+  { id: 'sabonete', tipo: 'cobaia', codigo: 'FHP-002', nome: 'Sabonete', jogador: 'Lucas Matheus',   cor: '#fff15a', img: 'img/sabonete.jpg' },
   { id: 'mostarda', tipo: 'cobaia', codigo: 'FHP-003', nome: 'Mostarda', jogador: 'Carlos André',    cor: '#e5b81e', img: 'img/mostarda.jpg' },
   { id: 'papelao',  tipo: 'cobaia', codigo: 'FHP-004', nome: 'Papelão',  jogador: 'André Carvalho',  cor: '#b98656', img: 'img/papelao.jpg' },
-  { id: 'papel',    tipo: 'cobaia', codigo: 'FHP-005', nome: 'Papel',    jogador: 'Danton Melo',     cor: '#22d3e6', img: 'img/papel.jpg' },
-  { id: 'luva',     tipo: 'cobaia', codigo: 'FHP-006', nome: 'Luva',     jogador: 'Gabriel Padilha', cor: '#3d7bff', img: 'img/luva.jpg' },
-  { id: 'velcro',   tipo: 'cobaia', codigo: 'FHP-007', nome: 'Velcro',   jogador: 'Ricardo Filho',   cor: '#ff5ca8', img: 'img/velcro.jpg' },
+  { id: 'papel',    tipo: 'cobaia', codigo: 'FHP-005', nome: 'Papel',    jogador: 'Danton Melo',     cor: '#111111', contorno: '#e8e8e8', img: 'img/papel.jpg' },
+  { id: 'luva',     tipo: 'cobaia', codigo: 'FHP-006', nome: 'Luva',     jogador: 'Gabriel Padilha', cor: '#ff7a1a', img: 'img/luva.jpg' },
+  { id: 'velcro',   tipo: 'cobaia', codigo: 'FHP-007', nome: 'Velcro',   jogador: 'Ricardo Filho',   cor: '#f5f5f5', img: 'img/velcro.jpg' },
 
   // Cobaias NPC (só aparecem quando o mestre coloca no mapa)
   { id: 'risa',        tipo: 'npc', codigo: 'FHP-008', nome: 'Risa',        cor: '#a3ff3c', img: 'img/risa.jpg' },
