@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009d';
+const VERSAO_SITE = '20261009e';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -3180,27 +3180,14 @@ function desenharPortas(paredes) {
     const secreto = verSegredo && !revelado ? obstaculoDe(andarAtual, ci) : null;
     const b = barreira(c);
     const chao = el('div', 'porta-chao porta-' + t, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
-    chao.innerHTML = revelado ? `<span>${SINAL_PORTA[digitada(pub) ? 'tk' : pub]}</span>` : '';
+    // porta fechada: botão vermelho simples (2D), flutuando acima da porta
+    chao.innerHTML = revelado ? `<span>${SINAL_PORTA[digitada(pub) ? 'tk' : pub]}</span>` : `<i class="botao-2d${t === 'p' ? ' apertado' : ''}"></i>`;
     if (secreto) chao.innerHTML += `<em class="porta-secreta" title="Só você vê: ${TIPOS_PORTA[secreto]}">${SINAL_PORTA[secreto]}</em>`;
     stage.appendChild(chao);
     const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
     const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
     pw.classList.add('porta-parede', 'porta-' + t);
     paredes.push(pw);
-    // botão vermelho em 3D, preso nas paredes do corredor dos dois lados da porta
-    if (t === 'f' || t === 'p' || pub === 'tk' || digitada(pub)) {
-      const placas = c.eixo === 'v'
-        ? [c.x + 0.03, c.x + c.w - 0.03].flatMap(xp => [[xp, ym - 0.55, xp, ym - 0.25], [xp, ym + 0.25, xp, ym + 0.55]])
-        : [c.y + 0.03, c.y + c.h - 0.03].flatMap(yp => [[xm - 0.55, yp, xm - 0.25, yp], [xm + 0.25, yp, xm + 0.55, yp]]);
-      placas.forEach(([x1, y1, x2, y2]) => {
-        const pl = parede(x1, y1, x2, y2);
-        pl.classList.add('botao-parede');
-        if (t === 'p') pl.classList.add('apertado');
-        if (pub === 'tk' || digitada(pub)) pl.classList.add('teclado');
-        pl.innerHTML = '<i class="botao-3d"></i>';
-        paredes.push(pl);
-      });
-    }
   });
 }
 // a cobaia precisa estar numa das duas salas ligadas pelo corredor (ou dentro dele)
