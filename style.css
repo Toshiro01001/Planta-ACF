@@ -1139,11 +1139,11 @@ body.espiando .viewport { box-shadow: inset 0 0 0 3px #3ddc97; }
    PRÉVIA DO CAMINHO
    ========================================================= */
 .previa-svg { position: absolute; left: 0; top: 0; transform: translateZ(1.8px); pointer-events: none; overflow: visible; }
-.previa-linha { fill: none; stroke: var(--cor-trilha, #f5c84c); stroke-width: 4; stroke-dasharray: 10 8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 5px var(--cor-trilha, #f5c84c)); }
+.previa-linha { fill: none; stroke: var(--cor-trilha, #f5c84c); stroke-width: 4; stroke-dasharray: 10 8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 5px var(--brilho-trilha, var(--cor-trilha, #f5c84c))); }
 .previa-rotulo { position: absolute; width: 0; height: 0; transform: translateZ(34px); transform-style: preserve-3d; pointer-events: none; }
 .previa-rotulo span {
   position: absolute; left: 22px; top: -36px; white-space: nowrap; font: 15px var(--mono); padding: 2px 8px; border-radius: 5px;
-  background: rgba(7,6,10,.92); border: 1px solid var(--cor-trilha, #f5c84c); color: #fff;
+  background: rgba(7,6,10,.92); border: 1px solid var(--brilho-trilha, var(--cor-trilha, #f5c84c)); color: #fff;
   transform: rotateZ(calc(var(--rot) * -1)) rotateX(calc(var(--tilt) * -1)) scale(var(--k, 1)); transform-origin: 0 100%;
 }
 .previa-rotulo.no-limite span { border-color: #ff3b5c; color: #ffb3c0; }
@@ -1339,3 +1339,8 @@ body.em-replay .ficha { opacity: .12; }
   .abas-mestre { grid-template-columns: repeat(4, 1fr) 36px; }
   .abas-mestre .fechar-abas { background: none; border: 0; font-size: 24px; color: var(--texto); padding: 0; }
 }
+
+/* fichas de cor escura (ex.: Papel, preto): contorno claro para aparecer no mapa */
+.ficha.escura .ficha-cabeca { box-shadow: 0 0 0 2px var(--contorno), 0 0 12px var(--contorno); }
+.ficha.escura .ficha-nome { border-color: var(--contorno); }
+.ficha.escura .ficha-haste { background: var(--contorno); }

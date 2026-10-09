@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009h';
+const VERSAO_SITE = '20261009i';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1036,6 +1036,8 @@ function desenharFichas() {
       f = el('div', 'ficha ' + s.tipo);
       f.dataset.id = id;
       f.style.setProperty('--cor', s.cor);
+      // cor escura (ex.: preto): ganha um contorno claro para aparecer no mapa escuro
+      if (s.contorno) { f.classList.add('escura'); f.style.setProperty('--contorno', s.contorno); }
       f.innerHTML = `<div class="ficha-sombra"></div>
         <div class="ficha-pino">
           <span class="ficha-nome"></span>
@@ -4127,6 +4129,8 @@ function previaInicio(tk) {
   // a trilha tem a cor da ficha que está andando
   const cor = (SER[tk.s] || {}).cor;
   if (cor) { svg.style.setProperty('--cor-trilha', cor); rot.style.setProperty('--cor-trilha', cor); }
+  const contorno = (SER[tk.s] || {}).contorno;
+  if (contorno) { svg.style.setProperty('--brilho-trilha', contorno); rot.style.setProperty('--brilho-trilha', contorno); }
   stage.appendChild(svg); stage.appendChild(rot);
   previa = { svg, linha, rot, pts: [{ x: tk.x, y: tk.y }], total: 0 };
 }
