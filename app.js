@@ -3841,7 +3841,8 @@ function itensLoja() {
 }
 const imgsLoja = {};
 function imagemDoItem(it, imgEl) {
-  if (it.img) { imgEl.src = it.img; return; }
+  // as imagens da loja ficam direto em img/ (versões antigas gravaram img/loja/)
+  if (it.img) { imgEl.src = it.img.replace('img/loja/', 'img/'); return; }
   if (!it.imgId) { imgEl.remove(); return; }
   if (imgsLoja[it.imgId]) { imgEl.src = imgsLoja[it.imgId]; return; }
   Rede.once('lojaImg/' + it.imgId).then(d => { if (d) { imgsLoja[it.imgId] = d; imgEl.src = d; } else imgEl.remove(); }).catch(() => imgEl.remove());
