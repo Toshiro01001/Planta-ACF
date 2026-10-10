@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010r';
+const VERSAO_SITE = '20261010s';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -305,7 +305,7 @@ const Segredos = {
     if (Store.modo === 'firebase') {
       if (this.ref) return;
       this.ref = Store.db.ref('segredos');
-      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; atualizarTudo(); agendarSincMestre(); }, () => {});
+      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; document.dispatchEvent(new Event('acf-segredos')); atualizarTudo(); agendarSincMestre(); }, e => { console.error('segredos:', e && e.message); });
     } else {
       try { this.dados = JSON.parse(localStorage.getItem('acf-segredos') || '{}'); } catch (e) { this.dados = {}; }
       this.pronto = true;
@@ -1529,6 +1529,12 @@ function desenharSons() {
 }
 
 function atualizarTudo() {
+  // os módulos extras redesenham mesmo se alguma parte do painel falhar
+  try { atualizarTudoPainel(); }
+  catch (e) { console.error('atualizarTudo:', e); }
+  finally { document.dispatchEvent(new Event('acf-tudo')); }
+}
+function atualizarTudoPainel() {
   desenharSons();
   desenharListaCores();
   desenharKitAux();
@@ -1569,7 +1575,6 @@ function atualizarTudo() {
   desenharBalanca();
   desenharEco();
   atualizarBotaoMinha();
-  document.dispatchEvent(new Event('acf-tudo'));   // módulos extras (ferramentas.js) redesenham junto
 }
 
 /* =========================================================
