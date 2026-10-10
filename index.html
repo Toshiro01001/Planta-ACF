@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261010n">
+<link rel="stylesheet" href="style.css?v=20261010o">
 </head>
 <body>
 
@@ -136,6 +136,7 @@
       <div id="minhaFicha" class="minha-ficha"></div>
       <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
       <button id="btnArquivo" class="btn-fantasma btn-arquivo">📜 Arquivo da O.R.F.E.U. <span class="n" hidden></span></button>
+      <button id="btnMinhaCor" class="btn-fantasma btn-cor" hidden><span class="pinta"></span>🎨 Cor da minha cobaia</button>
       <div id="zonaJogador" class="zona-jogador"></div>
     </section>
 
@@ -161,9 +162,23 @@
 
     <section class="bloco" id="blocoSons" hidden>
       <h2>Sons na Caixa</h2>
-      <p class="mini">Você não enxerga as cobaias. As salas com gente pulsam em vermelho, mais forte quanto mais barulho, e piscam quando alguém se move ali. As marcas apagadas são o rastro: onde algo foi ouvido nos últimos minutos.</p>
+      <p class="mini">Você não enxerga as cobaias e não sabe a sala exata. O barulho aparece como uma mancha vermelha borrada perto de onde veio, mais forte quanto mais gente, e pulsa quando alguém se move. Cada Filho e o seu robô ganham uma seta para o som mais forte. Manchas apagadas são o rastro dos últimos minutos. Norte é o topo da planta.</p>
+      <ul id="escutaAux" class="escuta-aux"></ul>
       <p class="mini">Segure o dedo (ou o botão do mouse) num ponto do mapa para marcar um lugar para os outros auxiliares e o Mestre.</p>
       <div class="lote-filhos"><button id="btnIniFilhosAux" class="btn-fantasma">🎲 Rolar iniciativa dos Filhos deste andar</button><label>bônus <input id="bonusFilhosAux" type="number" value="0"></label></div>
+    </section>
+
+    <section class="bloco" id="blocoKitAux" hidden>
+      <h2>Kit do auxiliar</h2>
+      <h3>Filhos da O.R.F.E.U.</h3>
+      <p class="mini">Cada toque coloca mais um, oculto dos jogadores, numa sala sorteada do andar aberto. No cartão do Filho dá para tirar (enquanto ainda estiver oculto) e mudar a cor.</p>
+      <div id="trayFilhosAux" class="tray"></div>
+      <div class="kit-botoes"><button data-kit="fichas" class="btn-fantasma">📋 Ameaças e Filhos</button><button data-kit="escudo" class="btn-fantasma">📜 Escudo do Mestre</button></div>
+      <h3>Rolagem secreta</h3>
+      <div class="mesa-linha"><input id="rolAuxExpr" value="1d20" aria-label="Expressão"><button data-kit="rolar">Rolar</button></div>
+      <p id="rolAuxRes" class="mini"></p>
+      <h3>Cores</h3>
+      <div id="coresAux"></div>
     </section>
 
     <section class="bloco" id="blocoRuido" data-aba="sessao">
@@ -193,6 +208,12 @@
       <h3>Mover em grupo</h3>
       <p class="mini">Shift+clique nas fichas para selecionar várias; arraste uma delas e o grupo vai junto. Esc limpa a seleção. No cartão de uma sala, "Trazer o grupo para cá" e "Trazer todas as cobaias para cá".</p>
       <p id="grupoInfo" class="mini grupo-info" hidden></p>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoCoresM" data-aba="mapa" hidden>
+      <h2>Cores</h2>
+      <p class="mini">Toque num personagem para escolher uma cor pronta ou qualquer cor no espectro. Vale para o mapa, o chat, os retratos e as fichas. Cada jogador também muda a da própria cobaia, e os auxiliares, a dos Filhos e do próprio robô.</p>
+      <div id="listaCores"></div>
     </section>
 
     <section class="bloco mestre-only" id="blocoSalasM" data-aba="mapa" hidden>
@@ -639,13 +660,13 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261010n"></script>
-<script src="config.js?v=20261010n"></script>
-<script src="app.js?v=20261010n"></script>
-<script src="catalogo-op.js?v=20261010n"></script>
-<script src="fichas.js?v=20261010n"></script>
-<script src="quadro.js?v=20261010n"></script>
-<script src="mesa.js?v=20261010n"></script>
-<script src="arquivo.js?v=20261010n"></script>
+<script src="data.js?v=20261010o"></script>
+<script src="config.js?v=20261010o"></script>
+<script src="app.js?v=20261010o"></script>
+<script src="catalogo-op.js?v=20261010o"></script>
+<script src="fichas.js?v=20261010o"></script>
+<script src="quadro.js?v=20261010o"></script>
+<script src="mesa.js?v=20261010o"></script>
+<script src="arquivo.js?v=20261010o"></script>
 </body>
 </html>

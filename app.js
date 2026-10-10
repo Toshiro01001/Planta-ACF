@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010n';
+const VERSAO_SITE = '20261010o';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -178,6 +178,7 @@ const Store = {
     } catch (e) {}
     setSync('modo local', '');
     Arquivos.ligar();
+    Cores.ligar();
     this.avisar();
   },
 
@@ -229,6 +230,7 @@ const Store = {
       this.avisar();
     });
     Arquivos.ligar();
+    Cores.ligar();
   },
 
   // junta o mapa público com as fichas ocultas (estas só chegam ao Mestre e aos auxiliares)
@@ -481,8 +483,12 @@ function recusaLocal(caminho, valor) {
     const n = (Store.state.estoque || {})[caminho[1]];
     return typeof n === 'number' && valor === n - 1 && valor >= 0 ? '' : 'A despensa não tem mais isso hoje.';
   }
+  if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
+  // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
+  if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f\d+-\d+$/.test(caminho[1])) return '';
+  if (aux && atual && !valor && SER[atual.s] && SER[atual.s].tipo === 'filho') return atual.h ? '' : 'Este Filho já foi revelado aos jogadores: só o Mestre tira do mapa.';
   if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar fichas do mapa.';
   if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover essa ficha.';
   const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
@@ -1329,6 +1335,8 @@ function desenharCartao() {
     </div>`;
   }
 
+  if (!mestre && aux && s.tipo === 'filho') acoes = `<div class="acoes">${tk.h ? '<button data-acao="remover-aux">Tirar do mapa</button>' : '<p class="mini">Revelado aos jogadores: só o Mestre tira do mapa.</p>'}</div>`;
+  if (podeCor(s.id)) acoes += `<div class="acoes"><button data-acao="cor" class="btn-cor"><span class="pinta" style="--cor:${s.cor}"></span>Mudar a cor de ${esc(s.nome)}</button></div>`;
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
   const condMestre = mestre && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
@@ -1346,6 +1354,8 @@ function desenharCartao() {
   if (condMestre) ligarCondMestre(c, selecionado);
 
   $('.fechar', c).onclick = () => selecionar(null);
+  const bcor = $('[data-acao="cor"]', c); if (bcor) bcor.onclick = () => Cores.escolher(s.id, bcor);
+  const brx = $('[data-acao="remover-aux"]', c); if (brx) brx.onclick = () => { const id = selecionado; if (!confirm('Tirar este Filho do mapa?')) return; selecionar(null); Store.definir(['tokens', id], null); };
   if (mestre) {
     $('[data-acao="ocultar"]', c).onclick = () => Store.definir(['tokens', selecionado], { ...tk, h: !tk.h });
     const bvf = $('[data-acao="vf"]', c);
@@ -1501,13 +1511,8 @@ function desenharSons() {
     const e = elDe(gr, k);
     if (e) alvo.set(e, Math.max(alvo.get(e) || 0, nivelDe(gr.ids.length + (gr.extra || 0))));
   });
-  if (ouvinte) {
-    $$('.sala, .corredor', stage).forEach(e => {
-      const n = alvo.get(e) || 0;
-      e.classList.toggle('som', n > 0);
-      e.style.setProperty('--som', n);
-    });
-  }
+  if (ouvinte) desenharEscuta(grupos);
+  else $$('.eco-zona, .eco-seta', stage).forEach(e => e.remove());
   // pulso quando uma cobaia se mexe
   Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
     if (!SER[tk.s] || SER[tk.s].tipo !== 'cobaia') return;
@@ -1516,15 +1521,17 @@ function desenharSons() {
     if (!ouvinte || !antes || antes === ultimaPos[id] || tk.a !== andarAtual) return;
     const p = salaEm(tk.a, tk.x, tk.y);
     if (p === 25 && ZONA_NEUTRA_ISENTA) return;
-    let e = p ? $(`.sala[data-cn="${cnDe(andarAtual, p)}"]`, stage) : null;
-    if (!p) { const ci = CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)); e = ci >= 0 ? $(`.corredor[data-ci="${ci}"]`, stage) : null; }
-    if (e) { e.classList.remove('pulso'); void e.offsetWidth; e.classList.add('pulso'); }
-    marcarRastro(tk.a, p, p ? null : CORREDORES.findIndex(c => dentro(c, tk.x, tk.y)));
+    // movimento: a mancha de som daquele lugar pulsa (sem dizer a sala)
+    const k = p ? `${tk.a}:${p}` : `corr:${id}`;
+    const ec = ecos[k];
+    if (ec) { ec.pulso = Date.now(); const e = $(`.eco-zona[data-k="${k}"]`, stage); if (e) { e.classList.remove('pulso'); void e.offsetWidth; e.classList.add('pulso'); } }
   });
 }
 
 function atualizarTudo() {
   desenharSons();
+  desenharListaCores();
+  desenharKitAux();
   desenharPerseguicao();
   verificarPedidoIniciativa();
   desenharRuido();
@@ -4269,7 +4276,78 @@ function desenharRastros() {
     if (vivo) e.style.setProperty('--rastro', (1 - (agora - t) / RASTRO_MS).toFixed(2));
   });
 }
-setInterval(() => { if (aux && !mestre) desenharRastros(); }, 5000);
+setInterval(() => { if (aux && !mestre) desenharEscuta(gruposDeSala()); }, 3000);
+
+/* =========================================================
+   ESCUTA DOS AUXILIARES
+   Os Filhos têm noção de onde vem o barulho, nunca da sala exata.
+   Cada fonte vira uma mancha borrada, deslocada ao acaso (muda a cada 45 s),
+   e cada Filho e o robô do auxiliar ganham uma seta apontando o som mais forte.
+   O que foi ouvido nos últimos minutos fica como mancha apagada (o rastro).
+   ========================================================= */
+const ecos = {};   // chave do grupo -> { a, x, y, n, ts, pulso }
+function sorteioEco(txt) { let h = 2166136261; for (const c of String(txt)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; }
+function centroEco(gr, k) {
+  let c;
+  if (gr.p) { const r = retSala(gr.p); c = { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }
+  else { const tk = (Store.state.tokens || {})[k.slice(5)]; if (!tk) return null; c = { x: tk.x, y: tk.y }; }
+  const r = sorteioEco(k + ':' + Math.floor(Date.now() / 45000));
+  const ang = r() * Math.PI * 2, dist = R * (0.35 + r() * 0.45);
+  return { x: c.x + Math.cos(ang) * dist, y: c.y + Math.sin(ang) * dist };
+}
+const ROSA = ['leste', 'sudeste', 'sul', 'sudoeste', 'oeste', 'noroeste', 'norte', 'nordeste'];
+const rumo = (dx, dy) => ROSA[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
+const faixaDist = d => { const s = d / (R + G); return s < 1.3 ? 'muito perto' : s < 2.6 ? 'perto' : s < 4 ? 'a algumas salas' : 'longe'; };
+const INTENS = ['', 'baixo', 'médio', 'alto', 'forte', 'ensurdecedor'];
+function desenharEscuta(grupos) {
+  if (!stage || !(aux && !mestre)) return;
+  const agora = Date.now();
+  grupos.forEach((gr, k) => {
+    if (gr.a !== andarAtual) return;
+    const n = nivelDe(gr.ids.length + (gr.extra || 0)); if (!n) return;
+    const c = centroEco(gr, k); if (!c) return;
+    ecos[k] = { ...(ecos[k] || {}), a: gr.a, x: c.x, y: c.y, n, ts: agora };
+  });
+  // manchas
+  const vivas = new Set();
+  Object.entries(ecos).forEach(([k, e]) => {
+    const idade = agora - e.ts;
+    if (e.a !== andarAtual || idade > RASTRO_MS) { if (idade > RASTRO_MS) delete ecos[k]; return; }
+    vivas.add(k);
+    let d = $(`.eco-zona[data-k="${k}"]`, stage);
+    if (!d) { d = el('div', 'eco-zona'); d.dataset.k = k; stage.appendChild(d); }
+    d.style.left = px(e.x); d.style.top = px(e.y);
+    const atual = idade < 4000;
+    d.classList.toggle('rastro', !atual);
+    d.style.setProperty('--som', atual ? e.n : 0);
+    d.style.setProperty('--rastro', atual ? 1 : (1 - idade / RASTRO_MS).toFixed(2));
+  });
+  $$('.eco-zona', stage).forEach(d => { if (!vivas.has(d.dataset.k)) d.remove(); });
+  // setas nos Filhos e no robô do auxiliar
+  const atuais = Object.values(ecos).filter(e => e.a === andarAtual && agora - e.ts < 4000);
+  const ouvintes = Object.entries(Store.state.tokens || {}).filter(([id, tk]) => tk.a === andarAtual && SER[tk.s] && (SER[tk.s].tipo === 'filho' || tk.s === aux) && visivelPara(tk));
+  const setas = new Set();
+  const linhas = [];
+  ouvintes.forEach(([id, tk]) => {
+    let melhor = null;
+    atuais.forEach(e => { const dist = Math.hypot(e.x - tk.x, e.y - tk.y); const nota = e.n / Math.max(1, dist); if (!melhor || nota > melhor.nota) melhor = { e, dist, nota }; });
+    if (!melhor) return;
+    setas.add(id);
+    let s = $(`.eco-seta[data-id="${id}"]`, stage);
+    if (!s) { s = el('div', 'eco-seta'); s.dataset.id = id; s.innerHTML = '<i></i>'; stage.appendChild(s); }
+    s.style.left = px(tk.x); s.style.top = px(tk.y);
+    s.style.setProperty('--ang', (Math.atan2(melhor.e.y - tk.y, melhor.e.x - tk.x) * 180 / Math.PI + 90).toFixed(0) + 'deg');
+    s.style.setProperty('--som', melhor.e.n);
+    const sr = SER[tk.s];
+    linhas.push(`<li style="--cor:${sr.cor}"><b>${esc(sr.tipo === 'filho' ? `${sr.codigo} ${sr.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : sr.nome)}</b> ouve um som ${INTENS[melhor.e.n]} ao <b>${rumo(melhor.e.x - tk.x, melhor.e.y - tk.y)}</b>, ${faixaDist(melhor.dist)}</li>`);
+  });
+  $$('.eco-seta', stage).forEach(s => { if (!setas.has(s.dataset.id)) s.remove(); });
+  const lista = $('#escutaAux');
+  if (lista) {
+    const html = linhas.length ? linhas.join('') : `<li class="vazio">${atuais.length ? 'Coloque um Filho neste andar para saber a direção do som.' : 'Silêncio neste andar.'}</li>`;
+    if (lista.dataset.html !== html) { lista.innerHTML = html; lista.dataset.html = html; }
+  }
+}
 
 /* =========================================================
    INICIATIVA DOS FILHOS EM LOTE
@@ -4391,10 +4469,11 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Segure o dedo num ponto</b> do mapa para avisar o Mestre: "quero ir para cá".</li>
     <li><b>🎲 Dados:</b> quantos d20, bônus e desvantagem.</li>
     <li><b>Perseguição:</b> só quem está na vez se move, até o limite de metros. O celular vibra na sua vez.</li>
-    <li><b>Painel:</b> sua ficha, a Loja do Maurício e o seu Caderno (só fica no seu aparelho).</li></ul>`;
+    <li><b>Painel:</b> sua ficha, a Loja do Maurício e o seu Caderno (só fica no seu aparelho). <b>🎨 Cor da minha cobaia</b>: escolha uma cor pronta ou qualquer uma no espectro; vale para o mapa, o chat, o retrato e as fichas.</li></ul>`;
   const auxT = `<h3>Mestre Auxiliar</h3><ul>
     <li>Você move os <b>Filhos</b> e o seu robô. As cobaias ficam invisíveis até o Mestre revelar.</li>
-    <li>As salas com cobaias <b>brilham em vermelho</b> conforme o barulho; o <b>rastro</b> marca onde algo foi ouvido nos últimos minutos.</li>
+    <li>Os Filhos <b>não sabem a sala exata</b>: o barulho aparece como uma mancha vermelha borrada perto de onde veio, mais forte quanto mais gente, e cada Filho (e o seu robô) ganha uma <b>seta</b> para o som mais forte, com a direção e a distância aproximada no painel. Manchas apagadas são o <b>rastro</b> dos últimos minutos.</li>
+    <li><b>Kit do auxiliar</b> (painel): colocar Filhos ocultos no andar aberto (e tirar enquanto estiverem ocultos), fichas de <b>ameaças e Filhos</b> divididas com o Mestre (com o pedido de Presença Perturbadora), Escudo do Mestre, rolagem secreta e as cores dos Filhos e do seu robô.</li>
     <li><b>Segure o dedo num ponto</b> para marcar um lugar para os outros auxiliares e o Mestre.</li>
     <li>No painel, <b>rolar iniciativa dos Filhos</b> do andar aberto de uma vez. O canal <b>Filhos</b> do chat é só de vocês e do Mestre.</li></ul>`;
   const mes = `<h3>Mestre</h3><ul>
@@ -4937,6 +5016,80 @@ Store.aoMudar(() => {
   atualizarTudo();
 });
 
+/* =========================================================
+   CORES DOS PERSONAGENS
+   cores/<id> = '#rrggbb' (sem registro = cor original do data.js).
+   Jogador muda a da própria cobaia; auxiliar, a dos Filhos e do próprio robô; Mestre, todas.
+   ========================================================= */
+const podeCor = id => !!SER[id] && (mestre || (!!meu && id === meu) || (!!aux && (SER[id].tipo === 'filho' || id === aux)));
+const PALETA = ['#e03131', '#ff4d6d', '#f72585', '#c2255c', '#ff7a3d', '#fb8500', '#ffb703', '#ffd166', '#94d82d', '#2f9e44', '#2d6a4f', '#20c997', '#4cc9f0', '#1c7ed6', '#3b5bdb', '#7048e8', '#9c36b5', '#c77dff', '#e9ecef', '#adb5bd', '#6b705c', '#7f5539', '#343a40', '#111111'];
+const Cores = {
+  v: {}, off: null,
+  ligar() { if (this.off) return; this.off = Rede.on('cores', v => { this.v = v || {}; this.aplicar(); }, () => {}); },
+  aplicar() {
+    SERES.forEach(x => {
+      if (x.corPadrao === undefined) { x.corPadrao = x.cor; x.contornoPadrao = x.contorno; }
+      const nova = /^#[0-9a-fA-F]{6}$/.test(this.v[x.id] || '') ? this.v[x.id] : x.corPadrao;
+      x.cor = nova;
+      // cor muito escura ganha contorno claro para aparecer no mapa escuro
+      x.contorno = nova === x.corPadrao ? x.contornoPadrao : (luz(nova) < 0.12 ? '#d9d2e6' : undefined);
+    });
+    fichasDom.forEach((f, id) => {
+      const tk = (Store.state.tokens || {})[id]; const sr = tk && SER[tk.s]; if (!sr) return;
+      f.style.setProperty('--cor', sr.cor);
+      f.classList.toggle('escura', !!sr.contorno); if (sr.contorno) f.style.setProperty('--contorno', sr.contorno);
+    });
+    desenharTray(); atualizarTudo(); Store.avisar();
+    document.dispatchEvent(new Event('acf-cores'));
+  },
+  gravar(id, cor) {
+    if (!podeCor(id)) { aviso('Você não pode mudar a cor deste personagem.'); return; }
+    Rede.set('cores/' + id, cor && /^#[0-9a-fA-F]{6}$/.test(cor) ? cor.toLowerCase() : null).catch(erroGravacao);
+    if (Store.modo !== 'firebase') { if (cor) this.v[id] = cor.toLowerCase(); else delete this.v[id]; this.aplicar(); }
+  },
+  escolher(id, ancora) {
+    const x = SER[id]; if (!x) return;
+    let p = $('#corPop');
+    if (!p) { p = el('div', 'cor-pop'); p.id = 'corPop'; document.body.appendChild(p); document.addEventListener('pointerdown', ev => { if (!p.hidden && !p.contains(ev.target) && !ev.target.closest('[data-acao="cor"], [data-cor-de]')) p.hidden = true; }); }
+    p.dataset.id = id;
+    p.innerHTML = `<div class="cor-pop-topo"><span class="pinta" style="--cor:${x.cor};${x.img ? `background-image:url('${x.img}')` : ''}"></span><b>${esc(x.nome)}</b><button class="fechar" aria-label="Fechar">×</button></div>
+      <div class="cor-grade">${PALETA.map(c => `<button data-c="${c}" style="--c:${c}" class="${c === x.cor ? 'on' : ''}" aria-label="Cor ${c}"></button>`).join('')}</div>
+      <label class="cor-espectro"><span>Espectro</span><input type="color" value="${/^#[0-9a-fA-F]{6}$/.test(x.cor) ? x.cor : '#8b5cf6'}"><output>${x.cor}</output></label>
+      <div class="cor-pop-acoes"><button data-c="">Voltar à cor original</button></div>`;
+    p.hidden = false;
+    const r = ancora ? ancora.getBoundingClientRect() : { left: innerWidth / 2 - 130, bottom: innerHeight / 2 - 120, top: 0 };
+    const w = Math.min(280, innerWidth - 16);
+    p.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + 'px';
+    p.style.top = Math.max(8, Math.min(innerHeight - 330, r.bottom + 6)) + 'px';
+    $('.fechar', p).onclick = () => { p.hidden = true; };
+    $$('[data-c]', p).forEach(b => b.onclick = () => { this.gravar(id, b.dataset.c); p.hidden = true; });
+    const ip = $('input[type=color]', p);
+    ip.oninput = () => { $('output', p).textContent = ip.value; };
+    ip.onchange = () => { this.gravar(id, ip.value); };
+  },
+};
+function luz(hex) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+// lista de cores para o Mestre (todos) e para o auxiliar (Filhos e o próprio robô)
+function desenharListaCores() {
+  const caixa = $('#listaCores'), caixaAux = $('#coresAux');
+  const botao = x => `<button data-cor-de="${x.id}" title="Mudar a cor de ${esc(x.nome)}"><span class="pinta${x.tipo === 'filho' ? ' filho' : ''}" style="--cor:${x.cor};${x.img && x.tipo !== 'filho' ? `background-image:url('${x.img}')` : ''}"></span>${esc(x.tipo === 'filho' ? x.codigo + ' ' + x.nome : x.nome)}</button>`;
+  const grupo = (t, lista) => lista.length ? `<h3>${t}</h3><div class="tray cores-tray">${lista.map(botao).join('')}</div>` : '';
+  if (caixa && mestre) {
+    const html = grupo('Cobaias', SERES.filter(x => x.tipo === 'cobaia')) + grupo('NPCs', SERES.filter(x => x.tipo === 'npc')) + grupo('Robôs S.T.A.F.F.', SERES.filter(x => x.tipo === 'robo')) + grupo('Filhos da O.R.F.E.U.', SERES.filter(x => x.tipo === 'filho'));
+    if (caixa.dataset.html !== html) { caixa.innerHTML = html; caixa.dataset.html = html; }
+  }
+  if (caixaAux && aux && !mestre) {
+    const html = grupo('Seu robô', SERES.filter(x => x.id === aux)) + grupo('Filhos', SERES.filter(x => x.tipo === 'filho'));
+    if (caixaAux.dataset.html !== html) { caixaAux.innerHTML = html; caixaAux.dataset.html = html; }
+  }
+  const bm = $('#btnMinhaCor');
+  if (bm) { bm.hidden = !meu || mestre; if (meu) { const pin = $('.pinta', bm); if (pin) pin.style.setProperty('--cor', SER[meu].cor); } }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cor-de]'); if (b) { Cores.escolher(b.dataset.corDe, b); return; }
+  if (e.target.closest('#btnMinhaCor') && meu) Cores.escolher(meu, e.target.closest('#btnMinhaCor'));
+});
+
 window.addEventListener('resize', () => enquadrar());
 
 (async function iniciar() {
@@ -4986,6 +5139,41 @@ function publicarVitais(v) {
   Store.definir(['tokens', quem], novo);
 }
 function enviarChat(texto, canal) { return Chat.enviar(texto, canal || 'geral', true); }
+
+/* =========================================================
+   KIT DO MESTRE AUXILIAR
+   Colocar Filhos (ocultos) no andar aberto, cores, fichas de ameaças e Filhos,
+   Escudo do Mestre e rolagem secreta. A escuta fica em desenharEscuta.
+   ========================================================= */
+function desenharKitAux() {
+  const bloco = $('#blocoKitAux'); if (!bloco) return;
+  bloco.hidden = !(aux && !mestre);
+  if (bloco.hidden) return;
+  const tokens = Store.state.tokens || {};
+  const html = SERES.filter(x => x.tipo === 'filho').map(x => {
+    const qtd = Object.values(tokens).filter(t => t.s === x.id).length;
+    return `<button data-filho-aux="${x.id}" title="Colocar mais um, oculto, numa sala sorteada deste andar"><span class="pinta filho" style="--cor:${x.cor}"></span>${x.codigo} ${esc(x.nome)}${qtd ? `<span class="qtd">×${qtd}</span>` : ''}</button>`;
+  }).join('');
+  const t = $('#trayFilhosAux');
+  if (t.dataset.html !== html) { t.innerHTML = html; t.dataset.html = html; }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-filho-aux]');
+  if (b && aux && !mestre) { colocar(b.dataset.filhoAux); aviso(`${SER[b.dataset.filhoAux].nome} entrou no ${andarAtual}º andar, oculto dos jogadores.`); return; }
+  const k = e.target.closest('[data-kit]'); if (!k || !(aux && !mestre)) return;
+  if (k.dataset.kit === 'fichas' && window.ACF_FICHAS) window.ACF_FICHAS.abrir('aux');
+  if (k.dataset.kit === 'escudo' && window.ACF_MESA) window.ACF_MESA.abrirEscudo();
+  if (k.dataset.kit === 'rolar') rolagemAux();
+});
+function rolagemAux() {
+  const ex = ($('#rolAuxExpr').value || '1d20').trim();
+  const F = window.ACF_FICHAS; if (!F) return;
+  const m = /^\s*(\d*)d20\s*([+-]\s*\d+)?\s*$/i.exec(ex);
+  let html;
+  if (m) { const t = F.rolarTeste(parseInt(m[1] || '1', 10), parseInt((m[2] || '0').replace(/\s/g, ''), 10)); html = `${t.dados.join(', ')} → ${t.desv ? 'menor' : 'maior'} ${t.esc} ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)} = <b>${t.total}</b>`; }
+  else { const r = F.rolarExpr(ex); html = `${esc(r.det)} = <b>${r.total}</b>`; }
+  $('#rolAuxRes').innerHTML = html + ` <small>${hora(Date.now()).slice(0, 5)}</small>`;
+}
 window.ACF = {
   Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som, COND, publicarVitais, enviarChat, condicoesVisiveis,
   get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), definir: (c, v) => Store.definir(c, v),
@@ -5006,5 +5194,7 @@ window.ACF = {
   redesenharCartao: () => { if (salaSel) desenharCartao(); },
   redesenharChat: () => { if (Chat.aberto) Chat.desenhar(); },
   diario: (k, t) => { try { Diario.registrar(k, t); } catch (e) {} },
+  escolherCor: (id, ancora) => Cores.escolher(id, ancora),
+  podeCor,
 };
 })();
