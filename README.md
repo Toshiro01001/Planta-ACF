@@ -11,6 +11,8 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `app.js` | O motor: desenha a planta, gira a câmera, arrasta as fichas, sincroniza |
 | `data.js` | Nomes das salas, elementos e lista de seres. **É aqui que se edita o conteúdo** |
 | `config.js` | Senhas (em hash) e a conexão com o Firebase |
+| `fichas.js` | Fichas de agente de Ordem Paranormal (botão 📋 Fichas) |
+| `catalogo-op.js` | Catálogo de habilidades, rituais, itens, melhorias e maldições usado nas fichas |
 | `img/` | Retratos das cobaias e o ícone da aba |
 
 ## Publicar no GitHub Pages
@@ -86,6 +88,16 @@ Diário, anotações, funções, Balança e a lista do apagão ficam em `segredo
 - **Jogadores:** linha tracejada com os metros ao arrastar; Caderno (só no aparelho); aviso de conexão perdida; botão **?** com a ajuda do seu perfil; botão **🔊** para desligar os sons.
 - **Mestre:** painel em abas (Mapa, Sessão, Registro, Segredos); "Ver pelos olhos de" um jogador ou auxiliar; gatilhos nas salas (alerta quando uma cobaia entra); cenas prontas; Shift+clique para mover em grupo e "Trazer todas as cobaias para cá"; resumo da sessão para imprimir ou salvar em PDF; lista de quem está conectado.
 - **Auxiliares:** rastro de som que vai apagando; sinal no mapa visível aos outros auxiliares e ao Mestre; iniciativa de todos os Filhos do andar de uma vez.
+
+## Fichas de agente (📋 Fichas, atalho F)
+
+Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias (o atributo de cada uma pode ser trocado), PV, SAN e PE (ou PD na regra de Determinação), defesa, esquiva e bloqueio, habilidades, rituais com DT e custo, inventário com patente, limite de itens por categoria, crédito, carga e melhorias ou maldições nos itens. Tudo que é calculado tem um campo de ajuste para regras da casa.
+
+- **Jogador:** cria e edita as próprias fichas. Cada ficha tem um código secreto (aparece dentro dela); em outro aparelho, "Abrir por código". Fichas de outra cobaia abertas por código ficam só para leitura.
+- **Mestre:** "Fichas dos jogadores" mostra todas, ao vivo, só para leitura (o Firebase recusa qualquer alteração vinda da conta do Mestre). "Minhas fichas" guarda NPCs e inimigos, que só o Mestre vê.
+- **Catálogo:** habilidades por classe, trilha, origem, poderes paranormais e homebrew; rituais por elemento e círculo; itens por tipo e fonte. A aba "Minhas" reúne o que você criou nas suas fichas, para reaproveitar.
+- **Exportar e importar:** cada ficha baixa um arquivo `.json` (cópia de segurança). "Importar arquivo" cria uma ficha nova a partir dele.
+- No Firebase, as fichas ficam em `agentes` (jogadores) e `agentesMestre` (Mestre). As regras novas estão no arquivo de regras entregue junto com esta versão.
 
 ## Salas dos andares 2 a 5
 
