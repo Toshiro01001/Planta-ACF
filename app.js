@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010s';
+const VERSAO_SITE = '20261010t';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -538,7 +538,12 @@ async function hash(txt) {
 
 let liberados = new Set();
 try { liberados = new Set(JSON.parse(localStorage.getItem('acf-andares') || '[]')); } catch (e) {}
-const salvarLiberados = () => { try { localStorage.setItem('acf-andares', JSON.stringify([...liberados])); } catch (e) {} };
+const salvarLiberados = () => { try { localStorage.setItem('acf-andares', JSON.stringify([...liberados])); localStorage.setItem('acf-andares-ver', JSON.stringify(liberadosVer)); } catch (e) {} };
+// "Trancar de novo": o Mestre sobe a versão da tranca do andar (mapa/trancaAndar); quem destrancou numa versão anterior volta a ver a senha
+let liberadosVer = {};
+try { liberadosVer = JSON.parse(localStorage.getItem('acf-andares-ver') || '{}') || {}; } catch (e) {}
+const nInt = v => Math.round(Number(v)) || 0;
+const versaoTranca = a => nInt((Store.state.trancaAndar || {})['a' + a]);
 
 let mestre = false;
 function definirMestre(sim) {
@@ -732,7 +737,7 @@ function esconderDica() { if (!dicaFeita) { dicaFeita = true; $('#dica').style.o
    DESENHO DA PLANTA
    ========================================================= */
 let andarAtual = 1;
-const podeVer = a => mestre || !!aux || liberados.has(a);
+const podeVer = a => mestre || !!aux || (liberados.has(a) && nInt(liberadosVer['a' + a]) >= versaoTranca(a));
 
 function el(tag, cls, estilo) {
   const e = document.createElement(tag);
@@ -1587,6 +1592,7 @@ $('#formSenha').addEventListener('submit', async e => {
   const ativa = (Store.state.senhasAndar || {})['a' + andarAtual] || SENHAS_ANDARES[andarAtual];
   if (h === ativa) {
     liberados.add(andarAtual);
+    liberadosVer['a' + andarAtual] = versaoTranca(andarAtual);
     salvarLiberados();
     montarAndar();
     atualizarTudo();
@@ -5023,6 +5029,8 @@ function desenharOpcoesLoja() {
    ========================================================= */
 Store.aoMudar(st => Diario.observar(st));
 Store.aoMudar(() => { verificarApagao(); focoInicialCelular(); agendarSincMestre(); });
+// o Mestre trancou de novo o andar aberto: a tela volta para a senha
+Store.aoMudar(() => { const el = $('#bloqueio'); if (el && !podeVer(andarAtual) && el.hidden) montarAndar(); });
 Store.aoMudar(() => {
   if (podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
   atualizarTudo();
@@ -5209,6 +5217,7 @@ window.ACF = {
   escolherCor: (id, ancora) => Cores.escolher(id, ancora),
   podeCor,
   hash, alertaMestre,
+  infoSala: cn => infoSala(Math.ceil(cn / 25), cn),
   get auxLogado() { return !!aux && (Store.modo !== 'firebase' || !!(Store.auth && Store.auth.currentUser && Store.auth.currentUser.email === EMAIL_AUXILIARES)); },
 };
 })();

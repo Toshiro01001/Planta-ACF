@@ -810,12 +810,22 @@ function desenharAba() {
   if (aba === 'habilidades') el.innerHTML = abaLista('hab', 'habilidades', d, ed);
   if (aba === 'rituais') el.innerHTML = abaRituais(d, ed);
   if (aba === 'inventario') el.innerHTML = abaInventario(d, ed);
-  if (aba === 'descricao') el.innerHTML = `<div class="fx-desc">
+  if (aba === 'descricao') el.innerHTML = `<div class="fx-desc">${htmlDividas(d)}
     <label>Anotações ${area('desc.anot', 4, 'Anotações pessoais do agente...')}</label>
     <label>Aparência ${area('desc.apar', 4)}</label><label>Personalidade ${area('desc.pers', 4)}</label>
     <label>Histórico ${area('desc.hist', 5)}</label><label>Objetivo ${area('desc.obj', 3)}</label></div>`;
   $$('details[data-id]', el).forEach(dt => { if (F.abertos.has(dt.dataset.id)) dt.open = true; });
   atualizarDerivados();
+}
+
+// preços cobrados pela Parede de Desejos: o texto fica na ficha; o Mestre marca "cobrado" em mapa/dividas
+function htmlDividas(d) {
+  const lista = Object.entries(d.dividas || {}).filter(([, x]) => x && x.p).sort((a, b) => num(b[1].ts) - num(a[1].ts));
+  if (!lista.length) return '';
+  const st = (A.estado || {}).dividas || {};
+  const pend = lista.filter(([k]) => st[k] !== 'pago').length;
+  return `<section class="fx-dividas"><h4>O que devo à Parede <small>${pend ? `${pend} pendente${pend > 1 ? 's' : ''}` : 'tudo cobrado'}</small></h4>
+    ${lista.map(([k, x]) => `<article class="${st[k] === 'pago' ? 'pago' : ''}"><header><b>${st[k] === 'pago' ? 'COBRADO' : 'PENDENTE'}</b> · preço ${int(x.n)} · ${new Date(num(x.ts)).toLocaleDateString('pt-BR')}</header><p class="fx-div-d">“${esc(x.d || '')}”</p><p class="fx-div-p">${esc(x.p)}</p></article>`).join('')}</section>`;
 }
 
 function abaCombate(d, ed) {
@@ -1109,6 +1119,9 @@ function adicionarDoCatalogo(i, minha) {
     F.abertos.add(c.itemId);
   }
   A.aviso(`"${x.n}" adicionado.`);
+  const at = F.atual;
+  if (at && at.editavel && !ehMestre() && (A.SER[at.d.dono] || {}).tipo === 'cobaia' && (c.tipo === 'rit' || (c.tipo === 'hab' && /^transcender$/i.test(String(x.n || '').trim()))))
+    document.dispatchEvent(new CustomEvent('acf-ficha-add', { detail: { s: at.d.dono, tipo: c.tipo, n: String(x.n || ''), c: int(x.c) || 1 } }));
   if (c.tipo === 'mods') { F.cat = null; $('#fxModal').hidden = true; }
   desenharAba();
 }
@@ -1522,6 +1535,8 @@ A.aoMudar(() => {
   verCena();
   if (F.aberto && F.tela === 'ficha') {
     atualizarGasto();
+    const dv = $('.fx-dividas');
+    if (dv && F.atual && F.atual.d) { const novo = htmlDividas(F.atual.d); if (dv.outerHTML !== novo) dv.outerHTML = novo; }
     // a Calculadora de NEX do Mestre mudou a exposição desta cobaia
     const o = $('.fx-nex-exp'), d = F.atual && F.atual.d;
     if (o && d) { const v = nexDe(d); if (o.textContent !== v + '%') { o.textContent = v + '%'; o.style.setProperty('--nexc', corNex(v)); o.classList.remove('pulsa'); void o.offsetWidth; o.classList.add('pulsa'); } }

@@ -675,26 +675,59 @@ function rolagemSecreta() {
   if ($('#mesaRolAvisa').checked) A.enviarChat('🎲 O Mestre rolou algo em segredo…', 'geral');
 }
 
-/* ---------- Escudo do Mestre (resumos das regras) ---------- */
-function abrirEscudo() {
-  let o = $('#escudoMestre');
-  if (!o) { o = document.createElement('div'); o.id = 'escudoMestre'; o.className = 'escudo'; document.body.appendChild(o); o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-esc="fechar"]')) o.hidden = true; }); }
+/* ---------- Escudo do Mestre (resumos das regras, separados em tópicos) ----------
+   O conteúdo fica em escudo.js (window.ACF_ESCUDO). Busca por palavra e um tópico por vez (ou todos). */
+const ESC = { top: ls.get('acf-escudo-top', 'todos'), busca: '' };
+const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function topicosEscudo() {
+  const base = ((window.ACF_ESCUDO || {}).topicos || []).map(t => ({ ...t, cards: t.cards.slice() }));
   const C = (FX() && FX().PATENTES) || [];
-  const t = (tit, linhas) => `<section><h3>${tit}</h3><table>${linhas.map(l => `<tr>${l.map((c, i) => `<${i ? 'td' : 'th'}>${c}</${i ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</table></section>`;
-  const p = (tit, itens) => `<section><h3>${tit}</h3><ul>${itens.map(x => `<li>${x}</li>`).join('')}</ul></section>`;
-  o.innerHTML = `<div class="escudo-caixa"><header><span>O.R.F.E.U. · USO DO MESTRE</span><h2>Escudo do Mestre</h2><button data-esc="fechar" aria-label="Fechar">×</button></header><div class="escudo-grade">
-    ${t('Dificuldades', [['Fácil', '5'], ['Média', '10'], ['Difícil', '15'], ['Muito difícil', '20'], ['Formidável', '25'], ['Heroica', '30'], ['Quase impossível', '35']])}
-    ${p('Dados', ['Teste: 1d20 por ponto do atributo, fica com o maior, soma o bônus da perícia.', 'Atributo 0: rola 2d20 e fica com o pior.', '+O é um d20 a mais; −O, um a menos.', 'Se as penalidades deixarem menos de 1 dado, rola como se fossem bônus e fica com o pior.', 'Treino: leigo +0, treinado +5, veterano +10, expert +15.'])}
-    ${t('Urgência da investigação', [['Muito baixa', '6 rodadas'], ['Baixa', '5'], ['Média', '4'], ['Alta', '3'], ['Muito alta', '2'], ['Procurar pistas', 'DT 15 simples · 20 complexa · 25+ vaga'], ['Opcional', 'a cada 3 falhas, −1 rodada']])}
-    ${p('Ferimentos e loucura', ['<b>Machucado</b>: metade dos PV ou menos (sem penalidade; pré-requisito de efeitos).', '<b>Morrendo</b>: 0 PV, inconsciente. Três turnos iniciados morrendo na mesma cena: morre. Medicina DT 20 (+5 por estabilização anterior na cena).', '<b>Perturbado</b>: menos da metade da SAN. Na primeira vez na cena, um efeito de insanidade (Tabela 5.1, p. 112).', '<b>Enlouquecendo</b>: SAN 0. Três turnos na mesma cena: insano, vira NPC. Diplomacia DT 20 (+5 por vez já acalmado) ou curar 1 de SAN.', '<b>Perda de vida</b>: reduz PV ignorando resistência a dano.'])}
-    ${p('Presença Perturbadora', ['Ao enxergar a criatura: Vontade contra a DT da ficha.', 'Falhou: sofre o dano mental. Passou: metade.', 'NEX igual ou acima do indicado: imune.', 'Várias criaturas: usa a de VD mais alto, +1d6 por criatura a mais.', 'Determinação: cada dado desce um passo e a quantidade cai à metade (arredonda para cima).'])}
-    ${p('Rituais', ['DT para resistir: 10 + limite de PE + Presença.', 'Custo: 1º círculo 1 PE · 2º 3 PE · 3º 6 PE · 4º 10 PE (formas avançadas somam o indicado).', '<b>Custo do Paranormal</b> (exceto Medo): Ocultismo DT 20 + custo. Falhou: perde SAN igual ao custo; por 5 ou mais, também 1 de SAN permanente.', '<b>Medo</b>: sempre perde SAN igual ao custo e 1 permanente (discente 2, verdadeiro 3).'])}
-    ${p('Condições', ['<b>Abalado</b> −O em testes (de novo: apavorado). <b>Apavorado</b> −OO em perícias e foge da fonte.', '<b>Fraco</b> −O em Agi, For e Vig (de novo: debilitado). <b>Debilitado</b> −OO nesses (de novo: inconsciente).', '<b>Frustrado</b> −O em Int e Pre (de novo: esmorecido). <b>Esmorecido</b> −OO nesses.', '<b>Desprevenido</b> −5 Defesa e −O Reflexos. <b>Vulnerável</b> −2 Defesa. <b>Indefeso</b> −10 Defesa, falha em Reflexos.', '<b>Cego</b> desprevenido e lento, −OO em perícias de Agi e For. <b>Ofuscado</b> −O em ataque e Percepção. <b>Surdo</b> −OO Iniciativa.', '<b>Caído</b> −OO em ataque corpo a corpo, desloc. 1,5m, −5 Def. corpo a corpo e +5 à distância.', '<b>Agarrado</b> desprevenido, imóvel, −O em ataque. <b>Enredado</b> lento, vulnerável, −O em ataque.', '<b>Fatigado</b> fraco e vulnerável. <b>Exausto</b> debilitado, lento e vulnerável.', '<b>Alquebrado</b> +1 PE em habilidades e rituais. <b>Lento</b> metade do deslocamento. <b>Enjoado</b> uma ação padrão ou de movimento por rodada.', '<b>Sangrando</b> Vigor DT 20 no início do turno; falha perde 1d6 PV. <b>Em chamas</b> 1d6 de fogo por turno; ação padrão apaga.', 'Condições terminam no fim da cena, salvo indicação.'])}
-    ${p('Interlúdio (duas ações)', ['<b>Dormir</b>: PV e PE iguais ao limite de PE × descanso (precária ½, normal ×1, confortável ×2, luxuosa ×3). Uma vez.', '<b>Relaxar</b>: SAN do mesmo jeito, +1 por colega que também relaxar. Uma vez.', '<b>Alimentar-se</b>: favorito +2 SAN ao relaxar; nutritivo e energético sobem um passo de PV ou PE ao dormir; rápido +5 em revisar caso.', '<b>Exercitar-se</b> e <b>Ler</b>: +1d6 guardado (máximo Vigor ou Intelecto).', '<b>Manutenção</b> conserta item. <b>Revisar caso</b> pode render uma pista que passou.', 'Determinação: dormir só recupera PV; relaxar recupera PD; prato favorito dá 2 PD temporários.'])}
-    ${p('Perigos', ['<b>Queda</b>: 1d6 de impacto a cada 1,5m (máx. 40d6 em 60m). Na água, −4d6.', '<b>Fogo</b>: Reflexos DT 15 ou fica em chamas.', '<b>Asfixia</b>: segura o ar por rodadas igual ao Vigor; depois Fortitude DT 5 (+5 por teste).'])}
-    ${t('Patentes', C.map(x => [x.n, `${x.pp} PP · crédito ${x.cred.toLowerCase()} · itens I ${x.lim[0]}, II ${x.lim[1]}, III ${x.lim[2]}, IV ${x.lim[3]}`]))}
-  </div><p class="escudo-rodape">Resumos para consulta rápida. A regra completa está no livro (OPRPG v1.3 e Sobrevivendo ao Horror).</p></div>`;
+  const eq = base.find(t => t.id === 'equipamento');
+  if (eq && C.length) eq.cards.push({ titulo: 'Patentes', tipo: 'tabela', fonte: 'OPRPG p. 51', linhas: [['Patente', 'PP', 'Crédito', 'Itens I · II · III · IV']].concat(C.map(x => [x.n, String(x.pp), x.cred, x.lim.join(' · ')])) });
+  return base;
+}
+function cardEscudo(c) {
+  const corpo = c.tipo === 'tabela'
+    ? `<table>${c.linhas.map((l, i) => `<tr>${l.map(x => i ? `<td>${x}</td>` : `<th>${x}</th>`).join('')}</tr>`).join('')}</table>`
+    : `<ul>${c.linhas.map(x => `<li>${x}</li>`).join('')}</ul>`;
+  return `<article class="esc-card"><h4>${c.titulo}</h4>${corpo}${c.fonte ? `<small class="esc-fonte">${c.fonte}</small>` : ''}</article>`;
+}
+function desenharEscudo() {
+  const o = $('#escudoMestre'); if (!o || o.hidden) return;
+  const tops = topicosEscudo();
+  if (ESC.top !== 'todos' && !tops.some(t => t.id === ESC.top)) ESC.top = 'todos';
+  const q = semAcento(ESC.busca).trim();
+  const casa = c => !q || semAcento(c.titulo + ' ' + JSON.stringify(c.linhas).replace(/<[^>]+>/g, '')).includes(q);
+  $('.esc-nav', o).innerHTML = [['todos', 'Tudo']].concat(tops.map(t => [t.id, t.titulo])).map(([k, n]) => {
+    const qtd = q ? (k === 'todos' ? tops.reduce((s, t) => s + t.cards.filter(casa).length, 0) : (tops.find(t => t.id === k) || { cards: [] }).cards.filter(casa).length) : 0;
+    return `<button data-esc="top" data-v="${k}" class="${ESC.top === k ? 'on' : ''}${q && !qtd ? ' vazio' : ''}">${esc(n)}${q ? ` <i>${qtd}</i>` : ''}</button>`; }).join('');
+  const vis = tops.filter(t => ESC.top === 'todos' || t.id === ESC.top);
+  const html = vis.map(t => { const cs = t.cards.filter(casa); if (!cs.length) return '';
+    return `<section class="esc-topico" id="esc-${t.id}">${ESC.top === 'todos' ? `<h3>${esc(t.titulo)}</h3>` : ''}<div class="esc-cards">${cs.map(cardEscudo).join('')}</div></section>`; }).join('');
+  const corpo = $('.esc-corpo', o);
+  corpo.innerHTML = html || `<p class="esc-vazio">Nada encontrado${q ? ` para "${esc(ESC.busca)}"` : ''}.</p>`;
+  const on = $('.esc-nav button.on', o); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+}
+function abrirEscudo(topico) {
+  let o = $('#escudoMestre');
+  if (!o) {
+    o = document.createElement('div'); o.id = 'escudoMestre'; o.className = 'escudo'; document.body.appendChild(o);
+    o.innerHTML = `<div class="escudo-caixa"><header><span>O.R.F.E.U. · USO DO MESTRE</span><h2>Escudo do Mestre</h2>
+      <input class="esc-busca" type="search" placeholder="Buscar regra (ex.: agarrar, queda, morrendo)" autocomplete="off" aria-label="Buscar regra"><button data-esc="fechar" aria-label="Fechar">×</button></header>
+      <nav class="esc-nav" aria-label="Tópicos"></nav><div class="esc-corpo"></div>
+      <p class="escudo-rodape">Resumos para consulta rápida (Livro de Regras OPRPG v1.3 e Sobrevivendo ao Horror); a regra completa está no livro. "Regras da Caixa" são as regras desta campanha e do site.</p></div>`;
+    o.addEventListener('click', e => {
+      if (e.target === o || e.target.closest('[data-esc="fechar"]')) { o.hidden = true; return; }
+      const b = e.target.closest('[data-esc="top"]');
+      if (b) { ESC.top = b.dataset.v; ls.set('acf-escudo-top', ESC.top); desenharEscudo(); $('.esc-corpo', o).scrollTop = 0; }
+    });
+    $('.esc-busca', o).addEventListener('input', e => { ESC.busca = e.target.value; if (ESC.busca && ESC.top !== 'todos') ESC.top = 'todos'; desenharEscudo(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !o.hidden) o.hidden = true; });
+  }
+  if (topico) ESC.top = topico;
   o.hidden = false;
+  desenharEscudo();
+  if (!matchMedia('(max-width: 700px)').matches) setTimeout(() => $('.esc-busca', o).focus(), 30);
 }
 
 /* =========================================================
@@ -962,14 +995,14 @@ function desenharMesaRel() {
     $('#mesaRelNome').onchange = ev => { const nome = ev.target.value.trim().slice(0, 120); relMeta = { ...(relMeta || { inicio: Date.now() }), nome }; A.Rede.set('relatorio/meta', relMeta).catch(() => {}); };
   }
 }
-const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena', nex: 'NEX', desejo: 'desejou à Parede' };
+const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena', nex: 'NEX', desejo: 'desejou à Parede', cofre: 'abriu o cofre' };
 async function abrirRelatorio() {
   const dados = await A.Rede.once('relatorio').catch(() => null) || {};
   const meta = dados.meta || {}, evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
   const nomeDe = id => (A.SER[id] || {}).nome || id || '';
   const por = {};
   cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: [], m20: 0, m1: 0, caiu: 0, enl: 0, fim: '', nex: 0, des: [] }; });
-  const pistas = [], pres = [], memb = [];
+  const pistas = [], pres = [], memb = [], cof = [];
   let cenas = 0;
   evs.forEach(e => {
     const p = por[e.q];
@@ -985,6 +1018,7 @@ async function abrirRelatorio() {
     if (e.t === 'pista') pistas.push(e.x);
     if (e.t === 'presenca') pres.push(e.x);
     if (e.t === 'membrana') memb.push(e.x);
+    if (e.t === 'cofre') cof.push(`${nomeDe(e.q)}: ${e.x}`);
     if (e.t === 'cena') cenas++;
   });
   const ativos = Object.entries(por).filter(([, p]) => p.dano || p.cura || p.san || p.pd || p.pe || p.rit.length || p.m20 || p.m1 || p.caiu || p.enl || p.fim || p.nex || p.des.length);
@@ -994,7 +1028,7 @@ async function abrirRelatorio() {
   const linhaTexto = (id, p) => `👤 ${nomeDe(id)}: ` + [p.dano ? `−${p.dano} PV` : '', p.cura ? `+${p.cura} PV curados` : '', p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : '', p.pe ? `${p.pe} PE gastos` : '', p.rit.length ? `${p.rit.length} ritua${p.rit.length > 1 ? 'is' : 'l'} (${[...new Set(p.rit.map(r => r.replace(/\s*\(.*\)$/, '')))].join(', ')})` : '', p.m20 ? `${p.m20}× 20 natural` : '', p.m1 ? `${p.m1}× 1 natural` : '', p.nex ? `NEX ${p.nex > 0 ? '+' : ''}${p.nex}` : '', p.des.length ? `${p.des.length} desejo${p.des.length > 1 ? 's' : ''} à Parede` : '', p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : '', p.fim ? p.fim.toUpperCase() : ''].filter(Boolean).join(' · ');
   const texto = [`📁 RELATÓRIO O.R.F.E.U.${meta.nome ? ' · ' + meta.nome : ''}`, `${new Date(ini).toLocaleDateString('pt-BR')} · duração ${durTxt}${cenas ? ` · ${cenas + 1} cenas` : ''}`, '',
     ...(ativos.length ? ativos.map(([id, p]) => linhaTexto(id, p)) : ['Nenhum agente registrou mudanças.']), '',
-    pistas.length ? `🔎 Pistas (${pistas.length}): ${pistas.join(' | ')}` : '', pres.length ? `😱 Presenças: ${pres.join(', ')}` : '', memb.length ? `🩸 Membrana rompida: ${memb.join(', ')}` : '',
+    pistas.length ? `🔎 Pistas (${pistas.length}): ${pistas.join(' | ')}` : '', pres.length ? `😱 Presenças: ${pres.join(', ')}` : '', memb.length ? `🩸 Membrana rompida: ${memb.join(', ')}` : '', cof.length ? `🔓 Cofres abertos: ${cof.join(' | ')}` : '',
     ativos.some(([, p]) => p.fim) ? `💀 Baixas: ${ativos.filter(([, p]) => p.fim).map(([id, p]) => `${nomeDe(id)} (${p.fim})`).join(', ')}` : ''].join('\n').replace(/\n{3,}/g, '\n\n').trim();
   let o = $('#relatorioTela');
   if (!o) {
@@ -1015,7 +1049,7 @@ async function abrirRelatorio() {
     ${ativos.length ? `<table class="rel-tab"><thead><tr><th>Agente</th><th>Dano</th><th>SAN / PD</th><th>PE</th><th>Rituais</th><th>Dados</th><th>NEX</th><th>Estado</th></tr></thead><tbody>
       ${ativos.map(([id, p]) => `<tr><th>${esc(nomeDe(id))}</th>${cel(p.dano ? `−${p.dano}${p.cura ? ` <small>(+${p.cura})</small>` : ''}` : p.cura ? `<small>+${p.cura}</small>` : '')}${cel([p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : ''].filter(Boolean).join(' · '))}${cel(p.pe ? String(p.pe) : '')}${cel(p.rit.length ? esc([...new Set(p.rit)].join(', ')) : '')}${cel([p.m20 ? `${p.m20}× 20` : '', p.m1 ? `${p.m1}× 1` : ''].filter(Boolean).join(' · '))}${cel(p.nex ? `${p.nex > 0 ? '+' : ''}${p.nex}%` : '')}${cel(p.fim ? `<b class="rel-fim">${p.fim.toUpperCase()}</b>` : [p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : ''].filter(Boolean).join(' · '))}</tr>`).join('')}</tbody></table>` : '<p class="mini">Nenhum agente registrou mudanças.</p>'}
     <div class="rel-grade"><section><h3>Pistas (${pistas.length})</h3>${pistas.length ? `<ol>${pistas.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '<p class="mini">Nenhuma.</p>'}</section>
-      <section><h3>Ameaças e membrana</h3><ul>${pres.map(p => `<li>Presença: ${esc(p)}</li>`).join('')}${memb.map(p => `<li>Rompida: ${esc(p)}</li>`).join('')}</ul>${pres.length || memb.length ? '' : '<p class="mini">Nada registrado.</p>'}</section></div>
+      <section><h3>Ameaças e membrana</h3><ul>${pres.map(p => `<li>Presença: ${esc(p)}</li>`).join('')}${memb.map(p => `<li>Rompida: ${esc(p)}</li>`).join('')}${cof.map(p => `<li>Cofre aberto · ${esc(p)}</li>`).join('')}</ul>${pres.length || memb.length || cof.length ? '' : '<p class="mini">Nada registrado.</p>'}</section></div>
     <details class="rel-linha"><summary>Linha do tempo (${evs.length})</summary><ol>${evs.map(e => `<li><time>${new Date(num(e.ts)).toLocaleTimeString('pt-BR').slice(0, 5)}</time> ${e.q ? `<b>${esc(nomeDe(e.q))}</b> ` : ''}${esc(ROT_REL[e.t] || e.t)}${e.v && ['dano', 'cura', 'san', 'pd', 'pe'].includes(e.t) ? ` ${int(e.v)}` : e.t === 'nex' ? ` ${int(e.v) > 0 ? '+' : ''}${int(e.v)}` : ''}${e.x ? `: ${esc(e.x)}` : ''}</li>`).join('')}</ol></details>
     <textarea class="rel-texto" hidden readonly>${esc(texto)}</textarea>
     <footer class="rel-acoes"><button data-rel="pdf" class="btn-protocolo">🖨 Imprimir ou salvar PDF</button><button data-rel="copiar">📋 Copiar texto para o grupo</button><button data-rel="fechar">Fechar</button></footer></div>`;
