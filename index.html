@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261010m">
+<link rel="stylesheet" href="style.css?v=20261010n">
 </head>
 <body>
 
@@ -135,6 +135,7 @@
       <h2>Sua cobaia</h2>
       <div id="minhaFicha" class="minha-ficha"></div>
       <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
+      <button id="btnArquivo" class="btn-fantasma btn-arquivo">📜 Arquivo da O.R.F.E.U. <span class="n" hidden></span></button>
       <div id="zonaJogador" class="zona-jogador"></div>
     </section>
 
@@ -391,7 +392,7 @@
     <section class="bloco mestre-only" id="blocoMesaCena" data-aba="mesa" hidden>
       <h2>Cena e escudo</h2>
       <div class="mesa-linha"><button id="mesaNovaCena">Nova cena</button><button id="mesaEscudo">📜 Escudo do Mestre</button></div>
-      <p class="mini">Nova cena zera os contadores de Morrendo e Enlouquecendo. Os turnos contam sozinhos na perseguição, e você também ajusta pelo cartão da cobaia.</p>
+      <p class="mini">Nova cena zera os contadores de Morrendo e Enlouquecendo e desconta a munição usada na cena. Os turnos contam sozinhos na perseguição, e você também ajusta pelo cartão da cobaia.</p>
     </section>
     <section class="bloco mestre-only" id="blocoMesaInv" data-aba="mesa" hidden><h2>Cena de investigação</h2><div id="mesaInv"></div></section>
     <section class="bloco mestre-only" id="blocoMesaInt" data-aba="mesa" hidden><h2>Interlúdio</h2><div id="mesaInt"></div></section>
@@ -399,6 +400,10 @@
     <section class="bloco mestre-only" id="blocoMesaAmb" data-aba="mesa" hidden><h2>Ambiente</h2><div id="mesaAmb"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRol" data-aba="mesa" hidden><h2>Rolagem secreta</h2><div id="mesaRol"></div></section>
     <section class="bloco mestre-only" id="blocoMesaAmea" data-aba="mesa" hidden><h2>Ameaças</h2><div id="mesaAmea"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaMemb" data-aba="mesa" hidden><h2>Membrana</h2><div id="mesaMemb"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaArq" data-aba="mesa" hidden><h2>Arquivo da O.R.F.E.U.</h2><div id="mesaArq"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaMom" data-aba="mesa" hidden><h2>Momentos marcantes</h2><div id="mesaMom"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaRel" data-aba="mesa" hidden><h2>Relatório da missão</h2><div id="mesaRel"></div></section>
 
     <section class="bloco mestre-only" id="blocoDiario" data-aba="registro" hidden>
       <h2>Diário da sessão</h2>
@@ -634,12 +639,13 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261010m"></script>
-<script src="config.js?v=20261010m"></script>
-<script src="app.js?v=20261010m"></script>
-<script src="catalogo-op.js?v=20261010m"></script>
-<script src="fichas.js?v=20261010m"></script>
-<script src="quadro.js?v=20261010m"></script>
-<script src="mesa.js?v=20261010m"></script>
+<script src="data.js?v=20261010n"></script>
+<script src="config.js?v=20261010n"></script>
+<script src="app.js?v=20261010n"></script>
+<script src="catalogo-op.js?v=20261010n"></script>
+<script src="fichas.js?v=20261010n"></script>
+<script src="quadro.js?v=20261010n"></script>
+<script src="mesa.js?v=20261010n"></script>
+<script src="arquivo.js?v=20261010n"></script>
 </body>
 </html>

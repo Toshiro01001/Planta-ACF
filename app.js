@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010m';
+const VERSAO_SITE = '20261010n';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -366,7 +366,8 @@ const Rede = {
     try { this.arvore = JSON.parse(localStorage.getItem('acf-rede') || '{}') || {}; } catch (e) { this.arvore = {}; }
     try {
       this.canal = new BroadcastChannel('acf-rede');
-      this.canal.onmessage = ev => { this.arvore = ev.data.arvore || {}; this.notificar(ev.data.caminho); };
+      // cada aba aplica só o trecho que mudou (trocar a árvore inteira perdia gravações simultâneas)
+      this.canal.onmessage = ev => { if ('valor' in ev.data) this.gravarLocal(ev.data.caminho, ev.data.valor); else this.arvore = ev.data.arvore || {}; this.notificar(ev.data.caminho); };
     } catch (e) {}
   },
   ler(c) { let o = this.arvore; for (const k of this.partes(c)) { if (o == null || typeof o !== 'object') return null; o = o[k]; } return o === undefined ? null : o; },
@@ -379,13 +380,16 @@ const Rede = {
       return Store.db.ref(c).set(v);
     }
     this.iniciarLocal();
+    this.gravarLocal(c, v);
+    try { localStorage.setItem('acf-rede', JSON.stringify(this.arvore)); } catch (e) { aviso('Sem espaço no navegador para guardar isso (modo local).'); }
+    try { this.canal && this.canal.postMessage({ caminho: c, valor: this.copia(v) }); } catch (e) {}
+    this.notificar(c);
+  },
+  gravarLocal(c, v) {
     const ps = this.partes(c);
     let o = this.arvore;
     for (let i = 0; i < ps.length - 1; i++) { if (!o[ps[i]] || typeof o[ps[i]] !== 'object') o[ps[i]] = {}; o = o[ps[i]]; }
     if (v === null) delete o[ps[ps.length - 1]]; else o[ps[ps.length - 1]] = this.copia(v);
-    try { localStorage.setItem('acf-rede', JSON.stringify(this.arvore)); } catch (e) { aviso('Sem espaço no navegador para guardar isso (modo local).'); }
-    try { this.canal && this.canal.postMessage({ arvore: this.arvore, caminho: c }); } catch (e) {}
-    this.notificar(c);
   },
   chave() {
     if (this.fb()) return Store.db.ref('_').push().key;
@@ -1190,6 +1194,17 @@ function selecionarSala(cn) {
   desenharCartao();
 }
 
+/* Ganchos do cartão da sala: módulos extras (mesa.js, arquivo.js) acrescentam blocos
+   ao cartão. g.mestre(cn) e g.publico(cn) devolvem HTML; g.ligar(c, cn, publico) liga os botões. */
+const ganchosSala = [];
+function htmlGanchosSala(cn, publico) {
+  return ganchosSala.map(g => { try { const f = publico ? g.publico : g.mestre; return f ? f(cn) || '' : ''; } catch (e) { console.warn(e); return ''; } }).join('');
+}
+function ligarGanchosSala(c, cn, publico) { ganchosSala.forEach(g => { try { if (g.ligar) g.ligar(c, cn, publico); } catch (e) { console.warn(e); } }); }
+// gancho do chat: transforma o texto já escapado (ex.: ⟦cifra:ID⟧ vira a cifra desenhada)
+const ganchosChat = [];
+const textoChat = t => ganchosChat.reduce((h, f) => { try { return f(h); } catch (e) { return h; } }, esc(t));
+
 function desenharCartaoSala() {
   const c = $('#cartao');
   delete c.dataset.ficha;
@@ -1220,10 +1235,12 @@ function desenharCartaoSala() {
     <label class="nota-sala">Anotações da sala <span class="so-mestre">só o Mestre vê</span>
       <textarea class="nota-txt" rows="9" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
     <span class="nota-status" aria-live="polite"></span>
+    ${htmlGanchosSala(cn, false)}
     ${htmlEdicaoSala(a, cn, p)}`;
   c.hidden = false;
   $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
   ligarEdicaoSala(c, a, cn);
+  ligarGanchosSala(c, cn, false);
   const caixaNota = $('textarea.nota-txt', c);
   let tNota = null;
   const salvarNota = () => {
@@ -1273,8 +1290,10 @@ function desenharCartaoSalaPublico() {
       <h3>${vis ? 'CN ' + pad2(cn) : 'Sala desconhecida'}</h3><span class="cod">${vis ? (nome || 'sem nome registrado') : 'ainda não mapeada'}</span></div></div>
     ${mostraEl ? `<p>Elemento: ${el2.nome}</p>` : ''}
     <p><strong>Aqui:</strong> ${aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>
-    ${vis && Arquivos.daSala(cn).length ? `<p><strong>Arquivos encontrados:</strong></p><div class="acoes">${Arquivos.daSala(cn).map(([fid, t]) => `<button data-abrir="${fid}">📄 ${esc(t)}</button>`).join('')}</div>` : ''}`;
+    ${vis && Arquivos.daSala(cn).length ? `<p><strong>Arquivos encontrados:</strong></p><div class="acoes">${Arquivos.daSala(cn).map(([fid, t]) => `<button data-abrir="${fid}">📄 ${esc(t)}</button>`).join('')}</div>` : ''}
+    ${vis ? htmlGanchosSala(cn, true) : ''}`;
   c.hidden = false;
+  if (vis) ligarGanchosSala(c, cn, true);
   $('.fechar', c).onclick = () => selecionar(null);
   $$('[data-abrir]', c).forEach(b => b.onclick = () => Arquivos.abrir(b.dataset.abrir));
 }
@@ -3685,7 +3704,7 @@ const Chat = {
       const btn = mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '';
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
-        <div class="msg-txt">${esc(m.t)}</div></div></li>`;
+        <div class="msg-txt">${textoChat(m.t)}</div></div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
@@ -4365,7 +4384,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Teclado:</b> algumas portas trancadas têm um teclado ao lado do botão. Digite o código que vocês encontraram. Errar faz barulho.</li>
     <li><b>Régua 📏:</b> ligue no canto do mapa e arraste para medir a distância em metros.</li>
     <li><b>Atalhos:</b> Q/E giram o mapa, R liga a régua, C abre o chat, F abre as fichas, B abre o quadro.</li></ul>
-    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre. <b>🖍 Quadro:</b> quadro branco ou preto compartilhado com a mesa, ao vivo: caneta, marca-texto, texto com fontes, notas adesivas, formas, setas e imagens (escolha, cole ou arraste). Cada um escolhe a própria cor. <b>Retrato:</b> com uma ficha ativa (★ na ficha), seu PV e PE aparecem no canto do mapa; o Mestre pode pedir testes (Presença Perturbadora), abrir interlúdios e mandar recompensas, que aparecem numa janela na sua tela.</li></ul>`;
+    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre. <b>🖍 Quadro:</b> quadro branco ou preto compartilhado com a mesa, ao vivo: caneta, marca-texto, texto com fontes, notas adesivas, formas, setas e imagens (escolha, cole ou arraste). Cada um escolhe a própria cor. <b>Retrato:</b> com uma ficha ativa (★ na ficha), seu PV e PE aparecem no canto do mapa; o Mestre pode pedir testes (Presença Perturbadora), abrir interlúdios e mandar recompensas, que aparecem numa janela na sua tela. <b>📜 Arquivo da O.R.F.E.U.</b> (no seu painel): cifras em sigilos para decifrar com a equipe (toque num símbolo para dar um palpite), documentos com trechos tarjados que o Mestre libera e as visões que só você teve. Com um <i>Medidor de Estabilidade da Membrana</i> na ficha, você lê a estabilidade da sala onde está.</li></ul>`;
   const jog = `<h3>Sua cobaia</h3><ul>
     <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
     <li><b>↶ Desfazer</b> (ou Ctrl+Z) volta o último movimento.</li>
@@ -4385,7 +4404,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Condições:</b> no cartão da ficha, toque em "Condições" e alterne cada uma: todos veem, só o dono vê ou desligada.</li>
     <li><b>Replay:</b> na aba Registro, "Replay no mapa" refaz os movimentos da sessão em velocidade acelerada, só na sua tela.</li>
     <li><b>Atalhos do Mestre:</b> N próximo turno · A apagão · L loja · V revelar ou esconder a sala aberta · P replay · Ctrl+Z desfazer · R régua · C chat · F fichas · B quadro.</li>
-    <li><b>Aba Mesa:</b> painel de retratos (o que aparece na sua tela e na de cada jogador), nova cena, Escudo do Mestre, cena de investigação com urgência e pistas, interlúdio, fim de missão (PP e NEX vão para as fichas), ambiente sonoro por elemento, rolagem secreta e ameaças. Morrendo e Enlouquecendo contam os turnos sozinhos na perseguição.</li>
+    <li><b>Aba Mesa:</b> painel de retratos (o que aparece na sua tela e na de cada jogador), nova cena, Escudo do Mestre, cena de investigação com urgência e pistas, interlúdio, fim de missão (PP e NEX vão para as fichas), ambiente sonoro por elemento, rolagem secreta e ameaças. Morrendo e Enlouquecendo contam os turnos sozinhos na perseguição. <b>Membrana</b> de cada sala (rituais e Presenças derrubam; ajuste no cartão da sala), <b>Arquivo da O.R.F.E.U.</b> (cifras, documentos tarjados e visões), <b>momentos marcantes</b> e <b>relatório da missão</b> para PDF ou para o grupo. "Nova cena" também desconta a munição usada.</li>
     <li><b>📋 Fichas:</b> na aba "Fichas dos jogadores" você vê a ficha de cada cobaia ao vivo, só para leitura (o Firebase recusa qualquer alteração vinda da sua conta). Em "Minhas fichas" você cria e edita NPCs e inimigos, que só você vê.</li>
     <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
     <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
@@ -4975,5 +4994,17 @@ window.ACF = {
   garantirLogin: () => (Store.modo === 'firebase' && !mestre && Store.auth && !Store.auth.currentUser ? Store.garantirLogin() : Promise.resolve()),
   get mestre() { return mestre; }, get meu() { return meu; }, get aux() { return aux; },
   get firebase() { return Store.modo === 'firebase'; },
+  // sala (CN) onde está a ficha; null fora do mapa
+  salaDe(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a) return null; const p = salaEm(tk.a, tk.x, tk.y); return p ? cnDe(tk.a, p) : null; },
+  salaVisivel: cn => salaVisivel(Math.ceil(cn / 25), cn),
+  nomeSala(cn) { const a = Math.ceil(cn / 25); const vis = salaVisivel(a, cn); const n = vis ? infoSala(a, cn)[0] : ''; return vis ? `CN ${pad2(cn)}${n ? ' · ' + n : ''}` : 'Sala desconhecida'; },
+  get segredos() { return mestre ? Segredos.dados : {}; },
+  get segredosProntos() { return mestre && Segredos.pronto; },
+  gravarSegredo: (c, v) => { if (mestre) Segredos.gravar(c, v); },
+  ganchoSala: g => { ganchosSala.push(g); },
+  ganchoChat: f => { ganchosChat.push(f); },
+  redesenharCartao: () => { if (salaSel) desenharCartao(); },
+  redesenharChat: () => { if (Chat.aberto) Chat.desenhar(); },
+  diario: (k, t) => { try { Diario.registrar(k, t); } catch (e) {} },
 };
 })();

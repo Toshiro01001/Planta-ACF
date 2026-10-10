@@ -71,7 +71,7 @@ function desenharHud() {
     const icones = conds.filter(c => !['morrendo', 'enlouquecendo', 'machucado'].includes(c)).map(c => (A.COND[c] || {}).i || '').join('');
     return `<div class="hud-card${morr ? ' morrendo' : ''}${enl ? ' enlouquecendo' : ''}${!v ? ' sem-ficha' : ''}" data-id="${id}" title="${esc(tit)}" style="--cor:${s.cor || '#888'}">
       <div class="hud-retrato">${mancha(id)}<div class="hud-foto"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></div>${pe !== null && pe !== undefined ? `<span class="hud-pe" title="${v && v.det ? 'Pontos de Determinação' : 'Pontos de Esforço'}">${int(pe)}</span>` : ''}</div>
-      <div class="hud-txt"><b class="hud-nome">${esc(s.nome || id)}</b>${v ? `<span class="hud-pv"><i>${pv}</i>/${pvM}</span>` : '<span class="hud-pv hud-vazio">—</span>'}${icones ? `<span class="hud-icones">${icones}</span>` : ''}</div>
+      <div class="hud-txt"><b class="hud-nome">${esc(s.nome || id)}</b>${v ? `<span class="hud-pv"><i>${pv}</i>/${pvM}</span>` : '<span class="hud-pv hud-vazio">—</span>'}${icones ? `<span class="hud-icones">${icones}</span>` : ''}${medidorHud(id)}</div>
       ${morr ? '<span class="hud-estado">MORRENDO</span>' : enl ? '<span class="hud-estado">ENLOUQUECENDO</span>' : ''}</div>`;
   }).join('') + (!A.mestre && ids.length ? '<button class="hud-recolher" data-hud="recolher" title="Esconder o painel" aria-label="Esconder o painel">–</button>' : '');
   if (caixa.dataset.html !== html) { caixa.innerHTML = html; caixa.dataset.html = html; }
@@ -88,6 +88,13 @@ function desenharHud() {
   if (!A.mestre && A.meu && !hudOffJog()[A.meu] && ls.get('acf-hud-recolhido', false)) {
     if (!mostrar) { const b = document.createElement('button'); b.id = 'hudMostrar'; b.className = 'hud-mostrar'; b.textContent = '♥ Retrato'; b.onclick = () => { ls.set('acf-hud-recolhido', false); desenharHud(); }; area.appendChild(b); }
   } else if (mostrar) mostrar.remove();
+}
+// leitura do Medidor da Membrana no próprio retrato (só para quem carrega o item)
+function medidorHud(id) {
+  if (A.mestre || id !== A.meu || !temMedidor()) return '';
+  const cn = A.salaDe(id); if (!cn) return '';
+  const v = membDe(cn), g = grauMemb(v);
+  return `<span class="hud-memb memb-g-${g[2]}" title="Medidor da Membrana: ${A.nomeSala(cn)}">📟 ${v}%</span>`;
 }
 function aoClicarHud(e) {
   if (e.target.closest('[data-hud="recolher"]')) { ls.set('acf-hud-recolhido', true); desenharHud(); return; }
@@ -145,8 +152,10 @@ function contarTurnos() {
 }
 function novaCena() {
   const c = est().cond || {};
+  A.definir(['cena'], { id: A.Rede.chave(), ts: Date.now() });
+  registrarRel('cena');
   Object.keys(c).forEach(id => ['_mt', '_et', '_ms'].forEach(k => { if (c[id] && c[id][k]) A.definir(['cond', id, k], null); }));
-  A.aviso('Nova cena: contadores de Morrendo e Enlouquecendo zerados.');
+  A.aviso('Nova cena: contadores de Morrendo e Enlouquecendo zerados e munição descontada.');
 }
 
 /* =========================================================
@@ -175,6 +184,14 @@ function aoClicarJanela(e) {
 const adiados = new Set();
 
 /* ---------- 4a. Presença Perturbadora ---------- */
+function vigiarChamadoMembrana() {
+  const ch = est().chamado;
+  if (!A.mestre || !ch || ch.t !== 'presenca' || !ch.id || Date.now() - num(ch.ts) > 60000) return;
+  const vistos = ls.get('acf-memb-ch', []);
+  if (vistos.includes(ch.id)) return;
+  ls.set('acf-memb-ch', [...vistos.slice(-30), ch.id]);
+  quedaPorPresenca(ch);
+}
 // regra de Determinação (SaH): cada dado desce um passo e a quantidade cai pela metade (arredonda para cima)
 function danoDeterminacao(expr) {
   return String(expr || '').replace(/(\d*)d(\d+)/gi, (m, q, f) => {
@@ -373,6 +390,7 @@ function verRecompensa() {
   if (pp) lista.push(['pp', int(d.pp) + pp]);
   const nexSobe = novoNex && FX().NEXES.includes(novoNex) && novoNex > (int(d.nex) || 5) && !(FX().CLASSES[d.classe] || {}).estagio;
   if (nexSobe) lista.push(['nex', novoNex]);
+  if (FX().consumoMissao) lista.push(...FX().consumoMissao(d));   // flechas e afins: duram a missão
   FX().aplicarNaAtiva(lista).then(ok => {
     if (!ok) return;
     const dep = FX().ativa();
@@ -406,9 +424,19 @@ function sigiloSVG(nome, cor) {
   return `<svg viewBox="0 0 200 200" style="--el:${cor}"><g class="sg-traco" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round">
     <circle cx="100" cy="100" r="96"/><circle cx="100" cy="100" r="78"/><path d="${estrela}Z"/><circle cx="100" cy="100" r="30"/>${raios}${runas}<circle cx="100" cy="100" r="6"/></g></svg>`;
 }
-function mostrarSigilo(e) {
-  if (!e || e.t !== 'sigilo' || num(e.ts) <= ultimoSigilo || Date.now() - num(e.ts) > 9000) return;
+// tudo o que chega em "efeito": sigilo de ritual ou momento marcante
+function aoEfeito(e) {
+  if (!e || num(e.ts) <= ultimoSigilo || Date.now() - num(e.ts) > 9000) return;
   ultimoSigilo = num(e.ts);
+  if (A.mestre) {
+    relEfeito(e);
+    const k = 'acf-memb-ef';
+    if (e.t === 'sigilo' && num(e.ts) > num(ls.get(k, 0))) { ls.set(k, num(e.ts)); quedaPorRitual(e); }
+  }
+  if (e.t === 'sigilo') mostrarSigilo(e);
+  else if (e.t === 'momento') mostrarMomento(e);
+}
+function mostrarSigilo(e) {
   const cor = corEl(e.el);
   let o = $('#sigiloTela');
   if (!o) { o = document.createElement('div'); o.id = 'sigiloTela'; o.className = 'sigilo-tela'; o.setAttribute('aria-live', 'polite'); document.body.appendChild(o); }
@@ -507,6 +535,7 @@ function desenharMesaMestre() {
   grade('#mesaHudMeu', hudOffMeu(), (id, off) => { const o = hudOffMeu(); if (off) o[id] = true; else delete o[id]; ls.set('acf-hud-gm-off', o); desenharHud(); });
   grade('#mesaHudJog', hudOffJog(), (id, off) => A.definir(['hud', 'off', id], off ? true : null));
   desenharMesaInv(); desenharMesaInt(); desenharMesaRec(); desenharMesaAmb(); desenharMesaRol(); desenharMesaAmea();
+  desenharMesaMemb(); desenharMesaMom(); desenharMesaRel();
 }
 // não redesenha um bloco enquanto alguém digita nele (botões e caixas de marcar não contam)
 function semFoco(id) { const e = $(id), a = document.activeElement; return !!e && !(a && e.contains(a) && a.matches('input:not([type=checkbox]), select, textarea')); }
@@ -615,6 +644,16 @@ function aoClicarMesa(e) {
   } else if (a === 'amb') { A.definir(['amb'], b.dataset.v ? { el: b.dataset.v, ts: Date.now() } : null); }
   else if (a === 'rol') rolagemSecreta();
   else if (a === 'fichas') { FX() && FX().abrir(); }
+  else if (a === 'memb-ok') mudarMemb(int(b.dataset.cn), 100);
+  else if (a === 'memb-tudo') { if (confirm('Restaurar a membrana de todas as salas?')) A.definir(['membrana'], null); }
+  else if (a === 'mom-teste') mostrarMomento({ t: 'momento', k: b.dataset.v, n: 'teste (só na sua tela)', q: 'Mestre', id: (cobaias()[0] || {}).id, ts: Date.now() });
+  else if (a === 'rel-ver') abrirRelatorio();
+  else if (a === 'rel-novo') {
+    if (!confirm('Começar o registro de uma nova missão? O relatório atual será apagado (gere e salve antes).')) return;
+    relMeta = { nome: '', inicio: Date.now() };
+    A.Rede.set('relatorio', { meta: relMeta }).catch(() => {});
+    $('#mesaRel').dataset.html = ''; desenharMesaRel();
+  }
 }
 function rolagemSecreta() {
   const ex = ($('#mesaRolExpr').value || '1d20').trim();
@@ -651,11 +690,330 @@ function abrirEscudo() {
 }
 
 /* =========================================================
+   10. MEMBRANA
+   Cada sala tem uma estabilidade de 0 a 100 (sem registro = 100).
+   Rituais conjurados ali e Presenças Perturbadoras derrubam sozinhos (feito pela tela do Mestre).
+   Todos veem as rachaduras nas salas conhecidas; o número só aparece para quem
+   carrega um Medidor de Estabilidade da Membrana na ficha ativa.
+   ========================================================= */
+const MEMB_GRAUS = [[75, 'estável', 'estavel'], [50, 'fissurada', 'fissurada'], [25, 'rachada', 'rachada'], [1, 'crítica', 'critica'], [0, 'rompida', 'rompida']];
+const membDe = cn => { const v = (est().membrana || {})['c' + cn]; return v === undefined || v === null ? 100 : Math.max(0, Math.min(100, int(v))); };
+const grauMemb = v => MEMB_GRAUS.find(g => v >= g[0]) || MEMB_GRAUS[4];
+const membAuto = () => ls.get('acf-memb-auto', true);
+function temMedidor() {
+  const at = FX() && FX().ativa();
+  return !!at && Object.values(at.d.itens || {}).some(it => it && /medidor de estabilidade da membrana/i.test(it.n || '') && (it.qtd === undefined || it.qtd === '' || int(it.qtd) > 0));
+}
+function mudarMemb(cn, novo) {
+  if (!A.mestre || !cn) return;
+  novo = Math.max(0, Math.min(100, Math.round(novo)));
+  if (novo === membDe(cn)) return;
+  A.definir(['membrana', 'c' + cn], novo >= 100 ? null : novo);
+}
+// rachaduras desenhadas por sala (forma fixa pelo número da sala). Três camadas: aparecem conforme o grau.
+function rachaduras(cn) {
+  const r = semente('memb' + cn);
+  const camada = k => Array.from({ length: 2 + k }, () => {
+    const lado = Math.floor(r() * 4), t = 10 + r() * 80;
+    let x = lado === 0 ? t : lado === 1 ? 100 : lado === 2 ? t : 0, y = lado === 0 ? 0 : lado === 1 ? t : lado === 2 ? 100 : t;
+    let d = `M${x.toFixed(1)} ${y.toFixed(1)}`;
+    const alvoX = 35 + r() * 30, alvoY = 35 + r() * 30, passos = 4 + Math.floor(r() * 3);
+    let ramos = '';
+    for (let i = 1; i <= passos; i++) {
+      x += (alvoX - x) / (passos - i + 1.4) + (r() - 0.5) * 14; y += (alvoY - y) / (passos - i + 1.4) + (r() - 0.5) * 14;
+      d += `L${x.toFixed(1)} ${y.toFixed(1)}`;
+      if (r() > 0.6) ramos += `M${x.toFixed(1)} ${y.toFixed(1)}l${((r() - 0.5) * 22).toFixed(1)} ${((r() - 0.5) * 22).toFixed(1)}`;
+    }
+    return `<path d="${d}${ramos}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><g class="rc rc1">${camada(0)}</g><g class="rc rc2">${camada(1)}</g><g class="rc rc3">${camada(2)}</g><ellipse class="rc-fenda" cx="50" cy="50" rx="9" ry="16"/></svg>`;
+}
+function pintarMembrana() {
+  $$('.sala[data-cn]').forEach(s => {
+    const cn = +s.dataset.cn, v = membDe(cn);
+    const vis = !s.classList.contains('desconhecida');
+    const g = v >= 75 || !vis ? '' : grauMemb(v)[2];
+    if ((s.dataset.memb || '') === g) return;
+    s.classList.remove('memb-fissurada', 'memb-rachada', 'memb-critica', 'memb-rompida');
+    let fx = $('.memb-fx', s);
+    if (g) {
+      s.classList.add('memb-' + g);
+      if (!fx) { fx = document.createElement('i'); fx.className = 'memb-fx'; fx.innerHTML = rachaduras(cn); const tinta = $('.sala-tinta', s); s.insertBefore(fx, tinta ? tinta.nextSibling : s.firstChild); }
+    } else if (fx) fx.remove();
+    s.dataset.memb = g;
+  });
+}
+const membAnt = {};
+let membIni = false;
+function vigiarMembrana() {
+  if (!A.mestre) { membIni = false; return; }
+  const m = est().membrana || {};
+  const chaves = new Set([...Object.keys(m), ...Object.keys(membAnt)]);
+  chaves.forEach(k => {
+    const v = m[k] === undefined || m[k] === null ? 100 : int(m[k]);
+    const ant = membAnt[k] === undefined ? 100 : membAnt[k];   // sala sem registro = 100
+    membAnt[k] = v;
+    if (!membIni || ant === v) return;
+    const cn = +k.slice(1);
+    if (ant > 0 && v <= 0) {
+      A.aviso(`🩸 A membrana se rompeu: ${A.nomeSala(cn)}. O Outro Lado está aberto aqui.`);
+      A.diario('sala', `Membrana rompida: ${A.nomeSala(cn)}`);
+      registrarRel('membrana', '', 0, A.nomeSala(cn), 'mb' + cn + '-' + Date.now());
+      if (somOk() && A.Som) { A.Som.tom(55, 0, 2.2, 'sawtooth', 0.12, 28); A.Som.tom(880, 0.05, 0.9, 'sine', 0.04, 220); }
+    } else if (grauMemb(ant)[2] !== grauMemb(v)[2] && v < ant && v > 0 && v < 25) A.aviso(`A membrana da ${A.nomeSala(cn)} está crítica (${v}).`);
+  });
+  membIni = true;
+}
+// quedas automáticas: ritual conjurado na sala e Presença Perturbadora
+function quedaPorRitual(e) {
+  if (!A.mestre || !membAuto() || !e || !e.quem) return;
+  const cn = A.salaDe(e.quem); if (!cn) return;
+  const queda = 5 * Math.max(1, int(e.c) || 1) * (/medo/i.test(e.el || '') ? 2 : 1);
+  mudarMemb(cn, membDe(cn) - queda);
+}
+function quedaPorPresenca(ch) {
+  if (!A.mestre || !membAuto()) return;
+  const queda = Math.max(3, Math.min(20, Math.round((int(ch.vd) || 100) / 20)));
+  const salas = new Set(Object.keys(ch.alvos || {}).map(id => A.salaDe(id)).filter(Boolean));
+  salas.forEach(cn => mudarMemb(cn, membDe(cn) - queda));
+}
+function htmlMembMestre(cn) {
+  const v = membDe(cn), g = grauMemb(v);
+  return `<div class="memb-cartao memb-g-${g[2]}" style="--v:${v}"><div class="memb-cab"><span>MEMBRANA</span><b>${v}</b><small>/100 · ${g[1]}</small></div><div class="memb-barra"><i></i></div>
+    <div class="acoes memb-acoes"><button data-memb="-5">−5</button><button data-memb="-10">−10</button><button data-memb="-25">−25</button><button data-memb="+10">+10</button><button data-memb="=100">Restaurar</button></div></div>`;
+}
+function htmlMembPublico(cn) {
+  if (!temMedidor()) return '';
+  const v = membDe(cn), g = grauMemb(v);
+  return `<div class="memb-cartao memb-g-${g[2]} memb-leitura" style="--v:${v}"><div class="memb-cab"><span>📟 MEDIDOR</span><b>${v}%</b><small>${g[1]}</small></div><div class="memb-barra"><i></i></div></div>`;
+}
+A.ganchoSala({
+  mestre: htmlMembMestre,
+  publico: htmlMembPublico,
+  ligar(c, cn, pub) {
+    if (pub || !A.mestre) return;
+    $$('[data-memb]', c).forEach(b => b.onclick = () => {
+      const t = b.dataset.memb;
+      mudarMemb(cn, t[0] === '=' ? int(t.slice(1)) : membDe(cn) + int(t));
+    });
+  },
+});
+function desenharMesaMemb() {
+  if (!semFoco('#mesaMemb')) return;
+  const m = est().membrana || {};
+  const lista = Object.keys(m).map(k => +k.slice(1)).filter(cn => membDe(cn) < 100).sort((a, b) => membDe(a) - membDe(b));
+  const html = `<p class="mini">Cada sala começa em 100. Ritual conjurado na sala tira 5 por círculo (Medo tira o dobro); Presença Perturbadora tira de 3 a 20 conforme o VD. Ajuste e restaure pelo cartão da sala. Só quem tem um <i>Medidor de Estabilidade da Membrana</i> na ficha vê o número.</p>
+    <label class="chave"><input type="checkbox" id="mesaMembAuto" ${membAuto() ? 'checked' : ''}><span>Quedas automáticas (rituais e Presença)</span></label>
+    ${lista.length ? `<ul class="memb-lista">${lista.map(cn => { const v = membDe(cn), g = grauMemb(v); return `<li class="memb-g-${g[2]}" style="--v:${v}"><span>${esc(A.nomeSala(cn))}</span><b>${v}</b><i class="memb-barra"><i></i></i><button data-mi="memb-ok" data-cn="${cn}" title="Restaurar">↺</button></li>`; }).join('')}</ul>
+      <button data-mi="memb-tudo" class="perigo">Restaurar todas</button>` : '<p class="mini">Todas as salas estão estáveis.</p>'}`;
+  const c = $('#mesaMemb');
+  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $('#mesaMembAuto').onchange = e => ls.set('acf-memb-auto', e.target.checked); }
+}
+
+/* =========================================================
+   11. MOMENTOS MARCANTES (20 natural, 1 natural, óbito, insanidade)
+   ========================================================= */
+const MOMENTOS = [['20', '20 natural'], ['1', '1 natural'], ['obito', 'Óbito'], ['insano', 'Insanidade']];
+const momentoLigado = k => !(((est().momentos || {}).off) || {})[k];
+// chamado pela ficha do jogador ao rolar
+function momento(k, titulo, d) {
+  if (!momentoLigado(k) || A.mestre) return;
+  try { A.Rede.set('efeito', { t: 'momento', k, n: String(titulo || '').slice(0, 120), q: String((d && d.nome) || '').slice(0, 120), id: A.meu || '', ts: Date.now() }); } catch (e) {}
+}
+function mostrarMomento(e) {
+  let o = $('#momentoTela');
+  if (!o) { o = document.createElement('div'); o.id = 'momentoTela'; o.className = 'momento-tela'; o.setAttribute('aria-live', 'polite'); document.body.appendChild(o); o.addEventListener('click', () => o.classList.remove('ativo')); }
+  const s = A.SER[e.id] || {};
+  const foto = s.img ? ` style="background-image:url('${s.img}')"` : '';
+  const k = e.k;
+  let html = '';
+  if (k === '20') html = `<div class="mm mm-20"><i class="mm-raios"></i><b class="mm-num">20</b><p><b>${esc(e.q)}</b>${e.n ? ' · ' + esc(e.n) : ''}</p></div>`;
+  else if (k === '1') html = `<div class="mm mm-1"><b class="mm-num">1</b><svg class="mm-trinca" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M48 0L52 22L41 38L57 55L46 72L54 100M52 22L68 30M41 38L24 44M57 55L76 60M46 72L30 82"/></svg><p><b>${esc(e.q)}</b>${e.n ? ' · ' + esc(e.n) : ''}</p></div>`;
+  else if (k === 'obito' || k === 'insano') {
+    const ob = k === 'obito';
+    html = `<div class="mm mm-ficha ${ob ? 'mm-obito' : 'mm-insano'}" style="--cor:${s.cor || '#888'}"><div class="mm-papel"><span class="mm-cab">O.R.F.E.U. · REGISTRO DE AGENTE</span>
+      <div class="mm-foto"${foto}></div><b class="mm-nome">${esc(s.nome || e.q || '')}</b><small>${esc(s.jogador || '')}</small>
+      <span class="mm-data">${new Date(num(e.ts)).toLocaleDateString('pt-BR')}</span><i class="mm-carimbo">${ob ? 'ÓBITO' : 'INSANO'}</i></div></div>`;
+  }
+  if (!html) return;
+  o.className = 'momento-tela k-' + k;
+  o.innerHTML = html;
+  o.classList.remove('ativo'); void o.offsetWidth; o.classList.add('ativo');
+  clearTimeout(mostrarMomento.t); mostrarMomento.t = setTimeout(() => o.classList.remove('ativo'), k === '20' || k === '1' ? 3400 : 6500);
+  if (!somOk() || !A.Som) return;
+  if (k === '20') [523, 659, 784, 1047].forEach((f, i) => A.Som.tom(f, i * 0.09, 0.5, 'triangle', 0.07));
+  else if (k === '1') { A.Som.tom(220, 0, 0.6, 'sawtooth', 0.07, 70); A.Som.tom(110, 0.05, 0.8, 'square', 0.04, 40); }
+  else if (k === 'obito') { A.Som.tom(98, 0, 2.4, 'sine', 0.14, 49); A.Som.tom(147, 0.5, 2, 'sine', 0.06, 73); }
+  else { [311, 330, 349, 370].forEach((f, i) => A.Som.tom(f, i * 0.12, 1.4, 'sine', 0.05, f * 0.5)); }
+}
+// óbito e insanidade: a tela do Mestre percebe o contador chegar a 3
+const contAnt = {};
+let contIni = false;
+function vigiarContadores() {
+  if (!A.mestre) { contIni = false; return; }
+  const c = est().cond || {};
+  cobaias().forEach(x => {
+    const mt = int((c[x.id] || {})._mt), et = int((c[x.id] || {})._et);
+    const ant = contAnt[x.id];
+    contAnt[x.id] = { mt, et };
+    if (!contIni || !ant) return;
+    const base = { t: 'momento', n: '', q: x.nome, id: x.id, ts: Date.now() };
+    if (ant.mt < 3 && mt >= 3 && momentoLigado('obito')) A.Rede.set('efeito', { ...base, k: 'obito' }).catch(() => {});
+    else if (ant.et < 3 && et >= 3 && momentoLigado('insano')) A.Rede.set('efeito', { ...base, k: 'insano' }).catch(() => {});
+  });
+  contIni = true;
+}
+function desenharMesaMom() {
+  if (!semFoco('#mesaMom')) return;
+  const html = `<p class="mini">Animação curta na tela de todos. O 20 e o 1 saem das rolagens das fichas; óbito e insanidade, quando o contador de Morrendo ou Enlouquecendo chega a 3.</p>
+    <div class="lista-apagao">${MOMENTOS.map(([k, n]) => `<label class="chave"><input type="checkbox" data-mom="${k}" ${momentoLigado(k) ? 'checked' : ''}><span>${n}</span></label>`).join('')}</div>
+    <div class="mesa-linha"><button data-mi="mom-teste" data-v="20">Testar 20</button><button data-mi="mom-teste" data-v="obito">Testar óbito</button></div>`;
+  const c = $('#mesaMom');
+  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $$('[data-mom]', c).forEach(i => i.onchange = () => A.definir(['momentos', 'off', i.dataset.mom], i.checked ? null : true)); }
+}
+
+/* =========================================================
+   12. RELATÓRIO O.R.F.E.U. (montado pela tela do Mestre)
+   relatorio/meta {nome, inicio} e relatorio/ev/<chave> {t, q, v, x, ts}. Só o Mestre lê e grava.
+   ========================================================= */
+let relMeta, relOff = null;
+function ligarRelatorio() {
+  if (relOff || !A.mestre || !A.pronto) return;
+  relOff = A.Rede.on('relatorio/meta', v => { relMeta = v || null; desenharMesaRel(); }, () => {});
+}
+function registrarRel(t, q, v, x, chave) {
+  if (!A.mestre || !A.pronto || relMeta === undefined) return;
+  const ts = Date.now();
+  if (!relMeta) { relMeta = { nome: '', inicio: ts }; A.Rede.set('relatorio/meta', relMeta).catch(() => {}); }
+  A.Rede.set('relatorio/ev/' + (chave || A.Rede.chave()), { t, q: q || '', v: int(v), x: String(x || '').slice(0, 200), ts }).catch(() => {});
+}
+const vitAnt = {}, condAnt = {};
+let pistasAnt = null, chamadoAnt, intAnt, recAnt, relIni = false;
+function vigiarRelatorio() {
+  if (!A.mestre || relMeta === undefined) return;
+  const e = est();
+  cobaias().forEach(x => {
+    const v = ((e.tokens || {})[x.id] || {}).vit;
+    const ant = vitAnt[x.id];
+    vitAnt[x.id] = v ? { ...v } : null;
+    if (relIni && v && ant && ant.nome === v.nome) {
+      const dif = k => int(v[k]) - int(ant[k]);
+      if (dif('pv') < 0) registrarRel('dano', x.id, -dif('pv'));
+      if (dif('pv') > 0) registrarRel('cura', x.id, dif('pv'));
+      if (v.san !== undefined && ant.san !== undefined && dif('san') < 0) registrarRel('san', x.id, -dif('san'));
+      if (v.pd !== undefined && ant.pd !== undefined && dif('pd') < 0) registrarRel('pd', x.id, -dif('pd'));
+      if (v.pe !== undefined && ant.pe !== undefined && dif('pe') < 0) registrarRel('pe', x.id, -dif('pe'));
+    }
+    const cs = A.condicoesVisiveis(x.id);
+    const ca = condAnt[x.id];
+    condAnt[x.id] = { m: cs.includes('morrendo'), e: cs.includes('enlouquecendo') };
+    if (relIni && ca) {
+      if (!ca.m && condAnt[x.id].m) registrarRel('caiu', x.id);
+      if (!ca.e && condAnt[x.id].e) registrarRel('enl', x.id);
+    }
+  });
+  const pistas = (e.inv || {}).pistas || {};
+  if (relIni && pistasAnt) Object.entries(pistas).forEach(([k, p]) => { if (!pistasAnt.has(k)) registrarRel('pista', '', 0, p.t, 'i' + k); });
+  pistasAnt = new Set(Object.keys(pistas));
+  const ch = e.chamado;
+  if (relIni && ch && ch.id && ch.id !== chamadoAnt && ch.t === 'presenca') registrarRel('presenca', '', Object.keys(ch.alvos || {}).length, ch.nome, 'p' + ch.id);
+  chamadoAnt = ch && ch.id;
+  const it = e.interludio;
+  if (relIni && it && it.on && it.id !== intAnt) registrarRel('interludio', '', 0, (DESCANSO[it.cond] || DESCANSO.normal)[0], 'l' + it.id);
+  intAnt = it && it.on ? it.id : null;
+  const rc = e.recomp;
+  if (relIni && rc && rc.id && rc.id !== recAnt) registrarRel('recomp', '', 0, rc.msg || '', 'r' + rc.id);
+  recAnt = rc && rc.id;
+  relIni = true;
+}
+// efeitos (rituais e momentos) chegam pelo caminho "efeito"
+function relEfeito(ef) {
+  if (ef.t === 'sigilo') registrarRel('ritual', ef.quem || '', int(ef.c), `${ef.n}${ef.el ? ' (' + ef.el + ')' : ''}`, 'e' + int(ef.ts));
+  else if (ef.t === 'momento') registrarRel('m' + ef.k, ef.id || '', 0, ef.n || '', 'e' + int(ef.ts));
+}
+function desenharMesaRel() {
+  if (!$('#mesaRel') || !semFoco('#mesaRel')) return;
+  const m = relMeta;
+  const html = `<p class="mini">Enquanto sua tela estiver aberta, o site anota dano, Sanidade, PE, rituais, quedas, pistas, Presenças, rupturas da membrana e momentos marcantes. No fim, gere o relatório para salvar em PDF ou mandar no grupo.</p>
+    ${m ? `<p class="mini">Missão em registro desde <b>${new Date(num(m.inicio)).toLocaleString('pt-BR')}</b>.</p>` : '<p class="mini">Nenhum registro ainda: começa sozinho no primeiro acontecimento.</p>'}
+    <label class="mesa-campo">Nome da missão <input id="mesaRelNome" value="${esc((m && m.nome) || '')}" placeholder="Ex.: Missão 03 · O Laboratório Nº 5"></label>
+    <div class="mesa-linha"><button data-mi="rel-ver" class="btn-protocolo">📁 Gerar relatório</button><button data-mi="rel-novo" class="perigo">Nova missão</button></div>`;
+  const c = $('#mesaRel');
+  if (c.dataset.html !== html) {
+    c.innerHTML = html; c.dataset.html = html;
+    $('#mesaRelNome').onchange = ev => { const nome = ev.target.value.trim().slice(0, 120); relMeta = { ...(relMeta || { inicio: Date.now() }), nome }; A.Rede.set('relatorio/meta', relMeta).catch(() => {}); };
+  }
+}
+const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena' };
+async function abrirRelatorio() {
+  const dados = await A.Rede.once('relatorio').catch(() => null) || {};
+  const meta = dados.meta || {}, evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
+  const nomeDe = id => (A.SER[id] || {}).nome || id || '';
+  const por = {};
+  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: [], m20: 0, m1: 0, caiu: 0, enl: 0, fim: '' }; });
+  const pistas = [], pres = [], memb = [];
+  let cenas = 0;
+  evs.forEach(e => {
+    const p = por[e.q];
+    if (p) {
+      if (['dano', 'cura', 'san', 'pd', 'pe'].includes(e.t)) p[e.t] += int(e.v);
+      if (e.t === 'ritual') p.rit.push(e.x);
+      if (e.t === 'm20') p.m20++; if (e.t === 'm1') p.m1++;
+      if (e.t === 'caiu') p.caiu++; if (e.t === 'enl') p.enl++;
+      if (e.t === 'mobito') p.fim = 'óbito'; if (e.t === 'minsano' && !p.fim) p.fim = 'insano';
+    }
+    if (e.t === 'pista') pistas.push(e.x);
+    if (e.t === 'presenca') pres.push(e.x);
+    if (e.t === 'membrana') memb.push(e.x);
+    if (e.t === 'cena') cenas++;
+  });
+  const ativos = Object.entries(por).filter(([, p]) => p.dano || p.cura || p.san || p.pd || p.pe || p.rit.length || p.m20 || p.m1 || p.caiu || p.enl || p.fim);
+  const ini = num(meta.inicio) || (evs[0] && evs[0].ts) || Date.now(), fim = evs.length ? num(evs[evs.length - 1].ts) : ini;
+  const dur = Math.max(0, Math.round((fim - ini) / 60000));
+  const durTxt = dur >= 60 ? `${Math.floor(dur / 60)}h${String(dur % 60).padStart(2, '0')}` : `${dur} min`;
+  const linhaTexto = (id, p) => `👤 ${nomeDe(id)}: ` + [p.dano ? `−${p.dano} PV` : '', p.cura ? `+${p.cura} PV curados` : '', p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : '', p.pe ? `${p.pe} PE gastos` : '', p.rit.length ? `${p.rit.length} ritua${p.rit.length > 1 ? 'is' : 'l'} (${[...new Set(p.rit.map(r => r.replace(/\s*\(.*\)$/, '')))].join(', ')})` : '', p.m20 ? `${p.m20}× 20 natural` : '', p.m1 ? `${p.m1}× 1 natural` : '', p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : '', p.fim ? p.fim.toUpperCase() : ''].filter(Boolean).join(' · ');
+  const texto = [`📁 RELATÓRIO O.R.F.E.U.${meta.nome ? ' · ' + meta.nome : ''}`, `${new Date(ini).toLocaleDateString('pt-BR')} · duração ${durTxt}${cenas ? ` · ${cenas + 1} cenas` : ''}`, '',
+    ...(ativos.length ? ativos.map(([id, p]) => linhaTexto(id, p)) : ['Nenhum agente registrou mudanças.']), '',
+    pistas.length ? `🔎 Pistas (${pistas.length}): ${pistas.join(' | ')}` : '', pres.length ? `😱 Presenças: ${pres.join(', ')}` : '', memb.length ? `🩸 Membrana rompida: ${memb.join(', ')}` : '',
+    ativos.some(([, p]) => p.fim) ? `💀 Baixas: ${ativos.filter(([, p]) => p.fim).map(([id, p]) => `${nomeDe(id)} (${p.fim})`).join(', ')}` : ''].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  let o = $('#relatorioTela');
+  if (!o) {
+    o = document.createElement('div'); o.id = 'relatorioTela'; o.className = 'relatorio-tela'; document.body.appendChild(o);
+    o.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-rel]');
+      if (ev.target === o || (b && b.dataset.rel === 'fechar')) { o.hidden = true; document.body.classList.remove('imprimindo-rel'); return; }
+      if (!b) return;
+      if (b.dataset.rel === 'pdf') { document.body.classList.add('imprimindo-rel'); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('imprimindo-rel'), 500); }, 60); }
+      if (b.dataset.rel === 'copiar') { const t = o.dataset.texto; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => A.aviso('Relatório copiado. Cole no grupo.'), () => { const ta = $('textarea', o); ta.hidden = false; ta.select(); A.aviso('Copie o texto selecionado.'); }); }
+    });
+  }
+  o.dataset.texto = texto;
+  const cel = (v, cls = '') => `<td class="${cls}">${v || '<i>—</i>'}</td>`;
+  o.innerHTML = `<div class="rel-folha"><header class="rel-cab"><div><span>O.R.F.E.U. · DOCUMENTO INTERNO</span><h2>Relatório de Missão${meta.nome ? `<small>${esc(meta.nome)}</small>` : ''}</h2></div><i class="rel-selo">O.R.F.E.U.<br>CONFIDENCIAL</i></header>
+    <p class="rel-meta">Aberto em ${new Date(ini).toLocaleString('pt-BR')} · duração ${durTxt}${cenas ? ` · ${cenas + 1} cenas` : ''} · ${evs.length} registros</p>
+    <h3>Agentes</h3>
+    ${ativos.length ? `<table class="rel-tab"><thead><tr><th>Agente</th><th>Dano</th><th>SAN / PD</th><th>PE</th><th>Rituais</th><th>Dados</th><th>Estado</th></tr></thead><tbody>
+      ${ativos.map(([id, p]) => `<tr><th>${esc(nomeDe(id))}</th>${cel(p.dano ? `−${p.dano}${p.cura ? ` <small>(+${p.cura})</small>` : ''}` : p.cura ? `<small>+${p.cura}</small>` : '')}${cel([p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : ''].filter(Boolean).join(' · '))}${cel(p.pe ? String(p.pe) : '')}${cel(p.rit.length ? esc([...new Set(p.rit)].join(', ')) : '')}${cel([p.m20 ? `${p.m20}× 20` : '', p.m1 ? `${p.m1}× 1` : ''].filter(Boolean).join(' · '))}${cel(p.fim ? `<b class="rel-fim">${p.fim.toUpperCase()}</b>` : [p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : ''].filter(Boolean).join(' · '))}</tr>`).join('')}</tbody></table>` : '<p class="mini">Nenhum agente registrou mudanças.</p>'}
+    <div class="rel-grade"><section><h3>Pistas (${pistas.length})</h3>${pistas.length ? `<ol>${pistas.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '<p class="mini">Nenhuma.</p>'}</section>
+      <section><h3>Ameaças e membrana</h3><ul>${pres.map(p => `<li>Presença: ${esc(p)}</li>`).join('')}${memb.map(p => `<li>Rompida: ${esc(p)}</li>`).join('')}</ul>${pres.length || memb.length ? '' : '<p class="mini">Nada registrado.</p>'}</section></div>
+    <details class="rel-linha"><summary>Linha do tempo (${evs.length})</summary><ol>${evs.map(e => `<li><time>${new Date(num(e.ts)).toLocaleTimeString('pt-BR').slice(0, 5)}</time> ${e.q ? `<b>${esc(nomeDe(e.q))}</b> ` : ''}${esc(ROT_REL[e.t] || e.t)}${e.v && ['dano', 'cura', 'san', 'pd', 'pe'].includes(e.t) ? ` ${int(e.v)}` : ''}${e.x ? `: ${esc(e.x)}` : ''}</li>`).join('')}</ol></details>
+    <textarea class="rel-texto" hidden readonly>${esc(texto)}</textarea>
+    <footer class="rel-acoes"><button data-rel="pdf" class="btn-protocolo">🖨 Imprimir ou salvar PDF</button><button data-rel="copiar">📋 Copiar texto para o grupo</button><button data-rel="fechar">Fechar</button></footer></div>`;
+  o.hidden = false;
+}
+
+/* =========================================================
    9. LIGAÇÕES
    ========================================================= */
 let efeitoOff = null;
 function tudo() {
-  if (!efeitoOff && A.pronto) efeitoOff = A.Rede.on('efeito', mostrarSigilo, () => {});
+  if (!efeitoOff && A.pronto) efeitoOff = A.Rede.on('efeito', aoEfeito, () => {});
+  ligarRelatorio();
+  vigiarMembrana();
+  vigiarContadores();
+  vigiarRelatorio();
+  vigiarChamadoMembrana();
+  pintarMembrana();
   desenharHud();
   efeitosDaTela();
   contarTurnos();
@@ -673,10 +1031,11 @@ document.addEventListener('acf-perfil', () => setTimeout(agendar, 50));
 document.addEventListener('acf-ativa', agendar);
 document.addEventListener('click', e => { if (e.target.closest('#painel [data-mi]')) aoClicarMesa(e); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = $('#escudoMestre'); if (o && !o.hidden) o.hidden = true; } });
-const bNova = $('#mesaNovaCena'); if (bNova) bNova.addEventListener('click', () => { if (confirm('Começar uma nova cena? Zera os contadores de Morrendo e Enlouquecendo.')) novaCena(); });
+const bNova = $('#mesaNovaCena'); if (bNova) bNova.addEventListener('click', () => { if (confirm('Começar uma nova cena? Zera os contadores de Morrendo e Enlouquecendo e desconta a munição usada.')) novaCena(); });
 const bEsc = $('#mesaEscudo'); if (bEsc) bEsc.addEventListener('click', abrirEscudo);
 // navegadores só liberam som depois de um toque: tenta de novo o ambiente no primeiro clique
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
-window.ACF_MESA = { abrirEscudo, desenharHud, novaCena, danoDeterminacao };
+setInterval(pintarMembrana, 1200);
+window.ACF_MESA = { abrirEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio };
 })();
