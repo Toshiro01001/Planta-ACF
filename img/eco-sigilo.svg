@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="230 350 740 820" width="740" height="820" role="img" aria-label="Sigilo do Eco">
+  <defs>
+    <filter id="brush" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.02" numOctaves="2" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="15" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <g id="sig" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <g stroke="#7a3fa0" stroke-opacity=".5" filter="url(#soft)">
+        <path stroke-width="34" d="M600 548 C858 600 940 880 760 1030 C672 1108 528 1108 440 1030 C280 920 300 700 360 600"/>
+        <path stroke-width="22" d="M600 392 a78 78 0 1 0 0.1 0"/>
+        <line stroke-width="22" x1="600" y1="560" x2="600" y2="1030"/>
+      </g>
+      <g stroke="#9fc23f" stroke-opacity=".9">
+        <path stroke-width="15" d="M600 548 C858 600 940 880 760 1030 C672 1108 528 1108 440 1030 C280 920 300 700 360 600"/>
+        <path stroke-width="11" d="M600 392 a78 78 0 1 0 0.1 0"/>
+        <line stroke-width="10" x1="600" y1="560" x2="600" y2="1030"/>
+      </g>
+      <g stroke="#eef6cf">
+        <path stroke-width="5" d="M600 548 C858 600 940 880 760 1030 C672 1108 528 1108 440 1030 C280 920 300 700 360 600"/>
+        <path stroke-width="4" d="M600 392 a78 78 0 1 0 0.1 0"/>
+        <line stroke-width="3.5" x1="600" y1="560" x2="600" y2="1030"/>
+      </g>
+      <ellipse cx="600" cy="470" rx="13" ry="34" fill="#eef6cf" stroke="none"/>
+      <g stroke="#eef6cf" stroke-width="4" stroke-opacity=".95">
+        <line x1="566" y1="630" x2="634" y2="650"/>
+        <line x1="560" y1="730" x2="640" y2="730"/>
+        <line x1="566" y1="830" x2="634" y2="810"/>
+        <line x1="572" y1="930" x2="628" y2="945"/>
+      </g>
+    </g>
+  </defs>
+  <use href="#sig" filter="url(#brush)"/>
+</svg>
