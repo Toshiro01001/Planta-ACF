@@ -197,12 +197,12 @@ function htmlDoc(id, d, mestreVe) {
 function publicarDoc(id) {
   const d = (sg()._docs || {})[id]; if (!d) return;
   if (!d.pub) { A.definir(['docs', id], null); return; }
-  A.definir(['docs', id], { tit: d.tit || '', cab: d.cab || '', data: d.data === undefined ? null : String(d.data), onde: d.onde || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() });
+  A.definir(['docs', id], { tit: d.tit || '', pasta: d.pasta || '', cab: d.cab || '', data: d.data === undefined ? null : String(d.data), onde: d.onde || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() });
 }
 function publicarCifra(id) {
   const c = (sg()._cifras || {})[id]; if (!c) return;
   if (!c.pub) { A.definir(['cifras', id], null); return; }
-  A.definir(['cifras', id], { tit: c.tit || '', onde: c.onde || '', s: cifrar(c.txt), ts: num(c.ts) || Date.now() });
+  A.definir(['cifras', id], { tit: c.tit || '', pasta: c.pasta || '', onde: c.onde || '', s: cifrar(c.txt), ts: num(c.ts) || Date.now() });
 }
 
 /* =========================================================
@@ -267,127 +267,263 @@ async function enviarVisao() {
   const log = ls.get('acf-visoes-enviadas', []);
   log.unshift({ id: v.id, alvo, txt, img: !!img, ts: v.ts });
   ls.set('acf-visoes-enviadas', log.slice(0, 15));
-  $('#vsTxt').value = ''; $('#vsImg').value = '';
   A.aviso(`Visão enviada para ${nome}.`);
-  desenharLista();
+  fecharForm(); desenharFerramentas(); selecionar(v.id);
 }
 
 /* =========================================================
    4. JANELA DO ARQUIVO (jogadores e Mestre)
    ========================================================= */
-const Arq = { aba: 'cifras', aberto: false, edit: null };
-function abrir(aba) {
+const Arq = { aba: 'docs', aberto: false, edit: null, sel: {}, busca: {}, filtro: {}, sala: {}, ordem: {}, mob: 'lista' };
+const quemSou = () => A.meu || A.aux || 'mestre';
+const KEY_FIX = () => 'acf-arq-fixos-' + quemSou();
+const KEY_LIDOS = () => 'acf-arq-lidos-' + quemSou();
+const KEY_FECHADAS = 'acf-arq-pastas-fechadas';
+const estreito = () => matchMedia('(max-width: 700px)').matches;
+const ABAS = () => A.mestre ? [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Chave'], ['visoes-m', 'Visões']] : [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Decifrar'], ['visoes', 'Visões']];
+const nTarjas = d => (String(d.txt || '').match(/\[\[[\s\S]*?\]\]/g) || []).length;
+const revDoc = d => (Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {})).filter(p => p.x !== undefined && p.t !== undefined).length;
+const glifosDe = c => [...new Set((Array.isArray(c.s) ? c.s : Object.values(c.s || {})).filter(x => typeof x === 'number'))];
+const revCifra = c => glifosDe(c).filter(g => revDe(g)).length;
+const salaDe = o => { const m = /^sala:(\d+)$/.exec(o || ''); return m ? +m[1] : 0; };
+// data escrita no documento ("21/12/2012") vira número para ordenar; sem data, usa a criação
+function dataOrd(txt, ts) { const m = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(txt || ''); if (m) { let y = +m[3]; if (y < 100) y += 1900; return Date.UTC(y, +m[2] - 1, +m[1]); } const a = /\b(1[89]\d\d|20\d\d)\b/.exec(txt || ''); return a ? Date.UTC(+a[1], 0, 1) : num(ts); }
+const fixos = () => ls.get(KEY_FIX(), {});
+const ehFixo = (aba, id) => !!(fixos()[aba] || {})[id];
+function lido(aba) { return (ls.get(KEY_LIDOS(), {})[aba]) || {}; }
+function marcarLido(aba, id, n) {
+  if (estreito() && Arq.mob !== 'leitor') return;   // no celular, só conta como lido quando abre
+  const t = ls.get(KEY_LIDOS(), {}); t[aba] = t[aba] || {}; if (t[aba][id] === n) return;
+  t[aba][id] = n; ls.set(KEY_LIDOS(), t); atualizarBadge();
+  setTimeout(() => { desenharEstante(); atualizarAbas(); }, 0);
+}
+function marcaDe(aba, id, n) { if (A.mestre) return ''; const l = lido(aba); if (!(id in l)) return 'novo'; return n > l[id] ? 'liberado' : ''; }
+
+// cada aba vira uma lista de entradas do mesmo formato: a estante só sabe desenhar isso
+function entradas(aba) {
+  if (aba === 'docs') {
+    if (A.mestre) return Object.entries(sg()._docs || {}).map(([id, d]) => { const n = nTarjas(d), r = Object.keys(d.rev || {}).length;
+      return { id, tit: d.tit || 'Sem título', pasta: d.pasta || '', sala: salaDe(d.onde), pub: !!d.pub, ts: num(d.ts), dataTxt: d.data !== undefined ? d.data : '', ord: dataOrd(d.data, d.ts), extra: n ? `${r}/${n} tarjas` : '', busca: `${d.tit} ${d.txt} ${d.pasta || ''} ${d.data || ''}` }; });
+    return Object.entries(docsPub()).filter(([, d]) => ondeVisivel(d.onde)).map(([id, d]) => { const n = revDoc(d);
+      return { id, tit: d.tit || 'Documento', pasta: d.pasta || '', sala: salaDe(d.onde), ts: num(d.ts), dataTxt: d.data || '', ord: dataOrd(d.data, d.ts), marca: marcaDe('docs', id, n), n, busca: `${d.tit} ${(Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {})).map(p => p.t || '').join(' ')} ${d.pasta || ''}` }; });
+  }
+  if (aba === 'cifras') {
+    if (A.mestre) return Object.entries(sg()._cifras || {}).map(([id, c]) => ({ id, tit: c.tit || 'Sem título', pasta: c.pasta || '', sala: salaDe(c.onde), pub: !!c.pub, ts: num(c.ts), ord: num(c.ts), busca: `${c.tit} ${c.txt} ${c.pasta || ''}` }));
+    return Object.entries(cifrasPub()).filter(([, c]) => ondeVisivel(c.onde)).map(([id, c]) => { const n = revCifra(c);
+      return { id, tit: c.tit || 'Inscrição', pasta: c.pasta || '', sala: salaDe(c.onde), ts: num(c.ts), ord: num(c.ts), marca: marcaDe('cifras', id, n), n, extra: `${n}/${glifosDe(c).length} letras`, busca: `${c.tit} ${c.pasta || ''}` }; });
+  }
+  if (aba === 'chave') {
+    const usados = new Set();
+    Object.values(cifrasPub()).filter(c => ondeVisivel(c.onde)).forEach(c => glifosDe(c).forEach(g => usados.add(g)));
+    if (A.mestre) Object.values(sg()._cifras || {}).forEach(c => cifrar(c.txt).forEach(t => { if (typeof t === 'number') usados.add(t); }));
+    const lista = [...usados].map(g => { const rv = revDe(g), pl = palpites['g' + g];
+      return { id: 'g' + g, g, tit: rv || (pl ? pl.l : '?'), pasta: rv ? 'Confirmadas' : pl ? 'Com palpite' : 'Sem palpite', estado: rv ? 'conf' : pl ? 'pal' : 'sem', ord: g, letra: rv || (pl ? pl.l : '~'), extra: A.mestre ? `é ${letraDoGlifo(g)}` : '', busca: `${rv} ${pl ? pl.l : ''} ${A.mestre ? letraDoGlifo(g) : ''}` }; });
+    if (lista.length) lista.unshift({ id: 'todos', tit: 'Quadro completo', pasta: '', fixo: true, ord: -1, busca: 'quadro todos' });
+    return lista;
+  }
+  if (aba === 'visoes') return ls.get(chaveVisoes(), []).map(h => ({ id: h.id, tit: h.txt ? (h.txt.length > 46 ? h.txt.slice(0, 44) + '…' : h.txt) : '(só imagem)', pasta: '', ts: num(h.ts), ord: num(h.ts), marca: marcaDe('visoes', h.id, 1), img: !!h.img, busca: h.txt || '' }));
+  if (aba === 'visoes-m') return ls.get('acf-visoes-enviadas', []).map(h => ({ id: h.id || 't' + h.ts, tit: h.txt ? (h.txt.length > 46 ? h.txt.slice(0, 44) + '…' : h.txt) : '(só imagem)', pasta: (A.SER[h.alvo] || {}).nome || h.alvo, alvo: h.alvo, ts: num(h.ts), ord: num(h.ts), img: !!h.img, busca: `${h.txt || ''} ${(A.SER[h.alvo] || {}).nome || ''}` }));
+  return [];
+}
+const PASTA_PADRAO = { docs: 'Sem pasta', cifras: 'Sem pasta', visoes: 'Suas visões', 'visoes-m': 'Sem destino', chave: 'Símbolos' };
+const ORDENS = { docs: [['rec', 'Mais recentes'], ['data', 'Data no documento'], ['tit', 'Título'], ['sala', 'Sala']], cifras: [['rec', 'Mais recentes'], ['tit', 'Título'], ['sala', 'Sala']], chave: [['sim', 'Símbolo'], ['letra', 'Letra']], visoes: [['rec', 'Mais recentes'], ['ant', 'Mais antigas']], 'visoes-m': [['rec', 'Mais recentes'], ['ant', 'Mais antigas']] };
+function filtros(aba) {
+  if (aba === 'chave') return [['todos', 'Todas'], ['conf', 'Confirmadas'], ['pal', 'Com palpite'], ['sem', 'Sem palpite']];
+  if (A.mestre && (aba === 'docs' || aba === 'cifras')) return [['todos', 'Todos'], ['pub', 'Publicados'], ['ocu', 'Ocultos']];
+  if (A.mestre) return [['todos', 'Todas']];
+  return [['todos', 'Todos'], ['novos', 'Novos']];
+}
+function filtrar(aba, lista) {
+  const f = Arq.filtro[aba] || 'todos', q = normal(Arq.busca[aba] || '').trim(), s = Arq.sala[aba] || '';
+  return lista.filter(e => {
+    if (e.id === 'todos') return !q;
+    if (f === 'pub' && !e.pub) return false; if (f === 'ocu' && e.pub) return false;
+    if (f === 'novos' && !e.marca) return false;
+    if (['conf', 'pal', 'sem'].includes(f) && e.estado !== f) return false;
+    if (s && (aba === 'visoes-m' ? e.alvo !== s : String(e.sala) !== s)) return false;
+    return !q || normal(e.busca + ' ' + e.tit).includes(q);
+  });
+}
+function ordenar(aba, lista) {
+  const o = Arq.ordem[aba] || ORDENS[aba][0][0];
+  const cmp = { rec: (a, b) => b.ts - a.ts, ant: (a, b) => a.ts - b.ts, data: (a, b) => b.ord - a.ord, tit: (a, b) => a.tit.localeCompare(b.tit, 'pt'), sala: (a, b) => (a.sala || 999) - (b.sala || 999) || b.ts - a.ts, sim: (a, b) => a.ord - b.ord, letra: (a, b) => String(a.letra).localeCompare(String(b.letra)) || a.ord - b.ord }[o] || ((a, b) => b.ts - a.ts);
+  return lista.sort(cmp);
+}
+
+/* ---------- janela ---------- */
+function abrir(aba, novo) {
   let o = $('#arquivoTela');
   if (!o) {
     o = document.createElement('div'); o.id = 'arquivoTela'; o.className = 'arquivo-tela';
-    o.innerHTML = `<div class="arq-caixa"><header class="arq-cab"><div><span>O.R.F.E.U. · ACERVO INTERNO</span><h2>Arquivo da O.R.F.E.U.</h2></div><button data-arq="fechar" aria-label="Fechar">×</button></header>
-      <nav class="arq-abas"></nav><div class="arq-corpo"><div id="arqForm"></div><div id="arqLista"></div></div></div>`;
+    o.innerHTML = `<div class="arq-caixa"><header class="arq-cab"><div><span>O.R.F.E.U. · ACERVO INTERNO</span><h2>Arquivo</h2></div><nav class="arq-abas"></nav><button data-arq="fechar" class="arq-x" aria-label="Fechar">×</button></header>
+      <div class="arq-corpo"><aside class="arq-estante"><div class="arq-ferr" id="arqFerr"></div><div class="arq-lista" id="arqLista"></div><div class="arq-estante-pe" id="arqPe"></div></aside>
+      <section class="arq-leitor" id="arqLeitor"></section></div>
+      <div class="arq-modal" id="arqModal" hidden><div class="arq-modal-caixa"><header><b id="arqModalTit"></b><button data-arq="cancelar" class="arq-x" aria-label="Fechar">×</button></header><div id="arqForm"></div></div></div></div>`;
     document.body.appendChild(o);
     o.addEventListener('click', aoClicar);
-    o.addEventListener('change', e => { if (e.target.id === 'cfOnde' || e.target.id === 'dcOnde') { const n = $('#' + e.target.id + 'Cn'); if (n) n.hidden = e.target.value !== 'sala'; } });
+    o.addEventListener('change', e => {
+      if (e.target.id === 'cfOnde' || e.target.id === 'dcOnde') { const n = $('#' + e.target.id + 'Cn'); if (n) n.hidden = e.target.value !== 'sala'; }
+      if (e.target.dataset.arqF) { Arq[e.target.dataset.arqF][Arq.aba] = e.target.value; desenharEstante(); }
+    });
+    o.addEventListener('input', e => { if (e.target.id === 'arqBusca') { Arq.busca[Arq.aba] = e.target.value; desenharEstante(); } });
   }
   if (aba) Arq.aba = aba;
-  if (!A.mestre && Arq.aba === 'visoes-m') Arq.aba = 'cifras';
-  Arq.aberto = true; Arq.edit = null;
+  if (!ABAS().some(a => a[0] === Arq.aba)) Arq.aba = 'docs';
+  Arq.aberto = true; Arq.mob = 'lista';
   o.hidden = false;
   document.body.classList.add('arq-aberto');
-  if (!A.mestre) { ls.set('acf-arq-visto-' + (A.meu || A.aux || ''), Date.now()); atualizarBadge(); }
   desenharTudo();
+  if (novo) abrirForm(null);
 }
-function fechar() { const o = $('#arquivoTela'); if (o) o.hidden = true; Arq.aberto = false; document.body.classList.remove('arq-aberto'); fecharPalpite(); }
+function fechar() { const o = $('#arquivoTela'); if (o) o.hidden = true; Arq.aberto = false; fecharForm(); document.body.classList.remove('arq-aberto'); fecharPalpite(); }
 function desenharTudo() {
-  const abas = A.mestre ? [['cifras', 'Cifras'], ['docs', 'Documentos'], ['chave', 'Chave'], ['visoes-m', 'Visões']] : [['cifras', 'Cifras'], ['docs', 'Documentos'], ['chave', 'Decifrar'], ['visoes', 'Visões']];
-  if (!abas.some(a => a[0] === Arq.aba)) Arq.aba = 'cifras';
-  $('#arquivoTela .arq-abas').innerHTML = abas.map(([k, n]) => `<button data-arq="aba" data-v="${k}" class="${Arq.aba === k ? 'on' : ''}">${n}</button>`).join('');
-  desenharForm(); desenharLista();
+  const o = $('#arquivoTela'); if (!o) return;
+  $('.arq-abas', o).innerHTML = ABAS().map(([k, n]) => { const novos = A.mestre ? 0 : entradas(k).filter(e => e.marca).length;
+    return `<button data-arq="aba" data-v="${k}" class="${Arq.aba === k ? 'on' : ''}">${n}${novos ? `<i class="arq-ponto">${novos}</i>` : ''}</button>`; }).join('');
+  desenharFerramentas(); desenharEstante(); desenharLeitor(true);
 }
-const opcoesOnde = (id, onde) => { const m = /^sala:(\d+)$/.exec(onde || ''); return `<label class="arq-campo">Onde aparece <select id="${id}"><option value="">Só no Arquivo</option><option value="sala" ${m ? 'selected' : ''}>Na parede de uma sala</option></select></label><label class="arq-campo" id="${id}Cn" ${m ? '' : 'hidden'}>CN da sala <input type="number" id="${id}N" min="1" max="125" value="${m ? m[1] : ''}"></label>`; };
-const lerOnde = id => { if ($('#' + id).value !== 'sala') return ''; const n = int($('#' + id + 'N').value); return n >= 1 && n <= 125 ? 'sala:' + n : ''; };
-function desenharForm() {
-  const f = $('#arqForm'); if (!f) return;
-  if (!A.mestre) {
-    f.innerHTML = Arq.aba === 'chave' ? '<p class="arq-dica">Cada símbolo é sempre a mesma letra em todas as cifras. Toque num símbolo para marcar seu palpite; todos da mesa veem. As letras carimbadas foram confirmadas pelo Mestre.</p>'
-      : Arq.aba === 'cifras' ? '<p class="arq-dica">Mensagens em sigilos encontradas pela equipe. Toque num símbolo para dar um palpite.</p>'
-      : Arq.aba === 'docs' ? '<p class="arq-dica">Documentos recuperados. Os trechos tarjados podem ser liberados pelo Mestre durante a investigação.</p>'
-      : '<p class="arq-dica">Só você vê as suas visões. Elas ficam guardadas neste aparelho.</p>';
-    return;
+function desenharFerramentas() {
+  const aba = Arq.aba, f = $('#arqFerr');
+  const salas = aba === 'visoes-m' ? cobaias().map(x => [x.id, x.nome]) : aba === 'chave' ? [] : [...new Set(entradas(aba).map(e => e.sala).filter(Boolean))].sort((a, b) => a - b).map(cn => [String(cn), `CN ${String(cn).padStart(2, '0')}`]);
+  f.innerHTML = `<input id="arqBusca" type="search" placeholder="Buscar ${aba === 'chave' ? 'letra' : aba.startsWith('visoes') ? 'visão' : aba === 'cifras' ? 'cifra' : 'documento'}…" value="${esc(Arq.busca[aba] || '')}" autocomplete="off">
+    <div class="arq-chips">${filtros(aba).map(([k, n]) => `<button data-arq="filtro" data-v="${k}" class="${(Arq.filtro[aba] || 'todos') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+    <div class="arq-selects">${salas.length ? `<select data-arq-f="sala" aria-label="${aba === 'visoes-m' ? 'Cobaia' : 'Sala'}"><option value="">${aba === 'visoes-m' ? 'Todas as cobaias' : 'Todas as salas'}</option>${salas.map(([v, n]) => `<option value="${v}" ${Arq.sala[aba] === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
+      <select data-arq-f="ordem" aria-label="Ordem">${ORDENS[aba].map(([k, n]) => `<option value="${k}" ${(Arq.ordem[aba] || ORDENS[aba][0][0]) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
+  const pe = $('#arqPe');
+  const novo = A.mestre ? { docs: '+ Novo documento', cifras: '+ Nova cifra', 'visoes-m': '+ Nova visão' }[aba] : '';
+  pe.innerHTML = novo ? `<button data-arq="novo" class="pri">${novo}</button>` : aba === 'chave' && A.mestre ? '<button data-arq="pal-limpar" class="perigo">Apagar todos os palpites</button>' : aba === 'visoes' && entradas('visoes').length ? '<button data-arq="vs-apagar-tudo" class="perigo">Apagar todas</button>' : '';
+  pe.hidden = !pe.innerHTML;
+}
+function desenharEstante() {
+  const l = $('#arqLista'); if (!l || !Arq.aberto) return;
+  const aba = Arq.aba, todas = entradas(aba);
+  const lista = ordenar(aba, filtrar(aba, todas));
+  const fx = fixos()[aba] || {}, fechadas = ls.get(KEY_FECHADAS, {});
+  const grupos = new Map();
+  const fixadas = lista.filter(e => fx[e.id] || e.fixo);
+  if (fixadas.length) grupos.set('📌 Fixados', fixadas);
+  lista.filter(e => !fx[e.id] && !e.fixo).forEach(e => { const p = e.pasta || PASTA_PADRAO[aba]; if (!grupos.has(p)) grupos.set(p, []); grupos.get(p).push(e); });
+  // a pasta padrão vai para o fim; as outras em ordem alfabética
+  const nomes = [...grupos.keys()].sort((a, b) => (a === '📌 Fixados' ? -1 : b === '📌 Fixados' ? 1 : a === PASTA_PADRAO[aba] ? 1 : b === PASTA_PADRAO[aba] ? -1 : a.localeCompare(b, 'pt')));
+  const sel = Arq.sel[aba];
+  const linha = e => `<button class="arq-row${sel === e.id ? ' on' : ''}${e.pub === false ? ' ocu' : ''}" data-arq="sel" data-id="${esc(e.id)}">
+      ${aba === 'chave' && e.g !== undefined ? `<span class="arq-gl">${glifoSVG(e.g)}</span>` : ''}
+      <span class="arq-row-txt"><b>${aba === 'chave' && e.g !== undefined ? `<span class="arq-letra ${e.estado}">${esc(e.tit)}</span>` : esc(e.tit)}</b>
+      <small>${[e.dataTxt, e.sala ? 'CN ' + String(e.sala).padStart(2, '0') : '', aba === 'visoes-m' || aba === 'visoes' ? new Date(e.ts).toLocaleDateString('pt-BR') : '', e.img ? 'com imagem' : '', e.extra].filter(Boolean).map(esc).join(' · ')}</small></span>
+      ${e.marca ? `<i class="arq-marca ${e.marca}">${e.marca === 'novo' ? 'NOVO' : 'LIBERADO'}</i>` : ''}${e.pub !== undefined ? `<i class="arq-estado ${e.pub ? 'pub' : ''}" title="${e.pub ? 'Publicado' : 'Oculto dos jogadores'}"></i>` : ''}</button>`;
+  const html = lista.length ? nomes.map(p => { const k = aba + ':' + p, fechada = !!fechadas[k] && !Arq.busca[aba];
+    return `<div class="arq-pasta${fechada ? ' fechada' : ''}"><button class="arq-pasta-cab" data-arq="pasta" data-v="${esc(k)}"><span>${esc(p)}</span><i>${grupos.get(p).length}</i></button>${fechada ? '' : `<div class="arq-pasta-itens">${grupos.get(p).map(linha).join('')}</div>`}</div>`; }).join('')
+    : `<p class="arq-vazio">${todas.length ? 'Nada com esses filtros.' : vazioDe(aba)}</p>`;
+  if (l.dataset.html !== html) { l.innerHTML = html; l.dataset.html = html; }
+  // nada selecionado: abre o mais recente (no celular, a lista vem primeiro)
+  if (!sel || !todas.some(e => e.id === sel)) {
+    const prim = lista.find(e => e.marca) || ordenar(aba, todas.filter(e => e.id !== 'todos').slice())[0] || lista[0];
+    if (aba === 'chave') Arq.sel[aba] = todas.length ? 'todos' : undefined;
+    else Arq.sel[aba] = prim ? prim.id : undefined;
+    if (Arq.sel[aba] !== sel) { desenharEstante(); desenharLeitor(); }
   }
-  if (Arq.aba === 'cifras') {
-    const c = Arq.edit ? (sg()._cifras || {})[Arq.edit] || {} : {};
-    f.innerHTML = `<div class="arq-form"><h3>${Arq.edit ? 'Editar cifra' : 'Nova cifra'}</h3>
-      <label class="arq-campo">Título (os jogadores veem) <input id="cfTit" maxlength="80" value="${esc(c.tit || '')}" placeholder="Ex.: Inscrição na porta da CN 14"></label>
+}
+const vazioDe = aba => ({ docs: A.mestre ? 'Nenhum documento criado.' : 'Nenhum documento encontrado ainda.', cifras: A.mestre ? 'Nenhuma cifra criada.' : 'Nenhuma cifra encontrada ainda.', chave: 'Nenhum símbolo encontrado ainda.', visoes: 'Nenhuma visão… ainda.', 'visoes-m': 'Nenhuma visão enviada deste aparelho.' }[aba]);
+
+/* ---------- leitor ---------- */
+const btnFixar = (aba, id) => `<button data-arq="fixar" data-id="${esc(id)}" class="${ehFixo(aba, id) ? 'on' : ''}" title="Fixar no topo da estante">📌 ${ehFixo(aba, id) ? 'Fixado' : 'Fixar'}</button>`;
+const voltar = '<button data-arq="voltar" class="arq-voltar">‹ Voltar</button>';
+function desenharLeitor(forcar) {
+  const el = $('#arqLeitor'); if (!el || !Arq.aberto) return;
+  const corpo = $('#arquivoTela .arq-corpo'); corpo.dataset.mob = Arq.mob;
+  const aba = Arq.aba, id = Arq.sel[aba];
+  let barra = '', html = '';
+  if (!id) html = `<div class="arq-leitor-vazio"><span>◈</span><p>${A.mestre && aba !== 'chave' ? 'Escolha um item na estante ou crie um novo.' : 'Escolha um item na estante.'}</p></div>`;
+  else if (aba === 'docs') {
+    if (A.mestre) { const d = (sg()._docs || {})[id]; if (d) { const n = nTarjas(d), r = Object.keys(d.rev || {}).length;
+      barra = `<button data-arq="dc-pub" data-id="${id}" class="${d.pub ? '' : 'pri'}">${d.pub ? '◌ Esconder' : '● Publicar'}</button>${n ? `<button data-arq="dc-abrir" data-id="${id}">Revelar todas</button><button data-arq="dc-fechar" data-id="${id}">Tarjar todas</button>` : ''}<button data-arq="dc-editar" data-id="${id}">✎ Editar</button>${btnFixar(aba, id)}<button data-arq="dc-apagar" data-id="${id}" class="perigo arq-dir">Apagar</button>`;
+      html = `<p class="arq-meta">${[d.pub ? 'Publicado' : 'Oculto dos jogadores', d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : 'Só no Arquivo', n ? `${r} de ${n} tarjas abertas · toque numa tarja para abrir ou fechar` : ''].filter(Boolean).map(esc).join(' · ')}</p><div class="doc-mestre" data-doc="${id}">${htmlDoc(id, d, true)}</div>`; } }
+    else { const d = docsPub()[id]; if (d) { barra = btnFixar(aba, id); html = `<p class="arq-meta">${[d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : ''].filter(Boolean).map(esc).join(' · ')}</p>${htmlDoc(id, d, false)}`; marcarLido('docs', id, revDoc(d)); } }
+  } else if (aba === 'cifras') {
+    if (A.mestre) { const c = (sg()._cifras || {})[id]; if (c) {
+      barra = `<button data-arq="cf-pub" data-id="${id}" class="${c.pub ? '' : 'pri'}">${c.pub ? '◌ Esconder' : '● Publicar'}</button>${c.pub ? `<button data-arq="cf-chat" data-id="${id}">Mandar no chat</button><button data-arq="cf-revtudo" data-id="${id}">Revelar letras</button><button data-arq="cf-esctudo" data-id="${id}">Esconder letras</button>` : ''}<button data-arq="cf-editar" data-id="${id}">✎ Editar</button>${btnFixar(aba, id)}<button data-arq="cf-apagar" data-id="${id}" class="perigo arq-dir">Apagar</button>`;
+      html = `<p class="arq-meta">${[c.pub ? 'Publicada' : 'Oculta dos jogadores', c.pasta, c.onde ? A.nomeSala(salaDe(c.onde)) : 'Só no Arquivo'].filter(Boolean).map(esc).join(' · ')}</p>
+        <article class="cf-folha"><header><span class="doc-cab">O.R.F.E.U. · INSCRIÇÃO</span><h3>${esc(c.tit || 'Sem título')}</h3></header><p class="arq-plano">${esc(c.txt || '')}</p>${htmlCifra(id, c.pub ? cifrasPub()[id] : { s: cifrar(c.txt) }, 'cheia')}</article>
+        <p class="mini">Toque num símbolo para revelar ou esconder a letra em todas as cifras. Palpites: verde certo, vermelho errado.</p>`; } }
+    else { const c = cifrasPub()[id]; if (c) { barra = btnFixar(aba, id); html = `<p class="arq-meta">${[c.pasta, c.onde ? A.nomeSala(salaDe(c.onde)) : '', `${revCifra(c)} de ${glifosDe(c).length} letras confirmadas`].filter(Boolean).map(esc).join(' · ')}</p>
+      <article class="cf-folha"><header><span class="doc-cab">INSCRIÇÃO ENCONTRADA</span><h3>${esc(c.tit || 'Inscrição')}</h3></header>${htmlCifra(id, c, 'cheia')}</article><p class="mini">Toque num símbolo para dar um palpite. Todos da mesa veem.</p>`; marcarLido('cifras', id, revCifra(c)); } }
+  } else if (aba === 'chave') {
+    if (id === 'todos') { const es = entradas('chave').filter(e => e.g !== undefined).sort((a, b) => a.g - b.g);
+      html = `<article class="cf-folha"><header><span class="doc-cab">CHAVE DOS SIGILOS</span><h3>Quadro completo</h3></header><div class="cifra cf-chave"><div class="cf-texto">${es.map(e => `<span class="cf-palavra">${htmlCel(e.g)}</span>`).join('')}</div></div></article>
+        <p class="arq-meta">${es.filter(e => e.estado === 'conf').length} de ${es.length} confirmadas · ${es.filter(e => e.estado === 'pal').length} com palpite · cada símbolo é sempre a mesma letra em todas as cifras</p>`; }
+    else { const g = +id.slice(1), rv = revDe(g), pl = palpites['g' + g];
+      const onde = Object.entries(A.mestre ? sg()._cifras || {} : cifrasPub()).filter(([, c]) => (A.mestre ? cifrar(c.txt) : glifosDe(c)).includes(g)).map(([cid, c]) => `<button data-arq="ir-cifra" data-id="${cid}">◈ ${esc(c.tit || 'Cifra')}</button>`).join('');
+      barra = A.mestre ? `<button data-arq="gl-rev" data-id="${g}" class="${rv ? '' : 'pri'}">${rv ? 'Esconder a letra' : `Revelar como ${letraDoGlifo(g)}`}</button>` : rv ? '' : `<button data-arq="gl-pal" data-id="${g}" class="pri">${pl ? 'Mudar palpite' : 'Dar palpite'}</button>`;
+      html = `<div class="gl-ficha"><div class="gl-grande">${glifoSVG(g)}</div><div><p class="gl-letra ${rv ? 'conf' : pl ? 'pal' : 'sem'}">${esc(rv || (pl ? pl.l : '?'))}</p>
+        <p class="arq-meta">${rv ? 'Confirmada pelo Mestre' : pl ? `Palpite de ${esc((A.SER[pl.por] || {}).nome || 'alguém')}` : 'Ninguém arriscou ainda'}${A.mestre ? ` · na chave: ${letraDoGlifo(g)}` : ''}</p></div></div>
+        ${onde ? `<p class="arq-sub">Aparece em</p><div class="arq-linha">${onde}</div>` : ''}`; }
+  } else if (aba === 'visoes') { const h = ls.get(chaveVisoes(), []).find(x => x.id === id); if (h) {
+      barra = `<button data-arq="vs-rever" data-id="${esc(id)}" class="pri">▶ Rever</button>${btnFixar(aba, id)}<button data-arq="vs-apagar" data-id="${esc(id)}" class="perigo arq-dir">Apagar</button>`;
+      html = `<article class="vs-folha">${h.img ? `<img src="${h.img}" alt="">` : ''}<p>${esc(h.txt || '')}</p><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}</small></article>`; marcarLido('visoes', id, 1); } }
+  else if (aba === 'visoes-m') { const log = ls.get('acf-visoes-enviadas', []); const i = log.findIndex(h => (h.id || 't' + h.ts) === id), h = log[i]; if (h) {
+      barra = `${btnFixar(aba, id)}<button data-arq="vsm-apagar" data-i="${i}" class="perigo arq-dir" title="${h.id ? 'Apaga também do Arquivo do jogador' : 'Apaga só desta lista'}">Apagar</button>`;
+      html = `<p class="arq-meta">Para ${esc((A.SER[h.alvo] || {}).nome || h.alvo)} · ${new Date(num(h.ts)).toLocaleString('pt-BR')}${h.img ? ' · com imagem (a imagem fica só com o jogador)' : ''}</p><article class="vs-folha"><p>${esc(h.txt || '(só imagem)')}</p></article>
+        <p class="mini">Apagar tira a visão daqui e também do Arquivo do jogador, na próxima vez que ele estiver com o site aberto.</p>`; } }
+  if (id && !html) html = `<div class="arq-leitor-vazio"><span>◈</span><p>Este item não existe mais.</p></div>`;
+  const tudo = `<div class="arq-barra">${voltar}${barra}</div><div class="arq-papel">${html}</div>`;
+  if (forcar || el.dataset.html !== tudo) { const rol = el.scrollTop, mesmo = el.dataset.item === aba + id; el.innerHTML = tudo; el.dataset.html = tudo; el.dataset.item = aba + id; el.scrollTop = mesmo ? rol : 0; }
+}
+function desenharLista() { desenharEstante(); desenharLeitor(); }
+// contadores de novidades nas abas, sem redesenhar o resto
+function atualizarAbas() {
+  if (A.mestre) return;
+  $$('#arquivoTela .arq-abas button').forEach(b => { const n = entradas(b.dataset.v).filter(e => e.marca).length; let i = $('.arq-ponto', b);
+    if (n && !i) { i = document.createElement('i'); i.className = 'arq-ponto'; b.appendChild(i); } if (i) { if (n) i.textContent = n; else i.remove(); } });
+}
+
+/* ---------- formulários (janela por cima) ---------- */
+const opcoesOnde = (id, onde) => { const m = /^sala:(\d+)$/.exec(onde || ''); return `<div class="arq-linha"><label class="arq-campo">Onde aparece <select id="${id}"><option value="">Só no Arquivo</option><option value="sala" ${m ? 'selected' : ''}>Na parede de uma sala</option></select></label><label class="arq-campo" id="${id}Cn" ${m ? '' : 'hidden'}>CN da sala <input type="number" id="${id}N" min="1" max="125" value="${m ? m[1] : ''}"></label></div>`; };
+const lerOnde = id => { if ($('#' + id).value !== 'sala') return ''; const n = int($('#' + id + 'N').value); return n >= 1 && n <= 125 ? 'sala:' + n : ''; };
+const campoPasta = (id, v, aba) => `<label class="arq-campo">Pasta <input id="${id}" maxlength="40" list="${id}L" value="${esc(v || '')}" placeholder="Ex.: Relatórios, Relatos orais, Ordens"><datalist id="${id}L">${[...new Set(entradas(aba).map(e => e.pasta).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join('')}</datalist></label>`;
+function abrirForm(id) {
+  if (!A.mestre) return;
+  Arq.edit = id || null;
+  const f = $('#arqForm'), aba = Arq.aba;
+  if (aba === 'cifras') {
+    const c = id ? (sg()._cifras || {})[id] || {} : {};
+    $('#arqModalTit').textContent = id ? 'Editar cifra' : 'Nova cifra';
+    f.innerHTML = `<div class="arq-linha"><label class="arq-campo">Título (os jogadores veem) <input id="cfTit" maxlength="80" value="${esc(c.tit || '')}" placeholder="Ex.: Inscrição na porta da CN 14"></label>${campoPasta('cfPasta', c.pasta, 'cifras')}</div>
       <label class="arq-campo">Mensagem (letras e números viram símbolos; acentos somem) <textarea id="cfTxt" rows="3" maxlength="400" placeholder="O QUE ESTÁ ESCRITO">${esc(c.txt || '')}</textarea></label>
-      ${opcoesOnde('cfOnde', c.onde)}
-      <div class="arq-linha"><button data-arq="cf-salvar" class="pri">${Arq.edit ? 'Salvar' : 'Criar (oculta)'}</button>${Arq.edit ? '<button data-arq="cancelar">Cancelar</button>' : ''}<span class="arq-prev" id="cfPrev"></span></div></div>`;
-    const prev = () => { const t = $('#cfTxt').value; $('#cfPrev').innerHTML = t ? htmlCifra('prev', { s: cifrar(t.slice(0, 40)) }, 'mini') : ''; };
+      <div class="arq-prev" id="cfPrev"></div>${opcoesOnde('cfOnde', c.onde)}
+      <div class="arq-linha arq-form-pe"><button data-arq="cancelar">Cancelar</button><button data-arq="cf-salvar" class="pri">${id ? 'Salvar' : 'Criar (oculta)'}</button></div>`;
+    const prev = () => { const t = $('#cfTxt').value; $('#cfPrev').innerHTML = t ? htmlCifra('prev', { s: cifrar(t.slice(0, 60)) }, 'mini') : ''; };
     $('#cfTxt').oninput = prev; prev();
-  } else if (Arq.aba === 'docs') {
-    const d = Arq.edit ? (sg()._docs || {})[Arq.edit] || {} : {};
-    f.innerHTML = `<div class="arq-form"><h3>${Arq.edit ? 'Editar documento' : 'Novo documento'}</h3>
-      <label class="arq-campo">Título <input id="dcTit" maxlength="100" value="${esc(d.tit || '')}" placeholder="Ex.: Relatório do Experimento 7"></label>
-      <div class="arq-linha"><label class="arq-campo">Cabeçalho <input id="dcCab" maxlength="100" value="${esc(d.cab || '')}" placeholder="O.R.F.E.U. · DOCUMENTO INTERNO"></label>
+  } else if (aba === 'docs') {
+    const d = id ? (sg()._docs || {})[id] || {} : {};
+    $('#arqModalTit').textContent = id ? 'Editar documento' : 'Novo documento';
+    f.innerHTML = `<div class="arq-linha"><label class="arq-campo arq-largo">Título <input id="dcTit" maxlength="100" value="${esc(d.tit || '')}" placeholder="Ex.: Relatório do Experimento 7"></label>${campoPasta('dcPasta', d.pasta, 'docs')}</div>
+      <div class="arq-linha"><label class="arq-campo arq-largo">Cabeçalho <input id="dcCab" maxlength="100" value="${esc(d.cab || '')}" placeholder="O.R.F.E.U. · DOCUMENTO INTERNO"></label>
         <label class="arq-campo">Data no documento <input id="dcData" maxlength="40" value="${esc(d.data !== undefined ? d.data : new Date().toLocaleDateString('pt-BR'))}" placeholder="vazio: sem data"></label></div>
-      <p class="mini">A data aparece no pé do documento como você escrever: 21/12/2012, "março de 1998", "??/??/19??"... Deixe vazio para não mostrar data.</p>
-      <label class="arq-campo">Texto. Coloque entre [[colchetes duplos]] o que fica tarjado. <textarea id="dcTxt" rows="7" maxlength="6000" placeholder="O paciente [[nome]] foi transferido para a ala [[C-12]] em...">${esc(d.txt || '')}</textarea></label>
+      <label class="arq-campo">Texto · entre [[colchetes duplos]] fica tarjado <textarea id="dcTxt" rows="10" maxlength="6000" placeholder="O paciente [[nome]] foi transferido para a ala [[C-12]] em...">${esc(d.txt || '')}</textarea></label>
       ${opcoesOnde('dcOnde', d.onde)}
-      <div class="arq-linha"><button data-arq="dc-salvar" class="pri">${Arq.edit ? 'Salvar' : 'Criar (oculto)'}</button>${Arq.edit ? '<button data-arq="cancelar">Cancelar</button>' : ''}</div></div>`;
-  } else if (Arq.aba === 'visoes-m') {
-    f.innerHTML = `<div class="arq-form"><h3>Mandar uma visão</h3><p class="mini">Aparece só na tela da cobaia escolhida, com som. Os outros veem apenas "Fulano teve uma visão" no chat, se você deixar marcado.</p>
+      <p class="mini">A data sai no pé do documento como você escrever (21/12/2012, "março de 1998", "??/??/19??"); vazio esconde.</p>
+      <div class="arq-linha arq-form-pe"><button data-arq="cancelar">Cancelar</button><button data-arq="dc-salvar" class="pri">${id ? 'Salvar' : 'Criar (oculto)'}</button></div>`;
+  } else if (aba === 'visoes-m') {
+    $('#arqModalTit').textContent = 'Nova visão';
+    f.innerHTML = `<p class="mini">Aparece só na tela da cobaia escolhida, com som. Os outros veem apenas "Fulano teve uma visão" no chat, se ficar marcado.</p>
       <label class="arq-campo">Para <select id="vsAlvo"><option value="">Escolha…</option>${cobaias().map(x => `<option value="${x.id}">${esc(x.nome)}${x.jogador ? ' · ' + esc(x.jogador) : ''}</option>`).join('')}</select></label>
-      <label class="arq-campo">Frase <textarea id="vsTxt" rows="2" maxlength="300" placeholder="Ela ainda está na sala de baixo."></textarea></label>
+      <label class="arq-campo">Frase <textarea id="vsTxt" rows="3" maxlength="300" placeholder="Ela ainda está na sala de baixo."></textarea></label>
       <label class="arq-campo">Imagem (opcional) <input type="file" id="vsImg" accept="image/*"></label>
       <div class="arq-linha"><label class="arq-campo">Efeito <select id="vsEf">${EF_VISAO.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
         <label class="arq-campo">Duração <select id="vsDur">${[3, 5, 8, 12].map(s => `<option value="${s}" ${s === 5 ? 'selected' : ''}>${s} s</option>`).join('')}</select></label></div>
       <label class="chave"><input type="checkbox" id="vsChat" checked><span>Avisar no chat geral</span></label>
-      <div class="arq-linha"><button data-arq="vs-enviar" class="pri">👁 Enviar visão</button></div></div>`;
-  } else f.innerHTML = '<p class="arq-dica">Todos os símbolos já usados nas cifras publicadas. Toque para revelar ou esconder a letra em todas as cifras de uma vez. Palpites dos jogadores: verde certo, vermelho errado.</p>';
+      <div class="arq-linha arq-form-pe"><button data-arq="cancelar">Cancelar</button><button data-arq="vs-enviar" class="pri">👁 Enviar visão</button></div>`;
+  } else return;
+  $('#arqModal').hidden = false;
+  setTimeout(() => { if ($('#arqForm').contains(document.activeElement)) return; const i = $('#arqForm input, #arqForm select'); if (i) i.focus(); }, 30);
 }
-// só a lista é redesenhada quando algo muda (o formulário fica intacto enquanto o Mestre digita)
-function desenharLista() {
-  const l = $('#arqLista'); if (!l || !Arq.aberto) return;
-  let html = '';
-  if (Arq.aba === 'cifras') {
-    if (A.mestre) {
-      const lst = Object.entries(sg()._cifras || {}).sort((a, b) => num(b[1].ts) - num(a[1].ts));
-      html = lst.map(([id, c]) => `<div class="arq-item${c.pub ? ' pub' : ''}"><div class="arq-item-cab"><b>${esc(c.tit || 'Sem título')}</b><small>${c.pub ? 'publicada' : 'oculta'}${c.onde ? ' · ' + esc(A.nomeSala(+c.onde.slice(5))) : ''}</small></div>
-        <p class="arq-plano">${esc(c.txt || '')}</p>${c.pub ? htmlCifra(id, cifrasPub()[id], 'cheia') : ''}
-        <div class="arq-linha"><button data-arq="cf-pub" data-id="${id}">${c.pub ? 'Esconder' : 'Publicar'}</button>${c.pub ? `<button data-arq="cf-chat" data-id="${id}">Mandar no chat</button><button data-arq="cf-revtudo" data-id="${id}">Revelar todas as letras</button><button data-arq="cf-esctudo" data-id="${id}">Esconder letras</button>` : ''}<button data-arq="cf-editar" data-id="${id}">Editar</button><button data-arq="cf-apagar" data-id="${id}" class="perigo">Apagar</button></div></div>`).join('') || '<p class="arq-vazio">Nenhuma cifra criada.</p>';
-    } else {
-      const lst = Object.entries(cifrasPub()).filter(([, c]) => ondeVisivel(c.onde)).sort((a, b) => num(b[1].ts) - num(a[1].ts));
-      html = lst.map(([id, c]) => `<div class="arq-item pub"><div class="arq-item-cab"><b>${esc(c.tit || 'Inscrição')}</b><small>${c.onde ? esc(A.nomeSala(+c.onde.slice(5))) : ''}</small></div>${htmlCifra(id, c, 'cheia')}</div>`).join('') || '<p class="arq-vazio">Nenhuma cifra encontrada ainda.</p>';
-    }
-  } else if (Arq.aba === 'docs') {
-    if (A.mestre) {
-      const lst = Object.entries(sg()._docs || {}).sort((a, b) => num(b[1].ts) - num(a[1].ts));
-      html = lst.map(([id, d]) => { const n = (String(d.txt || '').match(/\[\[[\s\S]*?\]\]/g) || []).length, r = Object.keys(d.rev || {}).length;
-        return `<div class="arq-item${d.pub ? ' pub' : ''}"><div class="arq-item-cab"><b>${esc(d.tit || 'Sem título')}</b><small>${d.pub ? 'publicado' : 'oculto'} · ${r}/${n} tarjas abertas${d.onde ? ' · ' + esc(A.nomeSala(+d.onde.slice(5))) : ''}</small></div>
-        <div class="doc-mestre" data-doc="${id}">${htmlDoc(id, d, true)}</div><p class="mini">Toque num trecho tarjado para revelar aos jogadores.</p>
-        <div class="arq-linha"><button data-arq="dc-pub" data-id="${id}">${d.pub ? 'Esconder' : 'Publicar'}</button><button data-arq="dc-abrir" data-id="${id}">Revelar todas</button><button data-arq="dc-fechar" data-id="${id}">Tarjar todas</button><button data-arq="dc-editar" data-id="${id}">Editar</button><button data-arq="dc-apagar" data-id="${id}" class="perigo">Apagar</button></div></div>`; }).join('') || '<p class="arq-vazio">Nenhum documento criado.</p>';
-    } else {
-      const lst = Object.entries(docsPub()).filter(([, d]) => ondeVisivel(d.onde)).sort((a, b) => num(b[1].ts) - num(a[1].ts));
-      html = lst.map(([id, d]) => `<div class="arq-item pub">${htmlDoc(id, d, false)}</div>`).join('') || '<p class="arq-vazio">Nenhum documento encontrado ainda.</p>';
-    }
-  } else if (Arq.aba === 'chave') {
-    const usados = new Set();
-    Object.values(cifrasPub()).filter(c => ondeVisivel(c.onde)).forEach(c => (Array.isArray(c.s) ? c.s : Object.values(c.s || {})).forEach(t => { if (typeof t === 'number') usados.add(t); }));
-    const lst = [...usados].sort((a, b) => a - b);
-    html = lst.length ? `<div class="cifra cf-chave"><div class="cf-texto">${lst.map(g => `<span class="cf-palavra">${htmlCel(g)}</span>`).join('')}</div></div>
-      <p class="mini">${lst.filter(g => revDe(g)).length} de ${lst.length} símbolos confirmados · ${lst.filter(g => !revDe(g) && palpites['g' + g]).length} com palpite.</p>${A.mestre ? '<div class="arq-linha"><button data-arq="pal-limpar" class="perigo">Apagar todos os palpites</button></div>' : ''}`
-      : '<p class="arq-vazio">Nenhum símbolo encontrado ainda.</p>';
-  } else if (Arq.aba === 'visoes') {
-    const hist = ls.get(chaveVisoes(), []);
-    html = hist.length ? hist.map(h => `<div class="arq-item vs-item">${h.img ? `<img src="${h.img}" alt="">` : ''}<p>${esc(h.txt || '(só imagem)')}</p><div class="arq-linha"><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}</small><button data-arq="vs-apagar" data-id="${esc(h.id)}" class="perigo">Apagar</button></div></div>`).join('')
-      + '<div class="arq-linha"><button data-arq="vs-apagar-tudo" class="perigo">Apagar todas as visões</button></div>' : '<p class="arq-vazio">Nenhuma visão… ainda.</p>';
-  } else if (Arq.aba === 'visoes-m') {
-    const log = ls.get('acf-visoes-enviadas', []);
-    html = log.length ? `<h3 class="arq-sub">Enviadas deste aparelho</h3>${log.map((h, i) => `<div class="arq-item"><div class="arq-linha"><b>${esc((A.SER[h.alvo] || {}).nome || h.alvo)}</b><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}${h.img ? ' · com imagem' : ''}</small><button data-arq="vsm-apagar" data-i="${i}" class="perigo" title="${h.id ? 'Apaga também do Arquivo do jogador' : 'Apaga só desta lista'}">Apagar</button></div><p>${esc(h.txt || '')}</p></div>`).join('')}
-      <p class="mini">Apagar tira a visão daqui e também do Arquivo do jogador (na próxima vez que ele estiver com o site aberto).</p>` : '';
-  }
-  if (l.dataset.html !== html) { l.innerHTML = html; l.dataset.html = html; }
-}
+function fecharForm() { const m = $('#arqModal'); if (m) m.hidden = true; Arq.edit = null; }
+function selecionar(id) { Arq.sel[Arq.aba] = id; Arq.mob = 'leitor'; desenharEstante(); desenharLeitor(true); }
+
 function aoClicar(e) {
   const t = e.target;
   if (t === $('#arquivoTela')) { fechar(); return; }
+  if (t === $('#arqModal')) { fecharForm(); return; }
   const tj = t.closest('[data-tj]');
   if (tj && A.mestre) {
     const id = tj.closest('[data-doc]').dataset.doc, x = +tj.dataset.tj;
@@ -399,49 +535,58 @@ function aoClicar(e) {
   const b = t.closest('[data-arq]'); if (!b) return;
   const a = b.dataset.arq, id = b.dataset.id;
   if (a === 'fechar') { fechar(); return; }
-  if (a === 'aba') { Arq.aba = b.dataset.v; Arq.edit = null; desenharTudo(); return; }
-  if (a === 'cancelar') { Arq.edit = null; desenharForm(); return; }
+  if (a === 'aba') { Arq.aba = b.dataset.v; Arq.mob = 'lista'; fecharForm(); desenharTudo(); return; }
+  if (a === 'cancelar') { fecharForm(); return; }
+  if (a === 'sel') { selecionar(id); return; }
+  if (a === 'voltar') { Arq.mob = 'lista'; desenharLeitor(); return; }
+  if (a === 'filtro') { Arq.filtro[Arq.aba] = b.dataset.v; desenharFerramentas(); desenharEstante(); return; }
+  if (a === 'pasta') { const f = ls.get(KEY_FECHADAS, {}); if (f[b.dataset.v]) delete f[b.dataset.v]; else f[b.dataset.v] = true; ls.set(KEY_FECHADAS, f); desenharEstante(); return; }
+  if (a === 'fixar') { const f = fixos(); f[Arq.aba] = f[Arq.aba] || {}; if (f[Arq.aba][id]) delete f[Arq.aba][id]; else f[Arq.aba][id] = 1; ls.set(KEY_FIX(), f); desenharLista(); return; }
+  if (a === 'ir-cifra') { Arq.aba = 'cifras'; Arq.sel.cifras = id; Arq.mob = 'leitor'; desenharTudo(); return; }
+  if (a === 'gl-pal') { const cel = $('#arqLeitor .gl-grande'); abrirPalpite(+id, cel || b); return; }
+  if (a === 'vs-rever') { const h = ls.get(chaveVisoes(), []).find(x => x.id === id); if (h) mostrarVisao({ ...h, ts: Date.now() }); return; }
   if (a === 'vs-apagar' || a === 'vs-apagar-tudo') {
-    if (a === 'vs-apagar-tudo' && !confirm('Apagar todas as suas visões deste aparelho?')) return;
+    if (!confirm(a === 'vs-apagar-tudo' ? 'Apagar todas as suas visões deste aparelho?' : 'Apagar esta visão?')) return;
     ls.set(chaveVisoes(), a === 'vs-apagar-tudo' ? [] : ls.get(chaveVisoes(), []).filter(h => h.id !== id));
-    atualizarBadge(); desenharLista(); return;
+    Arq.sel.visoes = undefined; Arq.mob = 'lista'; atualizarBadge(); desenharFerramentas(); desenharLista(); return;
   }
   if (!A.mestre) return;
+  if (a === 'novo') { abrirForm(null); return; }
+  if (a === 'gl-rev') { const g = +id; A.definir(['cifraRev', 'g' + g], revDe(g) ? null : letraDoGlifo(g)); return; }
   if (a === 'vsm-apagar') {
     const log = ls.get('acf-visoes-enviadas', []), h = log[+b.dataset.i]; if (!h) return;
     if (!confirm(`Apagar esta visão${h.id ? ` também do Arquivo de ${(A.SER[h.alvo] || {}).nome || h.alvo}` : ''}?`)) return;
     log.splice(+b.dataset.i, 1); ls.set('acf-visoes-enviadas', log);
     if (h.id) A.Rede.set('visoes/' + h.alvo, { id: 'del-' + A.Rede.chave(), del: h.id, ts: Date.now() }).catch(() => A.aviso('O servidor recusou.'));
-    desenharLista(); return;
+    Arq.sel['visoes-m'] = undefined; Arq.mob = 'lista'; desenharLista(); return;
   }
   if (a === 'cf-salvar') {
     const txt = ($('#cfTxt').value || '').trim();
     if (!normal(txt).replace(/[^A-Z0-9]/g, '')) { A.aviso('Escreva a mensagem com letras ou números.'); return; }
     const k = Arq.edit || A.Rede.chave(), velho = (sg()._cifras || {})[k] || {};
-    A.gravarSegredo(['_cifras', k], { tit: ($('#cfTit').value || '').trim().slice(0, 80), txt: txt.slice(0, 400), onde: lerOnde('cfOnde'), pub: !!velho.pub, ts: velho.ts || Date.now() });
+    A.gravarSegredo(['_cifras', k], { tit: ($('#cfTit').value || '').trim().slice(0, 80), pasta: ($('#cfPasta').value || '').trim().slice(0, 40), txt: txt.slice(0, 400), onde: lerOnde('cfOnde'), pub: !!velho.pub, ts: velho.ts || Date.now() });
     if (velho.pub) publicarCifra(k);
-    Arq.edit = null; desenharForm(); desenharLista(); A.redesenharCartao();
+    fecharForm(); desenharFerramentas(); selecionar(k); A.redesenharCartao();
   } else if (a === 'cf-pub') { const c = sg()._cifras[id]; A.gravarSegredo(['_cifras', id, 'pub'], !c.pub); publicarCifra(id); desenharLista(); A.redesenharCartao(); }
   else if (a === 'cf-chat') { A.enviarChat(`⟦cifra:${id}⟧`, 'geral'); A.aviso('Cifra mandada no chat geral.'); }
-  else if (a === 'cf-revtudo' || a === 'cf-esctudo') { const c = cifrasPub()[id]; if (!c) return; new Set((Array.isArray(c.s) ? c.s : Object.values(c.s || {})).filter(x => typeof x === 'number')).forEach(g => A.definir(['cifraRev', 'g' + g], a === 'cf-revtudo' ? letraDoGlifo(g) : null)); }
-  else if (a === 'cf-editar') { Arq.edit = id; desenharForm(); $('#arqForm').scrollIntoView({ block: 'start' }); }
-  else if (a === 'cf-apagar') { if (!confirm('Apagar esta cifra?')) return; A.gravarSegredo(['_cifras', id], null); A.definir(['cifras', id], null); desenharLista(); A.redesenharCartao(); }
+  else if (a === 'cf-revtudo' || a === 'cf-esctudo') { const c = cifrasPub()[id]; if (!c) return; glifosDe(c).forEach(g => A.definir(['cifraRev', 'g' + g], a === 'cf-revtudo' ? letraDoGlifo(g) : null)); }
+  else if (a === 'cf-editar' || a === 'dc-editar') abrirForm(id);
+  else if (a === 'cf-apagar') { if (!confirm('Apagar esta cifra?')) return; A.gravarSegredo(['_cifras', id], null); A.definir(['cifras', id], null); Arq.sel.cifras = undefined; Arq.mob = 'lista'; desenharFerramentas(); desenharLista(); A.redesenharCartao(); }
   else if (a === 'dc-salvar') {
     const txt = ($('#dcTxt').value || '').trim();
     if (!txt) { A.aviso('Escreva o texto do documento.'); return; }
     const k = Arq.edit || A.Rede.chave(), velho = (sg()._docs || {})[k] || {};
-    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), cab: ($('#dcCab').value || '').trim().slice(0, 100), data: ($('#dcData').value || '').trim().slice(0, 40), txt: txt.slice(0, 6000), onde: lerOnde('dcOnde'), pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
+    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), pasta: ($('#dcPasta').value || '').trim().slice(0, 40), cab: ($('#dcCab').value || '').trim().slice(0, 100), data: ($('#dcData').value || '').trim().slice(0, 40), txt: txt.slice(0, 6000), onde: lerOnde('dcOnde'), pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
     if (velho.pub) publicarDoc(k);
-    Arq.edit = null; desenharForm(); desenharLista(); A.redesenharCartao();
+    fecharForm(); desenharFerramentas(); selecionar(k); A.redesenharCartao();
   } else if (a === 'dc-pub') { const d = sg()._docs[id]; A.gravarSegredo(['_docs', id, 'pub'], !d.pub); publicarDoc(id); desenharLista(); A.redesenharCartao(); }
   else if (a === 'dc-abrir' || a === 'dc-fechar') {
     const d = sg()._docs[id]; if (!d) return;
-    const n = (String(d.txt || '').match(/\[\[[\s\S]*?\]\]/g) || []).length, rev = {};
+    const n = nTarjas(d), rev = {};
     if (a === 'dc-abrir') for (let i = 0; i < n; i++) rev[i] = true;
     A.gravarSegredo(['_docs', id, 'rev'], a === 'dc-abrir' && n ? rev : null); publicarDoc(id); desenharLista();
   }
-  else if (a === 'dc-editar') { Arq.edit = id; desenharForm(); $('#arqForm').scrollIntoView({ block: 'start' }); }
-  else if (a === 'dc-apagar') { if (!confirm('Apagar este documento?')) return; A.gravarSegredo(['_docs', id], null); A.definir(['docs', id], null); desenharLista(); A.redesenharCartao(); }
+  else if (a === 'dc-apagar') { if (!confirm('Apagar este documento?')) return; A.gravarSegredo(['_docs', id], null); A.definir(['docs', id], null); Arq.sel.docs = undefined; Arq.mob = 'lista'; desenharFerramentas(); desenharLista(); A.redesenharCartao(); }
   else if (a === 'vs-enviar') { b.disabled = true; enviarVisao().catch(() => {}).finally(() => { b.disabled = false; }); }
   else if (a === 'pal-limpar') { if (confirm('Apagar todos os palpites dos jogadores?')) A.Rede.set('cifraPalpite', null).catch(() => {}); }
 }
@@ -461,7 +606,7 @@ A.ganchoSala({
     if (!cs.length && !ds.length) return '';
     return `<div class="arq-sala"><p class="mesa-k">NA PAREDE</p>${cs.map(([id, c]) => htmlCifra(id, c, 'mini')).join('')}${ds.length ? `<div class="acoes">${ds.map(([id, d]) => `<button data-arq-sala="doc" data-id="${id}">▤ ${esc(d.tit || 'Documento')}</button>`).join('')}</div>` : ''}</div>`;
   },
-  ligar(c) { $$('[data-arq-sala]', c).forEach(b => b.onclick = () => abrir(b.dataset.arqSala === 'doc' ? 'docs' : 'cifras')); },
+  ligar(c) { $$('[data-arq-sala]', c).forEach(b => b.onclick = () => { if (b.dataset.id) { Arq.sel.docs = b.dataset.id; } abrir(b.dataset.arqSala === 'doc' ? 'docs' : 'cifras'); if (b.dataset.id) { Arq.mob = 'leitor'; desenharLeitor(true); } }); },
 });
 // marca no mapa as salas com cifra ou documento
 function marcarSalas() {
@@ -478,17 +623,15 @@ function atualizarBadge() {
   const b = $('#btnArquivo'); if (!b) return;
   b.hidden = A.mestre || !(A.meu || A.aux);
   if (A.mestre) return;
-  const visto = num(ls.get('acf-arq-visto-' + (A.meu || A.aux || ''), 0));
-  const novos = [...Object.values(cifrasPub()), ...Object.values(docsPub())].filter(x => x && ondeVisivel(x.onde) && num(x.ts) > visto).length
-    + ls.get(chaveVisoes(), []).filter(h => num(h.ts) > visto).length;
+  const novos = ['docs', 'cifras', 'visoes'].reduce((t, k) => t + entradas(k).filter(e => e.marca).length, 0);
   const n = $('.n', b); n.hidden = !novos; n.textContent = novos;
 }
 function desenharMesaArq() {
   const c = $('#mesaArq'); if (!c || !A.mestre) return;
   const nc = Object.keys(sg()._cifras || {}).length, nd = Object.keys(sg()._docs || {}).length;
   const html = `<p class="mini">Cifras em sigilos, documentos tarjados e visões para um jogador só. ${nc} cifra${nc === 1 ? '' : 's'} e ${nd} documento${nd === 1 ? '' : 's'} criados.</p>
-    <div class="mesa-linha"><button data-arqm="cifras" class="btn-protocolo">📜 Abrir o Arquivo</button><button data-arqm="visoes-m">👁 Mandar visão</button></div>`;
-  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $$('[data-arqm]', c).forEach(b => b.onclick = () => abrir(b.dataset.arqm)); }
+    <div class="mesa-linha"><button data-arqm="docs" class="btn-protocolo">📜 Abrir o Arquivo</button><button data-arqm="visoes-m" data-novo="1">👁 Mandar visão</button></div>`;
+  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $$('[data-arqm]', c).forEach(b => b.onclick = () => abrir(b.dataset.arqm, !!b.dataset.novo)); }
 }
 let agendado = false, ultimoRev = '', ultimoPal = '';
 function redesenhar() {
@@ -498,7 +641,7 @@ function redesenhar() {
     try {
       ligarPalpites(); ligarVisoes();
       atualizarBadge(); desenharMesaArq(); marcarSalas();
-      if (Arq.aberto) { if (!A.mestre && Arq.aba.startsWith('visoes-')) Arq.aba = 'cifras'; desenharLista(); }
+      if (Arq.aberto) { if (!ABAS().some(x => x[0] === Arq.aba)) { Arq.aba = 'docs'; desenharTudo(); } else { atualizarAbas(); desenharLista(); } }
       // cifras no chat e no cartão da sala acompanham revelações e palpites
       const r = JSON.stringify(est().cifraRev || {}) + JSON.stringify(est().cifras || {}) + JSON.stringify(est().docs || {}), p = JSON.stringify(palpites);
       if (r !== ultimoRev || p !== ultimoPal) { ultimoRev = r; ultimoPal = p; A.redesenharChat(); if (!A.mestre) A.redesenharCartao(); }
@@ -507,7 +650,10 @@ function redesenhar() {
 }
 A.aoMudar(redesenhar);
 document.addEventListener('acf-perfil', () => { setTimeout(redesenhar, 60); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && Arq.aberto && !($('#cfPalpite') && !$('#cfPalpite').hidden)) fechar(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !Arq.aberto || ($('#cfPalpite') && !$('#cfPalpite').hidden)) return;
+  if ($('#arqModal') && !$('#arqModal').hidden) fecharForm(); else fechar();
+});
 const btn = $('#btnArquivo'); if (btn) btn.addEventListener('click', () => abrir());
 setInterval(marcarSalas, 1500);
 setTimeout(redesenhar, 800);
