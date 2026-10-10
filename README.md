@@ -12,6 +12,7 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `data.js` | Nomes das salas, elementos e lista de seres. **É aqui que se edita o conteúdo** |
 | `config.js` | Senhas (em hash) e a conexão com o Firebase |
 | `fichas.js` | Fichas de agente de Ordem Paranormal (botão 📋 Fichas) |
+| `quadro.js` | Quadro colaborativo da mesa (botão 🖍 Quadro) |
 | `catalogo-op.js` | Catálogo de habilidades, rituais, itens, melhorias e maldições usado nas fichas |
 | `img/` | Retratos das cobaias e o ícone da aba |
 
@@ -98,6 +99,10 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **Catálogo:** habilidades por classe, trilha, origem, poderes paranormais e homebrew; rituais por elemento e círculo; itens por tipo e fonte. A aba "Minhas" reúne o que você criou nas suas fichas, para reaproveitar.
 - **Exportar e importar:** cada ficha baixa um arquivo `.json` (cópia de segurança). "Importar arquivo" cria uma ficha nova a partir dele.
 - No Firebase, as fichas ficam em `agentes` (jogadores) e `agentesMestre` (Mestre). As regras novas estão no arquivo de regras entregue junto com esta versão.
+
+## Quadro da equipe (🖍 Quadro, atalho B)
+
+Quadro compartilhado, ao vivo, para jogadores, auxiliares e Mestre: caneta, marca-texto, borracha, texto com 7 fontes (tamanho, negrito e itálico), notas adesivas, retângulo, elipse, seta, linha e imagens (escolher, colar com Ctrl+V ou arrastar). Cada pessoa escolhe a própria cor (a primeira é a cor da cobaia, quando ela aparece bem no fundo). Fundo branco ou preto por quadro; tinta quase preta vira clara no quadro preto e vice-versa, para nada sumir. Dá para criar vários quadros (abas), mover, redimensionar, duplicar, trazer para a frente e desfazer (Ctrl+Z). Qualquer um apaga o que fez; só o Mestre limpa ou apaga um quadro inteiro. No Firebase: `quadrosMeta` e `quadrosItens`.
 
 ## Salas dos andares 2 a 5
 

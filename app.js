@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009k';
+const VERSAO_SITE = '20261009l';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2612,7 +2612,7 @@ function desfazer() {
 }
 $('#btnDesfazer').addEventListener('click', desfazer);
 window.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !e.target.matches('input, textarea, select')) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !e.target.matches('input, textarea, select') && !document.body.classList.contains('qd-aberto') && !document.body.classList.contains('fx-aberta')) {
     e.preventDefault();
     desfazer();
   }
@@ -2620,17 +2620,18 @@ window.addEventListener('keydown', e => {
 
 /* =========================================================
    ATALHOS DE TECLADO
-   Todos: Q/E giram · R régua · C chat · F fichas · ? ajuda
+   Todos: Q/E giram · R régua · C chat · F fichas · B quadro · ? ajuda
    Mestre: N próximo turno · A apagão · L loja · V revelar/esconder a sala aberta · P replay
    Ctrl+Z desfaz (já existia)
    ========================================================= */
 window.addEventListener('keydown', e => {
-  if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, textarea, select') || $('dialog[open]') || document.body.classList.contains('fx-aberta')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, textarea, select') || $('dialog[open]') || document.body.classList.contains('fx-aberta') || document.body.classList.contains('qd-aberto')) return;
   const k = e.key.toLowerCase();
   const clicar = id => { const b = $(id); if (b && !b.disabled && !b.hidden) b.click(); };
   if (k === 'r') clicar('#btnRegua');
   else if (k === 'c') clicar('#btnChat');
   else if (k === 'f') clicar('#btnFichas');
+  else if (k === 'b') clicar('#btnQuadro');
   else if (k === '?') clicar('#btnAjuda');
   if (!mestre) return;
   if (k === 'n' && P().on) { clicar('#btnProxTurno'); aviso('Próximo turno.'); }
@@ -4320,8 +4321,8 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Despensa e cofre:</b> abaixo do botão da loja aparecem o cofre de sucatas do grupo e a despensa da Zona Neutra. Toque em "Pegar 1" para levar uma água ou comida (todos veem no chat).</li>
     <li><b>Teclado:</b> algumas portas trancadas têm um teclado ao lado do botão. Digite o código que vocês encontraram. Errar faz barulho.</li>
     <li><b>Régua 📏:</b> ligue no canto do mapa e arraste para medir a distância em metros.</li>
-    <li><b>Atalhos:</b> Q/E giram o mapa, R liga a régua, C abre o chat, F abre as fichas.</li></ul>
-    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre.</li></ul>`;
+    <li><b>Atalhos:</b> Q/E giram o mapa, R liga a régua, C abre o chat, F abre as fichas, B abre o quadro.</li></ul>
+    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre. <b>🖍 Quadro:</b> quadro branco ou preto compartilhado com a mesa, ao vivo: caneta, marca-texto, texto com fontes, notas adesivas, formas, setas e imagens (escolha, cole ou arraste). Cada um escolhe a própria cor.</li></ul>`;
   const jog = `<h3>Sua cobaia</h3><ul>
     <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
     <li><b>↶ Desfazer</b> (ou Ctrl+Z) volta o último movimento.</li>
@@ -4340,7 +4341,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Pedidos:</b> na aba Sessão, aprove ou recuse cada pedido. Aprovar desconta as sucatas da ficha ou do cofre do grupo e responde no Sussurro do jogador.</li>
     <li><b>Condições:</b> no cartão da ficha, toque em "Condições" e alterne cada uma: todos veem, só o dono vê ou desligada.</li>
     <li><b>Replay:</b> na aba Registro, "Replay no mapa" refaz os movimentos da sessão em velocidade acelerada, só na sua tela.</li>
-    <li><b>Atalhos do Mestre:</b> N próximo turno · A apagão · L loja · V revelar ou esconder a sala aberta · P replay · Ctrl+Z desfazer · R régua · C chat · F fichas.</li>
+    <li><b>Atalhos do Mestre:</b> N próximo turno · A apagão · L loja · V revelar ou esconder a sala aberta · P replay · Ctrl+Z desfazer · R régua · C chat · F fichas · B quadro.</li>
     <li><b>📋 Fichas:</b> na aba "Fichas dos jogadores" você vê a ficha de cada cobaia ao vivo, só para leitura (o Firebase recusa qualquer alteração vinda da sua conta). Em "Minhas fichas" você cria e edita NPCs e inimigos, que só você vê.</li>
     <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
     <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
