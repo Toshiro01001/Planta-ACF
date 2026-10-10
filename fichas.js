@@ -83,6 +83,16 @@ const ORIGENS = [
 ];
 const CUSTO_RITUAL = { 1: 1, 2: 3, 3: 6, 4: 10 };
 const ELEM_COR = { conhecimento: '#d9a514', energia: '#8a3fd1', morte: '#7c7c7c', sangue: '#c2272f', medo: '#e9e4f2', varia: '#5fa8a0' };
+// cor de destaque da ficha: a cor da cobaia (cores muito escuras viram cinza claro)
+function acento(cor) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(cor || '').trim());
+  if (!m) return { ac: '#c9a14a', txt: '#16130c' };
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (lum < 0.14) return { ac: '#d8d2c8', txt: '#16130c' };
+  return { ac: '#' + m[1], txt: lum > 0.5 ? '#16130c' : '#ffffff' };
+}
+const estiloAc = dono => { const s = A.SER[dono] || {}; const a = dono === 'mestre' ? acento('#c9a14a') : acento(s.cor); return `--ac:${a.ac};--ac-txt:${a.txt}`; };
 const corEl = el => ELEM_COR[String(el || '').toLowerCase().split(/[\s&/]/)[0]] || '#8b5cf6';
 const TIPOS_ITEM = { arma: 'Arma', municao: 'Munição', protecao: 'Proteção', geral: 'Geral', amaldicoado: 'Item Amaldiçoado' };
 const ROM = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI'];
@@ -283,20 +293,22 @@ function desenharLista() {
     const d = x.d, s = A.SER[d.dono] || {};
     const foto = d.foto || s.img || '';
     const cl = CLASSES[d.classe] || {};
-    const sub = [cl.n, d.trilha].filter(Boolean).join(' · ');
     const nivel = cl.estagio ? `Estágio ${d.estagio || 1}` : d.classe === 'mundano' ? 'NEX 0%' : `NEX ${d.nex || 5}%`;
-    return `<article class="fx-cartao" style="--cor:${s.cor || '#8b5cf6'}">
-      <div class="fx-cartao-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}></div>
-      <div class="fx-cartao-info"><h3>${esc(d.nome || 'Sem nome')}</h3><p>${esc(sub)}</p><small>${esc(nivel)} · Registrado em ${new Date(d.criado || Date.now()).toLocaleDateString('pt-BR')}</small>
-      ${gmJog ? `<small class="fx-cod">Código: ${esc(codigoDe(x.ref))}</small>` : ''}
-      <div class="fx-cartao-acoes"><button class="fx-btn-roxo" data-acao="abrir-ficha" data-k="${esc(codigoDe(x.ref))}" data-gm="${x.ref.gm ? 1 : ''}">Acessar ficha</button>
-      ${podeCriar ? `<button data-acao="apagar-ficha" data-k="${esc(codigoDe(x.ref))}" data-gm="${x.ref.gm ? 1 : ''}" class="fx-btn-perigo" title="Apagar ficha">🗑</button>` : ''}</div></div></article>`;
+    const k = esc(codigoDe(x.ref)), gmA = x.ref.gm ? 1 : '';
+    return `<article class="fx-cartao" style="${estiloAc(d.dono)}">
+      <span class="fx-cartao-aba">${esc(x.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</span>
+      <div class="fx-cartao-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}><span class="fx-cartao-nex">${esc(nivel)}</span></div>
+      <div class="fx-cartao-info"><small class="fx-k">${esc(cl.n || '')}${d.trilha ? ' · ' + esc(d.trilha) : ''}</small><h3>${esc(d.nome || 'Sem nome')}</h3>
+      <small class="fx-cartao-data">Aberta em ${new Date(d.criado || Date.now()).toLocaleDateString('pt-BR')}${d.jogador ? ' · ' + esc(d.jogador) : ''}</small>
+      ${gmJog ? `<small class="fx-cod">${k}</small>` : ''}
+      <div class="fx-cartao-acoes"><button class="fx-btn-roxo" data-acao="abrir-ficha" data-k="${k}" data-gm="${gmA}">Abrir ficha</button>
+      ${podeCriar ? `<button data-acao="apagar-ficha" data-k="${k}" data-gm="${gmA}" class="fx-btn-perigo" title="Apagar ficha" aria-label="Apagar ficha">✕</button>` : ''}</div></div></article>`;
   };
   let html = cab;
   if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
   if (!todos.length) html += `<p class="fx-vazio">${gmJog ? 'Nenhum jogador criou ficha ainda.' : 'Nenhuma ficha ainda. Crie a primeira!'}</p>`;
   Object.entries(grupos).forEach(([g, xs]) => {
-    if (gmJog) { const s = A.SER[g] || {}; html += `<h2 class="fx-grupo"><span class="fx-pinta" style="--cor:${s.cor || '#8b5cf6'}"></span>${esc(s.nome || g)}${s.jogador ? ` <small>${esc(s.jogador)}</small>` : ''}</h2>`; }
+    if (gmJog) { const s = A.SER[g] || {}; html += `<h2 class="fx-grupo" style="${estiloAc(g)}"><span class="fx-pinta"></span>${esc(s.nome || g)}${s.jogador ? ` <small>${esc(s.jogador)}</small>` : ''}</h2>`; }
     html += `<div class="fx-grade">${xs.map(cartao).join('')}</div>`;
   });
   corpo.innerHTML = html;
@@ -446,66 +458,73 @@ function desenharFicha() {
   const foto = d.foto || s.img || '';
   const corpo = $('#fxCorpo');
   const rolagemTopo = corpo.scrollTop;
-  corpo.innerHTML = `<div class="fx-ficha${at.editavel ? '' : ' so-leitura'}" data-mob="${F.abaMob}" style="--cor:${s.cor || '#8b5cf6'}">
-    ${at.editavel ? '' : `<div class="fx-aviso-leitura">👁 Modo leitura · ${ehMestre() ? 'o Mestre vê esta ficha ao vivo, mas não pode alterá-la' : 'esta ficha é de outra cobaia, só o dono pode editar'}</div>`}
+  const ed = at.editavel;
+  const det = d.regra === 'determinacao';
+  const nivelCampo = cl.estagio
+    ? `<select data-c="estagio"${RO()}>${[1, 2, 3, 4, 5].map(e => `<option ${int(d.estagio) === e ? 'selected' : ''}>${e}</option>`).join('')}</select>`
+    : d.classe === 'mundano' ? '<input value="0%" disabled>'
+    : `<select data-c="nex"${RO()}>${NEXES.map(x => `<option value="${x}" ${int(d.nex) === x ? 'selected' : ''}>${x}%</option>`).join('')}</select>`;
+  corpo.innerHTML = `<div class="fx-ficha${ed ? '' : ' so-leitura'}" data-mob="${F.abaMob}" style="${estiloAc(d.dono)}">
+    ${ed ? '' : `<div class="fx-aviso-leitura"><b>SOMENTE LEITURA</b><span>${ehMestre() ? 'O Mestre acompanha esta ficha ao vivo, mas não pode alterá-la.' : 'Esta ficha é de outra cobaia. Só o dono pode editar.'}</span></div>`}
     <nav class="fx-abas-mob">${[['status', 'Status'], ['pericias', 'Perícias'], ['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba-mob" data-v="${k}" class="${F.abaMob === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
     <section class="fx-col fx-col-esq">
-      <div class="fx-id">
-        <label class="fx-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}>${at.editavel ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar</span>' : ''}</label>
-        <div class="fx-id-campos">
-          <label>Personagem ${campo('nome')}</label>
-          <label>Origem <input data-c="origem" list="fxOrigens" value="${esc(d.origem)}"${RO()}></label>
-          ${at.editavel ? `<button class="fx-mini" data-acao="aplicar-origem" title="Marca as perícias da origem como treinadas e adiciona o poder dela">aplicar origem</button>` : ''}
+      <div class="fx-dossie fx-painel">
+        <label class="fx-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">${esc(at.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</i></label>
+        <div class="fx-dossie-campos">
+          <label class="fx-nome"><span>Agente</span>${campo('nome')}</label>
+          <div class="fx-dossie-grade">
+            <label>Jogador ${campo('jogador')}</label>
+            <label class="fx-origem">Origem <span><input data-c="origem" list="fxOrigens" value="${esc(d.origem)}"${RO()}>${ed ? `<button class="fx-mini" data-acao="aplicar-origem" title="Marca as perícias da origem como treinadas e adiciona o poder dela">aplicar</button>` : ''}</span></label>
+            <label>Classe <select data-c="classe"${RO()}>${Object.entries(CLASSES).map(([k, c]) => `<option value="${k}" ${d.classe === k ? 'selected' : ''}>${c.n}</option>`).join('')}</select></label>
+            <label>Trilha <input data-c="trilha" list="fxTrilhas" value="${esc(d.trilha)}"${RO()}></label>
+            <label>Regra <select data-c="regra"${RO()}><option value="padrao" ${!det ? 'selected' : ''}>PV, PE e Sanidade</option><option value="determinacao" ${det ? 'selected' : ''}>Determinação (SaH)</option></select></label>
+          </div>
         </div>
-      </div>
-      <div class="fx-id2">
-        <label>Jogador ${campo('jogador')}</label>
-        <label>Classe <select data-c="classe"${RO()}>${Object.entries(CLASSES).map(([k, c]) => `<option value="${k}" ${d.classe === k ? 'selected' : ''}>${c.n}</option>`).join('')}</select></label>
-        <label>Trilha <input data-c="trilha" list="fxTrilhas" value="${esc(d.trilha)}"${RO()}></label>
-        <label>Regra <select data-c="regra"${RO()}><option value="padrao" ${d.regra !== 'determinacao' ? 'selected' : ''}>PV, PE e Sanidade</option><option value="determinacao" ${d.regra === 'determinacao' ? 'selected' : ''}>Determinação (SaH)</option></select></label>
+        <div class="fx-nex">
+          <label class="fx-nex-grande">${cl.estagio ? 'Estágio' : 'NEX'} ${nivelCampo}</label>
+          <div class="fx-nex-mini"><span>${det ? 'PD' : 'PE'}/turno</span><output data-calc="peTurno"></output></div>
+          <div class="fx-nex-mini"><span>Desloc.</span><span class="fx-desl">${campo('desl', 'n', ' min="0" step="1.5"')}<output data-calc="desl"></output></span></div>
+        </div>
       </div>
       <datalist id="fxOrigens">${ORIGENS.map(o => `<option value="${esc(o[0])}">`).join('')}</datalist>
       <datalist id="fxTrilhas">${(cl.trilhas || []).map(t => `<option value="${esc(t)}">`).join('')}</datalist>
-      <div class="fx-atributos">
-        <span class="fx-atr-centro">ATRIBUTOS</span>
-        ${ATRS.map(([k, n, sg]) => `<label class="fx-atr fx-atr-${k}"><input data-c="atr.${k}" type="number" data-n="1" min="0" max="9" value="${int(d.atr[k])}"${RO()}><b>${sg}</b><small>${n}</small></label>`).join('')}
+      <div class="fx-faixa">
+        <div class="fx-painel fx-p-atr"><h4 class="fx-ph"><i>01</i>Atributos</h4>
+          <div class="fx-atributos">${ATRS.map(([k, n, sg]) => `<label class="fx-atr"><span class="fx-atr-sg">${sg}</span><input data-c="atr.${k}" type="number" data-n="1" min="0" max="9" value="${int(d.atr[k])}"${RO()}><small>${n}</small><span class="fx-pips" data-pips="${k}">${'<b></b>'.repeat(5)}</span></label>`).join('')}</div>
+          <label class="fx-larga">Proficiências ${campo('prof')}</label>
+          <div class="fx-codigo">${ed && !at.ref.gm ? `<span>Código <code>${esc(codigoDe(at.ref))}</code></span><button class="fx-mini" data-acao="copiar-codigo">copiar</button>` : ''}<button class="fx-mini" data-acao="exportar" title="Baixa um arquivo com a ficha inteira (cópia de segurança ou para importar em outro lugar)">exportar</button></div>
+        </div>
+        <div class="fx-painel fx-p-vit"><h4 class="fx-ph"><i>02</i>Sinais vitais</h4><div class="fx-barras">${barras(d)}</div></div>
+        <div class="fx-painel fx-p-def"><h4 class="fx-ph"><i>03</i>Defesa</h4>
+          <div class="fx-def-tiles">
+            <div class="fx-tile fx-tile-g"><output data-calc="defesa"></output><span>Defesa</span></div>
+            <div class="fx-tile"><output data-calc="esquiva"></output><span>Esquiva</span></div>
+            <div class="fx-tile"><output data-calc="bloqueio"></output><span>Bloqueio</span></div>
+          </div>
+          <div class="fx-def-conta">10 + AGI + <span title="Proteções vestidas">equip. <output data-calc="defEquip"></output></span> + <label>outros ${campo('defOutros', 'n')}</label><output data-calc="defCarga" class="fx-alerta"></output></div>
+          <label class="fx-larga">Proteção ${campo('protecao')}</label>
+          <label class="fx-larga">Resistências ${campo('resist')}</label>
+        </div>
       </div>
-      <div class="fx-linha3">
-        <label>${cl.estagio ? 'Estágio' : 'NEX'} ${cl.estagio
-          ? `<select data-c="estagio"${RO()}>${[1, 2, 3, 4, 5].map(e => `<option ${int(d.estagio) === e ? 'selected' : ''}>${e}</option>`).join('')}</select>`
-          : d.classe === 'mundano' ? '<input value="0%" disabled>'
-          : `<select data-c="nex"${RO()}>${NEXES.map(x => `<option value="${x}" ${int(d.nex) === x ? 'selected' : ''}>${x}%</option>`).join('')}</select>`}</label>
-        <label>${d.regra === 'determinacao' ? 'PD' : 'PE'} / turno <output data-calc="peTurno"></output></label>
-        <label>Deslocamento <span class="fx-desl">${campo('desl', 'n', ' min="0" step="1.5"')}<output data-calc="desl"></output></span></label>
-      </div>
-      <div class="fx-barras">${barras(d)}</div>
-      <div class="fx-defesa">
-        <div class="fx-escudo"><output data-calc="defesa"></output><span>DEFESA</span></div>
-        <div class="fx-def-conta">= 10 + AGI + <span title="Proteções vestidas">equip. <output data-calc="defEquip"></output></span> + <label>outros ${campo('defOutros', 'n')}</label><output data-calc="defCarga" class="fx-alerta"></output></div>
-        <div class="fx-def-reacoes"><span>Bloqueio <output data-calc="bloqueio"></output></span><span>Esquiva <output data-calc="esquiva"></output></span></div>
-      </div>
-      <label class="fx-larga">Proteção ${campo('protecao')}</label>
-      <label class="fx-larga">Resistências ${campo('resist')}</label>
-      <label class="fx-larga">Proficiências ${campo('prof')}</label>
-      ${at.editavel && !at.ref.gm ? `<p class="fx-codigo">Código desta ficha: <code>${esc(codigoDe(at.ref))}</code> <button class="fx-mini" data-acao="copiar-codigo">copiar</button></p>` : ''}
-      <p class="fx-codigo"><button class="fx-mini" data-acao="exportar" title="Baixa um arquivo com a ficha inteira (cópia de segurança ou para importar em outro lugar)">⬇ Exportar ficha</button></p>
     </section>
-    <section class="fx-col fx-col-meio">
-      <h3 class="fx-tit">PERÍCIAS</h3>
-      <table class="fx-pericias"><thead><tr><th>Perícia</th><th>Dados</th><th>Bônus</th><th>Treino</th><th>Outros</th></tr></thead>
+    <section class="fx-col fx-col-meio fx-painel">
+      <h4 class="fx-ph"><i>04</i>Perícias</h4>
+      <table class="fx-pericias"><thead><tr><th>Perícia</th><th>Atr.</th><th title="Treinado, Veterano, Expert">Treino</th><th>Outros</th><th>Total</th></tr></thead>
       <tbody>${PERICIAS.map(([id, n, a, so, carga]) => {
         const p = d.per[id] || {};
-        return `<tr data-per="${id}" class="${int(p.t) ? 'treinada t' + int(p.t) : ''}">
-          <td><button class="fx-rolar" data-acao="rolar-per" data-v="${id}" title="Rolar ${n}">${n}${so ? '*' : ''}${carga ? '+' : ''}</button></td>
-          <td>${at.editavel ? `<select class="fx-per-atr${p.a && p.a !== a ? ' mudado' : ''}" data-c="per.${id}.a" title="Atributo usado nos dados (ex.: Racionalidade Inflexível usa Intelecto em Vontade)">${ATRS.map(([k, , sg]) => `<option value="${k}" ${(p.a || a) === k ? 'selected' : ''}>${sg}</option>`).join('')}</select>` : `<span class="${p.a && p.a !== a ? 'fx-mudado' : ''}">(${(p.a || a).toUpperCase()})</span>`}</td><td><output data-calc="per-${id}"></output></td>
-          <td><select data-c="per.${id}.t" data-n="1"${RO()}>${TREINOS.map(([v, tn]) => `<option value="${v}" ${int(p.t) === v ? 'selected' : ''} title="${tn}">${v}</option>`).join('')}</select></td>
-          <td>${campo(`per.${id}.o`, 'n')}</td></tr>`;
+        const t = int(p.t);
+        return `<tr data-per="${id}" class="${t ? 'treinada t' + t : ''}">
+          <td><button class="fx-rolar" data-acao="rolar-per" data-v="${id}" title="Rolar ${n}">${n}<sup>${so ? '*' : ''}${carga ? '+' : ''}</sup></button></td>
+          <td>${ed ? `<select class="fx-per-atr${p.a && p.a !== a ? ' mudado' : ''}" data-c="per.${id}.a" title="Atributo usado nos dados (ex.: Racionalidade Inflexível usa Intelecto em Vontade)">${ATRS.map(([k, , sg]) => `<option value="${k}" ${(p.a || a) === k ? 'selected' : ''}>${sg}</option>`).join('')}</select>` : `<span class="fx-per-atr-ro${p.a && p.a !== a ? ' fx-mudado' : ''}">${(p.a || a).toUpperCase()}</span>`}</td>
+          <td><span class="fx-treino">${[[5, 'T', 'Treinado (+5)'], [10, 'V', 'Veterano (+10)'], [15, 'E', 'Expert (+15)']].map(([v, l, tt]) => `<button data-acao="treino" data-id="${id}" data-v="${v}" class="${t >= v ? 'on' : ''}" title="${tt}"${ed ? '' : ' disabled'}>${l}</button>`).join('')}</span></td>
+          <td>${campo(`per.${id}.o`, 'n')}</td>
+          <td><output class="fx-per-total" data-calc="per-${id}"></output></td></tr>`;
       }).join('')}</tbody></table>
-      <p class="fx-legenda">+ penalidade de carga · * somente treinada · toque no nome para rolar</p>
+      <p class="fx-legenda">Toque no nome para rolar · <b>*</b> só treinada · <b>+</b> sofre penalidade de carga · T, V e E: treinado, veterano e expert</p>
     </section>
     <section class="fx-col fx-col-dir">
       <nav class="fx-abas">${[['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba" data-v="${k}" class="${F.aba === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
-      <div class="fx-aba-corpo" id="fxAba"></div>
+      <div class="fx-aba-corpo fx-painel" id="fxAba"></div>
     </section></div>`;
   desenharAba();
   atualizarDerivados();
@@ -514,17 +533,14 @@ function desenharFicha() {
 
 function barras(d) {
   const det = d.regra === 'determinacao';
-  const defs = det ? [['pv', 'VIDA', 'pvMax', 'v'], ['pd', 'DETERMINAÇÃO', 'pdMax', 'd']] : [['pv', 'VIDA', 'pvMax', 'v'], ['san', 'SANIDADE', 'sanMax', 's'], ['pe', 'ESFORÇO', 'peMax', 'e']];
-  return defs.map(([k, n, mx, cls]) => `<div class="fx-barra fx-barra-${cls}" data-barra="${k}" data-max="${mx}">
-    <span class="fx-barra-tit">${n}</span>
-    <div class="fx-barra-trilho"><div class="fx-barra-fill"></div>
-      ${F.atual.editavel ? `<button data-acao="barra" data-k="${k}" data-v="-5" class="fx-b-l">«</button><button data-acao="barra" data-k="${k}" data-v="-1" class="fx-b-l2">‹</button>` : ''}
-      <span class="fx-barra-txt"><input data-c="${k}.a" type="number" data-n="1" class="fx-barra-at"${RO()}> / <output data-calc="${mx}"></output></span>
-      ${F.atual.editavel ? `<button data-acao="barra" data-k="${k}" data-v="1" class="fx-b-r2">›</button><button data-acao="barra" data-k="${k}" data-v="5" class="fx-b-r">»</button>` : ''}
-    </div>
-    <label class="fx-ajuste" title="Ajuste no máximo (poderes, origem, itens)">ajuste ${campo(k + '.aj', 'n')}</label></div>`).join('');
+  const defs = det ? [['pv', 'Vida', 'PV', 'pvMax', 'v'], ['pd', 'Determinação', 'PD', 'pdMax', 'd']] : [['pv', 'Vida', 'PV', 'pvMax', 'v'], ['san', 'Sanidade', 'SAN', 'sanMax', 's'], ['pe', 'Esforço', 'PE', 'peMax', 'e']];
+  const ed = F.atual.editavel;
+  return defs.map(([k, n, sg, mx, cls]) => `<div class="fx-barra fx-barra-${cls}" data-barra="${k}" data-max="${mx}">
+    <div class="fx-barra-cab"><span class="fx-barra-tit">${n} <i>${sg}</i></span><span class="fx-barra-txt"><input data-c="${k}.a" type="number" data-n="1" class="fx-barra-at"${RO()}><i>/</i><output data-calc="${mx}"></output></span></div>
+    <div class="fx-barra-trilho"><div class="fx-barra-fill"></div></div>
+    <div class="fx-barra-ctl">${ed ? `<button data-acao="barra" data-k="${k}" data-v="-5">−5</button><button data-acao="barra" data-k="${k}" data-v="-1">−1</button><button data-acao="barra" data-k="${k}" data-v="1">+1</button><button data-acao="barra" data-k="${k}" data-v="5">+5</button>` : ''}
+    <label class="fx-ajuste" title="Ajuste no máximo (poderes, origem, itens, regras da casa)">ajuste ${campo(k + '.aj', 'n')}</label></div></div>`).join('');
 }
-
 // recalcula só os números (não redesenha: preserva o foco do que está sendo digitado)
 function atualizarDerivados() {
   const at = F.atual; if (!at || !at.d) return;
@@ -537,16 +553,19 @@ function atualizarDerivados() {
   ['pvMax', 'peMax', 'sanMax', 'pdMax'].forEach(k => put(k, r[k]));
   PERICIAS.forEach(([id]) => {
     const b = r.bonus(id);
-    put('per-' + id, `(${b >= 0 ? '' : ''}${b})`);
+    put('per-' + id, b > 0 ? '+' + b : b < 0 ? '−' + Math.abs(b) : '0');
     const tr = $(`tr[data-per="${id}"]`, raiz);
-    if (tr) { const t = int((d.per[id] || {}).t); tr.className = t ? 'treinada t' + t : ''; }
+    if (tr) { const t = int((d.per[id] || {}).t); tr.className = t ? 'treinada t' + t : ''; $$('.fx-treino button', tr).forEach(x => x.classList.toggle('on', t >= int(x.dataset.v))); }
   });
+  $$('.fx-pips', raiz).forEach(p => { const v = int(d.atr[p.dataset.pips]); [...p.children].forEach((x, i) => x.classList.toggle('on', i < v)); p.classList.toggle('mais', v > 5); });
   $$('.fx-barra', raiz).forEach(b => {
     const k = b.dataset.barra, mx = r[b.dataset.max];
     const a = d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx;
     const inp = $('.fx-barra-at', b);
     if (document.activeElement !== inp) inp.value = a;
-    $('.fx-barra-fill', b).style.width = `${Math.max(0, Math.min(100, mx ? a / mx * 100 : 0))}%`;
+    const pc = Math.max(0, Math.min(100, mx ? a / mx * 100 : 0));
+    $('.fx-barra-fill', b).style.width = `${pc}%`;
+    b.classList.toggle('critico', pc > 0 && pc <= 25); b.classList.toggle('zerado', a <= 0);
   });
   // inventário
   put('dt', r.dt);
@@ -599,7 +618,7 @@ function abaCombate(d, ed) {
       <div class="fx-ataque-btns"><button data-acao="atacar" data-id="${esc(it.id || '')}" data-per="${per}">🎲 Ataque</button>${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">🎲 Dano${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-mult="${mult}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">💥 Crítico${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}</div></div>`;
   };
   return `<div class="fx-combate">
-    <div class="fx-rapidos">${['fortitude', 'reflexos', 'vontade', 'iniciativa', 'percepcao'].map(p => `<button data-acao="rolar-per" data-v="${p}">🎲 ${PER[p][1]} <b>${r.bonus(p) >= 0 ? '+' : ''}${r.bonus(p)}</b></button>`).join('')}</div>
+    <div class="fx-rapidos">${['fortitude', 'reflexos', 'vontade', 'iniciativa', 'percepcao'].map(p => `<button data-acao="rolar-per" data-v="${p}"><span>${PER[p][1]}</span><b>${r.bonus(p) >= 0 ? '+' : ''}${r.bonus(p)}</b></button>`).join('')}</div>
     <h4>Ataques</h4>
     ${linhaAtaque({ n: 'Ataque desarmado', a: { dano: '1d3', tipo: 'Corpo a Corpo', emp: 'Leve', td: 'Impacto (não letal)', margem: 20, mult: 2 } }, true)}
     ${armas.map(it => linhaAtaque(it)).join('') || '<p class="fx-vazio-p">Nenhuma arma no inventário. Adicione na aba Inventário.</p>'}
@@ -692,63 +711,166 @@ function itemHTML(it, ed) {
   </div></details>`;
 }
 
-/* ---------------- CATÁLOGO (modal) ---------------- */
+/* ---------------- CATÁLOGO (modal) ----------------
+   Habilidades: abas por classe, origens, poderes paranormais e homebrew; chips por trilha ou fonte.
+   Rituais: abas por elemento, chips por círculo. Itens: abas por tipo, chips por fonte.
+   "Minhas": o que você criou nas suas fichas e não está no catálogo, para reaproveitar. */
+const ELEMENTOS = ['Conhecimento', 'Energia', 'Morte', 'Sangue', 'Medo', 'Varia'];
+const LIVRO_ITENS = ['Armas', 'Munições', 'Proteções', 'Geral', 'Itens Amaldiçoados'];
+const fonteDe = x => (/CÍRCULO/i.test(x.g || '') || LIVRO_ITENS.includes(x.g) ? 'Livro' : x.g || 'Outros');
+const TRILHA_CLASSE = {};
+Object.entries(CLASSES).forEach(([k, c]) => (c.trilhas || []).forEach(t => { TRILHA_CLASSE[t.toLowerCase()] = k; }));
+function abaDe(tipo, x) {
+  if (tipo === 'hab') {
+    const g = String(x.g || '').toLowerCase();
+    if (g.startsWith('poderes de ')) return g.slice(11);
+    if (TRILHA_CLASSE[g]) return TRILHA_CLASSE[g];
+    if (g === 'origens') return 'origens';
+    if (ELEMENTOS.some(e => e.toLowerCase() === g)) return 'paranormal';
+    return 'homebrew';
+  }
+  if (tipo === 'rit') return String(x.el || 'varia').toLowerCase().split(/[\s&/]/)[0];
+  return x.t || 'geral';
+}
+function abasDe(tipo) {
+  if (tipo === 'hab') return [['combatente', 'Combatente'], ['especialista', 'Especialista'], ['ocultista', 'Ocultista'], ['origens', 'Origens'], ['paranormal', 'Poderes Paranormais'], ['homebrew', 'Homebrew']];
+  if (tipo === 'rit') return [['todos', 'Todos'], ...ELEMENTOS.map(e => [e.toLowerCase(), e])];
+  if (tipo === 'itens') return [['arma', 'Armas'], ['municao', 'Munições'], ['protecao', 'Proteções'], ['geral', 'Geral'], ['amaldicoado', 'Itens Amaldiçoados']];
+  return [];
+}
+// chips da aba: [valor, rótulo, filtro]
+function chipsDe(tipo, tab, base) {
+  if (tipo === 'hab') {
+    if (tab === 'origens') return [];
+    const gs = [...new Set(base.filter(x => abaDe('hab', x) === tab).map(x => x.g))];
+    const chips = gs.map(g => [g, g, x => x.g === g]);
+    return ['paranormal', 'homebrew'].includes(tab) ? [['', 'Todos', () => true], ...chips] : chips;
+  }
+  if (tipo === 'rit') return [['', 'Todos', () => true], ...[1, 2, 3, 4].map(c => [String(c), `${c}º Círculo`, x => int(x.c) === c])];
+  if (tipo === 'itens') {
+    const fs = [...new Set(base.filter(x => abaDe('itens', x) === tab).map(fonteDe))];
+    return fs.length > 1 ? [['', 'Todos', () => true], ...fs.map(f => [f, f, x => fonteDe(x) === f])] : [];
+  }
+  return [];
+}
+const NOMES_CAT = { hab: ['Habilidades', 'Minhas habilidades', 'Adicionar habilidade'], rit: ['Rituais', 'Meus rituais', 'Adicionar ritual'], itens: ['Itens', 'Meus itens', 'Adicionar item'] };
+function baseDe(c) {
+  if (c.tipo === 'hab') return C.habilidades;
+  if (c.tipo === 'rit') return C.rituais;
+  if (c.tipo === 'itens') return C.itens;
+  return c.sub === 'maldicoes' ? C.maldicoes : C.melhorias;
+}
 function abrirCatalogo(tipo, itemId) {
-  F.cat = { tipo, itemId, busca: '', grupo: '', circ: '', el: '', sub: tipo === 'mods' ? 'melhorias' : '' };
+  const ultimo = (F.ultimoCat || {})[tipo] || {};
+  let tab = ultimo.tab;
+  if (!tab) {
+    const d = F.atual && F.atual.d;
+    tab = tipo === 'hab' ? (['combatente', 'especialista', 'ocultista'].includes(d && d.classe) ? d.classe : 'combatente') : tipo === 'rit' ? 'todos' : 'arma';
+  }
+  F.cat = { tipo, itemId, seg: 'cat', tab, chip: ultimo.chip, busca: '', fonte: '', sub: tipo === 'mods' ? 'melhorias' : '', minhas: null };
   desenharCatalogo();
+}
+async function carregarMinhas() {
+  const c = F.cat; if (!c) return;
+  const campoD = c.tipo === 'hab' ? 'hab' : c.tipo === 'rit' ? 'rit' : 'itens';
+  const nomes = new Set(baseDe(c).map(x => x.n.toLowerCase()));
+  let fichas = [];
+  try {
+    if (ehMestre()) fichas = Object.values((await A.Rede.once('agentesMestre')) || {});
+    else fichas = (await Promise.all(indice().filter(r => r && r.chave && r.dono === quem()).map(r => A.Rede.once(caminho(r)).catch(() => null)))).filter(Boolean);
+  } catch (e) {}
+  const atual = F.atual && F.atual.d;
+  if (atual && !fichas.some(f => f.criado === atual.criado && f.nome === atual.nome)) fichas.push(atual);
+  const vistos = new Set(), out = [];
+  fichas.forEach(f => lista(f[campoD]).forEach(x => {
+    const k = String(x.n || '').trim().toLowerCase();
+    const assinatura = k + '|' + String(x.d || '').slice(0, 80);
+    if (!k || nomes.has(k) || vistos.has(assinatura)) return;
+    vistos.add(assinatura);
+    out.push({ ...x, fichaOrigem: f.nome || '' });
+  }));
+  if (F.cat === c) { c.minhas = out.sort((a, b) => a.n.localeCompare(b.n, 'pt-BR')); desenharCatalogo(); }
+}
+function artigoCatalogo(x, c, i, minha) {
+  const meta = [minha ? 'Na ficha ' + (x.fichaOrigem || '') : (c.tipo === 'hab' && c.busca ? x.g : ''), c.tipo === 'rit' && x.el ? x.el : '', x.c ? x.c + 'º círculo' : '', c.tipo === 'rit' && !minha ? fonteDe(x) : '',
+    c.tipo === 'itens' ? (TIPOS_ITEM[x.t] || '') : '', c.tipo === 'itens' && x.cat !== undefined ? 'Categoria ' + (ROM[x.cat] || x.cat) : '', c.tipo === 'itens' && x.esp !== undefined ? x.esp + ' espaço' + (num(x.esp) === 1 ? '' : 's') : '',
+    x.a ? `${x.a.dano} · ${x.a.margem < 20 ? x.a.margem + '/' : ''}x${x.a.mult}` : '', x.def ? 'Defesa +' + x.def : '', c.tipo === 'itens' && !minha ? fonteDe(x) : '', c.tipo === 'mods' && x.el ? x.el : ''].filter(Boolean);
+  const d = String(x.d || '');
+  return `<article class="fx-cat-item" style="--el:${corEl(x.el)}"><div><b>${esc(x.n)}</b>${meta.length ? `<small>${esc(meta.join(' · '))}</small>` : ''}
+    <p>${esc(d.slice(0, 420))}${d.length > 420 ? '…' : ''}</p></div><button class="fx-btn-roxo" data-acao="cat-add" data-i="${i}"${minha ? ' data-m="1"' : ''}>Adicionar</button></article>`;
 }
 function desenharCatalogo() {
   const m = $('#fxModal'); const c = F.cat; if (!c) { m.hidden = true; return; }
   m.hidden = false;
-  let base, titulo;
-  if (c.tipo === 'hab') { base = C.habilidades; titulo = 'Adicionar habilidade'; }
-  if (c.tipo === 'rit') { base = C.rituais; titulo = 'Adicionar ritual'; }
-  if (c.tipo === 'itens') { base = C.itens; titulo = 'Adicionar item'; }
-  if (c.tipo === 'mods') { base = c.sub === 'maldicoes' ? C.maldicoes : C.melhorias; titulo = 'Melhorias para itens'; }
-  const grupos = [...new Set(base.map(x => x.g).filter(Boolean))];
-  const b = c.busca.toLowerCase();
-  const res = base.map((x, i) => ({ ...x, i })).filter(x => (!b || (x.n + ' ' + x.d).toLowerCase().includes(b)) && (!c.grupo || x.g === c.grupo)
-    && (!c.circ || int(x.c) === int(c.circ)) && (!c.el || String(x.el || '').toLowerCase().includes(c.el)) && (c.tipo !== 'itens' || !c.sub || x.t === c.sub));
-  if (b) {
-    const peso = x => { const n = x.n.toLowerCase(); return n === b ? 0 : n.startsWith(b) ? 1 : n.includes(b) ? 2 : 3; };
-    res.sort((x, y) => peso(x) - peso(y));
+  const base = baseDe(c);
+  const mods = c.tipo === 'mods';
+  const nomes = NOMES_CAT[c.tipo] || ['Modificações', 'Maldições', 'Melhorias para itens'];
+  const b = c.busca.toLowerCase().trim();
+  let corpoLista = '', contagem = '', barraFiltros = '';
+  if (!mods && c.seg === 'minhas') {
+    if (!c.minhas) { corpoLista = '<p class="fx-vazio-p">Procurando nas suas fichas…</p>'; if (!c.carregando) { c.carregando = true; carregarMinhas(); } }
+    else {
+      const res = c.minhas.map((x, i) => ({ x, i })).filter(({ x }) => !b || (x.n + ' ' + (x.d || '')).toLowerCase().includes(b));
+      contagem = `${res.length} criado${res.length === 1 ? '' : 's'} por você`;
+      corpoLista = res.map(({ x, i }) => artigoCatalogo(x, c, i, true)).join('') || `<p class="fx-vazio-p">${b ? 'Nada encontrado.' : 'Nada criado por você ainda. Crie do zero abaixo: o que você criar aparece aqui para usar em outras fichas.'}</p>`;
+    }
+    const criar = c.tipo === 'itens' ? Object.entries(TIPOS_ITEM).map(([k, n]) => `<button data-acao="novo-item" data-v="${k}">+ ${n}</button>`).join('') : `<button data-acao="novo" data-v="${c.tipo}">+ ${c.tipo === 'rit' ? 'Novo ritual' : 'Nova habilidade'}</button>`;
+    barraFiltros = `<div class="fx-cat-criar"><span>Criar do zero</span>${criar}</div>`;
+  } else {
+    let res = base.map((x, i) => ({ x, i }));
+    if (b) {
+      res = res.filter(({ x }) => (x.n + ' ' + (x.d || '') + ' ' + (x.g || '')).toLowerCase().includes(b));
+      const peso = x => { const n = x.n.toLowerCase(); return n === b ? 0 : n.startsWith(b) ? 1 : n.includes(b) ? 2 : 3; };
+      res.sort((p, q) => peso(p.x) - peso(q.x));
+    } else if (!mods) {
+      if (!(c.tipo === 'rit' && c.tab === 'todos')) res = res.filter(({ x }) => abaDe(c.tipo, x) === c.tab);
+      const chips = chipsDe(c.tipo, c.tab, base);
+      if (chips.length && !chips.some(ch => ch[0] === (c.chip || ''))) c.chip = chips[0][0];
+      const ch = chips.find(k => k[0] === (c.chip || ''));
+      if (ch) res = res.filter(({ x }) => ch[2](x));
+      if (c.tipo === 'rit' && c.fonte) res = res.filter(({ x }) => fonteDe(x) === c.fonte);
+      barraFiltros = chips.length ? `<div class="fx-chips">${chips.map(([v, n]) => `<button data-acao="cat-chip" data-v="${esc(v)}" class="${(c.chip || '') === v ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>` : '';
+    }
+    const mostra = res.slice(0, 120);
+    contagem = `${res.length} resultado${res.length === 1 ? '' : 's'}${b && !mods ? ' em todo o catálogo' : ''}${res.length > mostra.length ? ` · mostrando ${mostra.length}, refine a busca` : ''}`;
+    corpoLista = mostra.map(({ x, i }) => artigoCatalogo(x, c, i, false)).join('') || '<p class="fx-vazio-p">Nada encontrado.</p>';
   }
-  const mostra = res.slice(0, 120);
-  m.innerHTML = `<div class="fx-modal-caixa"><div class="fx-modal-topo"><h3>${titulo}</h3><button class="fx-fechar" data-acao="fechar-modal" aria-label="Fechar">×</button></div>
-    ${c.tipo === 'mods' ? `<div class="fx-seg"><button data-acao="mod-sub" data-v="melhorias" class="${c.sub === 'melhorias' ? 'on' : ''}">Modificações</button><button data-acao="mod-sub" data-v="maldicoes" class="${c.sub === 'maldicoes' ? 'on' : ''}">Maldições</button></div>` : ''}
-    <div class="fx-modal-filtros"><input id="fxBusca" placeholder="Buscar…" value="${esc(c.busca)}">
-      ${grupos.length > 1 ? `<select id="fxGrupo"><option value="">Todas as fontes</option>${grupos.map(g => `<option ${c.grupo === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : ''}
-      ${c.tipo === 'rit' ? `<select id="fxCirc"><option value="">Todo círculo</option>${[1, 2, 3, 4].map(x => `<option value="${x}" ${int(c.circ) === x ? 'selected' : ''}>${x}º círculo</option>`).join('')}</select>
-        <select id="fxEl"><option value="">Todo elemento</option>${['conhecimento', 'energia', 'morte', 'sangue', 'medo', 'varia'].map(e => `<option value="${e}" ${c.el === e ? 'selected' : ''}>${e[0].toUpperCase() + e.slice(1)}</option>`).join('')}</select>` : ''}
-      ${c.tipo === 'itens' ? `<select id="fxTipoIt"><option value="">Todo tipo</option>${Object.entries(TIPOS_ITEM).map(([k, n]) => `<option value="${k}" ${c.sub === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}
-    </div>
-    <p class="fx-dica">${res.length} resultado${res.length === 1 ? '' : 's'}${res.length > mostra.length ? ` (mostrando ${mostra.length}; refine a busca)` : ''}</p>
-    <div class="fx-modal-lista">${mostra.map(x => `<article class="fx-cat-item" style="--el:${corEl(x.el)}"><div><b>${esc(x.n)}</b>
-      <small>${esc([x.g, x.el, x.c ? x.c + 'º círculo' : '', x.t ? TIPOS_ITEM[x.t] : '', x.cat !== undefined && c.tipo === 'itens' ? 'Cat. ' + (ROM[x.cat] || x.cat) : '', x.esp !== undefined ? x.esp + ' esp.' : '', x.a ? `${x.a.dano} · ${x.a.margem < 20 ? x.a.margem + '/' : ''}x${x.a.mult}` : '', x.def ? 'Defesa +' + x.def : ''].filter(Boolean).join(' · '))}</small>
-      <p>${esc(x.d).slice(0, 420)}${x.d.length > 420 ? '…' : ''}</p></div><button class="fx-btn-roxo" data-acao="cat-add" data-i="${x.i}">Adicionar</button></article>`).join('') || '<p class="fx-vazio-p">Nada encontrado.</p>'}</div></div>`;
+  const fontesRit = c.tipo === 'rit' && c.seg === 'cat' && !b ? [...new Set(C.rituais.map(fonteDe))] : [];
+  m.innerHTML = `<div class="fx-modal-caixa" style="${F.atual ? estiloAc(F.atual.d.dono) : ''}"><div class="fx-modal-topo"><h3>${esc(nomes[2])}</h3><button class="fx-fechar" data-acao="fechar-modal" aria-label="Fechar">×</button></div>
+    <div class="fx-seg">${mods
+      ? `<button data-acao="mod-sub" data-v="melhorias" class="${c.sub === 'melhorias' ? 'on' : ''}">Modificações</button><button data-acao="mod-sub" data-v="maldicoes" class="${c.sub === 'maldicoes' ? 'on' : ''}">Maldições</button>`
+      : `<button data-acao="cat-seg" data-v="cat" class="${c.seg === 'cat' ? 'on' : ''}">${nomes[0]}</button><button data-acao="cat-seg" data-v="minhas" class="${c.seg === 'minhas' ? 'on' : ''}">${nomes[1]}</button>`}</div>
+    ${!mods && c.seg === 'cat' ? `<nav class="fx-cat-abas${b ? ' apagada' : ''}">${abasDe(c.tipo).map(([k, n]) => `<button data-acao="cat-tab" data-v="${k}" class="${c.tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>` : ''}
+    ${barraFiltros}
+    <div class="fx-modal-filtros"><span class="fx-busca"><input id="fxBusca" placeholder="Buscar${!mods && c.seg === 'cat' ? ' em todo o catálogo' : ''}…" value="${esc(c.busca)}"></span>
+      ${fontesRit.length > 1 ? `<select id="fxFonte"><option value="">Todas as fontes</option>${fontesRit.map(f => `<option ${c.fonte === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>` : ''}</div>
+    <p class="fx-dica">${esc(contagem)}</p>
+    <div class="fx-modal-lista">${corpoLista}</div></div>`;
   const busca = $('#fxBusca');
   busca.oninput = () => { c.busca = busca.value; const pos = busca.selectionStart; desenharCatalogo(); const nb = $('#fxBusca'); nb.focus(); nb.setSelectionRange(pos, pos); };
-  const liga = (id, k) => { const e = $(id); if (e) e.onchange = () => { c[k] = e.value; desenharCatalogo(); }; };
-  liga('#fxGrupo', 'grupo'); liga('#fxCirc', 'circ'); liga('#fxEl', 'el'); liga('#fxTipoIt', 'sub');
+  const fo = $('#fxFonte'); if (fo) fo.onchange = () => { c.fonte = fo.value; desenharCatalogo(); };
 }
-function adicionarDoCatalogo(i) {
-  const c = F.cat; const d = F.atual.d; const id = A.Rede.chave();
+function adicionarDoCatalogo(i, minha) {
+  const c = F.cat; const id = A.Rede.chave();
   const o = Date.now();
-  if (c.tipo === 'hab') { const x = C.habilidades[i]; const v = { n: x.n, d: x.d, g: x.g || '', o }; if (x.el) v.el = x.el; gravar('hab.' + id, v, true); }
-  if (c.tipo === 'rit') { const x = C.rituais[i]; const v = { ...x, o }; delete v.g; gravar('rit.' + id, v, true); }
-  if (c.tipo === 'itens') {
-    const x = C.itens[i]; const v = { n: x.n, t: x.t, cat: x.cat, esp: x.esp, qtd: 1, d: x.d, o };
+  const x = minha ? c.minhas[i] : baseDe(c)[i];
+  if (!x) return;
+  if (minha) {
+    const v = JSON.parse(JSON.stringify(x)); delete v.id; delete v.fichaOrigem; v.o = o;
+    gravar(`${c.tipo === 'hab' ? 'hab' : c.tipo === 'rit' ? 'rit' : 'itens'}.${id}`, v, true);
+  } else if (c.tipo === 'hab') { const v = { n: x.n, d: x.d, g: x.g || '', o }; if (x.el) v.el = x.el; gravar('hab.' + id, v, true); }
+  else if (c.tipo === 'rit') { const v = { ...x, o }; delete v.g; gravar('rit.' + id, v, true); }
+  else if (c.tipo === 'itens') {
+    const v = { n: x.n, t: x.t, cat: x.cat, esp: x.esp, qtd: 1, d: x.d, o };
     if (x.el) v.el = x.el; if (x.a) v.a = { ...x.a }; if (x.def) v.def = x.def;
     if (x.t === 'protecao') v.vest = true;
     gravar('itens.' + id, v, true);
-  }
-  if (c.tipo === 'mods') {
-    const x = (c.sub === 'maldicoes' ? C.maldicoes : C.melhorias)[i];
+  } else if (c.tipo === 'mods') {
     const v = { n: x.n, d: x.d, o }; if (c.sub === 'maldicoes') { v.mal = true; if (x.el) v.el = x.el; }
     gravar(`itens.${c.itemId}.mods.${id}`, v, true);
     F.abertos.add(c.itemId);
   }
-  A.aviso(`"${(c.tipo === 'hab' ? C.habilidades : c.tipo === 'rit' ? C.rituais : c.tipo === 'itens' ? C.itens : (c.sub === 'maldicoes' ? C.maldicoes : C.melhorias))[i].n}" adicionado.`);
+  A.aviso(`"${x.n}" adicionado.`);
   if (c.tipo === 'mods') { F.cat = null; $('#fxModal').hidden = true; }
   desenharAba();
 }
@@ -856,11 +978,21 @@ function aoClicar(e) {
     atualizarDerivados();
     return;
   }
+  if (ac === 'treino') {
+    const id = b.dataset.id, alvo = int(v), atual = int((at.d.per[id] || {}).t);
+    gravar(`per.${id}.t`, atual === alvo ? alvo - 5 : alvo, true);
+    atualizarDerivados();
+    return;
+  }
   if (ac === 'catalogo') { abrirCatalogo(v); return; }
   if (ac === 'mod-sub') { F.cat.sub = v; F.cat.busca = ''; desenharCatalogo(); return; }
-  if (ac === 'cat-add') { adicionarDoCatalogo(int(b.dataset.i)); return; }
+  if (ac === 'cat-seg') { F.cat.seg = v; desenharCatalogo(); return; }
+  if (ac === 'cat-tab') { F.cat.tab = v; F.cat.chip = undefined; F.cat.busca = ''; F.ultimoCat = { ...(F.ultimoCat || {}), [F.cat.tipo]: { tab: v } }; desenharCatalogo(); $('#fxModal .fx-modal-lista').scrollTop = 0; return; }
+  if (ac === 'cat-chip') { F.cat.chip = v; F.ultimoCat = { ...(F.ultimoCat || {}), [F.cat.tipo]: { tab: F.cat.tab, chip: v } }; desenharCatalogo(); $('#fxModal .fx-modal-lista').scrollTop = 0; return; }
+  if (ac === 'cat-add') { adicionarDoCatalogo(int(b.dataset.i), !!b.dataset.m); return; }
   if (ac === 'add-mod') { abrirCatalogo('mods', b.dataset.id); return; }
   if (ac === 'rem-mod') { gravar(`itens.${b.dataset.id}.mods.${b.dataset.m}`, null, true); F.abertos.add(b.dataset.id); desenharAba(); return; }
+  if ((ac === 'novo' || ac === 'novo-item') && F.cat) { F.cat = null; $('#fxModal').hidden = true; if (ac === 'novo-item') { F.aba = 'inventario'; } }
   if (ac === 'novo') {
     const id = A.Rede.chave();
     const vbase = v === 'rit' ? { n: 'Novo ritual', el: 'Conhecimento', c: 1, d: '', o: Date.now() } : { n: 'Nova habilidade', d: '', o: Date.now() };
