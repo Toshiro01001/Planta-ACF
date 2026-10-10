@@ -65,6 +65,24 @@ const somaAte = (id, ate = Infinity) => baseDe(id) + eventosNex().filter(e => e.
 const nexAtual = id => limitar(somaAte(id));
 const ultimoEv = id => eventosNex().filter(e => e.s === id).pop() || null;
 const N = { aba: 'calc', filtro: 'todos' };
+// Marcos de NEX: valores da regra opcional "NEX & Experiência" (Sobrevivendo ao Horror, p. 98 a 103). O Mestre edita em Ajustes.
+const MARCOS_PADRAO = [
+  { v: 25, t: 'Alterações gerais (SaH p. 99): pode testar Ocultismo sem ser treinado (+2 se for treinado) e sofre −5 em Diplomacia, Enganação ou Intimidação, à escolha.' },
+  { v: 35, t: 'Alterações gerais (SaH p. 99): coincidências paranormais passam a acontecer ao redor; soma um atributo à escolha (exceto Presença) ao total de PE e sofre −5 em Atletismo, Fortitude ou Reflexos.' },
+  { v: 50, t: 'SaH p. 99: no próximo Transcender, ganha afinidade com Conhecimento, Energia, Morte ou Sangue e passa a receber as alterações desse elemento.' },
+  { v: 60, t: 'Alteração do elemento da afinidade, grau 60% (SaH p. 100 a 103).' },
+  { v: 75, t: 'Alteração do elemento da afinidade, grau 75% (SaH p. 100 a 103).' },
+  { v: 90, t: 'Alteração do elemento da afinidade, grau 90% (SaH p. 100 a 103).' },
+  { v: 99, t: 'Limite da exposição (SaH p. 99): só uma desconjuração passa de 99%.' },
+];
+const marcos = () => { const m = nexSg().marcos; const l = m ? Object.values(m).filter(x => x && num(x.v) > 0) : MARCOS_PADRAO; return l.map(x => ({ v: limitar(int(x.v)), t: String(x.t || '') })).sort((a, b) => a.v - b.v); };
+const proxMarco = n => marcos().find(m => m.v > n) || null;
+function avisarMarcos(id, antes, depois) {
+  marcos().filter(m => antes < m.v && depois >= m.v).forEach(m => {
+    if (A.alertaMestre) A.alertaMestre(`☢ ${nomeDe(id)} chegou a NEX ${m.v}%. ${m.t}`);
+    A.diario && A.diario('nex', `${nomeDe(id)} chegou a NEX ${m.v}%: ${m.t}`);
+  });
+}
 
 // manda os valores atuais para o mapa (fichas, HUD e cartão leem de lá)
 function publicarNex() {
@@ -73,6 +91,7 @@ function publicarNex() {
   cobaias().forEach(x => { const v = nexAtual(x.id); if (atual[x.id] !== v) A.definir(['nex', x.id], v); });
 }
 function aplicarNex(id, g, motivo) {
+  const antes = nexAtual(id);
   const k = A.Rede.chave();
   const ev = g ? { s: id, k: g.k, l: g.l, d: g.d, ts: Date.now() } : { s: id, k: 'ajuste', l: motivo.l, d: motivo.d, ts: Date.now() };
   A.gravarSegredo(['_nex', 'ev', k], ev);
@@ -80,6 +99,7 @@ function aplicarNex(id, g, motivo) {
   if (MESA().registrarRel) MESA().registrarRel('nex', id, ev.d, ev.l, 'n' + k);
   A.diario && A.diario('nex', `${nomeDe(id)}: ${ev.l} (${ev.d > 0 ? '+' : ''}${ev.d}) · NEX ${nexAtual(id)}%`);
   if (somOk()) A.Som.tom(ev.d > 0 ? 330 : 220, 0, 0.15, 'triangle', 0.06);
+  avisarMarcos(id, antes, nexAtual(id));
   desenharNex();
 }
 function reverterNex(k) {
@@ -116,6 +136,86 @@ function exportarNex() {
   baixar(`caixa-de-fosforos-nex-${new Date().toISOString().slice(0, 10)}.json`, lista);
 }
 
+/* ---------- sugestões automáticas (o Mestre confirma) ----------
+   Presença Perturbadora chamada, cobaia entrando numa sala de Medo, ritual aprendido ou Transcender
+   escolhido na ficha (o jogador avisa por "avisos", que só o Mestre lê). Nada sobe sozinho. */
+const KEY_SUG = 'acf-sug-nex';
+const SUG = { lista: ls.get(KEY_SUG, []), chamado: undefined, salas: null, avisosOff: null, visto: ls.get('acf-avisos-visto', 0) };
+const salvarSug = () => ls.set(KEY_SUG, SUG.lista.slice(-30));
+const GAT = k => GATILHOS.find(g => g.k === k);
+function sugerir(s, motivo, ops, chave) {
+  if (!A.mestre || !(A.SER[s] || {}).nome) return;
+  if (chave && SUG.lista.some(x => x.chave === chave)) return;
+  const x = { id: A.Rede.chave(), s, motivo: String(motivo).slice(0, 140), ops, chave: chave || '', ts: Date.now() };
+  SUG.lista.push(x); salvarSug();
+  // alerta com botões, além da lista no bloco da Calculadora
+  const caixa = $('#alertasMestre');
+  if (caixa) {
+    const d = document.createElement('div'); d.className = 'alerta-mestre sug-nex'; d.dataset.sug = x.id;
+    d.innerHTML = `<span>☢ ${esc(nomeDe(s))}: ${esc(x.motivo)}</span><div class="sug-botoes">${ops.map(k => { const g = GAT(k); return `<button data-sug="aplicar" data-id="${x.id}" data-g="${k}">+${g.d} ${esc(g.l)}</button>`; }).join('')}<button data-sug="ignorar" data-id="${x.id}">Ignorar</button></div>`;
+    caixa.prepend(d);
+    setTimeout(() => d.remove(), 60000);
+  }
+  if (somOk()) { A.Som.tom(520, 0, 0.12, 'triangle', 0.06); A.Som.tom(390, 0.14, 0.18, 'triangle', 0.06); }
+  desenharMesaNex();
+}
+function resolverSug(id, g) {
+  const x = SUG.lista.find(y => y.id === id); if (!x) return;
+  if (g) { const gt = GAT(g); if (gt) aplicarNex(x.s, gt); }
+  SUG.lista = SUG.lista.filter(y => y.id !== id); salvarSug();
+  $$(`[data-sug="aplicar"][data-id="${id}"], [data-sug="ignorar"][data-id="${id}"]`).forEach(b => { const a = b.closest('.alerta-mestre'); if (a) a.remove(); });
+  desenharMesaNex(); desenharNex();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-sug]'); if (!b || !A.mestre) return;
+  if (b.dataset.sug === 'aplicar') resolverSug(b.dataset.id, b.dataset.g);
+  else if (b.dataset.sug === 'ignorar') resolverSug(b.dataset.id, null);
+  else if (b.dataset.sug === 'limpar') { SUG.lista = []; salvarSug(); $$('.sug-nex').forEach(a => a.remove()); desenharMesaNex(); }
+});
+const posNaPlanta = cn => ((cn - 1) % 25) + 1;
+function vigiarSugestoes() {
+  if (!A.mestre || !A.pronto) { SUG.chamado = undefined; SUG.salas = null; return; }
+  // Presença Perturbadora: um chamado novo sugere "exposição à criatura" para cada alvo
+  const ch = est().chamado;
+  const idCh = ch && ch.t === 'presenca' ? ch.id : null;
+  if (SUG.chamado === undefined) SUG.chamado = idCh;
+  else if (idCh && idCh !== SUG.chamado) {
+    SUG.chamado = idCh;
+    Object.keys(ch.alvos || {}).filter(id => (A.SER[id] || {}).tipo === 'cobaia').forEach(id => sugerir(id, `Presença Perturbadora de ${ch.nome || 'criatura'}`, ['criatura'], 'pp:' + idCh + ':' + id));
+  }
+  // salas de Medo (a Zona Neutra, posição 25, fica de fora)
+  const agora = {};
+  cobaias().forEach(x => { agora[x.id] = A.salaDe(x.id); });
+  if (SUG.salas) cobaias().forEach(x => {
+    const cn = agora[x.id];
+    if (!cn || cn === SUG.salas[x.id] || posNaPlanta(cn) === 25) return;
+    const info = A.infoSala ? A.infoSala(cn) : ['', '?'];
+    if (info[1] === 'F') sugerir(x.id, `entrou na CN ${String(cn).padStart(2, '0')}${info[0] ? ' · ' + info[0] : ''} (sala de Medo)`, ['medo_leve', 'medo_mod'], 'sala:' + x.id + ':' + cn + ':' + Math.floor(Date.now() / 60000));
+  });
+  SUG.salas = agora;
+  // avisos que os jogadores mandam (ritual, Transcender, cofre aberto)
+  if (!SUG.avisosOff) SUG.avisosOff = A.Rede.on('avisos', v => {
+    Object.entries(v || {}).sort((a, b) => num(a[1].ts) - num(b[1].ts)).forEach(([k, x]) => {
+      if (!x) return;
+      if (num(x.ts) > SUG.visto) {
+        if (x.t === 'ritual') sugerir(x.s, `aprendeu o ritual ${x.x || ''}`.trim(), ['ritual'], 'av:' + k);
+        else if (x.t === 'transcender') sugerir(x.s, 'escolheu Transcender na ficha', ['transcender'], 'av:' + k);
+        else if (x.t === 'cofre') {
+          if (A.alertaMestre) A.alertaMestre(`🔓 ${x.s === 'aux' ? 'Um auxiliar' : nomeDe(x.s)} abriu o cofre: ${x.x || ''}`);
+          if (MESA().registrarRel) MESA().registrarRel('cofre', x.s, 0, x.x || '', 'c' + k);
+        }
+        SUG.visto = Math.max(SUG.visto, num(x.ts)); ls.set('acf-avisos-visto', SUG.visto);
+      }
+      A.Rede.set('avisos/' + k, null).catch(() => {});   // já lido: limpa
+    });
+  }, () => {});
+}
+// jogador: ritual ou Transcender adicionado pelo catálogo da ficha → aviso para o Mestre
+document.addEventListener('acf-ficha-add', e => {
+  const d = e.detail || {}; if (A.mestre || !d.s) return;
+  A.Rede.set('avisos/' + A.Rede.chave(), { t: d.tipo === 'rit' ? 'ritual' : 'transcender', s: d.s, x: d.tipo === 'rit' ? `${d.n} (${d.c}º círculo)`.slice(0, 120) : 'Transcender', ts: Date.now() }).catch(() => {});
+});
+
 /* ---------- bloco da Mesa ---------- */
 function desenharMesaNex() {
   const c = $('#mesaNex'); if (!c || !A.mestre || !semFoco('#mesaNex')) return;
@@ -127,6 +227,7 @@ function desenharMesaNex() {
   const html = `<p class="mini">Exposição paranormal das cobaias (não é o nível). Cada aumento entra no histórico, na ficha do jogador e no Relatório.</p>
     ${pronto ? '' : '<p class="mini">Carregando o histórico…</p>'}
     <ul class="nx-mini">${cobaias().map(x => { const n = valor(x.id); return `<li style="--nex:${corNex(n)}"><span>${esc(x.nome)}</span><i><b style="width:${n}%"></b></i><strong>${n}%</strong></li>`; }).join('')}</ul>
+    ${SUG.lista.length ? `<div class="sug-lista"><p class="mesa-k">SUGESTÕES DE NEX (${SUG.lista.length})</p>${SUG.lista.slice().reverse().map(x => `<div class="sug-item"><span><b>${esc(nomeDe(x.s))}</b> ${esc(x.motivo)} <small>${dataHora(x.ts).hora}</small></span><div class="sug-botoes">${x.ops.map(k => { const g = GAT(k); return g ? `<button data-sug="aplicar" data-id="${x.id}" data-g="${k}">+${g.d} ${esc(g.l)}</button>` : ''; }).join('')}<button data-sug="ignorar" data-id="${x.id}">Ignorar</button></div></div>`).join('')}<button data-sug="limpar" class="sug-limpar">Ignorar todas</button></div>` : ''}
     ${ant ? `<p class="nx-aviso">Encontrei ${ant} registro${ant === 1 ? '' : 's'} da Calculadora de NEX antiga neste navegador. <button data-nxm="antigos">Trazer para a Planta</button></p>` : ''}
     <button data-nxm="abrir" class="btn-protocolo">☢ Abrir a Calculadora de NEX</button>`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
@@ -171,7 +272,7 @@ function desenharNex(forcar) {
       const n = nexAtual(x.id), u = ultimoEv(x.id), aberto = N.abertos && N.abertos[x.id];
       return `<article class="nx-card" style="--nex:${corNex(n)}"><div class="nx-card-cab"><span>FHP · ${esc(codCurto(x.id))}</span><b>${esc(x.nome)}</b></div>
         <div class="nx-leitura"><span class="nx-num">${n}</span><span class="nx-pct">%</span><span class="nx-rot">NEX</span></div>
-        <div class="nx-barra"><i style="width:${n}%"></i></div><div class="nx-marcas"><span>0%</span><span>99%</span></div>
+        <div class="nx-barra"><i style="width:${n}%"></i>${marcos().map(m => `<em style="left:${m.v}%" title="Marco ${m.v}%" class="${n >= m.v ? 'ok' : ''}"></em>`).join('')}</div><div class="nx-marcas"><span>0%</span><span>${(pm => (pm ? `próximo marco: ${pm.v}%` : 'todos os marcos'))(proxMarco(n))}</span><span>99%</span></div>
         <details class="nx-aumento" data-id="${x.id}" ${aberto ? 'open' : ''}><summary>Aumento de NEX</summary>
           <div class="nx-gatilhos">${GATILHOS.map(g => `<button data-nx="gat" data-id="${x.id}" data-g="${g.k}"><span>${esc(g.l)}</span><b>+${g.d}</b></button>`).join('')}</div>
           <div class="nx-ajuste"><input type="number" step="1" data-aj="${x.id}" placeholder="±" aria-label="Valor do ajuste"><input data-ajm="${x.id}" maxlength="60" placeholder="Motivo do ajuste"><button data-nx="ajuste" data-id="${x.id}">Aplicar</button></div>
@@ -190,6 +291,9 @@ function desenharNex(forcar) {
     const ant = antigosNesteNavegador();
     html = `<section class="nx-cfg"><h3>NEX inicial</h3><p class="mini">O valor de partida de cada cobaia, antes dos aumentos. Vazio volta ao padrão da calculadora antiga.</p>
       <div class="nx-bases">${cobaias().map(x => { const b = (nexSg().base || {})[x.id]; return `<label><span>${esc(x.nome)}</span><input type="number" min="0" max="99" data-base="${x.id}" value="${typeof b === 'number' ? b : ''}" placeholder="${NEX_INICIAL[x.id] !== undefined ? NEX_INICIAL[x.id] : 0}"></label>`; }).join('')}</div>
+      <h3>Marcos de NEX</h3><p class="mini">Quando uma cobaia passa de um marco, você recebe um alerta com o texto. Os valores e textos padrão vêm da regra opcional "NEX &amp; Experiência" (Sobrevivendo ao Horror, p. 98 a 103), que separa nível e NEX como nesta campanha.</p>
+      <div class="nx-marcos-ed">${marcos().map((m, i) => `<div class="nx-marco-l"><input type="number" min="1" max="99" data-mv="${i}" value="${m.v}" aria-label="Valor"><input data-mt="${i}" maxlength="240" value="${esc(m.t)}" aria-label="Texto do marco"><button data-nx="marco-tirar" data-i="${i}" aria-label="Tirar">×</button></div>`).join('')}</div>
+      <div class="nx-botoes"><button data-nx="marco-novo">+ Marco</button><button data-nx="marco-salvar" class="nx-pri">Salvar marcos</button><button data-nx="marco-padrao">Voltar ao padrão do livro</button></div>
       <h3>Backup e calculadora antiga</h3>
       <p class="mini">Exportar baixa o histórico no mesmo formato da calculadora antiga. Importar aceita o backup dela ou o daqui e só acrescenta o que faltar.</p>
       <div class="nx-botoes"><button data-nx="exportar">⬇ Exportar backup</button><button data-nx="importar">⬆ Importar backup…</button>${ant ? `<button data-nx="antigos" class="nx-pri">Trazer ${ant} registro${ant === 1 ? '' : 's'} deste navegador</button>` : ''}</div>
@@ -217,6 +321,16 @@ function aoClicarNex(e) {
   else if (a === 'exportar') exportarNex();
   else if (a === 'importar') lerArquivo(obj => { if (!Array.isArray(obj)) { A.aviso('Arquivo inválido: use o backup da Calculadora de NEX.'); return; } importarEventos(eventosDaCalcAntiga(obj), 'do arquivo'); desenharNex(true); });
   else if (a === 'antigos') { let l = []; try { l = JSON.parse(localStorage.getItem(CHAVE_CALC_ANTIGA) || '[]'); } catch (er) {} importarEventos(eventosDaCalcAntiga(l), 'da calculadora antiga deste navegador'); desenharNex(true); }
+  else if (a === 'marco-salvar' || a === 'marco-novo' || a === 'marco-tirar') {
+    const l = $$('[data-mv]', o).map((i, k) => ({ v: limitar(int(i.value)), t: ($(`[data-mt="${k}"]`, o).value || '').trim().slice(0, 240) }));
+    if (a === 'marco-tirar') l.splice(int(b.dataset.i), 1);
+    if (a === 'marco-novo') l.push({ v: Math.min(99, (l.length ? Math.max(...l.map(m => m.v)) : 0) + 5), t: '' });
+    const obj = {}; l.filter(m => m.v > 0).forEach((m, k) => { obj['m' + k] = m; });
+    A.gravarSegredo(['_nex', 'marcos'], Object.keys(obj).length ? obj : { m0: { v: 99, t: '' } });
+    if (a === 'marco-salvar') A.aviso('Marcos de NEX salvos.');
+    desenharNex(true);
+  }
+  else if (a === 'marco-padrao') { if (confirm('Voltar os marcos ao padrão do livro?')) { A.gravarSegredo(['_nex', 'marcos'], null); desenharNex(true); } }
   else if (a === 'zerar') { if (!confirm('Apagar TODO o histórico de NEX? O NEX de cada cobaia volta ao inicial. Baixe um backup antes.')) return; A.gravarSegredo(['_nex', 'ev'], null); publicarNex(); desenharNex(true); }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = $('#nexTela'); if (o && !o.hidden) fecharNex(); } });
@@ -259,7 +373,7 @@ function htmlSenhas(ehMestre) {
     const ok = t ? (conferidos[a.n + '\u0000' + t + '\u0000' + hashAtivo(a.n)]) : undefined;
     if (t && ok === undefined) conferir(a.n, t);
     const estado = !t ? '<small class="sn-alerta">senha antiga do config.js (texto não guardado aqui)</small>' : ok === false ? '<small class="sn-alerta">o texto não confere com a senha ativa: salve de novo</small>' : '';
-    return `<div class="sn-linha"><span class="sn-nome">${esc(a.nome)}</span>${campo(t, `data-sn-andar="${a.n}"`, 'nova senha')}${btnCop(t)}${ehMestre ? `<button data-sn="salvar-andar" data-n="${a.n}">Salvar</button>` : ''}${estado}</div>`;
+    return `<div class="sn-linha"><span class="sn-nome">${esc(a.nome)}</span>${campo(t, `data-sn-andar="${a.n}"`, 'nova senha')}${btnCop(t)}${ehMestre ? `<button data-sn="salvar-andar" data-n="${a.n}">Salvar</button><button data-sn="trancar" data-n="${a.n}" title="Quem já entrou neste andar precisa digitar a senha de novo">🔒 Trancar de novo</button>` : ''}${estado}</div>`;
   }).join('');
   return `<p class="mini">${ehMestre ? 'Tudo o que você precisa passar para os jogadores, num lugar só. Os auxiliares também veem esta pasta, mas só você altera.' : 'Senhas para passar aos jogadores. Só o Mestre altera.'} Não envie o arquivo exportado ao GitHub.</p>
     <h3>Andares</h3><div class="sn-grupo">${linhasAndar}</div>
@@ -278,6 +392,7 @@ function desenharSenhas() {
   const html = htmlSenhas(A.mestre);
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
 }
+function trancarAndar(n) { A.definir(['trancaAndar', 'a' + n], int((est().trancaAndar || {})['a' + n]) + 1); }
 async function salvarAndar(n, txt) {
   txt = String(txt || '').trim();
   if (!txt) { A.aviso('Digite a senha do andar.'); return false; }
@@ -304,7 +419,9 @@ async function importarSenhas(o) {
   const resumo = [and.length ? `${and.length} senha${and.length === 1 ? '' : 's'} de andar` : '', o.parede ? 'a chave da Parede' : '', outras.length ? `${outras.length} outra${outras.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ');
   if (!resumo) { A.aviso('O arquivo não tem senhas para importar.'); return; }
   if (!confirm(`Importar ${resumo}? As senhas de andar mudam na hora: quem ainda não entrou no andar vai precisar da senha nova.${o.cofres && o.cofres.length ? '\n(Os códigos dos cofres não mudam por aqui: eles ficam em cada documento do Arquivo.)' : ''}`)) return;
+  const mudaram = and.filter(([n, t]) => String(((S.dados || {}).andares || {})['a' + n] || '') !== String(t).trim()).map(([n]) => int(n));
   for (const [n, t] of and) await salvarAndar(int(n), t);
+  if (mudaram.length && confirm(`Trancar de novo ${mudaram.length === 1 ? 'o andar que mudou de senha' : `os ${mudaram.length} andares que mudaram de senha`} para quem já tinha entrado?`)) mudaram.forEach(trancarAndar);
   if (o.parede) await A.Rede.set('senhas/parede', String(o.parede).trim().slice(0, 120)).catch(() => {});
   if (outras.length) { const obj = {}; outras.forEach(x => { obj[A.Rede.chave()] = { n: String(x.nome).slice(0, 40), s: String(x.senha).slice(0, 60), o: String(x.obs || '').slice(0, 80) }; }); await A.Rede.set('senhas/outras', obj).catch(() => {}); }
   A.aviso('Senhas importadas.');
@@ -316,7 +433,13 @@ document.addEventListener('click', async e => {
   if (a === 'exportar') { exportarSenhas(); A.aviso('Arquivo de senhas baixado. Guarde só com você.'); return; }
   if (a === 'parede-aqui') { const k = (S.dados || {}).parede; if (k) { try { localStorage.setItem(CHAVE_PAREDE, k); } catch (er) {} A.aviso('Chave da Parede gravada neste aparelho.'); } return; }
   if (!A.mestre) return;
-  if (a === 'salvar-andar') { const n = int(b.dataset.n), i = $(`[data-sn-andar="${n}"]`); b.disabled = true; if (await salvarAndar(n, i && i.value)) A.aviso(`Senha do ${andares().find(x => x.n === n).nome} trocada.`); b.disabled = false; }
+  if (a === 'salvar-andar') {
+    const n = int(b.dataset.n), i = $(`[data-sn-andar="${n}"]`), nome = andares().find(x => x.n === n).nome;
+    b.disabled = true;
+    if (await salvarAndar(n, i && i.value)) { A.aviso(`Senha do ${nome} trocada.`); if (confirm(`Trancar de novo o ${nome} para quem já tinha entrado? (Eles vão precisar da senha nova.)`)) trancarAndar(n); }
+    b.disabled = false;
+  }
+  else if (a === 'trancar') { const n = int(b.dataset.n), nome = andares().find(x => x.n === n).nome; if (confirm(`Trancar de novo o ${nome}? Todos os jogadores voltam para a tela da senha nesse andar.`)) { trancarAndar(n); A.aviso(`${nome} trancado de novo.`); } }
   else if (a === 'salvar-parede') { const v = ($('[data-sn-parede]').value || '').trim(); await A.Rede.set('senhas/parede', v ? v.slice(0, 120) : null).catch(() => A.aviso('O servidor recusou.')); A.aviso('Chave da Parede guardada.'); }
   else if (a === 'nova') { const n = ($('#snNovaN').value || '').trim(), s = ($('#snNovaS').value || '').trim(), o = ($('#snNovaO').value || '').trim(); if (!n || !s) { A.aviso('Preencha para quê e a senha.'); return; } await A.Rede.set('senhas/outras/' + A.Rede.chave(), { n: n.slice(0, 40), s: s.slice(0, 60), o: o.slice(0, 80) }).catch(() => A.aviso('O servidor recusou.')); }
   else if (a === 'tirar') { if (confirm('Apagar esta senha da lista?')) A.Rede.set('senhas/outras/' + b.dataset.k, null).catch(() => {}); }
@@ -401,7 +524,8 @@ function desenharParede() {
   const b = $('#pdOferecer'); b.disabled = P.pensando; b.classList.toggle('pensando', P.pensando); b.textContent = P.pensando ? 'A Parede considera…' : 'Oferecer à Parede';
   const hist = ls.get('acf-parede-hist', []).filter(h => A.mestre || h.s === A.meu).slice(-20).reverse();
   $('#pdHist').hidden = !hist.length;
-  $('#pdHistLista').innerHTML = hist.map(h => { const q = dataHora(h.ts); return `<article class="pd-hist-item"><header><b>${esc(nomeDe(h.s))}</b> · preço ${int(h.n)} · ${q.data} ${q.hora}</header><p class="pd-hist-d">“${esc(h.d)}”</p><p class="pd-hist-p">${esc(h.p)}</p></article>`; }).join('');
+  const dv = est().dividas || {};
+  $('#pdHistLista').innerHTML = hist.map(h => { const q = dataHora(h.ts); return `<article class="pd-hist-item${h.k && dv[h.k] === 'pago' ? ' pago' : ''}"><header><b>${esc(nomeDe(h.s))}</b> · preço ${int(h.n)} · ${q.data} ${q.hora}${h.k ? ` · <i>${dv[h.k] === 'pago' ? 'cobrado' : 'pendente'}</i>` : ''}</header><p class="pd-hist-d">“${esc(h.d)}”</p><p class="pd-hist-p">${esc(h.p)}</p></article>`; }).join('');
 }
 function avisoParede(t) { const a = $('#pdAviso'); if (!a) return; a.textContent = t; a.hidden = !t; }
 function guardarChave() {
@@ -445,7 +569,11 @@ async function oferecer() {
     const reg = { s: id, n: nivel, d: desejo.slice(0, 500), p: preco.slice(0, 2000), c: typeof d.count === 'number' ? d.count : 0, ts: Date.now() };
     const hist = ls.get('acf-parede-hist', []); hist.push(reg); ls.set('acf-parede-hist', hist.slice(-50));
     const k = A.Rede.chave(); P.meus[k] = true;
+    hist[hist.length - 1].k = k; ls.set('acf-parede-hist', hist.slice(-50));
     A.Rede.set('desejos/' + k, reg).catch(() => {});
+    // a dívida fica na ficha ativa do jogador (seção "O que devo à Parede"); o Mestre marca "cobrado"
+    const FXA = window.ACF_FICHAS, at = FXA && FXA.ativa && FXA.ativa();
+    if (at && at.d && at.d.dono === id && !A.mestre) FXA.aplicarNaAtiva([['dividas.' + k, { n: nivel, d: reg.d, p: reg.p, ts: reg.ts }]]);
   } catch (e) {
     avisoParede('A Parede recusou o pedido. Verifique a chave e a conexão. Detalhe: ' + (e.message || e));
   } finally { P.pensando = false; desenharParede(); desenharMesaParede(); }
@@ -507,12 +635,13 @@ function desenharMesaParede() {
   const c = $('#mesaParede'); if (!c || !A.mestre || !semFoco('#mesaParede')) return;
   if (!P.contTentou) { P.contTentou = true; carregarContagens(); }
   const lista = Object.entries(P.desejos || {}).sort((a, b) => num(b[1].ts) - num(a[1].ts));
-  const on = paredeAberta();
+  const on = paredeAberta(), dv = est().dividas || {};
+  const pend = lista.filter(([k]) => dv[k] !== 'pago').length;
   const html = `<p class="mini">O mesmo Worker do site antigo: a contagem de desejos é a mesma. Cada desejo e o preço chegam aqui e no Relatório.</p>
     <label class="chave"><input type="checkbox" data-pdm="on" ${on ? 'checked' : ''}><span>Parede desperta (os jogadores veem o botão)</span></label>
     <p class="mini">${P.contOk ? cobaias().map(x => `${esc(x.nome)} ${int(P.cont[x.id])}`).join(' · ') : 'Contagem: <button data-pdm="contar">consultar a pedra</button>'}</p>
     <div class="mesa-linha"><button data-pdm="abrir" class="btn-protocolo">🧱 Abrir a Parede</button></div>
-    ${lista.length ? `<details class="pd-m-lista"><summary>Desejos registrados (${lista.length})</summary>${lista.slice(0, 40).map(([k, d]) => { const q = dataHora(d.ts); return `<article><header><b>${esc(nomeDe(d.s))}</b> · preço ${int(d.n)} · ${q.data} ${q.hora}<button data-pdm="apagar" data-k="${esc(k)}" aria-label="Apagar este registro">×</button></header><p>“${esc(d.d)}”</p><p class="mini">${esc(d.p)}</p></article>`; }).join('')}</details>` : ''}`;
+    ${lista.length ? `<details class="pd-m-lista"><summary>Desejos registrados (${lista.length}) · ${pend ? `${pend} preço${pend > 1 ? 's' : ''} pendente${pend > 1 ? 's' : ''}` : 'tudo cobrado'}</summary>${lista.slice(0, 40).map(([k, d]) => { const q = dataHora(d.ts), pago = dv[k] === 'pago'; return `<article class="${pago ? 'pago' : ''}"><header><b>${esc(nomeDe(d.s))}</b> · preço ${int(d.n)} · ${q.data} ${q.hora}<button data-pdm="pago" data-k="${esc(k)}" class="pd-m-st">${pago ? '✓ cobrado' : 'marcar cobrado'}</button><button data-pdm="apagar" data-k="${esc(k)}" aria-label="Apagar este registro">×</button></header><p>“${esc(d.d)}”</p><p class="mini">${esc(d.p)}</p></article>`; }).join('')}</details>` : ''}`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
 }
 document.addEventListener('click', e => {
@@ -520,6 +649,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.pdm;
   if (a === 'abrir') abrirParede();
   else if (a === 'contar') carregarContagens();
+  else if (a === 'pago') { const k = b.dataset.k; A.definir(['dividas', k], (est().dividas || {})[k] === 'pago' ? null : 'pago'); setTimeout(desenharMesaParede, 30); }
   else if (a === 'apagar') { if (confirm('Apagar este registro de desejo? (A contagem do Worker não muda.)')) A.Rede.set('desejos/' + b.dataset.k, null).catch(() => {}); }
 });
 document.addEventListener('change', e => {
@@ -544,7 +674,7 @@ function tudo() {
   requestAnimationFrame(() => {
     agendado = false;
     try {
-      ligarSenhas(); ligarDesejos();
+      ligarSenhas(); ligarDesejos(); vigiarSugestoes();
       // o Mestre publica o NEX uma vez ao entrar, se já usa a calculadora
       if (A.mestre && A.segredosProntos && !nexPublicado) { nexPublicado = true; if (sg()._nex) publicarNex(); }
       if (!A.mestre) nexPublicado = false;

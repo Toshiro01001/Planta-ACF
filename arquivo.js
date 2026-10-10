@@ -150,6 +150,8 @@ async function tentarCodigo(cod) {
   if (!v) return null;
   const ab = cofresAbertos(); ab[t] = h; ls.set(KEY_COFRES, ab);
   cofreDocs[h] = v; ligarCofres();
+  // o Mestre fica sabendo quem abriu (alerta e Relatório)
+  if (!A.mestre) A.Rede.set('avisos/' + A.Rede.chave(), { t: 'cofre', s: A.meu || (A.aux ? 'aux' : '?'), x: Object.values(v).map(d => (d && d.tit) || 'Documento').join(' · ').slice(0, 120), ts: Date.now() }).catch(() => {});
   if (somOk()) { A.Som.tom(220, 0, 0.12, 'square', 0.06); A.Som.tom(440, 0.12, 0.12, 'square', 0.06); A.Som.tom(880, 0.24, 0.3, 'square', 0.06); }
   return { t, h, docs: v };
 }
