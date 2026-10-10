@@ -44,9 +44,10 @@ const hudOffJog = () => ((est().hud || {}).off) || {};
 const hudOffMeu = () => ls.get('acf-hud-gm-off', {});
 function vitaisDe(id) {
   const tk = (est().tokens || {})[id];
-  if (tk && tk.vit) return tk.vit;
+  const x = (est().nex || {})[id], expo = typeof x === 'number' ? x : undefined;   // NEX da Calculadora do Mestre
+  if (tk && tk.vit) return expo === undefined ? tk.vit : { ...tk.vit, nex: expo };
   const f = (est().fichas || {})[id];
-  if (f && (f.pv !== undefined || f.pvm !== undefined)) return { pv: f.pv, pvM: f.pvm, pe: f.pe, peM: f.pem, san: f.san, sanM: f.sanm, nex: f.nex, resumida: true };
+  if (f && (f.pv !== undefined || f.pvm !== undefined)) return { pv: f.pv, pvM: f.pvm, pe: f.pe, peM: f.pem, san: f.san, sanM: f.sanm, nex: expo === undefined ? f.nex : expo, resumida: true };
   return null;
 }
 const ultimoPV = {};
@@ -67,7 +68,7 @@ function desenharHud() {
     const morr = conds.includes('morrendo'), enl = conds.includes('enlouquecendo');
     const pv = v ? int(v.pv) : null, pvM = v ? int(v.pvM) : null;
     const pe = v ? (v.det ? v.pd : v.pe) : null;
-    const tit = v ? `${s.nome}: PV ${pv}/${pvM}${v.det ? ` · PD ${int(v.pd)}/${int(v.pdM)}` : `${v.pe !== undefined ? ` · PE ${int(v.pe)}/${int(v.peM)}` : ''}${v.san !== undefined ? ` · SAN ${int(v.san)}/${int(v.sanM)}` : ''}`}${v.nex !== undefined ? ` · NEX ${v.nex}${String(v.nex).startsWith('E') ? '' : '%'}` : ''}` : `${s.nome}: sem ficha ativa`;
+    const tit = v ? `${s.nome}: PV ${pv}/${pvM}${v.det ? ` · PD ${int(v.pd)}/${int(v.pdM)}` : `${v.pe !== undefined ? ` · PE ${int(v.pe)}/${int(v.peM)}` : ''}${v.san !== undefined ? ` · SAN ${int(v.san)}/${int(v.sanM)}` : ''}`}${v.nv !== undefined ? ` · ${String(v.nv).startsWith('E') ? 'Estágio ' + String(v.nv).slice(1) : 'Nível ' + v.nv}` : ''}${v.nex !== undefined && !String(v.nex).startsWith('E') ? ` · NEX ${v.nex}%` : ''}` : `${s.nome}: sem ficha ativa`;
     const icones = conds.filter(c => !['morrendo', 'enlouquecendo', 'machucado'].includes(c)).map(c => (A.COND[c] || {}).i || '').join('');
     return `<div class="hud-card${morr ? ' morrendo' : ''}${enl ? ' enlouquecendo' : ''}${!v ? ' sem-ficha' : ''}" data-id="${id}" title="${esc(tit)}" style="--cor:${s.cor || '#888'}">
       <div class="hud-retrato">${mancha(id)}<div class="hud-foto"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></div>${pe !== null && pe !== undefined ? `<span class="hud-pe" title="${v && v.det ? 'Pontos de Determinação' : 'Pontos de Esforço'}">${int(pe)}</span>` : ''}</div>
@@ -216,7 +217,8 @@ function abrirPresencaJogador(ch) {
   const det = !!(v && v.det);
   let expr = ch.dano + (int(ch.extras) ? `+${int(ch.extras)}d6` : '');
   if (det) expr = danoDeterminacao(expr);
-  const nex = v && typeof v.nex === 'number' ? v.nex : null;
+  const nx = (est().nex || {})[A.meu];
+  const nex = typeof nx === 'number' ? nx : v && typeof v.nex === 'number' ? v.nex : null;
   const imune = nex !== null && int(ch.nex) > 0 && nex >= int(ch.nex);
   const topo = `<p class="mesa-k" style="--el:${corEl(ch.el)}">PRESENÇA PERTURBADORA</p><h3>${esc(ch.nome)}</h3>
     <p>Você enxerga a criatura. Teste de <b>Vontade</b> contra <b>DT ${int(ch.dt)}</b>. Falhou: dano mental <b>${esc(expr)}</b>${det ? ' (ajustado para Determinação)' : ''}. Passou: metade.</p>`;
@@ -386,23 +388,24 @@ function verRecompensa() {
   if ((at.d.recAplic || {})[rc.id]) return;
   const d = at.d;
   const lista = [['recAplic.' + rc.id, true]];
-  const pp = int(meu.pp), novoNex = int(meu.nex);
+  const pp = int(meu.pp), novoNv = int(meu.nv);
   if (pp) lista.push(['pp', int(d.pp) + pp]);
-  const nexSobe = novoNex && FX().NEXES.includes(novoNex) && novoNex > (int(d.nex) || 5) && !(FX().CLASSES[d.classe] || {}).estagio;
-  if (nexSobe) lista.push(['nex', novoNex]);
+  // o Mestre manda o nível novo (1 a 20); o NEX de exposição é outra coisa e vem da Calculadora
+  const nvSobe = novoNv >= 1 && novoNv <= 20 && novoNv > FX().nivelDe(d) && !(FX().CLASSES[d.classe] || {}).estagio && d.classe !== 'mundano';
+  if (nvSobe) lista.push(['nivel', novoNv]);
   if (FX().consumoMissao) lista.push(...FX().consumoMissao(d));   // flechas e afins: duram a missão
   FX().aplicarNaAtiva(lista).then(ok => {
     if (!ok) return;
     const dep = FX().ativa();
     const pat = dep ? dep.r.patente : null;
     const m = $('#mesaJanela');
-    if (m && !m.hidden && m.dataset.id) { A.aviso(`Fim de missão: ${pp ? `+${pp} PP` : ''}${nexSobe ? ` · NEX ${novoNex}%` : ''}`); return; }
+    if (m && !m.hidden && m.dataset.id) { A.aviso(`Fim de missão: ${pp ? `+${pp} PP` : ''}${nvSobe ? ` · Nível ${novoNv}` : ''}`); return; }
     janela('rec-' + rc.id, `<p class="mesa-k">FIM DE MISSÃO</p><h3>${esc(rc.msg || 'Relatório da O.R.F.E.U.')}</h3>
       ${pp ? `<p>+<b>${pp}</b> pontos de prestígio. Total: ${int(d.pp) + pp}.${pat ? ` Patente: <b>${esc(pat.n)}</b> · crédito ${esc(pat.cred.toLowerCase())}.` : ''}</p>` : ''}
-      ${nexSobe ? `<p>NEX sobe para <b>${novoNex}%</b>. Confira na ficha as novas habilidades, poderes ou rituais que ele libera.</p>` : ''}
+      ${nvSobe ? `<p>Você sobe para o <b>nível ${novoNv}</b> (limite de PE ${novoNv} por turno). Confira na ficha as novas habilidades, poderes ou rituais que ele libera.</p>` : ''}
       <div class="mesa-botoes"><button data-mj="abrir-fichas" class="pri">Abrir minha ficha</button><button data-mj="fechar">Fechar</button></div>`, 'recompensa');
     estadoJanela = null;
-    A.rolagemDaFicha(`📁 ${d.nome}: fim de missão${pp ? `, +${pp} PP` : ''}${nexSobe ? `, NEX ${novoNex}%` : ''}.`);
+    A.rolagemDaFicha(`📁 ${d.nome}: fim de missão${pp ? `, +${pp} PP` : ''}${nvSobe ? `, nível ${novoNv}` : ''}.`);
   });
 }
 
@@ -579,9 +582,9 @@ function ouvirRespostas(alvo, id, fmt) {
 function desenharMesaRec() {
   if (!semFoco('#mesaRec')) return;
   const rc = est().recomp;
-  const nexes = (FX() && FX().NEXES) || [];
-  $('#mesaRec').innerHTML = `<p class="mini">Pontos de prestígio e NEX de cada cobaia. A ficha ativa de cada jogador recebe sozinha (patente, crédito e limite de itens sobem junto). Quem estiver fora recebe quando voltar.</p>
-    <div class="mesa-rec">${cobaias().map(x => `<div class="mesa-rec-linha"><span>${esc(x.nome)}</span><label>PP <input type="number" data-pp="${x.id}" min="0" value="0"></label><label>NEX <select data-nex="${x.id}"><option value="">—</option>${nexes.map(n => `<option value="${n}">${n}%</option>`).join('')}</select></label></div>`).join('')}</div>
+  const niveis = Array.from({ length: 20 }, (_, i) => i + 1);
+  $('#mesaRec').innerHTML = `<p class="mini">Pontos de prestígio e nível de cada cobaia (o NEX de exposição fica na Calculadora de NEX). A ficha ativa de cada jogador recebe sozinha (patente, crédito e limite de itens sobem junto). Quem estiver fora recebe quando voltar.</p>
+    <div class="mesa-rec">${cobaias().map(x => `<div class="mesa-rec-linha"><span>${esc(x.nome)}</span><label>PP <input type="number" data-pp="${x.id}" min="0" value="0"></label><label>Nível <select data-nv="${x.id}"><option value="">—</option>${niveis.map(n => `<option value="${n}">${n}</option>`).join('')}</select></label></div>`).join('')}</div>
     <label class="mesa-campo">Título <input id="mesaRecMsg" placeholder="Ex.: Missão concluída: o Laboratório Nº 5"></label>
     <button data-mi="rec" class="btn-protocolo">Enviar recompensas</button>
     ${rc && rc.id ? `<p class="mini">Último envio: ${esc(rc.msg || 'sem título')} · ${new Date(num(rc.ts)).toLocaleString('pt-BR')}</p>` : ''}`;
@@ -638,10 +641,10 @@ function aoClicarMesa(e) {
   else if (a === 'rec') {
     const por = {};
     cobaias().forEach(x => {
-      const pp = int(($(`[data-pp="${x.id}"]`) || {}).value), nex = int(($(`[data-nex="${x.id}"]`) || {}).value);
-      if (pp || nex) por[x.id] = { pp, nex };
+      const pp = int(($(`[data-pp="${x.id}"]`) || {}).value), nv = int(($(`[data-nv="${x.id}"]`) || {}).value);
+      if (pp || nv) por[x.id] = { pp, nv };
     });
-    if (!Object.keys(por).length) { A.aviso('Preencha PP ou NEX de alguém.'); return; }
+    if (!Object.keys(por).length) { A.aviso('Preencha PP ou nível de alguém.'); return; }
     if (!confirm('Enviar as recompensas? Cada ficha ativa recebe uma vez só.')) return;
     A.definir(['recomp'], { id: A.Rede.chave(), por, msg: ($('#mesaRecMsg').value || '').trim().slice(0, 120), ts: Date.now() });
     A.aviso('Recompensas enviadas.');
@@ -959,13 +962,13 @@ function desenharMesaRel() {
     $('#mesaRelNome').onchange = ev => { const nome = ev.target.value.trim().slice(0, 120); relMeta = { ...(relMeta || { inicio: Date.now() }), nome }; A.Rede.set('relatorio/meta', relMeta).catch(() => {}); };
   }
 }
-const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena' };
+const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena', nex: 'NEX', desejo: 'desejou à Parede' };
 async function abrirRelatorio() {
   const dados = await A.Rede.once('relatorio').catch(() => null) || {};
   const meta = dados.meta || {}, evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
   const nomeDe = id => (A.SER[id] || {}).nome || id || '';
   const por = {};
-  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: [], m20: 0, m1: 0, caiu: 0, enl: 0, fim: '' }; });
+  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: [], m20: 0, m1: 0, caiu: 0, enl: 0, fim: '', nex: 0, des: [] }; });
   const pistas = [], pres = [], memb = [];
   let cenas = 0;
   evs.forEach(e => {
@@ -976,17 +979,19 @@ async function abrirRelatorio() {
       if (e.t === 'm20') p.m20++; if (e.t === 'm1') p.m1++;
       if (e.t === 'caiu') p.caiu++; if (e.t === 'enl') p.enl++;
       if (e.t === 'mobito') p.fim = 'óbito'; if (e.t === 'minsano' && !p.fim) p.fim = 'insano';
+      if (e.t === 'nex') p.nex += int(e.v);
+      if (e.t === 'desejo') p.des.push(e.x);
     }
     if (e.t === 'pista') pistas.push(e.x);
     if (e.t === 'presenca') pres.push(e.x);
     if (e.t === 'membrana') memb.push(e.x);
     if (e.t === 'cena') cenas++;
   });
-  const ativos = Object.entries(por).filter(([, p]) => p.dano || p.cura || p.san || p.pd || p.pe || p.rit.length || p.m20 || p.m1 || p.caiu || p.enl || p.fim);
+  const ativos = Object.entries(por).filter(([, p]) => p.dano || p.cura || p.san || p.pd || p.pe || p.rit.length || p.m20 || p.m1 || p.caiu || p.enl || p.fim || p.nex || p.des.length);
   const ini = num(meta.inicio) || (evs[0] && evs[0].ts) || Date.now(), fim = evs.length ? num(evs[evs.length - 1].ts) : ini;
   const dur = Math.max(0, Math.round((fim - ini) / 60000));
   const durTxt = dur >= 60 ? `${Math.floor(dur / 60)}h${String(dur % 60).padStart(2, '0')}` : `${dur} min`;
-  const linhaTexto = (id, p) => `👤 ${nomeDe(id)}: ` + [p.dano ? `−${p.dano} PV` : '', p.cura ? `+${p.cura} PV curados` : '', p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : '', p.pe ? `${p.pe} PE gastos` : '', p.rit.length ? `${p.rit.length} ritua${p.rit.length > 1 ? 'is' : 'l'} (${[...new Set(p.rit.map(r => r.replace(/\s*\(.*\)$/, '')))].join(', ')})` : '', p.m20 ? `${p.m20}× 20 natural` : '', p.m1 ? `${p.m1}× 1 natural` : '', p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : '', p.fim ? p.fim.toUpperCase() : ''].filter(Boolean).join(' · ');
+  const linhaTexto = (id, p) => `👤 ${nomeDe(id)}: ` + [p.dano ? `−${p.dano} PV` : '', p.cura ? `+${p.cura} PV curados` : '', p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : '', p.pe ? `${p.pe} PE gastos` : '', p.rit.length ? `${p.rit.length} ritua${p.rit.length > 1 ? 'is' : 'l'} (${[...new Set(p.rit.map(r => r.replace(/\s*\(.*\)$/, '')))].join(', ')})` : '', p.m20 ? `${p.m20}× 20 natural` : '', p.m1 ? `${p.m1}× 1 natural` : '', p.nex ? `NEX ${p.nex > 0 ? '+' : ''}${p.nex}` : '', p.des.length ? `${p.des.length} desejo${p.des.length > 1 ? 's' : ''} à Parede` : '', p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : '', p.fim ? p.fim.toUpperCase() : ''].filter(Boolean).join(' · ');
   const texto = [`📁 RELATÓRIO O.R.F.E.U.${meta.nome ? ' · ' + meta.nome : ''}`, `${new Date(ini).toLocaleDateString('pt-BR')} · duração ${durTxt}${cenas ? ` · ${cenas + 1} cenas` : ''}`, '',
     ...(ativos.length ? ativos.map(([id, p]) => linhaTexto(id, p)) : ['Nenhum agente registrou mudanças.']), '',
     pistas.length ? `🔎 Pistas (${pistas.length}): ${pistas.join(' | ')}` : '', pres.length ? `😱 Presenças: ${pres.join(', ')}` : '', memb.length ? `🩸 Membrana rompida: ${memb.join(', ')}` : '',
@@ -1007,11 +1012,11 @@ async function abrirRelatorio() {
   o.innerHTML = `<div class="rel-folha"><header class="rel-cab"><div><span>O.R.F.E.U. · DOCUMENTO INTERNO</span><h2>Relatório de Missão${meta.nome ? `<small>${esc(meta.nome)}</small>` : ''}</h2></div><i class="rel-selo">O.R.F.E.U.<br>CONFIDENCIAL</i></header>
     <p class="rel-meta">Aberto em ${new Date(ini).toLocaleString('pt-BR')} · duração ${durTxt}${cenas ? ` · ${cenas + 1} cenas` : ''} · ${evs.length} registros</p>
     <h3>Agentes</h3>
-    ${ativos.length ? `<table class="rel-tab"><thead><tr><th>Agente</th><th>Dano</th><th>SAN / PD</th><th>PE</th><th>Rituais</th><th>Dados</th><th>Estado</th></tr></thead><tbody>
-      ${ativos.map(([id, p]) => `<tr><th>${esc(nomeDe(id))}</th>${cel(p.dano ? `−${p.dano}${p.cura ? ` <small>(+${p.cura})</small>` : ''}` : p.cura ? `<small>+${p.cura}</small>` : '')}${cel([p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : ''].filter(Boolean).join(' · '))}${cel(p.pe ? String(p.pe) : '')}${cel(p.rit.length ? esc([...new Set(p.rit)].join(', ')) : '')}${cel([p.m20 ? `${p.m20}× 20` : '', p.m1 ? `${p.m1}× 1` : ''].filter(Boolean).join(' · '))}${cel(p.fim ? `<b class="rel-fim">${p.fim.toUpperCase()}</b>` : [p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : ''].filter(Boolean).join(' · '))}</tr>`).join('')}</tbody></table>` : '<p class="mini">Nenhum agente registrou mudanças.</p>'}
+    ${ativos.length ? `<table class="rel-tab"><thead><tr><th>Agente</th><th>Dano</th><th>SAN / PD</th><th>PE</th><th>Rituais</th><th>Dados</th><th>NEX</th><th>Estado</th></tr></thead><tbody>
+      ${ativos.map(([id, p]) => `<tr><th>${esc(nomeDe(id))}</th>${cel(p.dano ? `−${p.dano}${p.cura ? ` <small>(+${p.cura})</small>` : ''}` : p.cura ? `<small>+${p.cura}</small>` : '')}${cel([p.san ? `−${p.san} SAN` : '', p.pd ? `−${p.pd} PD` : ''].filter(Boolean).join(' · '))}${cel(p.pe ? String(p.pe) : '')}${cel(p.rit.length ? esc([...new Set(p.rit)].join(', ')) : '')}${cel([p.m20 ? `${p.m20}× 20` : '', p.m1 ? `${p.m1}× 1` : ''].filter(Boolean).join(' · '))}${cel(p.nex ? `${p.nex > 0 ? '+' : ''}${p.nex}%` : '')}${cel(p.fim ? `<b class="rel-fim">${p.fim.toUpperCase()}</b>` : [p.caiu ? `caiu ${p.caiu}×` : '', p.enl ? `enlouqueceu ${p.enl}×` : ''].filter(Boolean).join(' · '))}</tr>`).join('')}</tbody></table>` : '<p class="mini">Nenhum agente registrou mudanças.</p>'}
     <div class="rel-grade"><section><h3>Pistas (${pistas.length})</h3>${pistas.length ? `<ol>${pistas.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '<p class="mini">Nenhuma.</p>'}</section>
       <section><h3>Ameaças e membrana</h3><ul>${pres.map(p => `<li>Presença: ${esc(p)}</li>`).join('')}${memb.map(p => `<li>Rompida: ${esc(p)}</li>`).join('')}</ul>${pres.length || memb.length ? '' : '<p class="mini">Nada registrado.</p>'}</section></div>
-    <details class="rel-linha"><summary>Linha do tempo (${evs.length})</summary><ol>${evs.map(e => `<li><time>${new Date(num(e.ts)).toLocaleTimeString('pt-BR').slice(0, 5)}</time> ${e.q ? `<b>${esc(nomeDe(e.q))}</b> ` : ''}${esc(ROT_REL[e.t] || e.t)}${e.v && ['dano', 'cura', 'san', 'pd', 'pe'].includes(e.t) ? ` ${int(e.v)}` : ''}${e.x ? `: ${esc(e.x)}` : ''}</li>`).join('')}</ol></details>
+    <details class="rel-linha"><summary>Linha do tempo (${evs.length})</summary><ol>${evs.map(e => `<li><time>${new Date(num(e.ts)).toLocaleTimeString('pt-BR').slice(0, 5)}</time> ${e.q ? `<b>${esc(nomeDe(e.q))}</b> ` : ''}${esc(ROT_REL[e.t] || e.t)}${e.v && ['dano', 'cura', 'san', 'pd', 'pe'].includes(e.t) ? ` ${int(e.v)}` : e.t === 'nex' ? ` ${int(e.v) > 0 ? '+' : ''}${int(e.v)}` : ''}${e.x ? `: ${esc(e.x)}` : ''}</li>`).join('')}</ol></details>
     <textarea class="rel-texto" hidden readonly>${esc(texto)}</textarea>
     <footer class="rel-acoes"><button data-rel="pdf" class="btn-protocolo">🖨 Imprimir ou salvar PDF</button><button data-rel="copiar">📋 Copiar texto para o grupo</button><button data-rel="fechar">Fechar</button></footer></div>`;
   o.hidden = false;
@@ -1052,5 +1057,5 @@ const bEsc = $('#mesaEscudo'); if (bEsc) bEsc.addEventListener('click', abrirEsc
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
 setInterval(pintarMembrana, 1200);
-window.ACF_MESA = { abrirEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio };
+window.ACF_MESA = { abrirEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
 })();

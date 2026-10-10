@@ -8,8 +8,8 @@
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261010q">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261010r">
 </head>
 <body>
 
@@ -136,6 +136,7 @@
       <div id="minhaFicha" class="minha-ficha"></div>
       <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
       <button id="btnArquivo" class="btn-fantasma btn-arquivo">📜 Arquivo da O.R.F.E.U. <span class="n" hidden></span></button>
+      <button id="btnParede" class="btn-fantasma btn-parede" hidden>🧱 A Parede de Desejos</button>
       <button id="btnMinhaCor" class="btn-fantasma btn-cor" hidden><span class="pinta"></span>🎨 Cor da minha cobaia</button>
       <div id="zonaJogador" class="zona-jogador"></div>
     </section>
@@ -179,6 +180,11 @@
       <p id="rolAuxRes" class="mini"></p>
       <h3>Cores</h3>
       <div id="coresAux"></div>
+    </section>
+
+    <section class="bloco" id="blocoSenhasAux" hidden>
+      <h2>Senhas</h2>
+      <div id="listaSenhasAux" class="lista-senhas"></div>
     </section>
 
     <section class="bloco" id="blocoRuido" data-aba="sessao">
@@ -425,6 +431,8 @@
     <section class="bloco mestre-only" id="blocoMesaArq" data-aba="mesa" hidden><h2>Arquivo da O.R.F.E.U.</h2><div id="mesaArq"></div></section>
     <section class="bloco mestre-only" id="blocoMesaMom" data-aba="mesa" hidden><h2>Momentos marcantes</h2><div id="mesaMom"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRel" data-aba="mesa" hidden><h2>Relatório da missão</h2><div id="mesaRel"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaNex" data-aba="mesa" hidden><h2>Calculadora de NEX</h2><div id="mesaNex"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaParede" data-aba="mesa" hidden><h2>Parede de Desejos</h2><div id="mesaParede"></div></section>
 
     <section class="bloco mestre-only" id="blocoDiario" data-aba="registro" hidden>
       <h2>Diário da sessão</h2>
@@ -467,6 +475,11 @@
       <p class="mini">Clique numa sala do mapa para escrever pistas, armadilhas ou o que já foi revelado. Só o Mestre vê.</p>
       <ul id="listaNotas" class="lista-notas"></ul>
       <p id="notasVazio" class="vazio">Nenhuma anotação neste andar.</p>
+    </section>
+
+    <section class="bloco mestre-only" id="blocoSenhas" data-aba="segredos" hidden>
+      <h2>Senhas</h2>
+      <div id="listaSenhas" class="lista-senhas"></div>
     </section>
 
     <section class="bloco mestre-only" id="blocoBackup" data-aba="segredos" hidden>
@@ -651,7 +664,7 @@
 <dialog id="dlgHash" class="dlg">
   <form method="dialog">
     <h2>Gerar hash de senha</h2>
-    <p class="mini">Digite a senha nova. Copie o resultado e cole no <code>config.js</code>, na linha do andar certo.</p>
+    <p class="mini">Para trocar a senha de um andar, use a pasta <b>Senhas</b> na aba Segredos: ela troca na hora, sem mexer no código. Este gerador serve para as linhas do <code>config.js</code> (senha do Mestre no modo local, auxiliares e senhas reserva dos andares).</p>
     <label>Senha nova<input id="hashEntrada" type="text" spellcheck="false"></label>
     <textarea id="hashSaida" readonly rows="3"></textarea>
     <div class="dlg-acoes">
@@ -660,13 +673,14 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261010q"></script>
-<script src="config.js?v=20261010q"></script>
-<script src="app.js?v=20261010q"></script>
-<script src="catalogo-op.js?v=20261010q"></script>
-<script src="fichas.js?v=20261010q"></script>
-<script src="quadro.js?v=20261010q"></script>
-<script src="mesa.js?v=20261010q"></script>
-<script src="arquivo.js?v=20261010q"></script>
+<script src="data.js?v=20261010r"></script>
+<script src="config.js?v=20261010r"></script>
+<script src="app.js?v=20261010r"></script>
+<script src="catalogo-op.js?v=20261010r"></script>
+<script src="fichas.js?v=20261010r"></script>
+<script src="quadro.js?v=20261010r"></script>
+<script src="mesa.js?v=20261010r"></script>
+<script src="arquivo.js?v=20261010r"></script>
+<script src="ferramentas.js?v=20261010r"></script>
 </body>
 </html>
