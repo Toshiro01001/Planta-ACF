@@ -100,13 +100,23 @@ const ROM = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 /* ---------------- CÁLCULOS ---------------- */
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
 const int = v => Math.round(num(v));
+// Nível (1 a 20) e NEX são coisas separadas nesta campanha.
+// Nível 1 = o antigo NEX 5% do livro … nível 20 = NEX 99%; o limite de PE por turno é o próprio nível.
+// NEX é só a exposição paranormal (0 a 99), controlada pelo Mestre na Calculadora de NEX.
+const nivelDoNexAntigo = nex => { const x = int(nex) || 5; return x >= 99 ? 20 : Math.max(1, Math.min(20, Math.floor(x / 5))); };
 function nivelDe(d) {
   const cl = CLASSES[d.classe] || CLASSES.combatente;
   if (cl.estagio) return Math.max(1, Math.min(5, int(d.estagio) || 1));
   if (d.classe === 'mundano') return 1;
-  const nex = int(d.nex) || 5;
-  return nex >= 99 ? 20 : Math.max(1, Math.floor(nex / 5));
+  // fichas antigas (sem "nivel") usavam o NEX como nível
+  if (d.nivel === undefined || d.nivel === null || d.nivel === '') return nivelDoNexAntigo(d.nex);
+  return Math.max(1, Math.min(20, int(d.nivel) || 1));
 }
+const NIVEIS = Array.from({ length: 20 }, (_, i) => i + 1);
+// NEX de exposição: das cobaias vem da Calculadora do Mestre (mapa/nex); das outras fichas, do próprio campo
+const nexMestre = dono => { const v = ((A.estado || {}).nex || {})[dono]; return (A.SER[dono] || {}).tipo === 'cobaia' && typeof v === 'number' ? v : null; };
+function nexDe(d) { const m = nexMestre(d.dono); if (m !== null) return m; return Math.max(0, Math.min(99, int(d.nex))); }
+const corNex = n => (n <= 20 ? '#ead63c' : n <= 40 ? '#d9a521' : n <= 60 ? '#e0701f' : n <= 80 ? '#cf2f2a' : '#b3246a');
 function calc(d) {
   if (d && d.tipo === 'ameaca') {
     const pvMax = Math.max(1, int(d.pvMax) || 1);
@@ -270,7 +280,7 @@ function novaFicha(dono) {
   const s = A.SER[dono] || {};
   return {
     v: 1, dono: dono || 'mestre', criado: Date.now(),
-    nome: s.nome || 'Novo agente', jogador: s.jogador || '', origem: '', classe: 'combatente', trilha: '', nex: 5, estagio: 1,
+    nome: s.nome || 'Novo agente', jogador: s.jogador || '', origem: '', classe: 'combatente', trilha: '', nivel: 1, nex: 0, estagio: 1,
     regra: 'padrao', foto: '',
     atr: { agi: 1, for: 1, int: 1, pre: 1, vig: 1 },
     per: {}, pv: { aj: 0 }, pe: { aj: 0 }, san: { aj: 0 }, pd: { aj: 0 },
@@ -367,7 +377,7 @@ function desenharLista() {
     const foto = d.foto || s.img || '';
     const cl = CLASSES[d.classe] || {};
     const amea = d.tipo === 'ameaca';
-    const nivel = amea ? `VD ${int(d.vd)}` : cl.estagio ? `Estágio ${d.estagio || 1}` : d.classe === 'mundano' ? 'NEX 0%' : `NEX ${d.nex || 5}%`;
+    const nivel = amea ? `VD ${int(d.vd)}` : cl.estagio ? `Estágio ${d.estagio || 1} · NEX ${nexDe(d)}%` : d.classe === 'mundano' ? `Mundano · NEX ${nexDe(d)}%` : `Nv ${nivelDe(d)} · NEX ${nexDe(d)}%`;
     const k = esc(codigoDe(x.ref)), gmA = x.ref.aux ? 'a' : x.ref.gm ? 1 : '';
     const sf = d.filho ? A.SER[d.filho] : null;
     return `<article class="fx-cartao" style="${estiloAc(d.dono)}">
@@ -528,6 +538,8 @@ function normalizar(d) {
   if (d && d.tipo === 'ameaca') { const n = novaAmeaca(); return { ...n, ...d, pres: { ...n.pres, ...(d.pres || {}) }, atr: { ...n.atr, ...(d.atr || {}) }, pv: d.pv || {}, ataques: d.ataques || {} }; }
   const n = novaFicha(d.dono);
   const r = { ...n, ...d };
+  // ficha antiga sem "nivel": o NEX dela era o nível (não pega o nível 1 do modelo)
+  if (d.nivel === undefined || d.nivel === null || d.nivel === '') r.nivel = nivelDoNexAntigo(d.nex);
   ['atr', 'pv', 'pe', 'san', 'pd', 'desc'].forEach(k => { r[k] = { ...n[k], ...(d[k] || {}) }; });
   ['per', 'hab', 'rit', 'itens'].forEach(k => { r[k] = d[k] || {}; });
   return r;
@@ -570,10 +582,16 @@ function desenharFicha() {
   const rolagemTopo = corpo.scrollTop;
   const ed = at.editavel;
   const det = d.regra === 'determinacao';
+  // ficha antiga: grava o nível que o NEX antigo representava, para o NEX virar só exposição
+  if (ed && !at.nivelGravado) { at.nivelGravado = true; gravar('nivel', nivelDe(d), true); }
   const nivelCampo = cl.estagio
     ? `<select data-c="estagio"${RO()}>${[1, 2, 3, 4, 5].map(e => `<option ${int(d.estagio) === e ? 'selected' : ''}>${e}</option>`).join('')}</select>`
-    : d.classe === 'mundano' ? '<input value="0%" disabled>'
-    : `<select data-c="nex"${RO()}>${NEXES.map(x => `<option value="${x}" ${int(d.nex) === x ? 'selected' : ''}>${x}%</option>`).join('')}</select>`;
+    : d.classe === 'mundano' ? '<input value="—" disabled>'
+    : `<select data-c="nivel"${RO()}>${NIVEIS.map(x => `<option value="${x}" ${nivelDe(d) === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
+  const nexM = nexMestre(d.dono), nexV = nexDe(d);
+  const nexCampo = nexM !== null
+    ? `<output class="fx-nex-exp" style="--nexc:${corNex(nexV)}" title="Exposição paranormal controlada pelo Mestre (Calculadora de NEX)">${nexV}%</output>`
+    : `<span class="fx-nex-exp-ed" style="--nexc:${corNex(nexV)}">${campo('nex', 'n', ' min="0" max="99" step="1"')}<i>%</i></span>`;
   corpo.innerHTML = `<div class="fx-ficha${ed ? '' : ' so-leitura'}" data-mob="${F.abaMob}" style="${estiloAc(d.dono)}">
     ${ed ? '' : `<div class="fx-aviso-leitura"><b>SOMENTE LEITURA</b><span>${ehMestre() ? 'O Mestre acompanha esta ficha ao vivo, mas não pode alterá-la.' : 'Esta ficha é de outra cobaia. Só o dono pode editar.'}</span></div>`}
     <nav class="fx-abas-mob">${[['status', 'Status'], ['pericias', 'Perícias'], ['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba-mob" data-v="${k}" class="${F.abaMob === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
@@ -591,7 +609,8 @@ function desenharFicha() {
           </div>
         </div>
         <div class="fx-nex">
-          <label class="fx-nex-grande">${cl.estagio ? 'Estágio' : 'NEX'} ${nivelCampo}</label>
+          <label class="fx-nex-grande">${cl.estagio ? 'Estágio' : 'Nível'} ${nivelCampo}</label>
+          <div class="fx-nex-mini fx-nex-exposicao" title="NEX: exposição paranormal. Não é o nível."><span>NEX</span>${nexCampo}</div>
           <div class="fx-nex-mini"><span>${det ? 'PD' : 'PE'}/turno</span><output data-calc="peTurno"></output></div>
           <div class="fx-nex-mini fx-gasto" title="Gasto neste turno (botões de −${det ? 'PD' : 'PE'} e rituais). Zera a cada turno da perseguição."><span>Neste turno</span><span><output data-calc="peGasto"></output>${ed ? '<button class="fx-mini" data-acao="zerar-gasto" aria-label="Zerar o gasto do turno">↺</button>' : ''}</span></div>
           <div class="fx-nex-mini"><span>Desloc.</span><span class="fx-desl">${campo('desl', 'n', ' min="0" step="1.5"')}<output data-calc="desl"></output></span></div>
@@ -1246,7 +1265,7 @@ function aoEditar(e) {
     if (path === 'regra') { desenharFicha(); return; }
     if (/\.t$|\.vest$|\.cat$|\.cenas$/.test(path)) { desenharAba(); return; }
   }
-  if (path === 'nex' || path === 'estagio') { atualizarDerivados(); }
+  if (path === 'nivel' || path === 'nex' || path === 'estagio') { atualizarDerivados(); }
   if (F.atual.d.tipo === 'ameaca' && path === 'el') { desenharFicha(); return; }
   // nome do item/habilidade: atualiza o título sem redesenhar
   const m = /^(itens|hab|rit)\.([^.]+)\.n$/.exec(path);
@@ -1467,7 +1486,7 @@ function vitaisDe(d) {
   const r = calc(d);
   const cur = (k, mx) => (d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx);
   const det = d.regra === 'determinacao';
-  const v = { nome: d.nome || '', pv: cur('pv', r.pvMax), pvM: r.pvMax, nex: CLASSES[d.classe] && CLASSES[d.classe].estagio ? 'E' + (int(d.estagio) || 1) : (d.classe === 'mundano' ? 0 : int(d.nex) || 5) };
+  const v = { nome: d.nome || '', pv: cur('pv', r.pvMax), pvM: r.pvMax, nex: nexDe(d), nv: CLASSES[d.classe] && CLASSES[d.classe].estagio ? 'E' + (int(d.estagio) || 1) : r.n };
   if (det) { v.det = 1; v.pd = cur('pd', r.pdMax); v.pdM = r.pdMax; if (d.enl) v.enl = 1; }
   else { v.pe = cur('pe', r.peMax); v.peM = r.peMax; v.san = cur('san', r.sanMax); v.sanM = r.sanMax; }
   return v;
@@ -1499,14 +1518,22 @@ function atualizarBotao() {
 }
 document.addEventListener('acf-perfil', () => setTimeout(() => { atualizarBotao(); ligarAtiva(); }, 0));
 document.addEventListener('acf-ativa', verCena);
-A.aoMudar(() => { verCena(); if (F.aberto && F.tela === 'ficha') atualizarGasto(); });
+A.aoMudar(() => {
+  verCena();
+  if (F.aberto && F.tela === 'ficha') {
+    atualizarGasto();
+    // a Calculadora de NEX do Mestre mudou a exposição desta cobaia
+    const o = $('.fx-nex-exp'), d = F.atual && F.atual.d;
+    if (o && d) { const v = nexDe(d); if (o.textContent !== v + '%') { o.textContent = v + '%'; o.style.setProperty('--nexc', corNex(v)); o.classList.remove('pulsa'); void o.offsetWidth; o.classList.add('pulsa'); } }
+  }
+});
 setTimeout(ligarAtiva, 600);
 const btn = $('#btnFichas');
 if (btn) btn.addEventListener('click', () => (F.aberto ? fechar() : abrir()));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && F.aberto) { if (!$('#fxModal').hidden) { F.cat = null; $('#fxModal').hidden = true; } else fechar(); } });
 setTimeout(atualizarBotao, 300);
 window.ACF_FICHAS = {
-  abrir, fechar, calc, rolarExpr, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, PATENTES,
+  abrir, fechar, calc, rolarExpr, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, NIVEIS, PATENTES, nivelDe, nexDe, corNex,
   ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
   // categoria do item pelo nome no catálogo; devolve o estouro do limite da patente, se houver
   checarLimite: nome => {

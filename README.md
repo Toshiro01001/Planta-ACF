@@ -14,9 +14,10 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `fichas.js` | Fichas de agente de Ordem Paranormal (botão 📋 Fichas) |
 | `mesa.js` | Ferramentas de Ordem Paranormal: retratos, Presença Perturbadora, interlúdio, fim de missão, investigação, ambiente, sigilo e Escudo do Mestre |
 | `quadro.js` | Quadro colaborativo da mesa (botão 🖍 Quadro) |
-| `arquivo.js` | Arquivo da O.R.F.E.U.: cifras de sigilos, documentos tarjados e visões |
+| `arquivo.js` | Arquivo da O.R.F.E.U.: cifras de sigilos, documentos tarjados, visões, Terminal O.R.F.E.U. e cofres |
+| `ferramentas.js` | Calculadora de NEX, pasta Senhas e Parede de Desejos (antes eram sites separados) |
 | `catalogo-op.js` | Catálogo de habilidades, rituais, itens, melhorias e maldições usado nas fichas |
-| `img/` | Retratos das cobaias e o ícone da aba |
+| `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
 
 ## Publicar no GitHub Pages
 
@@ -28,11 +29,15 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 
 O campo `saida` de cada andar, no `data.js`, diz qual sala leva ao andar de baixo. Sala na borda vira um corredor para fora da planta; sala do meio vira um poço no chão.
 
-## Senhas
+## Senhas (aba Segredos do Mestre; painel dos auxiliares)
 
-Cada andar tem a sua senha, guardada só como hash no `config.js`. Para trocar: entre como Mestre, clique em **Gerar hash de senha**, digite a senha nova e cole o resultado na linha do andar. Nunca escreva a senha em texto no repositório.
+Uma pasta com tudo o que se passa para os jogadores: a senha de cada andar, a chave da Parede de Desejos, os códigos dos cofres do Arquivo e outras senhas livres (porta, cofre, rádio…), cada uma com botão de copiar. Os auxiliares veem a mesma pasta, só para leitura.
 
-A trava é feita no navegador. Ela segura o jogador comum, mas quem souber ler código consegue contornar.
+- **Trocar a senha de um andar:** digite e clique em Salvar. Vale na hora para quem ainda não entrou naquele andar. Cada andar tem a sua, sem padrão entre elas.
+- **Exportar e importar:** um `.json` com todas as senhas. Importar troca as dos andares, a chave da Parede e as outras de uma vez. Os códigos dos cofres vão no arquivo só para consulta (eles mudam no próprio documento). **Nunca envie esse arquivo ao GitHub.**
+- **Como fica guardado:** o texto das senhas em `senhas` (Mestre e auxiliares leem, só o Mestre grava). Para conferir a senha do andar, o site usa só o hash, em `mapa/senhasAndar`. O `config.js` guarda hashes de reserva, usados enquanto a pasta não tiver a senha daquele andar.
+
+A trava dos andares é feita no navegador. Ela segura o jogador comum, mas quem souber ler código consegue contornar.
 
 ## Funções das cobaias
 
@@ -110,7 +115,10 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **Ficha ligada ao mapa:** PV 0 vira Morrendo, SAN 0 vira Enlouquecendo (com Determinação, dano mental maior que os PD). Os turnos contam sozinhos na perseguição; "Nova cena" zera. As condições de Ordem Paranormal marcadas no cartão da cobaia entram nas rolagens da ficha (−O, −OO, Defesa, deslocamento).
 - **Ameaças:** ficha de criatura (VD, Presença Perturbadora, PV, ataques). "Chamar o teste" abre na tela de cada jogador o teste de Vontade com a ficha dele; o jogador confirma o dano de SAN (ou PD) e o Mestre vê as respostas.
 - **Interlúdio:** cada jogador escolhe até duas ações; o site aplica PV, PE, SAN e os bônus de +1d6 de exercício e leitura.
-- **Fim de missão:** PP e NEX por cobaia; a ficha ativa recebe uma vez só (patente, crédito e limites sobem). A loja avisa quando um item passa do limite da patente.
+- **Nível e NEX são coisas separadas:** a ficha tem **Nível** (1 a 20) e **NEX** (exposição paranormal, 0 a 99). PV, PE, SAN e o **limite de PE por turno** saem do nível (nível 1 = antigo NEX 5% do livro … nível 20 = 99%; limite de PE = nível). O NEX das cobaias vem da Calculadora de NEX e aparece só para leitura na ficha do jogador, no retrato e no cartão; nas fichas de NPC o NEX se edita na própria ficha. Fichas antigas ganham sozinhas o nível que o NEX antigo representava.
+- **Calculadora de NEX:** os 7 cartões, os 5 gatilhos (criatura +2, sala de medo leve +2 e moderada +3, aprender ritual +1, transcender +1), ajuste manual com motivo, "desfazer último", histórico com filtro e "reverter", NEX inicial editável e backup no mesmo formato da calculadora antiga. Como a Planta mora no mesmo endereço da calculadora antiga, o painel avisa quando encontra os registros dela no navegador e traz com um clique. Cada aumento cai na ficha do jogador na hora e entra no Relatório. Fica em `segredos/_nex`; o valor atual vai para `mapa/nex`.
+- **Parede de Desejos:** o mesmo visual e o mesmo Cloudflare Worker do site antigo (a chave da IA continua só no Worker; a contagem de desejos é a mesma nos dois sites). O Mestre desperta a Parede e os jogadores ganham o botão 🧱; cada um deseja só pela própria cobaia, o Mestre por qualquer uma. A chave de acesso é pedida uma vez por aparelho (quem já usou o site antigo no mesmo aparelho não digita de novo) e fica na pasta Senhas. Cada desejo e o preço chegam ao Mestre (alerta, lista na Mesa e Relatório) e ficam no histórico do aparelho do jogador. No Firebase: `desejos` (o jogador só cria; só o Mestre lê).
+- **Fim de missão:** PP e nível por cobaia; a ficha ativa recebe uma vez só (patente, crédito e limites sobem). A loja avisa quando um item passa do limite da patente.
 - **Clima:** a tela do jogador desbota com a SAN baixa e pulsa em vermelho morrendo; conjurar mostra um sigilo na cor do elemento para todos e rola o Custo do Paranormal; o Mestre liga um ambiente sonoro por elemento.
 - **Ferramentas:** cena de investigação (urgência, rodadas, falhas e pistas numa faixa no mapa), rolagem secreta e Escudo do Mestre com os resumos de regra.
 - **Membrana:** cada sala tem estabilidade de 0 a 100. Ritual conjurado na sala tira 5 por círculo (Medo tira o dobro) e Presença Perturbadora tira de 3 a 20 conforme o VD. A sala racha e brilha na cor do elemento; ao romper, o Mestre recebe um alerta. O número só aparece para quem tem um *Medidor de Estabilidade da Membrana* na ficha ativa (no cartão da sala e no retrato). O Mestre ajusta e restaura pelo cartão da sala ou pela aba Mesa.
@@ -128,7 +136,11 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **Cifras de sigilos:** o Mestre escreve a mensagem e o site a mostra num alfabeto de 36 símbolos criados para a Caixa (não são os sigilos oficiais). A chave fica só nos segredos do Mestre; os jogadores recebem apenas os símbolos. Cada símbolo é sempre a mesma letra em todas as cifras. Os jogadores tocam num símbolo para dar um palpite, que todos veem; o Mestre vê palpites certos em verde e errados em vermelho e revela letras com um toque. A cifra aparece no Arquivo, na parede de uma sala (cartão da sala e ◈ no mapa) e no chat ("Mandar no chat").
 - **Documentos tarjados:** texto com trechos entre `[[colchetes duplos]]`. A data do pé do documento é escrita no próprio criador (qualquer formato; vazio esconde a data). Os jogadores veem tarjas pretas do tamanho do trecho (o texto escondido não chega ao aparelho deles). O Mestre toca numa tarja para liberar; ela se abre na tela de todos.
 - **Visões:** frase ou imagem que pisca na tela de uma cobaia só, com efeito (clarão, estática, sangue, sussurro) e som. O chat geral mostra apenas "Fulano teve uma visão". A visão fica guardada no Arquivo do jogador, naquele aparelho. O jogador apaga as próprias visões; o Mestre apaga as que mandou, e elas somem também do Arquivo do jogador.
-- No Firebase: `mapa/cifras`, `mapa/cifraRev` e `mapa/docs` (públicos, só o Mestre grava), `cifraPalpite` (palpites dos jogadores), `visoes/<cobaia>` (só o Mestre grava) e `segredos/_sigilos`, `_cifras` e `_docs` (só o Mestre lê).
+- **Terminal O.R.F.E.U.:** aba com tela de terminal de fósforo verde. Comandos `help`, `ls`, `open <diretório>`, `acesso <código>` e `clear` (os diretórios também são clicáveis). Mostra os documentos publicados que têm um **Diretório no Terminal** (campo no formulário do documento: arquivos, experimentos, cobaias ou qualquer outro). Como são documentos comuns, o Mestre edita tudo pelo Arquivo (ex.: o status das cobaias) e a mudança aparece na hora no terminal de todos.
+- **Cofre (código de acesso):** documento com código fica como "▓▓▓" na estante e no terminal, sem título nem texto. O texto vai para `cofre/<hash do código>`, um endereço que só existe para quem sabe o código, então nem o console do navegador mostra o conteúdo antes. O jogador digita o código no Arquivo ou no terminal; documentos com o mesmo código abrem juntos e ficam liberados naquele aparelho. O código aparece na pasta Senhas.
+- **Negrito:** `**assim**` no texto do documento.
+- **Importar e exportar documentos:** botões no pé da aba Documentos do Mestre. O arquivo `terminal-orfeu.json` (entregue fora do repositório) traz todo o conteúdo do antigo site Terminal O.R.F.E.U.: Arquivos, Experimentos (com o Projeto Olhos no cofre) e o Registro de Cobaias. **Não envie esses arquivos ao GitHub.**
+- No Firebase: `mapa/cifras`, `mapa/cifraRev` e `mapa/docs` (públicos, só o Mestre grava), `cifraPalpite` (palpites dos jogadores), `visoes/<cobaia>` (só o Mestre grava), `cofre/<hash>` (só o Mestre grava; lê quem sabe o código), `senhas/cofres` e `segredos/_sigilos`, `_cifras` e `_docs` (só o Mestre lê).
 
 ## Quadro da equipe (🖍 Quadro, atalho B)
 

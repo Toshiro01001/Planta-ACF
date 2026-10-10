@@ -5,9 +5,13 @@
      Os jogadores tentam decifrar juntos: cada palpite aparece para todos; o Mestre revela letras.
    - Documentos tarjados: o Mestre marca trechos com [[assim]] e vai destarjando durante a sessão.
    - Visões: imagem ou frase que pisca na tela de um jogador só.
+   - Terminal O.R.F.E.U.: aba com cara de terminal antigo (ls, open, acesso). Mostra os documentos
+     publicados que o Mestre colocou num "diretório do terminal".
+   - Cofre: documento com código de acesso. O conteúdo vai para cofre/<hash do código>, um endereço
+     que só existe para quem sabe o código. Em mapa/docs fica só uma marca "▓▓▓" sem título nem texto.
    Caminhos: mapa/cifras, mapa/cifraRev, mapa/docs (públicos, só o Mestre grava),
-   cifraPalpite (qualquer jogador), visoes/<cobaia> (só o Mestre grava),
-   segredos/_sigilos, _cifras e _docs (só o Mestre).
+   cifraPalpite (qualquer jogador), visoes/<cobaia> (só o Mestre grava), cofre/<hash> (só o Mestre grava;
+   lê quem sabe o hash), senhas/cofres (Mestre e auxiliares), segredos/_sigilos, _cifras e _docs (só o Mestre).
    ========================================================= */
 (() => {
 const A = window.ACF;
@@ -116,7 +120,39 @@ function htmlCel(t) {
       <span class="cf-letra">${esc(rv || (pl ? pl.l : ''))}</span>${glifoSVG(t)}${A.mestre ? `<small class="cf-certo">${certo}</small>` : ''}</button>`;
 }
 const cifrasPub = () => est().cifras || {};
-const docsPub = () => est().docs || {};
+// documentos públicos + os que este aparelho destrancou no cofre (as marcas ▓▓▓ somem quando abertas)
+const KEY_COFRES = 'acf-cofres';
+const cofreDocs = {}, cofreOff = {};
+const cofresAbertos = () => ls.get(KEY_COFRES, {});
+function docsPub() {
+  const base = est().docs || {}, ab = cofresAbertos(), out = {};
+  const hs = new Set(Object.values(ab));
+  Object.entries(base).forEach(([id, d]) => { if (d && d.tranca && ab[d.tranca]) return; out[id] = d; });
+  Object.entries(cofreDocs).forEach(([h, docs]) => { if (hs.has(h)) Object.entries(docs || {}).forEach(([id, d]) => { if (d) out[id] = { ...d, cofre: true }; }); });
+  return out;
+}
+function ligarCofres() {
+  Object.values(cofresAbertos()).forEach(h => {
+    if (cofreOff[h]) return;
+    cofreOff[h] = true;
+    A.garantirLogin().then(() => { cofreOff[h] = A.Rede.on('cofre/' + h, v => { cofreDocs[h] = v || {}; redesenhar(); }, () => {}); }, () => { cofreOff[h] = null; });
+  });
+}
+const codigoNormal = c => String(c || '').trim().toUpperCase().replace(/\s+/g, '');
+const hashCofre = async cod => { const h = await A.hash('cofre:' + codigoNormal(cod)); return { h, t: (await A.hash('tranca:' + h)).slice(0, 12) }; };
+// tenta destrancar com um código; devolve a tranca aberta ou null
+async function tentarCodigo(cod) {
+  if (!codigoNormal(cod)) return null;
+  const { h, t } = await hashCofre(cod);
+  if (!Object.values(est().docs || {}).some(d => d && d.tranca === t)) return null;
+  await A.garantirLogin().catch(() => {});
+  const v = await A.Rede.once('cofre/' + h).catch(() => null);
+  if (!v) return null;
+  const ab = cofresAbertos(); ab[t] = h; ls.set(KEY_COFRES, ab);
+  cofreDocs[h] = v; ligarCofres();
+  if (somOk()) { A.Som.tom(220, 0, 0.12, 'square', 0.06); A.Som.tom(440, 0.12, 0.12, 'square', 0.06); A.Som.tom(880, 0.24, 0.3, 'square', 0.06); }
+  return { t, h, docs: v };
+}
 const ondeVisivel = o => { const m = /^sala:(\d+)$/.exec(o || ''); return !m || A.mestre || A.salaVisivel(+m[1]); };
 
 /* ---------- popover de palpite (jogador) ---------- */
@@ -169,6 +205,8 @@ function partesDoc(txt, rev) {
   });
   return out;
 }
+// **assim** vira negrito (no Arquivo e no Terminal)
+const marcaTxt = t => esc(t).replace(/\*\*([^*\n][\s\S]*?)\*\*/g, '<b>$1</b>');
 const preenche = n => Array.from({ length: Math.ceil(n / 7) }, (_, k) => 'x'.repeat(Math.min(7, n - k * 7))).join(' ');
 const docVistos = {};
 function htmlDoc(id, d, mestreVe) {
@@ -178,14 +216,14 @@ function htmlDoc(id, d, mestreVe) {
   if (mestreVe) {
     let i = 0;
     corpo = String(d.txt || '').split(/\[\[([\s\S]*?)\]\]/).map((t, k) => {
-      if (k % 2 === 0) return esc(t);
+      if (k % 2 === 0) return marcaTxt(t);
       const x = i++;
       return `<button class="tj-m${(d.rev || {})[x] ? ' aberta' : ''}" data-tj="${x}" title="${(d.rev || {})[x] ? 'Revelada. Toque para tarjar de novo' : 'Tarjada. Toque para revelar aos jogadores'}">${esc(t)}</button>`;
     }).join('');
   } else {
     corpo = partes.map(p => {
-      if (p.x === undefined) return esc(p.t);
-      if (p.t !== undefined) { if (!vistos.has(p.x)) vistos.set(p.x, docVistos[id].pronto ? Date.now() : 0); return `<span class="tj-rev${Date.now() - vistos.get(p.x) < 2500 ? ' anima' : ''}">${esc(p.t)}</span>`; }
+      if (p.x === undefined) return marcaTxt(p.t);
+      if (p.t !== undefined) { if (!vistos.has(p.x)) vistos.set(p.x, docVistos[id].pronto ? Date.now() : 0); return `<span class="tj-rev${Date.now() - vistos.get(p.x) < 2500 ? ' anima' : ''}">${marcaTxt(p.t)}</span>`; }
       vistos.delete(p.x);
       return `<span class="tj" aria-label="trecho tarjado">${preenche(int(p.n))}</span>`;
     }).join('');
@@ -194,10 +232,33 @@ function htmlDoc(id, d, mestreVe) {
   return `<article class="doc-folha"><header><span class="doc-cab">${esc(d.cab || 'O.R.F.E.U. · DOCUMENTO INTERNO')}</span><h3>${esc(d.tit || 'Documento')}</h3></header><div class="doc-corpo">${corpo}</div>
     <footer><span>${esc(d.data !== undefined && d.data !== null ? d.data : new Date(num(d.ts) || Date.now()).toLocaleDateString('pt-BR'))}</span><i class="doc-carimbo">CONFIDENCIAL</i></footer></article>`;
 }
-function publicarDoc(id) {
+async function publicarDoc(id) {
   const d = (sg()._docs || {})[id]; if (!d) return;
-  if (!d.pub) { A.definir(['docs', id], null); return; }
-  A.definir(['docs', id], { tit: d.tit || '', pasta: d.pasta || '', cab: d.cab || '', data: d.data === undefined ? null : String(d.data), onde: d.onde || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() });
+  const velhoH = d.hPub || null;
+  const corpo = { tit: d.tit || '', pasta: d.pasta || '', cab: d.cab || '', data: d.data === undefined ? null : String(d.data), onde: d.onde || '', term: d.term || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() };
+  if (d.pub && d.cod) {
+    // cofre: o texto vai para cofre/<hash do código>; o público recebe só a marca
+    const { h, t } = await hashCofre(d.cod);
+    if (velhoH && velhoH !== h) A.Rede.set('cofre/' + velhoH + '/' + id, null).catch(() => {});
+    await A.Rede.set('cofre/' + h + '/' + id, corpo).catch(() => A.aviso('O servidor recusou o cofre.'));
+    A.definir(['docs', id], { tranca: t, pasta: d.pasta || '', term: d.term || '', onde: '', ts: corpo.ts });
+    if (velhoH !== h) A.gravarSegredo(['_docs', id, 'hPub'], h);
+    return;
+  }
+  if (velhoH) { A.Rede.set('cofre/' + velhoH + '/' + id, null).catch(() => {}); A.gravarSegredo(['_docs', id, 'hPub'], null); }
+  A.definir(['docs', id], d.pub ? corpo : null);
+}
+// lista de códigos dos cofres para o painel Senhas (Mestre e auxiliares)
+async function sincCofres() {
+  if (!A.mestre) return;
+  const out = {};
+  for (const [id, d] of Object.entries(sg()._docs || {})) {
+    if (!d || !d.cod) continue;
+    const { t } = await hashCofre(d.cod);
+    out[t] = out[t] || { cod: codigoNormal(d.cod), docs: {} };
+    out[t].docs[id] = (d.tit || 'Documento').slice(0, 100);
+  }
+  A.Rede.set('senhas/cofres', Object.keys(out).length ? out : null).catch(() => {});
 }
 function publicarCifra(id) {
   const c = (sg()._cifras || {})[id]; if (!c) return;
@@ -280,7 +341,7 @@ const KEY_FIX = () => 'acf-arq-fixos-' + quemSou();
 const KEY_LIDOS = () => 'acf-arq-lidos-' + quemSou();
 const KEY_FECHADAS = 'acf-arq-pastas-fechadas';
 const estreito = () => matchMedia('(max-width: 700px)').matches;
-const ABAS = () => A.mestre ? [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Chave'], ['visoes-m', 'Visões']] : [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Decifrar'], ['visoes', 'Visões']];
+const ABAS = () => A.mestre ? [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Chave'], ['visoes-m', 'Visões'], ['terminal', 'Terminal']] : [['docs', 'Documentos'], ['cifras', 'Cifras'], ['chave', 'Decifrar'], ['visoes', 'Visões'], ['terminal', 'Terminal']];
 const nTarjas = d => (String(d.txt || '').match(/\[\[[\s\S]*?\]\]/g) || []).length;
 const revDoc = d => (Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {})).filter(p => p.x !== undefined && p.t !== undefined).length;
 const glifosDe = c => [...new Set((Array.isArray(c.s) ? c.s : Object.values(c.s || {})).filter(x => typeof x === 'number'))];
@@ -303,9 +364,14 @@ function marcaDe(aba, id, n) { if (A.mestre) return ''; const l = lido(aba); if 
 function entradas(aba) {
   if (aba === 'docs') {
     if (A.mestre) return Object.entries(sg()._docs || {}).map(([id, d]) => { const n = nTarjas(d), r = Object.keys(d.rev || {}).length;
-      return { id, tit: d.tit || 'Sem título', pasta: d.pasta || '', sala: salaDe(d.onde), pub: !!d.pub, ts: num(d.ts), dataTxt: d.data !== undefined ? d.data : '', ord: dataOrd(d.data, d.ts), extra: n ? `${r}/${n} tarjas` : '', busca: `${d.tit} ${d.txt} ${d.pasta || ''} ${d.data || ''}` }; });
-    return Object.entries(docsPub()).filter(([, d]) => ondeVisivel(d.onde)).map(([id, d]) => { const n = revDoc(d);
-      return { id, tit: d.tit || 'Documento', pasta: d.pasta || '', sala: salaDe(d.onde), ts: num(d.ts), dataTxt: d.data || '', ord: dataOrd(d.data, d.ts), marca: marcaDe('docs', id, n), n, busca: `${d.tit} ${(Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {})).map(p => p.t || '').join(' ')} ${d.pasta || ''}` }; });
+      return { id, tit: d.tit || 'Sem título', pasta: d.pasta || '', sala: salaDe(d.onde), pub: !!d.pub, ts: num(d.ts), dataTxt: d.data !== undefined ? d.data : '', ord: dataOrd(d.data, d.ts), extra: [n ? `${r}/${n} tarjas` : '', d.term ? '⌨ ' + d.term : '', d.cod ? '🔒 ' + d.cod : ''].filter(Boolean).join(' · '), busca: `${d.tit} ${d.txt} ${d.pasta || ''} ${d.data || ''} ${d.term || ''} ${d.cod || ''}` }; });
+    const pubs = Object.entries(docsPub()).filter(([, d]) => d && ondeVisivel(d.onde));
+    // documentos trancados: uma entrada "▓▓▓" por código, sem título nem texto
+    const trancas = new Map();
+    pubs.filter(([, d]) => d.tranca).forEach(([, d]) => { const x = trancas.get(d.tranca); if (!x) trancas.set(d.tranca, { pasta: d.pasta || '', ts: num(d.ts) }); else x.ts = Math.max(x.ts, num(d.ts)); });
+    return pubs.filter(([, d]) => !d.tranca).map(([id, d]) => { const n = revDoc(d);
+      return { id, tit: d.tit || 'Documento', pasta: d.pasta || '', sala: salaDe(d.onde), ts: num(d.ts), dataTxt: d.data || '', ord: dataOrd(d.data, d.ts), marca: marcaDe('docs', id, n), n, extra: d.cofre ? '🔓 acesso liberado' : '', busca: `${d.tit} ${(Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {})).map(p => p.t || '').join(' ')} ${d.pasta || ''}` }; })
+      .concat([...trancas].map(([t, x]) => ({ id: 'tr:' + t, tit: '▓▓▓▓▓▓▓▓▓▓▓▓', pasta: x.pasta, ts: x.ts, ord: x.ts, extra: '🔒 acesso restrito', busca: 'acesso restrito cofre senha codigo' })));
   }
   if (aba === 'cifras') {
     if (A.mestre) return Object.entries(sg()._cifras || {}).map(([id, c]) => ({ id, tit: c.tit || 'Sem título', pasta: c.pasta || '', sala: salaDe(c.onde), pub: !!c.pub, ts: num(c.ts), ord: num(c.ts), busca: `${c.tit} ${c.txt} ${c.pasta || ''}` }));
@@ -325,8 +391,8 @@ function entradas(aba) {
   if (aba === 'visoes-m') return ls.get('acf-visoes-enviadas', []).map(h => ({ id: h.id || 't' + h.ts, tit: h.txt ? (h.txt.length > 46 ? h.txt.slice(0, 44) + '…' : h.txt) : '(só imagem)', pasta: (A.SER[h.alvo] || {}).nome || h.alvo, alvo: h.alvo, ts: num(h.ts), ord: num(h.ts), img: !!h.img, busca: `${h.txt || ''} ${(A.SER[h.alvo] || {}).nome || ''}` }));
   return [];
 }
-const PASTA_PADRAO = { docs: 'Sem pasta', cifras: 'Sem pasta', visoes: 'Suas visões', 'visoes-m': 'Sem destino', chave: 'Símbolos' };
-const ORDENS = { docs: [['rec', 'Mais recentes'], ['data', 'Data no documento'], ['tit', 'Título'], ['sala', 'Sala']], cifras: [['rec', 'Mais recentes'], ['tit', 'Título'], ['sala', 'Sala']], chave: [['sim', 'Símbolo'], ['letra', 'Letra']], visoes: [['rec', 'Mais recentes'], ['ant', 'Mais antigas']], 'visoes-m': [['rec', 'Mais recentes'], ['ant', 'Mais antigas']] };
+const PASTA_PADRAO = { terminal: '', docs: 'Sem pasta', cifras: 'Sem pasta', visoes: 'Suas visões', 'visoes-m': 'Sem destino', chave: 'Símbolos' };
+const ORDENS = { terminal: [['rec', '']], docs: [['rec', 'Mais recentes'], ['data', 'Data no documento'], ['tit', 'Título'], ['sala', 'Sala']], cifras: [['rec', 'Mais recentes'], ['tit', 'Título'], ['sala', 'Sala']], chave: [['sim', 'Símbolo'], ['letra', 'Letra']], visoes: [['rec', 'Mais recentes'], ['ant', 'Mais antigas']], 'visoes-m': [['rec', 'Mais recentes'], ['ant', 'Mais antigas']] };
 function filtros(aba) {
   if (aba === 'chave') return [['todos', 'Todas'], ['conf', 'Confirmadas'], ['pal', 'Com palpite'], ['sem', 'Sem palpite']];
   if (A.mestre && (aba === 'docs' || aba === 'cifras')) return [['todos', 'Todos'], ['pub', 'Publicados'], ['ocu', 'Ocultos']];
@@ -366,6 +432,15 @@ function abrir(aba, novo) {
       if (e.target.dataset.arqF) { Arq[e.target.dataset.arqF][Arq.aba] = e.target.value; desenharEstante(); }
     });
     o.addEventListener('input', e => { if (e.target.id === 'arqBusca') { Arq.busca[Arq.aba] = e.target.value; desenharEstante(); } });
+    o.addEventListener('keydown', e => {
+      if (e.target.id === 'arqCod' && e.key === 'Enter') { e.preventDefault(); abrirCofre(); }
+      if (e.target.id === 'termIn') {
+        if (e.key === 'Enter') { e.preventDefault(); const v = e.target.value; e.target.value = ''; termRodar(v); }
+        else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !TERM.espera && TERM.hist.length) { e.preventDefault(); TERM.hi = Math.max(0, Math.min(TERM.hist.length, TERM.hi + (e.key === 'ArrowUp' ? -1 : 1))); e.target.value = TERM.hist[TERM.hi] || ''; }
+      }
+    });
+    // tocar em qualquer ponto da tela do terminal volta o cursor para a linha de comando
+    o.addEventListener('click', e => { if (Arq.aba === 'terminal' && e.target.closest('.term-crt') && !e.target.closest('button') && !window.getSelection().toString()) { const i = $('#termIn'); if (i) i.focus(); } });
   }
   if (aba) Arq.aba = aba;
   if (!ABAS().some(a => a[0] === Arq.aba)) Arq.aba = 'docs';
@@ -384,6 +459,8 @@ function desenharTudo() {
 }
 function desenharFerramentas() {
   const aba = Arq.aba, f = $('#arqFerr');
+  $('#arquivoTela .arq-corpo').dataset.term = aba === 'terminal' ? '1' : '';
+  if (aba === 'terminal') { f.innerHTML = ''; $('#arqPe').hidden = true; return; }
   const salas = aba === 'visoes-m' ? cobaias().map(x => [x.id, x.nome]) : aba === 'chave' ? [] : [...new Set(entradas(aba).map(e => e.sala).filter(Boolean))].sort((a, b) => a - b).map(cn => [String(cn), `CN ${String(cn).padStart(2, '0')}`]);
   f.innerHTML = `<input id="arqBusca" type="search" placeholder="Buscar ${aba === 'chave' ? 'letra' : aba.startsWith('visoes') ? 'visão' : aba === 'cifras' ? 'cifra' : 'documento'}…" value="${esc(Arq.busca[aba] || '')}" autocomplete="off">
     <div class="arq-chips">${filtros(aba).map(([k, n]) => `<button data-arq="filtro" data-v="${k}" class="${(Arq.filtro[aba] || 'todos') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
@@ -391,11 +468,13 @@ function desenharFerramentas() {
       <select data-arq-f="ordem" aria-label="Ordem">${ORDENS[aba].map(([k, n]) => `<option value="${k}" ${(Arq.ordem[aba] || ORDENS[aba][0][0]) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
   const pe = $('#arqPe');
   const novo = A.mestre ? { docs: '+ Novo documento', cifras: '+ Nova cifra', 'visoes-m': '+ Nova visão' }[aba] : '';
-  pe.innerHTML = novo ? `<button data-arq="novo" class="pri">${novo}</button>` : aba === 'chave' && A.mestre ? '<button data-arq="pal-limpar" class="perigo">Apagar todos os palpites</button>' : aba === 'visoes' && entradas('visoes').length ? '<button data-arq="vs-apagar-tudo" class="perigo">Apagar todas</button>' : '';
+  const ie = A.mestre && aba === 'docs' ? '<div class="arq-ie"><button data-arq="dc-importar" title="Importar documentos de um arquivo .json">⬆ Importar</button><button data-arq="dc-exportar" title="Baixar todos os documentos em .json">⬇ Exportar</button><input type="file" id="arqImpDocs" accept=".json,application/json" hidden></div>' : '';
+  pe.innerHTML = novo ? `<button data-arq="novo" class="pri">${novo}</button>${ie}` : aba === 'chave' && A.mestre ? '<button data-arq="pal-limpar" class="perigo">Apagar todos os palpites</button>' : aba === 'visoes' && entradas('visoes').length ? '<button data-arq="vs-apagar-tudo" class="perigo">Apagar todas</button>' : '';
   pe.hidden = !pe.innerHTML;
 }
 function desenharEstante() {
   const l = $('#arqLista'); if (!l || !Arq.aberto) return;
+  if (Arq.aba === 'terminal') { if (l.dataset.html) { l.innerHTML = ''; l.dataset.html = ''; } return; }
   const aba = Arq.aba, todas = entradas(aba);
   const lista = ordenar(aba, filtrar(aba, todas));
   const fx = fixos()[aba] || {}, fechadas = ls.get(KEY_FECHADAS, {});
@@ -431,14 +510,19 @@ const voltar = '<button data-arq="voltar" class="arq-voltar">‹ Voltar</button>
 function desenharLeitor(forcar) {
   const el = $('#arqLeitor'); if (!el || !Arq.aberto) return;
   const corpo = $('#arquivoTela .arq-corpo'); corpo.dataset.mob = Arq.mob;
+  if (Arq.aba === 'terminal') { corpo.dataset.mob = 'leitor'; desenharTerminal(forcar); return; }
   const aba = Arq.aba, id = Arq.sel[aba];
   let barra = '', html = '';
-  if (!id) html = `<div class="arq-leitor-vazio"><span>◈</span><p>${A.mestre && aba !== 'chave' ? 'Escolha um item na estante ou crie um novo.' : 'Escolha um item na estante.'}</p></div>`;
+  if (aba === 'docs' && id && id.startsWith('tr:') && !A.mestre) {
+    html = `<div class="arq-cofre"><p class="arq-cofre-k">ACESSO RESTRITO</p><p class="arq-cofre-sub">AUTORIZAÇÃO NECESSÁRIA</p>
+      <div class="arq-cofre-linha"><input id="arqCod" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="código de acesso" aria-label="Código de acesso"><button data-arq="cofre" class="pri">Acessar</button></div>
+      <p class="arq-cofre-erro" id="arqCodErro" hidden>ACESSO NEGADO.</p></div>`;
+  } else if (!id) html = `<div class="arq-leitor-vazio"><span>◈</span><p>${A.mestre && aba !== 'chave' ? 'Escolha um item na estante ou crie um novo.' : 'Escolha um item na estante.'}</p></div>`;
   else if (aba === 'docs') {
     if (A.mestre) { const d = (sg()._docs || {})[id]; if (d) { const n = nTarjas(d), r = Object.keys(d.rev || {}).length;
       barra = `<button data-arq="dc-pub" data-id="${id}" class="${d.pub ? '' : 'pri'}">${d.pub ? '◌ Esconder' : '● Publicar'}</button>${n ? `<button data-arq="dc-abrir" data-id="${id}">Revelar todas</button><button data-arq="dc-fechar" data-id="${id}">Tarjar todas</button>` : ''}<button data-arq="dc-editar" data-id="${id}">✎ Editar</button>${btnFixar(aba, id)}<button data-arq="dc-apagar" data-id="${id}" class="perigo arq-dir">Apagar</button>`;
-      html = `<p class="arq-meta">${[d.pub ? 'Publicado' : 'Oculto dos jogadores', d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : 'Só no Arquivo', n ? `${r} de ${n} tarjas abertas · toque numa tarja para abrir ou fechar` : ''].filter(Boolean).map(esc).join(' · ')}</p><div class="doc-mestre" data-doc="${id}">${htmlDoc(id, d, true)}</div>`; } }
-    else { const d = docsPub()[id]; if (d) { barra = btnFixar(aba, id); html = `<p class="arq-meta">${[d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : ''].filter(Boolean).map(esc).join(' · ')}</p>${htmlDoc(id, d, false)}`; marcarLido('docs', id, revDoc(d)); } }
+      html = `<p class="arq-meta">${[d.pub ? 'Publicado' : 'Oculto dos jogadores', d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : 'Só no Arquivo', d.term ? 'Terminal: ' + d.term.toUpperCase() : '', d.cod ? 'Cofre: código ' + d.cod + ' (os jogadores só leem depois de digitar)' : '', n ? `${r} de ${n} tarjas abertas · toque numa tarja para abrir ou fechar` : ''].filter(Boolean).map(esc).join(' · ')}</p><div class="doc-mestre" data-doc="${id}">${htmlDoc(id, d, true)}</div>`; } }
+    else { const d = docsPub()[id]; if (d && !d.tranca) { barra = btnFixar(aba, id); html = `<p class="arq-meta">${[d.pasta, d.onde ? A.nomeSala(salaDe(d.onde)) : '', d.cofre ? '🔓 acesso liberado' : ''].filter(Boolean).map(esc).join(' · ')}</p>${htmlDoc(id, d, false)}`; marcarLido('docs', id, revDoc(d)); } }
   } else if (aba === 'cifras') {
     if (A.mestre) { const c = (sg()._cifras || {})[id]; if (c) {
       barra = `<button data-arq="cf-pub" data-id="${id}" class="${c.pub ? '' : 'pri'}">${c.pub ? '◌ Esconder' : '● Publicar'}</button>${c.pub ? `<button data-arq="cf-chat" data-id="${id}">Mandar no chat</button><button data-arq="cf-revtudo" data-id="${id}">Revelar letras</button><button data-arq="cf-esctudo" data-id="${id}">Esconder letras</button>` : ''}<button data-arq="cf-editar" data-id="${id}">✎ Editar</button>${btnFixar(aba, id)}<button data-arq="cf-apagar" data-id="${id}" class="perigo arq-dir">Apagar</button>`;
@@ -499,9 +583,11 @@ function abrirForm(id) {
     f.innerHTML = `<div class="arq-linha"><label class="arq-campo arq-largo">Título <input id="dcTit" maxlength="100" value="${esc(d.tit || '')}" placeholder="Ex.: Relatório do Experimento 7"></label>${campoPasta('dcPasta', d.pasta, 'docs')}</div>
       <div class="arq-linha"><label class="arq-campo arq-largo">Cabeçalho <input id="dcCab" maxlength="100" value="${esc(d.cab || '')}" placeholder="O.R.F.E.U. · DOCUMENTO INTERNO"></label>
         <label class="arq-campo">Data no documento <input id="dcData" maxlength="40" value="${esc(d.data !== undefined ? d.data : new Date().toLocaleDateString('pt-BR'))}" placeholder="vazio: sem data"></label></div>
-      <label class="arq-campo">Texto · entre [[colchetes duplos]] fica tarjado <textarea id="dcTxt" rows="10" maxlength="6000" placeholder="O paciente [[nome]] foi transferido para a ala [[C-12]] em...">${esc(d.txt || '')}</textarea></label>
+      <label class="arq-campo">Texto · entre [[colchetes duplos]] fica tarjado · entre **asteriscos duplos** fica em negrito <textarea id="dcTxt" rows="10" maxlength="12000" placeholder="O paciente [[nome]] foi transferido para a ala [[C-12]] em...">${esc(d.txt || '')}</textarea></label>
       ${opcoesOnde('dcOnde', d.onde)}
-      <p class="mini">A data sai no pé do documento como você escrever (21/12/2012, "março de 1998", "??/??/19??"); vazio esconde.</p>
+      <div class="arq-linha"><label class="arq-campo">Diretório no Terminal <input id="dcTerm" maxlength="24" list="dcTermL" value="${esc(d.term || '')}" placeholder="vazio: não aparece no Terminal"><datalist id="dcTermL">${[...new Set(['arquivos', 'experimentos', 'cobaias'].concat(Object.values(sg()._docs || {}).map(x => x.term).filter(Boolean)))].map(p => `<option value="${esc(p)}">`).join('')}</datalist></label>
+        <label class="arq-campo">Código de acesso (cofre) <input id="dcCod" maxlength="30" value="${esc(d.cod || '')}" autocomplete="off" spellcheck="false" placeholder="vazio: sem código"></label></div>
+      <p class="mini">A data sai no pé do documento como você escrever (21/12/2012, "março de 1998", "??/??/19??"); vazio esconde. Com código de acesso, os jogadores veem só "▓▓▓" até digitarem o código no Arquivo ou no Terminal (acesso CÓDIGO). Documentos com o mesmo código abrem juntos. O código aparece na pasta Senhas.</p>
       <div class="arq-linha arq-form-pe"><button data-arq="cancelar">Cancelar</button><button data-arq="dc-salvar" class="pri">${id ? 'Salvar' : 'Criar (oculto)'}</button></div>`;
   } else if (aba === 'visoes-m') {
     $('#arqModalTit').textContent = 'Nova visão';
@@ -550,6 +636,9 @@ function aoClicar(e) {
     ls.set(chaveVisoes(), a === 'vs-apagar-tudo' ? [] : ls.get(chaveVisoes(), []).filter(h => h.id !== id));
     Arq.sel.visoes = undefined; Arq.mob = 'lista'; atualizarBadge(); desenharFerramentas(); desenharLista(); return;
   }
+  if (a === 'cofre') { abrirCofre(); return; }
+  if (a === 'term-cmd') { termRodar(b.dataset.v); return; }
+  if (a === 'term-tranca') { termPedirCodigo(); return; }
   if (!A.mestre) return;
   if (a === 'novo') { abrirForm(null); return; }
   if (a === 'gl-rev') { const g = +id; A.definir(['cifraRev', 'g' + g], revDe(g) ? null : letraDoGlifo(g)); return; }
@@ -576,8 +665,10 @@ function aoClicar(e) {
     const txt = ($('#dcTxt').value || '').trim();
     if (!txt) { A.aviso('Escreva o texto do documento.'); return; }
     const k = Arq.edit || A.Rede.chave(), velho = (sg()._docs || {})[k] || {};
-    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), pasta: ($('#dcPasta').value || '').trim().slice(0, 40), cab: ($('#dcCab').value || '').trim().slice(0, 100), data: ($('#dcData').value || '').trim().slice(0, 40), txt: txt.slice(0, 6000), onde: lerOnde('dcOnde'), pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
-    if (velho.pub) publicarDoc(k);
+    const cod = codigoNormal($('#dcCod').value).slice(0, 30);
+    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), pasta: ($('#dcPasta').value || '').trim().slice(0, 40), cab: ($('#dcCab').value || '').trim().slice(0, 100), data: ($('#dcData').value || '').trim().slice(0, 40), txt: txt.slice(0, 12000), onde: cod ? '' : lerOnde('dcOnde'), term: ($('#dcTerm').value || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 24) || null, cod: cod || null, hPub: velho.hPub || null, pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
+    if (velho.pub || velho.hPub) publicarDoc(k);
+    if (cod || velho.cod) sincCofres();
     fecharForm(); desenharFerramentas(); selecionar(k); A.redesenharCartao();
   } else if (a === 'dc-pub') { const d = sg()._docs[id]; A.gravarSegredo(['_docs', id, 'pub'], !d.pub); publicarDoc(id); desenharLista(); A.redesenharCartao(); }
   else if (a === 'dc-abrir' || a === 'dc-fechar') {
@@ -586,9 +677,155 @@ function aoClicar(e) {
     if (a === 'dc-abrir') for (let i = 0; i < n; i++) rev[i] = true;
     A.gravarSegredo(['_docs', id, 'rev'], a === 'dc-abrir' && n ? rev : null); publicarDoc(id); desenharLista();
   }
-  else if (a === 'dc-apagar') { if (!confirm('Apagar este documento?')) return; A.gravarSegredo(['_docs', id], null); A.definir(['docs', id], null); Arq.sel.docs = undefined; Arq.mob = 'lista'; desenharFerramentas(); desenharLista(); A.redesenharCartao(); }
+  else if (a === 'dc-apagar') { if (!confirm('Apagar este documento?')) return; const dv = sg()._docs[id] || {}; if (dv.hPub) A.Rede.set('cofre/' + dv.hPub + '/' + id, null).catch(() => {}); A.gravarSegredo(['_docs', id], null); if (dv.cod) sincCofres(); A.definir(['docs', id], null); Arq.sel.docs = undefined; Arq.mob = 'lista'; desenharFerramentas(); desenharLista(); A.redesenharCartao(); }
   else if (a === 'vs-enviar') { b.disabled = true; enviarVisao().catch(() => {}).finally(() => { b.disabled = false; }); }
+  else if (a === 'dc-exportar') exportarDocs();
+  else if (a === 'dc-importar') { const i = $('#arqImpDocs'); i.value = ''; i.onchange = () => { if (i.files[0]) importarDocs(i.files[0]); }; i.click(); }
   else if (a === 'pal-limpar') { if (confirm('Apagar todos os palpites dos jogadores?')) A.Rede.set('cifraPalpite', null).catch(() => {}); }
+}
+
+/* ---------- cofre (jogador) ---------- */
+async function abrirCofre() {
+  const i = $('#arqCod'), e = $('#arqCodErro'); if (!i) return;
+  const b = $('#arqLeitor [data-arq="cofre"]'); if (b) b.disabled = true;
+  const r = await tentarCodigo(i.value).catch(() => null);
+  if (b) b.disabled = false;
+  if (!r) { if (e) { e.hidden = false; e.classList.remove('treme'); void e.offsetWidth; e.classList.add('treme'); } i.select(); if (somOk()) A.Som.tom(110, 0, 0.35, 'sawtooth', 0.07); return; }
+  // abre o primeiro documento liberado
+  const prim = Object.entries(r.docs).sort((a, b) => num(a[1].ts) - num(b[1].ts))[0];
+  Arq.sel.docs = prim ? prim[0] : undefined;
+  A.aviso('Acesso liberado.');
+  desenharEstante(); desenharLeitor(true);
+}
+
+/* ---------- importar e exportar documentos (Mestre) ---------- */
+function baixar(nome, obj) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportarDocs() {
+  const docs = Object.values(sg()._docs || {}).sort((a, b) => num(a.ts) - num(b.ts)).map(d => ({ tit: d.tit || '', pasta: d.pasta || '', cab: d.cab || '', data: d.data === undefined ? '' : d.data, txt: d.txt || '', onde: d.onde || '', term: d.term || '', cod: d.cod || '', pub: !!d.pub }));
+  baixar(`arquivo-orfeu-documentos-${new Date().toISOString().slice(0, 10)}.json`, { tipo: 'planta-acf-docs', versao: 1, salvoEm: Date.now(), docs });
+  A.aviso(`${docs.length} documento${docs.length === 1 ? '' : 's'} exportado${docs.length === 1 ? '' : 's'}. O arquivo tem os códigos dos cofres: não envie ao GitHub.`);
+}
+function importarDocs(f) {
+  const r = new FileReader();
+  r.onload = async () => {
+    let lista;
+    try { const o = JSON.parse(r.result); lista = Array.isArray(o) ? o : o && Array.isArray(o.docs) ? o.docs : null; } catch (e) { lista = null; }
+    lista = (lista || []).filter(d => d && typeof d.txt === 'string' && d.txt.trim());
+    if (!lista.length) { A.aviso('Arquivo sem documentos válidos.'); return; }
+    const existentes = new Set(Object.values(sg()._docs || {}).map(d => (d.tit || '') + '\u0000' + (d.txt || '')));
+    const novos = lista.filter(d => !existentes.has((d.tit || '') + '\u0000' + d.txt.trim()));
+    if (!novos.length) { A.aviso('Esses documentos já estão no Arquivo.'); return; }
+    const pubs = novos.filter(d => d.pub).length;
+    if (!confirm(`Importar ${novos.length} documento${novos.length === 1 ? '' : 's'}${lista.length > novos.length ? ` (${lista.length - novos.length} já existiam e ficam de fora)` : ''}?${pubs ? `\n${pubs} já entra${pubs === 1 ? '' : 'm'} publicado${pubs === 1 ? '' : 's'}, como no arquivo.` : ''}`)) return;
+    let t = Date.now();
+    const ks = [];
+    for (const d of novos) {
+      const k = A.Rede.chave(), cod = codigoNormal(d.cod).slice(0, 30);
+      A.gravarSegredo(['_docs', k], { tit: String(d.tit || '').slice(0, 100), pasta: String(d.pasta || '').slice(0, 40), cab: String(d.cab || '').slice(0, 100), data: String(d.data === undefined || d.data === null ? '' : d.data).slice(0, 40), txt: d.txt.trim().slice(0, 12000), onde: cod ? '' : (/^sala:\d+$/.test(d.onde || '') ? d.onde : ''), term: String(d.term || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 24) || null, cod: cod || null, pub: !!d.pub, ts: t++ });
+      ks.push(k);
+    }
+    for (const k of ks) if (sg()._docs[k].pub) await publicarDoc(k);
+    await sincCofres();
+    Arq.aba = 'docs'; desenharTudo();
+    A.aviso(`${ks.length} documento${ks.length === 1 ? '' : 's'} importado${ks.length === 1 ? '' : 's'}.`);
+  };
+  r.readAsText(f);
+}
+
+/* =========================================================
+   4b. TERMINAL O.R.F.E.U.
+   Mostra, em letra de terminal, os documentos publicados que têm um "diretório do terminal".
+   Comandos: help, ls, open <diretório>, acesso <código>, clear. A saída fica na sessão da aba.
+   ========================================================= */
+const KEY_TERM = 'acf-term-saida';
+const TERM = { linhas: null, espera: false, hist: [], hi: 0 };
+const BARRA = '-'.repeat(60);
+const barraT = () => '-'.repeat(estreito() ? 30 : 60);
+const termCarregar = () => { if (TERM.linhas) return; try { TERM.linhas = JSON.parse(sessionStorage.getItem(KEY_TERM) || 'null'); } catch (e) { TERM.linhas = null; } if (!Array.isArray(TERM.linhas)) TERM.linhas = [{ k: 'banner' }]; };
+const termSalvar = () => { try { sessionStorage.setItem(KEY_TERM, JSON.stringify(TERM.linhas.slice(-300))); } catch (e) {} };
+const termOut = (...ls2) => { termCarregar(); ls2.forEach(l => TERM.linhas.push(typeof l === 'string' ? { k: 't', t: l } : l)); termSalvar(); desenharTerminal(); };
+function termDirs() {
+  const m = new Map();
+  Object.values(docsPub()).forEach(d => { if (d && d.term && ondeVisivel(d.onde)) m.set(String(d.term).toLowerCase(), String(d.term).toLowerCase()); });
+  return [...m.keys()].sort((a, b) => a.localeCompare(b, 'pt'));
+}
+const termDocsDe = dir => Object.entries(docsPub()).filter(([, d]) => d && String(d.term || '').toLowerCase() === dir && ondeVisivel(d.onde));
+function termTextoDoc(id, d) {
+  const partes = Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {});
+  const corpo = partes.map(p => p.x === undefined ? marcaTxt(p.t) : p.t !== undefined ? `<span class="term-rev">${marcaTxt(p.t)}</span>` : `<span class="term-tj">${'█'.repeat(Math.min(40, Math.max(3, int(p.n))))}</span>`).join('');
+  return `${d.cab ? `<span class="term-dim">${esc(d.cab)}</span>\n` : ''}<b class="term-tit">${marcaTxt(d.tit || 'DOCUMENTO')}</b>\n${d.data ? `<span class="term-dim">Data: ${esc(d.data)}</span>\n` : ''}${corpo}`;
+}
+function termHtmlLinha(l) {
+  if (l.k === 'banner') {
+    const dirs = termDirs();
+    return `<span class="term-forte">ORFEU - DEPARTAMENTO DE ORGANIZAÇÃO, REAJUSTE E FORÇA EXPERIMENTAL UNIFICADA</span>\nSTATUS: OPERACIONAL\n${barraT()}\nCOMANDOS DISPONÍVEIS:\nls                  - listar diretórios\n${dirs.map(d => `${('open ' + d).padEnd(20)}- acessar ${d.toUpperCase()}`).join('\n')}${dirs.length ? '\n' : ''}acesso CÓDIGO       - autorização para arquivos restritos\nclear               - limpar terminal\n\nDIRETÓRIOS DISPONÍVEIS:\n${dirs.length ? dirs.map(d => `<button class="term-link" data-arq="term-cmd" data-v="open ${esc(d)}">[ ${esc(d.toUpperCase())} ]</button>`).join('\n') : '<span class="term-dim">(nenhum diretório liberado)</span>'}\n${barraT()}`;
+  }
+  if (l.k === 'cmd') return `<span class="term-cmd">${esc(l.p || 'ORFEU>')} ${esc(l.t)}</span>`;
+  if (l.k === 'dir') {
+    const docs = termDocsDe(l.d), ab = cofresAbertos();
+    if (!docs.length) return '<span class="term-erro">DIRETÓRIO VAZIO OU INDISPONÍVEL.</span>';
+    const abertos = docs.filter(([, d]) => !d.tranca).sort((a, b) => dataOrd(a[1].data, a[1].ts) - dataOrd(b[1].data, b[1].ts) || num(a[1].ts) - num(b[1].ts));
+    const trancas = [...new Set(docs.filter(([, d]) => d.tranca && !ab[d.tranca]).map(([, d]) => d.tranca))];
+    abertos.forEach(([id, d]) => marcarLido('docs', id, revDoc(d)));
+    return `<span class="term-forte">ORFEU :: ${esc(l.d.toUpperCase())}</span>\nACESSO RESTRITO\nDOCUMENTOS CLASSIFICADOS\n${barraT()}\n${abertos.map(([id, d]) => termTextoDoc(id, d)).join(`\n${barraT()}\n`)}${abertos.length ? `\n${barraT()}` : ''}${trancas.map(() => `\n<button class="term-link term-tranca" data-arq="term-tranca" title="Autorização necessária">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</button>`).join('')}`;
+  }
+  if (l.k === 'erro') return `<span class="term-erro">${esc(l.t)}</span>`;
+  if (l.k === 'ok') return `<span class="term-ok">${esc(l.t)}</span>`;
+  return esc(l.t || '');
+}
+function desenharTerminal(forcar) {
+  const el = $('#arqLeitor'); if (!el || !Arq.aberto || Arq.aba !== 'terminal') return;
+  termCarregar();
+  if (el.dataset.item !== 'terminal' || forcar) {
+    if (el.dataset.item !== 'terminal') {
+      el.innerHTML = `<div class="term-crt"><div class="term-tela" id="termTela"><pre class="term-saida" id="termSaida"></pre>
+        <label class="term-linha"><span id="termPrompt">ORFEU&gt;</span><input id="termIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Comando do terminal"></label></div></div>`;
+      el.dataset.item = 'terminal'; el.dataset.html = '';
+    }
+  }
+  const html = TERM.linhas.map(termHtmlLinha).join('\n');
+  const saida = $('#termSaida');
+  if (saida && saida.dataset.html !== html) { saida.innerHTML = html; saida.dataset.html = html; const t = $('#termTela'); if (t) t.scrollTop = t.scrollHeight; }
+  const i = $('#termIn'), p = $('#termPrompt');
+  if (i) { i.type = TERM.espera ? 'password' : 'text'; p.textContent = TERM.espera ? 'AUTORIZAÇÃO NECESSÁRIA:' : 'ORFEU>'; }
+  if (forcar && i && !estreito()) setTimeout(() => i.focus(), 30);
+}
+function termPedirCodigo() { TERM.espera = true; termOut({ k: 't', t: 'AUTORIZAÇÃO NECESSÁRIA.' }); const i = $('#termIn'); if (i) { i.value = ''; i.focus(); } }
+async function termCodigo(cod) {
+  const r = await tentarCodigo(cod).catch(() => null);
+  if (!r) { termOut({ k: 'erro', t: 'ACESSO NEGADO.' }); if (somOk()) A.Som.tom(110, 0, 0.35, 'sawtooth', 0.07); return; }
+  const dirs = [...new Set(Object.values(r.docs).map(d => String(d.term || '').toLowerCase()).filter(Boolean))];
+  termOut({ k: 'ok', t: 'CLASSIFICAÇÃO: ULTRA-RESTRITA' }, { k: 'ok', t: 'AUTORIZAÇÃO: CONFIRMADA' });
+  if (dirs.length) dirs.forEach(d => termOut({ k: 'dir', d }));
+  else termOut({ k: 't', t: 'Arquivos liberados no Arquivo (aba Documentos).' });
+}
+function termRodar(bruto) {
+  termCarregar();
+  const txt = String(bruto || '');
+  if (TERM.espera) {
+    TERM.espera = false;
+    TERM.linhas.push({ k: 'cmd', p: 'AUTORIZAÇÃO NECESSÁRIA:', t: '*'.repeat(Math.min(12, txt.length)) });
+    termSalvar(); desenharTerminal();
+    termCodigo(txt); return;
+  }
+  const cmd = txt.toLowerCase().replace(/"/g, '').replace(/\s+/g, ' ').trim();
+  TERM.linhas.push({ k: 'cmd', t: txt });
+  if (txt.trim()) { TERM.hist.push(txt); TERM.hi = TERM.hist.length; }
+  if (!cmd) { termSalvar(); desenharTerminal(); return; }
+  if (cmd === 'help' || cmd === 'ajuda') { termOut({ k: 'banner' }); return; }
+  if (cmd === 'clear' || cmd === 'limpar' || cmd === 'cls') { TERM.linhas = [{ k: 'banner' }]; termSalvar(); desenharTerminal(); return; }
+  if (cmd === 'ls' || cmd === 'dir') { const d = termDirs(); termOut(...(d.length ? d.map(x => x.toUpperCase() + '/') : ['(nenhum diretório liberado)'])); return; }
+  const m = /^(open|abrir|cd|cat)\s+(.+)$/.exec(cmd);
+  if (m) { const alvo = normal(m[2]).toLowerCase().replace(/\/$/, '').replace(/\s+/g, '-'); const d = termDirs().find(x => normal(x).toLowerCase() === alvo);
+    if (d) termOut({ k: 'dir', d }); else termOut({ k: 'erro', t: 'DESTINO NÃO ENCONTRADO.' }); return; }
+  const c = /^(acesso|senha|autorizar|login)(?:\s+(.+))?$/.exec(cmd);
+  if (c) { if (c[2]) { TERM.linhas[TERM.linhas.length - 1] = { k: 'cmd', t: txt.split(/\s+/)[0] + ' ' + '*'.repeat(Math.min(12, c[2].length)) }; termSalvar(); desenharTerminal(); termCodigo(txt.trim().split(/\s+/).slice(1).join(' ')); } else termPedirCodigo(); return; }
+  termOut({ k: 'erro', t: "COMANDO NÃO RECONHECIDO. DIGITE 'help'." });
 }
 
 /* =========================================================
@@ -639,7 +876,7 @@ function redesenhar() {
   requestAnimationFrame(() => {
     agendado = false;
     try {
-      ligarPalpites(); ligarVisoes();
+      ligarPalpites(); ligarVisoes(); ligarCofres();
       atualizarBadge(); desenharMesaArq(); marcarSalas();
       if (Arq.aberto) { if (!ABAS().some(x => x[0] === Arq.aba)) { Arq.aba = 'docs'; desenharTudo(); } else { atualizarAbas(); desenharLista(); } }
       // cifras no chat e no cartão da sala acompanham revelações e palpites
@@ -649,6 +886,7 @@ function redesenhar() {
   });
 }
 A.aoMudar(redesenhar);
+document.addEventListener('acf-tudo', redesenhar);
 document.addEventListener('acf-perfil', () => { setTimeout(redesenhar, 60); });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || !Arq.aberto || ($('#cfPalpite') && !$('#cfPalpite').hidden)) return;
@@ -657,5 +895,5 @@ document.addEventListener('keydown', e => {
 const btn = $('#btnArquivo'); if (btn) btn.addEventListener('click', () => abrir());
 setInterval(marcarSalas, 1500);
 setTimeout(redesenhar, 800);
-window.ACF_ARQUIVO = { abrir, fechar, glifoSVG, GLIFOS, mostrarVisao };
+window.ACF_ARQUIVO = { abrir, fechar, glifoSVG, GLIFOS, mostrarVisao, tentarCodigo, sincCofres };
 })();

@@ -4,19 +4,21 @@
 
 /* SENHAS
    As senhas não ficam escritas aqui, só a "impressão digital" (hash) delas.
-   Para trocar uma senha: abra o site, entre como Mestre, use o botão
-   "Gerar hash de senha" no painel e cole o resultado na linha certa abaixo.
+   As senhas dos andares agora se trocam pela pasta "Senhas" (aba Segredos do Mestre),
+   sem mexer aqui: o site usa a senha de lá. As linhas abaixo são só a reserva
+   (valem enquanto a pasta Senhas não tiver a senha daquele andar).
+   Para trocar a reserva: botão "Gerar hash de senha" no painel e cole o resultado na linha certa.
 
    Nunca escreva a senha em texto aqui: este arquivo fica público no GitHub.
    Linhas 1 a 5: um andar cada. */
 const SAL = 'acf-caixa::';
 
 const SENHAS_ANDARES = {
-  1: 'b55719674cdc2065f3d01391180297a20298e17996a0a3090defebc8fea485c0',
-  2: 'ff1fff0a240caeaf94eb0b87f8e763f68bb15d911be4b4f48d0faa5ecc1f1295',
-  3: 'b68cda3280b0de9cd3c9ff94f4fcd69d5a6e81b52e9ab9ce57c9c9b571ecb492',
-  4: '06dfd0c6de41ca7a00c0fb053e4bd976a1433e0fa32f69310c501e2e06d8df63',
-  5: 'ae92d66ed5035aee947afd5690361df5af5ec8bd72741cbd2443fdc3c5b4026a',
+  1: '5e7b1c26da0771522ba4bf74d3d88b1e47386758e961f15b338ac02c2d50af03',
+  2: '538ed5bcf673361a66e860ea5a3b3093d99807bf9c5476617b764780929507b7',
+  3: '703b65b9ca3d470b3a3e2c8f3cdecb7d539fa976cc62c2213943283015259739',
+  4: '68cc2292593e8e7dc0074bf21ea9a1e3f587ad1e73e38b70ce9d9032776e1895',
+  5: 'dff27bba63f3f782e6918b0824690dcbd2557989f8b1a922d4cfa4f773ed1730',
 };
 
 /* Senha dos Mestres Auxiliares.

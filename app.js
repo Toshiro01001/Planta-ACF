@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010q';
+const VERSAO_SITE = '20261010r';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1569,6 +1569,7 @@ function atualizarTudo() {
   desenharBalanca();
   desenharEco();
   atualizarBotaoMinha();
+  document.dispatchEvent(new Event('acf-tudo'));   // módulos extras (ferramentas.js) redesenham junto
 }
 
 /* =========================================================
@@ -1577,7 +1578,9 @@ function atualizarTudo() {
 $('#formSenha').addEventListener('submit', async e => {
   e.preventDefault();
   const h = await hash($('#inputSenha').value.trim());
-  if (h === SENHAS_ANDARES[andarAtual]) {
+  // a senha ativa vem do painel Senhas do Mestre (só o hash fica público); sem ela, vale a do config.js
+  const ativa = (Store.state.senhasAndar || {})['a' + andarAtual] || SENHAS_ANDARES[andarAtual];
+  if (h === ativa) {
     liberados.add(andarAtual);
     salvarLiberados();
     montarAndar();
@@ -3924,10 +3927,13 @@ $('#chkApagao00').addEventListener('change', e => Segredos.gravar(['_apagao00'],
 const CAMPOS_FICHA = [['pv', 'PV'], ['san', 'SAN'], ['pe', 'PE']];
 const fichaDe = id => (Store.state.fichas || {})[id] || null;
 // PV, SAN e PE vêm da ficha de agente quando o jogador tem uma ativa; sucatas continuam na ficha resumida do Mestre
+// NEX das cobaias: exposição definida pelo Mestre na Calculadora de NEX (mapa/nex)
+const nexExpo = id => { const v = (Store.state.nex || {})[id]; return typeof v === 'number' ? v : undefined; };
 function fichaComVitais(id) {
-  const f = fichaDe(id), tk = (Store.state.tokens || {})[id], v = tk && tk.vit;
+  const f0 = fichaDe(id), tk = (Store.state.tokens || {})[id], v = tk && tk.vit;
+  const f = nexExpo(id) !== undefined ? { ...(f0 || {}), nex: nexExpo(id) } : f0;
   if (!v) return f;
-  const o = { ...(f || {}), pv: v.pv, pvm: v.pvM, nex: v.nex };
+  const o = { ...(f || {}), pv: v.pv, pvm: v.pvM, nex: nexExpo(id) !== undefined ? nexExpo(id) : v.nex, nv: v.nv };
   if (v.det) { o.pe = v.pd; o.pem = v.pdM; delete o.san; delete o.sanm; } else { o.san = v.san; o.sanm = v.sanM; o.pe = v.pe; o.pem = v.peM; }
   return o;
 }
@@ -3938,7 +3944,8 @@ function barrasFicha(f) {
     if (v === undefined && m === undefined) return '';
     const pct = m ? Math.max(0, Math.min(100, (v || 0) / m * 100)) : 0;
     return `<div class="barra barra-${k}"><span class="barra-r">${r}</span><div class="barra-trilho"><div class="barra-cheia" style="width:${pct}%"></div></div><b>${v ?? '?'}${m ? '/' + m : ''}</b></div>`;
-  }).join('') + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '')
+  }).join('') + (f.nv !== undefined ? `<div class="barra barra-nex"><span class="barra-r">Nível</span><b>${String(f.nv).startsWith('E') ? 'Estágio ' + String(f.nv).slice(1) : f.nv}</b></div>` : '')
+    + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '')
     + (f.sM !== undefined || f.sm !== undefined ? `<div class="barra barra-nex"><span class="barra-r">Sucatas</span><b>${f.sM || 0} maiores · ${f.sm || 0} menores</b></div>` : '');
 }
 function htmlEditarFicha(id) {
@@ -5196,5 +5203,7 @@ window.ACF = {
   diario: (k, t) => { try { Diario.registrar(k, t); } catch (e) {} },
   escolherCor: (id, ancora) => Cores.escolher(id, ancora),
   podeCor,
+  hash, alertaMestre,
+  get auxLogado() { return !!aux && (Store.modo !== 'firebase' || !!(Store.auth && Store.auth.currentUser && Store.auth.currentUser.email === EMAIL_AUXILIARES)); },
 };
 })();

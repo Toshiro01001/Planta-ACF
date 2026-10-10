@@ -1,0 +1,27 @@
+{
+  "tipo": "planta-acf-senhas",
+  "versao": 1,
+  "salvoEm": 0,
+  "andares": {
+    "1": "umidade945+FLUORESCENTE",
+    "2": "Fosforo.719.concreto",
+    "3": "FERRUGEM+mofo830",
+    "4": "Eco+Vazio591",
+    "5": "742_Goteira_Parede"
+  },
+  "parede": "",
+  "cofres": [
+    {
+      "codigo": "E6Y6E6S",
+      "documentos": [
+        "6MOTHER6HORSE6EYES6",
+        "Registro de Log – Protótipo Operacional (1938)",
+        "O Incidente nas Cinzas: O Relato do Sargento Miller",
+        "Registro de Log – Departamento de Engenharia Psicossocial (Subdivisão MK-DELTA)",
+        "Registro de Áudio – Recuperação de Dados (Projeto O.R.F.E.U.)",
+        "Consequências"
+      ]
+    }
+  ],
+  "outras": []
+}
