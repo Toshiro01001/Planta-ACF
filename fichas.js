@@ -380,8 +380,8 @@ function desenharLista() {
       ${podeCriar ? `<button data-acao="apagar-ficha" data-k="${k}" data-gm="${gmA}" class="fx-btn-perigo" title="Apagar ficha" aria-label="Apagar ficha">✕</button>` : ''}</div></div></article>`;
   };
   let html = cab;
-  if (abaAux) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ameaca">+ Nova ameaça</button><button data-acao="novo-filho">+ Novo Filho</button></div>`;
-  else if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${ehMestre() ? '<button data-acao="nova-ameaca">+ Nova ameaça</button>' : ''}${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
+  if (abaAux) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ameaca">+ Nova ameaça</button><button data-acao="novo-filho">+ Novo Filho</button>${BTN_IMPORTAR}</div>`;
+  else if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${ehMestre() ? '<button data-acao="nova-ameaca">+ Nova ameaça</button>' : ''}${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}${BTN_IMPORTAR}</div>`;
   if (!todos.length) html += `<p class="fx-vazio">${gmJog ? 'Nenhum jogador criou ficha ainda.' : 'Nenhuma ficha ainda. Crie a primeira!'}</p>`;
   Object.entries(grupos).forEach(([g, xs]) => {
     if (gmJog) { const s = A.SER[g] || {}; html += `<h2 class="fx-grupo" style="${estiloAc(g)}"><span class="fx-pinta"></span>${esc(s.nome || g)}${s.jogador ? ` <small>${esc(s.jogador)}</small>` : ''}</h2>`; }
@@ -389,6 +389,7 @@ function desenharLista() {
   });
   corpo.innerHTML = html;
 }
+const BTN_IMPORTAR = '<label class="fx-btn-arq" title="Cria fichas novas a partir de arquivos exportados. Dá para escolher vários de uma vez.">⬆ Importar arquivos<input type="file" accept=".json,application/json" data-acao-arq="importar" multiple hidden></label>';
 function refDoCodigo(k, gm) {
   const i = k.indexOf(':');
   const dono = k.slice(0, i), chave = k.slice(i + 1);
@@ -458,25 +459,43 @@ function limparImportado(v, prof = 0) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
   return typeof v === 'boolean' ? v : null;
 }
-async function importarFicha(f) {
-  if (!f) return;
-  if (f.size > 1500000) { A.aviso('Arquivo grande demais para uma ficha.'); return; }
-  let dado;
-  try { dado = JSON.parse(await f.text()); } catch (e) { A.aviso('Esse arquivo não é uma ficha válida.'); return; }
-  const bruta = dado && dado.formato === 'acf-ficha' ? dado.ficha : dado;
-  if (!bruta || typeof bruta !== 'object' || !('nome' in bruta || 'atr' in bruta)) { A.aviso('Esse arquivo não é uma ficha válida.'); return; }
-  const gm = ehMestre();
-  const dono = gm ? 'mestre' : quem();
+// importa um ou vários arquivos (.json de uma ficha, ou um pacote com várias) para a aba aberta
+async function importarFichas(lista) {
+  const arquivos = [...(lista || [])]; if (!arquivos.length) return;
+  const naAux = F.abaLista === 'aux' && (ehMestre() || ehAux());
+  const gm = !naAux && ehMestre();
+  const dono = naAux ? 'aux' : gm ? 'mestre' : quem();
   if (!dono) { A.aviso('Escolha sua cobaia antes de importar uma ficha.'); return; }
-  const d = normalizar({ ...limparImportado(bruta), dono, criado: Date.now() });
-  d.dono = dono; d.criado = Date.now();
-  if (!CLASSES[d.classe]) d.classe = 'combatente';
-  if (!confirm(`Criar uma ficha nova com "${d.nome || 'Sem nome'}"${gm ? ' nas suas fichas de Mestre' : ''}?`)) return;
-  const ref = { gm, dono, chave: novaChave() };
-  try { await A.Rede.set(caminho(ref), d); } catch (e) { A.aviso('O servidor recusou a ficha importada.'); return; }
-  if (!gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); ligarAtiva(); }
-  A.aviso(`Ficha "${d.nome || 'Sem nome'}" importada.`);
-  abrirFicha(ref);
+  const fichas = [];
+  let ruins = 0;
+  for (const f of arquivos) {
+    if (f.size > 4000000) { ruins++; continue; }
+    let dado;
+    try { dado = JSON.parse(await f.text()); } catch (e) { ruins++; continue; }
+    const brutas = dado && dado.formato === 'acf-fichas' && Array.isArray(dado.fichas) ? dado.fichas : [dado && dado.formato === 'acf-ficha' ? dado.ficha : dado];
+    brutas.forEach(bruta => {
+      if (!bruta || typeof bruta !== 'object' || !('nome' in bruta || 'atr' in bruta)) { ruins++; return; }
+      const d = normalizar({ ...limparImportado(bruta), dono, criado: Date.now() });
+      d.dono = dono; d.criado = Date.now() + fichas.length;
+      if (d.tipo !== 'ameaca' && !CLASSES[d.classe]) d.classe = 'combatente';
+      fichas.push(d);
+    });
+  }
+  if (!fichas.length) { A.aviso(ruins > 1 ? 'Nenhum desses arquivos é uma ficha válida.' : 'Esse arquivo não é uma ficha válida.'); return; }
+  const onde = naAux ? ' em "Ameaças e Filhos" (o Mestre e os auxiliares veem)' : gm ? ' nas suas fichas de Mestre' : '';
+  const pergunta = fichas.length === 1 ? `Criar uma ficha nova com "${fichas[0].nome || 'Sem nome'}"${onde}?` : `Importar ${fichas.length} fichas${onde}?\n\n${fichas.slice(0, 12).map(d => '• ' + (d.nome || 'Sem nome')).join('\n')}${fichas.length > 12 ? `\n… e mais ${fichas.length - 12}` : ''}`;
+  if (!confirm(pergunta)) return;
+  let ok = 0, ultima = null;
+  for (const d of fichas) {
+    const ref = naAux ? { aux: true, dono: 'aux', chave: novaChave() } : { gm, dono, chave: novaChave() };
+    try { await A.Rede.set(caminho(ref), d); } catch (e) { ruins++; continue; }
+    if (!naAux && !gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); }
+    ok++; ultima = ref;
+  }
+  if (!naAux && !gm) ligarAtiva();
+  if (!ok) { A.aviso('O servidor recusou a importação.'); return; }
+  A.aviso(ok === 1 ? `Ficha "${fichas[0].nome || 'Sem nome'}" importada.` : `${ok} fichas importadas${ruins ? `; ${ruins} arquivo(s) ignorado(s)` : ''}.`);
+  if (ok === 1) abrirFicha(ultima); else irLista();
 }
 
 /* ---------------- FICHA ---------------- */
@@ -1212,7 +1231,7 @@ function aoEditar(e) {
   const t = e.target;
   if (t.dataset.filtro) { if (e.type === 'input') { F.filtros[t.dataset.filtro] = t.value; const pos = t.selectionStart; desenharAba(); const nt = $(`[data-filtro="${t.dataset.filtro}"]`); if (nt) { nt.focus(); nt.setSelectionRange(pos, pos); } } return; }
   if (t.dataset.acaoArq === 'foto' && e.type === 'change') { trocarFoto(t.files[0]); return; }
-  if (t.dataset.acaoArq === 'importar' && e.type === 'change') { importarFicha(t.files[0]); t.value = ''; return; }
+  if (t.dataset.acaoArq === 'importar' && e.type === 'change') { importarFichas(t.files); t.value = ''; return; }
   const path = t.dataset.c;
   if (!path || !F.atual || !F.atual.editavel) return;
   if (t.tagName === 'SELECT' && e.type === 'input') return;   // select grava no change
