@@ -192,12 +192,12 @@ function htmlDoc(id, d, mestreVe) {
     docVistos[id].pronto = true;
   }
   return `<article class="doc-folha"><header><span class="doc-cab">${esc(d.cab || 'O.R.F.E.U. · DOCUMENTO INTERNO')}</span><h3>${esc(d.tit || 'Documento')}</h3></header><div class="doc-corpo">${corpo}</div>
-    <footer><span>${new Date(num(d.ts) || Date.now()).toLocaleDateString('pt-BR')}</span><i class="doc-carimbo">CONFIDENCIAL</i></footer></article>`;
+    <footer><span>${esc(d.data !== undefined && d.data !== null ? d.data : new Date(num(d.ts) || Date.now()).toLocaleDateString('pt-BR'))}</span><i class="doc-carimbo">CONFIDENCIAL</i></footer></article>`;
 }
 function publicarDoc(id) {
   const d = (sg()._docs || {})[id]; if (!d) return;
   if (!d.pub) { A.definir(['docs', id], null); return; }
-  A.definir(['docs', id], { tit: d.tit || '', cab: d.cab || '', onde: d.onde || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() });
+  A.definir(['docs', id], { tit: d.tit || '', cab: d.cab || '', data: d.data === undefined ? null : String(d.data), onde: d.onde || '', partes: partesDoc(d.txt, d.rev), ts: num(d.ts) || Date.now() });
 }
 function publicarCifra(id) {
   const c = (sg()._cifras || {})[id]; if (!c) return;
@@ -221,6 +221,11 @@ function ligarVisoes() {
 }
 function receberVisao(v) {
   if (!v || !v.id) return;
+  if (v.del) {   // o Mestre apagou uma visão: some do Arquivo do jogador
+    const h0 = ls.get(chaveVisoes(), []);
+    if (h0.some(h => h.id === v.del)) { ls.set(chaveVisoes(), h0.filter(h => h.id !== v.del)); const o = $('#visaoTela'); if (o && !o.hidden && o.dataset.id === v.del) o.hidden = true; atualizarBadge(); desenharLista(); }
+    return;
+  }
   const hist = ls.get(chaveVisoes(), []);
   if (hist.some(h => h.id === v.id)) return;
   hist.unshift({ id: v.id, txt: v.txt || '', img: v.img || '', ts: num(v.ts) });
@@ -234,6 +239,7 @@ function mostrarVisao(v) {
   if (!o) { o = document.createElement('div'); o.id = 'visaoTela'; o.className = 'visao-tela'; document.body.appendChild(o); o.addEventListener('click', () => { if (o.classList.contains('fim')) { o.hidden = true; o.className = 'visao-tela'; } }); }
   const dur = Math.max(2, Math.min(15, int(v.dur) || 5));
   o.className = 'visao-tela ef-' + (v.ef || 'clarao');
+  o.dataset.id = v.id || '';
   o.style.setProperty('--dur', dur + 's');
   o.innerHTML = `${v.img ? `<div class="vs-img" style="background-image:url('${v.img}')"></div>` : ''}<p class="vs-txt">${esc(v.txt || '')}</p><span class="vs-fechar">toque para fechar · a visão fica no seu Arquivo</span>`;
   o.hidden = false;
@@ -259,7 +265,7 @@ async function enviarVisao() {
   const nome = (A.SER[alvo] || {}).nome || alvo;
   if ($('#vsChat').checked) A.enviarChat(`👁 ${nome} teve uma visão.`, 'geral');
   const log = ls.get('acf-visoes-enviadas', []);
-  log.unshift({ alvo, txt, img: !!img, ts: v.ts });
+  log.unshift({ id: v.id, alvo, txt, img: !!img, ts: v.ts });
   ls.set('acf-visoes-enviadas', log.slice(0, 15));
   $('#vsTxt').value = ''; $('#vsImg').value = '';
   A.aviso(`Visão enviada para ${nome}.`);
@@ -319,7 +325,9 @@ function desenharForm() {
     const d = Arq.edit ? (sg()._docs || {})[Arq.edit] || {} : {};
     f.innerHTML = `<div class="arq-form"><h3>${Arq.edit ? 'Editar documento' : 'Novo documento'}</h3>
       <label class="arq-campo">Título <input id="dcTit" maxlength="100" value="${esc(d.tit || '')}" placeholder="Ex.: Relatório do Experimento 7"></label>
-      <label class="arq-campo">Cabeçalho <input id="dcCab" maxlength="100" value="${esc(d.cab || '')}" placeholder="O.R.F.E.U. · DOCUMENTO INTERNO"></label>
+      <div class="arq-linha"><label class="arq-campo">Cabeçalho <input id="dcCab" maxlength="100" value="${esc(d.cab || '')}" placeholder="O.R.F.E.U. · DOCUMENTO INTERNO"></label>
+        <label class="arq-campo">Data no documento <input id="dcData" maxlength="40" value="${esc(d.data !== undefined ? d.data : new Date().toLocaleDateString('pt-BR'))}" placeholder="vazio: sem data"></label></div>
+      <p class="mini">A data aparece no pé do documento como você escrever: 21/12/2012, "março de 1998", "??/??/19??"... Deixe vazio para não mostrar data.</p>
       <label class="arq-campo">Texto. Coloque entre [[colchetes duplos]] o que fica tarjado. <textarea id="dcTxt" rows="7" maxlength="6000" placeholder="O paciente [[nome]] foi transferido para a ala [[C-12]] em...">${esc(d.txt || '')}</textarea></label>
       ${opcoesOnde('dcOnde', d.onde)}
       <div class="arq-linha"><button data-arq="dc-salvar" class="pri">${Arq.edit ? 'Salvar' : 'Criar (oculto)'}</button>${Arq.edit ? '<button data-arq="cancelar">Cancelar</button>' : ''}</div></div>`;
@@ -368,10 +376,12 @@ function desenharLista() {
       : '<p class="arq-vazio">Nenhum símbolo encontrado ainda.</p>';
   } else if (Arq.aba === 'visoes') {
     const hist = ls.get(chaveVisoes(), []);
-    html = hist.map(h => `<div class="arq-item vs-item">${h.img ? `<img src="${h.img}" alt="">` : ''}<p>${esc(h.txt || '(só imagem)')}</p><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}</small></div>`).join('') || '<p class="arq-vazio">Nenhuma visão… ainda.</p>';
+    html = hist.length ? hist.map(h => `<div class="arq-item vs-item">${h.img ? `<img src="${h.img}" alt="">` : ''}<p>${esc(h.txt || '(só imagem)')}</p><div class="arq-linha"><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}</small><button data-arq="vs-apagar" data-id="${esc(h.id)}" class="perigo">Apagar</button></div></div>`).join('')
+      + '<div class="arq-linha"><button data-arq="vs-apagar-tudo" class="perigo">Apagar todas as visões</button></div>' : '<p class="arq-vazio">Nenhuma visão… ainda.</p>';
   } else if (Arq.aba === 'visoes-m') {
     const log = ls.get('acf-visoes-enviadas', []);
-    html = log.length ? `<h3 class="arq-sub">Enviadas deste aparelho</h3>${log.map(h => `<div class="arq-item"><b>${esc((A.SER[h.alvo] || {}).nome || h.alvo)}</b> <small>${new Date(num(h.ts)).toLocaleString('pt-BR')}${h.img ? ' · com imagem' : ''}</small><p>${esc(h.txt || '')}</p></div>`).join('')}` : '';
+    html = log.length ? `<h3 class="arq-sub">Enviadas deste aparelho</h3>${log.map((h, i) => `<div class="arq-item"><div class="arq-linha"><b>${esc((A.SER[h.alvo] || {}).nome || h.alvo)}</b><small>${new Date(num(h.ts)).toLocaleString('pt-BR')}${h.img ? ' · com imagem' : ''}</small><button data-arq="vsm-apagar" data-i="${i}" class="perigo" title="${h.id ? 'Apaga também do Arquivo do jogador' : 'Apaga só desta lista'}">Apagar</button></div><p>${esc(h.txt || '')}</p></div>`).join('')}
+      <p class="mini">Apagar tira a visão daqui e também do Arquivo do jogador (na próxima vez que ele estiver com o site aberto).</p>` : '';
   }
   if (l.dataset.html !== html) { l.innerHTML = html; l.dataset.html = html; }
 }
@@ -391,7 +401,19 @@ function aoClicar(e) {
   if (a === 'fechar') { fechar(); return; }
   if (a === 'aba') { Arq.aba = b.dataset.v; Arq.edit = null; desenharTudo(); return; }
   if (a === 'cancelar') { Arq.edit = null; desenharForm(); return; }
+  if (a === 'vs-apagar' || a === 'vs-apagar-tudo') {
+    if (a === 'vs-apagar-tudo' && !confirm('Apagar todas as suas visões deste aparelho?')) return;
+    ls.set(chaveVisoes(), a === 'vs-apagar-tudo' ? [] : ls.get(chaveVisoes(), []).filter(h => h.id !== id));
+    atualizarBadge(); desenharLista(); return;
+  }
   if (!A.mestre) return;
+  if (a === 'vsm-apagar') {
+    const log = ls.get('acf-visoes-enviadas', []), h = log[+b.dataset.i]; if (!h) return;
+    if (!confirm(`Apagar esta visão${h.id ? ` também do Arquivo de ${(A.SER[h.alvo] || {}).nome || h.alvo}` : ''}?`)) return;
+    log.splice(+b.dataset.i, 1); ls.set('acf-visoes-enviadas', log);
+    if (h.id) A.Rede.set('visoes/' + h.alvo, { id: 'del-' + A.Rede.chave(), del: h.id, ts: Date.now() }).catch(() => A.aviso('O servidor recusou.'));
+    desenharLista(); return;
+  }
   if (a === 'cf-salvar') {
     const txt = ($('#cfTxt').value || '').trim();
     if (!normal(txt).replace(/[^A-Z0-9]/g, '')) { A.aviso('Escreva a mensagem com letras ou números.'); return; }
@@ -408,7 +430,7 @@ function aoClicar(e) {
     const txt = ($('#dcTxt').value || '').trim();
     if (!txt) { A.aviso('Escreva o texto do documento.'); return; }
     const k = Arq.edit || A.Rede.chave(), velho = (sg()._docs || {})[k] || {};
-    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), cab: ($('#dcCab').value || '').trim().slice(0, 100), txt: txt.slice(0, 6000), onde: lerOnde('dcOnde'), pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
+    A.gravarSegredo(['_docs', k], { tit: ($('#dcTit').value || '').trim().slice(0, 100), cab: ($('#dcCab').value || '').trim().slice(0, 100), data: ($('#dcData').value || '').trim().slice(0, 40), txt: txt.slice(0, 6000), onde: lerOnde('dcOnde'), pub: !!velho.pub, rev: txt === velho.txt ? velho.rev || null : null, ts: velho.ts || Date.now() });
     if (velho.pub) publicarDoc(k);
     Arq.edit = null; desenharForm(); desenharLista(); A.redesenharCartao();
   } else if (a === 'dc-pub') { const d = sg()._docs[id]; A.gravarSegredo(['_docs', id, 'pub'], !d.pub); publicarDoc(id); desenharLista(); A.redesenharCartao(); }
