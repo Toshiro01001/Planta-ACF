@@ -160,7 +160,11 @@ Nomes, elementos, subtítulos e elevadores desses andares não ficam no código.
 
 Ao abrir o site, a pessoa escolhe **Jogador**, **Mestre Auxiliar** ou **Mestre**. O Mestre Auxiliar entra com a senha dos auxiliares (com Firebase, é a senha da conta `auxiliares@caixa-acf.com`), escolhe o próprio robô e move os Filhos e o seu robô; ele não vê as cobaias, só os sons das salas, até o Mestre revelar. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
 
-Cada aba guarda o próprio perfil e o próprio login. Dá para testar Mestre, auxiliar e jogador em abas do mesmo navegador. O Mestre precisa entrar de novo só ao abrir uma aba nova (recarregar a página mantém o login).
+**Senha uma vez só.** "Trocar" não desconecta mais. Com a conta do Mestre conectada, Mestre e Mestre Auxiliar entram direto, sem senha (a conta do Mestre pode tudo o que o auxiliar pode). Com a conta dos auxiliares, o modo auxiliar entra direto e o Mestre pede a senha dele uma vez. A tela de escolha mostra qual conta está conectada e tem o botão **Sair da conta**; o botão "Sair da conta do Mestre" no painel faz o mesmo. Escolher **Jogador** sai da conta (o jogador grava com login anônimo), então voltar a Mestre pede a senha de novo.
+
+Cada aba guarda o próprio perfil e o próprio login. Dá para testar Mestre, auxiliar e jogador em abas do mesmo navegador. Recarregar a página mantém o login; abrir uma aba nova pede a senha uma vez.
+
+**O que o Mestre divide com os auxiliares** (aparecem no painel do auxiliar): Cena e Escudo (Nova cena e Escudo do Mestre), Ameaças (as divididas na aba "Ameaças e Filhos"), Membrana (ajustar pelo cartão da sala e restaurar pelo bloco; as quedas automáticas continuam pela tela do Mestre), Calculadora de NEX (o histórico mora em `nexCalc`, que Mestre e auxiliares leem e gravam; o que o auxiliar aplica entra no Relatório pela tela do Mestre e dispara os alertas de marco) e Parede de Desejos (despertar, desejar por qualquer cobaia, ver os desejos e marcar como cobrado). As sugestões automáticas de NEX continuam só na tela do Mestre, para ninguém aplicar a mesma sugestão duas vezes.
 
 Se alguém tentar algo que o perfil não permite (por exemplo, arrastar a cobaia de outro jogador), o site avisa e não envia nada. Se o servidor recusar alguma ação, aparece um aviso por alguns segundos e o mapa volta sozinho ao estado certo.
 

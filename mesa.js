@@ -153,8 +153,9 @@ function contarTurnos() {
 }
 function novaCena() {
   const c = est().cond || {};
-  A.definir(['cena'], { id: A.Rede.chave(), ts: Date.now() });
-  registrarRel('cena');
+  const idc = A.Rede.chave();
+  A.definir(['cena'], { id: idc, ts: Date.now() });
+  registrarRel('cena', '', 0, '', 'cn' + idc);
   Object.keys(c).forEach(id => ['_mt', '_et', '_ms'].forEach(k => { if (c[id] && c[id][k]) A.definir(['cond', id, k], null); }));
   A.aviso('Nova cena: contadores de Morrendo e Enlouquecendo zerados e munição descontada.');
 }
@@ -603,24 +604,28 @@ function desenharMesaRol() {
     <label class="chave"><input type="checkbox" id="mesaRolAvisa" checked><span>Avisar no chat que o Mestre rolou algo</span></label>
     <div id="mesaRolRes" class="mesa-rol-res"></div>`;
 }
-let ameaOff = null;
+let ameaOff = null, ameaDe = '';
 const ameaListas = { m: {}, a: {} };
 function desenharMesaAmea() {
-  if (ameaOff || !$('#mesaAmea') || !A.mestre) return;
+  const quem = A.mestre ? 'm' : A.aux ? 'a' : '';
+  if (ameaOff && ameaDe !== quem) { ameaOff(); ameaOff = null; ameaListas.m = {}; ameaListas.a = {}; }
+  if (ameaOff || !$('#mesaAmea') || !quem) return;
+  ameaDe = quem;
   const pinta = () => {
     const item = (d, aux) => { const f = d.filho ? A.SER[d.filho] : null; return `<div class="mesa-amea" style="--el:${f ? f.cor : corEl(d.el)}"><b>${esc(d.nome)}${aux ? ' <small>(auxiliares)</small>' : ''}</b><small>${f ? `Filho ${esc(f.codigo)} · ` : ''}VD ${int(d.vd)} · Vontade DT ${int((d.pres || {}).dt)} · ${esc((d.pres || {}).dano || '')}</small></div>`; };
     const ms = Object.values(ameaListas.m).filter(d => d && d.tipo === 'ameaca'), as = Object.values(ameaListas.a).filter(d => d && d.tipo === 'ameaca');
-    $('#mesaAmea').innerHTML = `<p class="mini">Fichas de criatura com Presença Perturbadora, ataques e PV. As suas ficam em 📋 Fichas › Minhas fichas; as divididas com os auxiliares (ameaças e Filhos), na aba "Ameaças e Filhos".</p>`
+    $('#mesaAmea').innerHTML = (A.mestre ? `<p class="mini">Fichas de criatura com Presença Perturbadora, ataques e PV. As suas ficam em 📋 Fichas › Minhas fichas; as divididas com os auxiliares (ameaças e Filhos), na aba "Ameaças e Filhos".</p>` : `<p class="mini">Ameaças e Filhos divididos pelo Mestre (📋 Fichas › Ameaças e Filhos). Na ficha da criatura, "Chamar o teste" abre a Presença Perturbadora na tela dos jogadores.</p>`)
       + (ms.length || as.length ? ms.map(d => item(d)).join('') + as.map(d => item(d, true)).join('') : '<p class="mini">Nenhuma ameaça criada.</p>')
       + '<button data-mi="fichas">Abrir fichas</button>';
   };
-  const o1 = A.Rede.on('agentesMestre', v => { ameaListas.m = v || {}; pinta(); }, () => {});
+  const o1 = A.mestre ? A.Rede.on('agentesMestre', v => { ameaListas.m = v || {}; pinta(); }, () => {}) : () => {};
   const o2 = A.Rede.on('agentesAux', v => { ameaListas.a = v || {}; pinta(); }, () => {});
   ameaOff = () => { o1(); o2(); };
 }
 function aoClicarMesa(e) {
-  const b = e.target.closest('[data-mi]'); if (!b || !A.mestre) return;
+  const b = e.target.closest('[data-mi]'); if (!b || !(A.mestre || A.aux)) return;
   const a = b.dataset.mi, inv = est().inv || {};
+  if (!A.mestre && !['memb-ok', 'memb-tudo', 'fichas'].includes(a)) return;   // auxiliar: só o que foi dividido com ele
   if (a === 'ini') {
     const g = URGENCIA.find(u => u[0] === $('#mesaUrg').value) || URGENCIA[2];
     A.definir(['inv'], { on: true, grau: g[0], max: g[2], rod: 1, falhas: 0, r3: !!$('#mesaR3').checked, pistas: {}, ts: Date.now() });
@@ -746,7 +751,7 @@ function temMedidor() {
   return !!at && Object.values(at.d.itens || {}).some(it => it && /medidor de estabilidade da membrana/i.test(it.n || '') && (it.qtd === undefined || it.qtd === '' || int(it.qtd) > 0));
 }
 function mudarMemb(cn, novo) {
-  if (!A.mestre || !cn) return;
+  if (!(A.mestre || A.aux) || !cn) return;
   novo = Math.max(0, Math.min(100, Math.round(novo)));
   if (novo === membDe(cn)) return;
   A.definir(['membrana', 'c' + cn], novo >= 100 ? null : novo);
@@ -824,6 +829,7 @@ function htmlMembMestre(cn) {
     <div class="acoes memb-acoes"><button data-memb="-5">−5</button><button data-memb="-10">−10</button><button data-memb="-25">−25</button><button data-memb="+10">+10</button><button data-memb="=100">Restaurar</button></div></div>`;
 }
 function htmlMembPublico(cn) {
+  if (A.aux && !A.mestre) return htmlMembMestre(cn);   // auxiliar ajusta a membrana pelo cartão da sala
   if (!temMedidor()) return '';
   const v = membDe(cn), g = grauMemb(v);
   return `<div class="memb-cartao memb-g-${g[2]} memb-leitura" style="--v:${v}"><div class="memb-cab"><span>📟 MEDIDOR</span><b>${v}%</b><small>${g[1]}</small></div><div class="memb-barra"><i></i></div></div>`;
@@ -832,7 +838,7 @@ A.ganchoSala({
   mestre: htmlMembMestre,
   publico: htmlMembPublico,
   ligar(c, cn, pub) {
-    if (pub || !A.mestre) return;
+    if (!A.mestre && !(pub && A.aux)) return;
     $$('[data-memb]', c).forEach(b => b.onclick = () => {
       const t = b.dataset.memb;
       mudarMemb(cn, t[0] === '=' ? int(t.slice(1)) : membDe(cn) + int(t));
@@ -844,11 +850,11 @@ function desenharMesaMemb() {
   const m = est().membrana || {};
   const lista = Object.keys(m).map(k => +k.slice(1)).filter(cn => membDe(cn) < 100).sort((a, b) => membDe(a) - membDe(b));
   const html = `<p class="mini">Cada sala começa em 100. Ritual conjurado na sala tira 5 por círculo (Medo tira o dobro); Presença Perturbadora tira de 3 a 20 conforme o VD. Ajuste e restaure pelo cartão da sala. Só quem tem um <i>Medidor de Estabilidade da Membrana</i> na ficha vê o número.</p>
-    <label class="chave"><input type="checkbox" id="mesaMembAuto" ${membAuto() ? 'checked' : ''}><span>Quedas automáticas (rituais e Presença)</span></label>
+    ${A.mestre ? `<label class="chave"><input type="checkbox" id="mesaMembAuto" ${membAuto() ? 'checked' : ''}><span>Quedas automáticas (rituais e Presença)</span></label>` : '<p class="mini">As quedas automáticas acontecem pela tela do Mestre. Você ajusta pelo cartão da sala ou restaura por aqui.</p>'}
     ${lista.length ? `<ul class="memb-lista">${lista.map(cn => { const v = membDe(cn), g = grauMemb(v); return `<li class="memb-g-${g[2]}" style="--v:${v}"><span>${esc(A.nomeSala(cn))}</span><b>${v}</b><i class="memb-barra"><i></i></i><button data-mi="memb-ok" data-cn="${cn}" title="Restaurar">↺</button></li>`; }).join('')}</ul>
       <button data-mi="memb-tudo" class="perigo">Restaurar todas</button>` : '<p class="mini">Todas as salas estão estáveis.</p>'}`;
   const c = $('#mesaMemb');
-  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $('#mesaMembAuto').onchange = e => ls.set('acf-memb-auto', e.target.checked); }
+  if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; const ch = $('#mesaMembAuto'); if (ch) ch.onchange = e => ls.set('acf-memb-auto', e.target.checked); }
 }
 
 /* =========================================================
@@ -939,7 +945,7 @@ function registrarRel(t, q, v, x, chave) {
   A.Rede.set('relatorio/ev/' + (chave || A.Rede.chave()), { t, q: q || '', v: int(v), x: String(x || '').slice(0, 200), ts }).catch(() => {});
 }
 const vitAnt = {}, condAnt = {};
-let pistasAnt = null, chamadoAnt, intAnt, recAnt, relIni = false;
+let pistasAnt = null, chamadoAnt, intAnt, recAnt, cenaAnt, relIni = false;
 function vigiarRelatorio() {
   if (!A.mestre || relMeta === undefined) return;
   const e = est();
@@ -972,6 +978,9 @@ function vigiarRelatorio() {
   const it = e.interludio;
   if (relIni && it && it.on && it.id !== intAnt) registrarRel('interludio', '', 0, (DESCANSO[it.cond] || DESCANSO.normal)[0], 'l' + it.id);
   intAnt = it && it.on ? it.id : null;
+  const cena = e.cena;
+  if (relIni && cena && cena.id && cena.id !== cenaAnt) registrarRel('cena', '', 0, '', 'cn' + cena.id);
+  cenaAnt = cena && cena.id;
   const rc = e.recomp;
   if (relIni && rc && rc.id && rc.id !== recAnt) registrarRel('recomp', '', 0, rc.msg || '', 'r' + rc.id);
   recAnt = rc && rc.id;
@@ -1077,6 +1086,12 @@ function tudo() {
   verAmbiente();
   desenharInvestigacao();
   desenharMesaMestre();
+  desenharMesaAux();
+}
+// auxiliares: Ameaças e Membrana (Cena e Escudo é fixo no HTML; NEX e Parede ficam em ferramentas.js)
+function desenharMesaAux() {
+  if (A.mestre || !A.aux) { if (!A.mestre && !A.aux && ameaOff) { ameaOff(); ameaOff = null; } return; }
+  desenharMesaAmea(); desenharMesaMemb();
 }
 let agendado = false;
 function agendar() { if (agendado) return; agendado = true; requestAnimationFrame(() => { agendado = false; try { tudo(); } catch (e) { console.warn('mesa:', e); } }); }

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261010t">
+<link rel="stylesheet" href="style.css?v=20261010u">
 </head>
 <body>
 
@@ -331,7 +331,7 @@
         <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
         <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra…</button>
         <button id="btnLimpar" class="btn-fantasma perigo">Tirar NPCs e Filhos do mapa</button>
-        <button id="btnSair" class="btn-fantasma">Sair do modo Mestre</button>
+        <button id="btnSair" class="btn-fantasma">Sair da conta do Mestre</button>
       </div>
     </section>
 
@@ -416,7 +416,7 @@
       <h3>Na minha tela</h3><div id="mesaHudMeu" class="lista-apagao"></div>
       <h3>Na tela de cada jogador</h3><div id="mesaHudJog" class="lista-apagao"></div>
     </section>
-    <section class="bloco mestre-only" id="blocoMesaCena" data-aba="mesa" hidden>
+    <section class="bloco mestre-aux" id="blocoMesaCena" data-aba="mesa" hidden>
       <h2>Cena e escudo</h2>
       <div class="mesa-linha"><button id="mesaNovaCena">Nova cena</button><button id="mesaEscudo">📜 Escudo do Mestre</button></div>
       <p class="mini">Nova cena zera os contadores de Morrendo e Enlouquecendo e desconta a munição usada na cena. Os turnos contam sozinhos na perseguição, e você também ajusta pelo cartão da cobaia.</p>
@@ -426,13 +426,13 @@
     <section class="bloco mestre-only" id="blocoMesaRec" data-aba="mesa" hidden><h2>Fim de missão</h2><div id="mesaRec"></div></section>
     <section class="bloco mestre-only" id="blocoMesaAmb" data-aba="mesa" hidden><h2>Ambiente</h2><div id="mesaAmb"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRol" data-aba="mesa" hidden><h2>Rolagem secreta</h2><div id="mesaRol"></div></section>
-    <section class="bloco mestre-only" id="blocoMesaAmea" data-aba="mesa" hidden><h2>Ameaças</h2><div id="mesaAmea"></div></section>
-    <section class="bloco mestre-only" id="blocoMesaMemb" data-aba="mesa" hidden><h2>Membrana</h2><div id="mesaMemb"></div></section>
+    <section class="bloco mestre-aux" id="blocoMesaAmea" data-aba="mesa" hidden><h2>Ameaças</h2><div id="mesaAmea"></div></section>
+    <section class="bloco mestre-aux" id="blocoMesaMemb" data-aba="mesa" hidden><h2>Membrana</h2><div id="mesaMemb"></div></section>
     <section class="bloco mestre-only" id="blocoMesaArq" data-aba="mesa" hidden><h2>Arquivo da O.R.F.E.U.</h2><div id="mesaArq"></div></section>
     <section class="bloco mestre-only" id="blocoMesaMom" data-aba="mesa" hidden><h2>Momentos marcantes</h2><div id="mesaMom"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRel" data-aba="mesa" hidden><h2>Relatório da missão</h2><div id="mesaRel"></div></section>
-    <section class="bloco mestre-only" id="blocoMesaNex" data-aba="mesa" hidden><h2>Calculadora de NEX</h2><div id="mesaNex"></div></section>
-    <section class="bloco mestre-only" id="blocoMesaParede" data-aba="mesa" hidden><h2>Parede de Desejos</h2><div id="mesaParede"></div></section>
+    <section class="bloco mestre-aux" id="blocoMesaNex" data-aba="mesa" hidden><h2>Calculadora de NEX</h2><div id="mesaNex"></div></section>
+    <section class="bloco mestre-aux" id="blocoMesaParede" data-aba="mesa" hidden><h2>Parede de Desejos</h2><div id="mesaParede"></div></section>
 
     <section class="bloco mestre-only" id="blocoDiario" data-aba="registro" hidden>
       <h2>Diário da sessão</h2>
@@ -551,6 +551,7 @@
           <span class="perfil-btn-sub">Controle total da Caixa</span>
         </button>
       </div>
+      <p id="perfilConta" class="perfil-conta" hidden><span id="perfilContaTxt"></span> <button id="btnSairConta" type="button">Sair da conta</button></p>
     </div>
     <div id="perfilPasso2" hidden>
       <h2>Qual cobaia você interpreta?</h2>
@@ -673,15 +674,15 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261010t"></script>
-<script src="config.js?v=20261010t"></script>
-<script src="escudo.js?v=20261010t"></script>
-<script src="app.js?v=20261010t"></script>
-<script src="catalogo-op.js?v=20261010t"></script>
-<script src="fichas.js?v=20261010t"></script>
-<script src="quadro.js?v=20261010t"></script>
-<script src="mesa.js?v=20261010t"></script>
-<script src="arquivo.js?v=20261010t"></script>
-<script src="ferramentas.js?v=20261010t"></script>
+<script src="data.js?v=20261010u"></script>
+<script src="config.js?v=20261010u"></script>
+<script src="escudo.js?v=20261010u"></script>
+<script src="app.js?v=20261010u"></script>
+<script src="catalogo-op.js?v=20261010u"></script>
+<script src="fichas.js?v=20261010u"></script>
+<script src="quadro.js?v=20261010u"></script>
+<script src="mesa.js?v=20261010u"></script>
+<script src="arquivo.js?v=20261010u"></script>
+<script src="ferramentas.js?v=20261010u"></script>
 </body>
 </html>

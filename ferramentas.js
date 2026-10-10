@@ -58,7 +58,44 @@ const limitar = v => Math.max(PISO, Math.min(TETO, v));
 const corNex = n => (n <= 20 ? '#ead63c' : n <= 40 ? '#d9a521' : n <= 60 ? '#e0701f' : n <= 80 ? '#cf2f2a' : '#b3246a');
 const codCurto = id => String((A.SER[id] || {}).codigo || '').replace(/^FHP-/, '');
 const idDoCodigo = c => (cobaias().find(x => codCurto(x.id) === String(c).padStart(3, '0')) || {}).id;
-const nexSg = () => sg()._nex || {};
+// o histórico da Calculadora mora em "nexCalc" (Mestre e auxiliares leem e gravam)
+const NXC = { dados: null, pronto: false, off: null, de: '', vistos: null, meus: new Set() };
+const nexSg = () => NXC.dados || {};
+const podeNex = () => A.mestre || !!A.aux;
+function ligarNexCalc() {
+  const quem = A.mestre ? 'm' : A.aux ? 'a' : '';
+  if (NXC.de === quem) return;
+  if (NXC.off) { NXC.off(); NXC.off = null; }
+  NXC.de = quem; NXC.dados = null; NXC.pronto = false; NXC.vistos = null;
+  if (!quem) return;
+  A.garantirLogin().then(() => {
+    if (NXC.de !== quem) return;
+    NXC.off = A.Rede.on('nexCalc', v => { NXC.dados = v || {}; NXC.pronto = true; aoMudarNexCalc(); tudo(); desenharNex(); }, () => { NXC.dados = {}; NXC.pronto = true; });
+  }, () => {});
+}
+function gravarNx(cam, v) {
+  if (v === undefined) v = null;
+  NXC.dados = NXC.dados || {};
+  let o = NXC.dados;
+  for (let i = 0; i < cam.length - 1; i++) { if (!o[cam[i]] || typeof o[cam[i]] !== 'object') o[cam[i]] = {}; o = o[cam[i]]; }
+  if (v === null) delete o[cam[cam.length - 1]]; else o[cam[cam.length - 1]] = JSON.parse(JSON.stringify(v));
+  A.Rede.set('nexCalc/' + cam.join('/'), v).catch(() => A.aviso('O servidor recusou a gravação do NEX.'));
+}
+// mudanças feitas por outra tela (Mestre ou auxiliar): o Mestre registra no Relatório; quem não aplicou recebe os marcos
+function aoMudarNexCalc() {
+  const ev = nexSg().ev || {}, ks = Object.keys(ev);
+  if (NXC.vistos === null) { NXC.vistos = new Set(ks); return; }
+  ks.forEach(k => {
+    if (NXC.vistos.has(k)) return;
+    NXC.vistos.add(k);
+    if (NXC.meus.has(k)) return;
+    const e = ev[k]; if (!e || !e.s) return;
+    if (A.mestre && MESA().registrarRel) MESA().registrarRel('nex', e.s, e.d, e.l, 'n' + k);
+    const depois = nexAtual(e.s);
+    avisarMarcos(e.s, limitar(somaAte(e.s) - int(e.d)), depois);
+  });
+  [...NXC.vistos].forEach(k => { if (!ev[k]) { NXC.vistos.delete(k); if (A.mestre) A.Rede.set('relatorio/ev/n' + k, null).catch(() => {}); } });
+}
 const baseDe = id => { const b = (nexSg().base || {})[id]; return typeof b === 'number' ? b : (NEX_INICIAL[id] !== undefined ? NEX_INICIAL[id] : 0); };
 const eventosNex = () => Object.entries(nexSg().ev || {}).map(([k, e]) => ({ k, ...e })).filter(e => e && e.s).sort((a, b) => num(a.ts) - num(b.ts));
 const somaAte = (id, ate = Infinity) => baseDe(id) + eventosNex().filter(e => e.s === id && num(e.ts) <= ate).reduce((t, e) => t + int(e.d), 0);
@@ -86,7 +123,7 @@ function avisarMarcos(id, antes, depois) {
 
 // manda os valores atuais para o mapa (fichas, HUD e cartão leem de lá)
 function publicarNex() {
-  if (!A.mestre || !A.segredosProntos) return;
+  if (!podeNex() || !NXC.pronto) return;
   const atual = est().nex || {};
   cobaias().forEach(x => { const v = nexAtual(x.id); if (atual[x.id] !== v) A.definir(['nex', x.id], v); });
 }
@@ -94,7 +131,8 @@ function aplicarNex(id, g, motivo) {
   const antes = nexAtual(id);
   const k = A.Rede.chave();
   const ev = g ? { s: id, k: g.k, l: g.l, d: g.d, ts: Date.now() } : { s: id, k: 'ajuste', l: motivo.l, d: motivo.d, ts: Date.now() };
-  A.gravarSegredo(['_nex', 'ev', k], ev);
+  NXC.meus.add(k); if (NXC.vistos) NXC.vistos.add(k);
+  gravarNx(['ev', k], ev);
   publicarNex();
   if (MESA().registrarRel) MESA().registrarRel('nex', id, ev.d, ev.l, 'n' + k);
   A.diario && A.diario('nex', `${nomeDe(id)}: ${ev.l} (${ev.d > 0 ? '+' : ''}${ev.d}) · NEX ${nexAtual(id)}%`);
@@ -103,7 +141,7 @@ function aplicarNex(id, g, motivo) {
   desenharNex();
 }
 function reverterNex(k) {
-  A.gravarSegredo(['_nex', 'ev', k], null);
+  gravarNx(['ev', k], null);
   publicarNex();
   A.Rede.set('relatorio/ev/n' + k, null).catch(() => {});
   desenharNex();
@@ -125,7 +163,7 @@ function importarEventos(novos, origem) {
   const n = Object.keys(so).length;
   if (!n) { A.aviso(`Nada novo ${origem}: esses registros já estão na Planta.`); return; }
   if (!confirm(`Trazer ${n} registro${n === 1 ? '' : 's'} de NEX ${origem}? Os que já existem na Planta ficam como estão.`)) return;
-  A.gravarSegredo(['_nex', 'ev'], { ...ev, ...so });
+  gravarNx(['ev'], { ...ev, ...so });
   publicarNex(); desenharNex();
   A.aviso(`${n} registro${n === 1 ? '' : 's'} de NEX importado${n === 1 ? '' : 's'}.`);
 }
@@ -218,29 +256,29 @@ document.addEventListener('acf-ficha-add', e => {
 
 /* ---------- bloco da Mesa ---------- */
 function desenharMesaNex() {
-  const c = $('#mesaNex'); if (!c || !A.mestre || !semFoco('#mesaNex')) return;
-  // sem os segredos ainda: mostra o que está no mapa e tenta de novo logo
-  const pronto = A.segredosProntos;
+  const c = $('#mesaNex'); if (!c || !podeNex() || !semFoco('#mesaNex')) return;
+  // sem o histórico ainda: mostra o que está no mapa e tenta de novo logo
+  const pronto = NXC.pronto;
   if (!pronto) setTimeout(desenharMesaNex, 1000);
   const valor = id => (pronto ? nexAtual(id) : (typeof (est().nex || {})[id] === 'number' ? est().nex[id] : baseDe(id)));
   const ant = pronto ? antigosNesteNavegador() : 0;
   const html = `<p class="mini">Exposição paranormal das cobaias (não é o nível). Cada aumento entra no histórico, na ficha do jogador e no Relatório.</p>
     ${pronto ? '' : '<p class="mini">Carregando o histórico…</p>'}
     <ul class="nx-mini">${cobaias().map(x => { const n = valor(x.id); return `<li style="--nex:${corNex(n)}"><span>${esc(x.nome)}</span><i><b style="width:${n}%"></b></i><strong>${n}%</strong></li>`; }).join('')}</ul>
-    ${SUG.lista.length ? `<div class="sug-lista"><p class="mesa-k">SUGESTÕES DE NEX (${SUG.lista.length})</p>${SUG.lista.slice().reverse().map(x => `<div class="sug-item"><span><b>${esc(nomeDe(x.s))}</b> ${esc(x.motivo)} <small>${dataHora(x.ts).hora}</small></span><div class="sug-botoes">${x.ops.map(k => { const g = GAT(k); return g ? `<button data-sug="aplicar" data-id="${x.id}" data-g="${k}">+${g.d} ${esc(g.l)}</button>` : ''; }).join('')}<button data-sug="ignorar" data-id="${x.id}">Ignorar</button></div></div>`).join('')}<button data-sug="limpar" class="sug-limpar">Ignorar todas</button></div>` : ''}
+    ${A.mestre && SUG.lista.length ? `<div class="sug-lista"><p class="mesa-k">SUGESTÕES DE NEX (${SUG.lista.length})</p>${SUG.lista.slice().reverse().map(x => `<div class="sug-item"><span><b>${esc(nomeDe(x.s))}</b> ${esc(x.motivo)} <small>${dataHora(x.ts).hora}</small></span><div class="sug-botoes">${x.ops.map(k => { const g = GAT(k); return g ? `<button data-sug="aplicar" data-id="${x.id}" data-g="${k}">+${g.d} ${esc(g.l)}</button>` : ''; }).join('')}<button data-sug="ignorar" data-id="${x.id}">Ignorar</button></div></div>`).join('')}<button data-sug="limpar" class="sug-limpar">Ignorar todas</button></div>` : ''}
     ${ant ? `<p class="nx-aviso">Encontrei ${ant} registro${ant === 1 ? '' : 's'} da Calculadora de NEX antiga neste navegador. <button data-nxm="antigos">Trazer para a Planta</button></p>` : ''}
     <button data-nxm="abrir" class="btn-protocolo">☢ Abrir a Calculadora de NEX</button>`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-nxm]'); if (!b || !A.mestre) return;
+  const b = e.target.closest('[data-nxm]'); if (!b || !podeNex()) return;
   if (b.dataset.nxm === 'abrir') abrirNex();
   if (b.dataset.nxm === 'antigos') { let l = []; try { l = JSON.parse(localStorage.getItem(CHAVE_CALC_ANTIGA) || '[]'); } catch (er) {} importarEventos(eventosDaCalcAntiga(l), 'da calculadora antiga deste navegador'); desenharMesaNex(); }
 });
 
 /* ---------- janela da calculadora ---------- */
 function abrirNex(aba) {
-  if (!A.mestre) return;
+  if (!podeNex()) return;
   let o = $('#nexTela');
   if (!o) {
     o = document.createElement('div'); o.id = 'nexTela'; o.className = 'nex-tela';
@@ -251,7 +289,7 @@ function abrirNex(aba) {
     o.addEventListener('click', aoClicarNex);
     o.addEventListener('change', e => {
       const i = e.target;
-      if (i.dataset.base) { const v = i.value === '' ? null : limitar(int(i.value)); A.gravarSegredo(['_nex', 'base', i.dataset.base], v); publicarNex(); desenharNex(); }
+      if (i.dataset.base) { const v = i.value === '' ? null : limitar(int(i.value)); gravarNx(['base', i.dataset.base], v); publicarNex(); desenharNex(); }
     });
   }
   if (aba) N.aba = aba;
@@ -326,12 +364,12 @@ function aoClicarNex(e) {
     if (a === 'marco-tirar') l.splice(int(b.dataset.i), 1);
     if (a === 'marco-novo') l.push({ v: Math.min(99, (l.length ? Math.max(...l.map(m => m.v)) : 0) + 5), t: '' });
     const obj = {}; l.filter(m => m.v > 0).forEach((m, k) => { obj['m' + k] = m; });
-    A.gravarSegredo(['_nex', 'marcos'], Object.keys(obj).length ? obj : { m0: { v: 99, t: '' } });
+    gravarNx(['marcos'], Object.keys(obj).length ? obj : { m0: { v: 99, t: '' } });
     if (a === 'marco-salvar') A.aviso('Marcos de NEX salvos.');
     desenharNex(true);
   }
-  else if (a === 'marco-padrao') { if (confirm('Voltar os marcos ao padrão do livro?')) { A.gravarSegredo(['_nex', 'marcos'], null); desenharNex(true); } }
-  else if (a === 'zerar') { if (!confirm('Apagar TODO o histórico de NEX? O NEX de cada cobaia volta ao inicial. Baixe um backup antes.')) return; A.gravarSegredo(['_nex', 'ev'], null); publicarNex(); desenharNex(true); }
+  else if (a === 'marco-padrao') { if (confirm('Voltar os marcos ao padrão do livro?')) { gravarNx(['marcos'], null); desenharNex(true); } }
+  else if (a === 'zerar') { if (!confirm('Apagar TODO o histórico de NEX? O NEX de cada cobaia volta ao inicial. Baixe um backup antes.')) return; gravarNx(['ev'], null); publicarNex(); desenharNex(true); }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = $('#nexTela'); if (o && !o.hidden) fecharNex(); } });
 
@@ -475,7 +513,7 @@ function carregarFontesParede() {
   document.head.appendChild(l);
 }
 function abrirParede() {
-  if (!A.mestre && !(A.meu && paredeAberta())) return;
+  if (!(A.mestre || A.aux) && !(A.meu && paredeAberta())) return;
   carregarFontesParede();
   let o = $('#paredeTela');
   if (!o) {
@@ -500,7 +538,8 @@ function abrirParede() {
     $('#pdDesejo', o).addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') oferecer(); });
     $('#pdChaveIn', o).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); guardarChave(); } });
   }
-  if (!P.ativo || (!A.mestre && P.ativo !== A.meu)) P.ativo = A.mestre ? (P.ativo || cobaias()[0].id) : A.meu;
+  const livre = A.mestre || !!A.aux;   // Mestre e auxiliares desejam por qualquer cobaia
+  if (!P.ativo || (!livre && P.ativo !== A.meu)) P.ativo = livre ? (P.ativo || cobaias()[0].id) : A.meu;
   o.hidden = false; document.body.classList.add('parede-aberta');
   $('#pdAviso').hidden = true;
   carregarContagens();
@@ -514,7 +553,7 @@ function fecharParede() {
 }
 function desenharParede() {
   const o = $('#paredeTela'); if (!o || o.hidden) return;
-  const quem = A.mestre ? cobaias() : cobaias().filter(x => x.id === A.meu);
+  const quem = A.mestre || A.aux ? cobaias() : cobaias().filter(x => x.id === A.meu);
   $('#pdAbas').innerHTML = quem.map(x => `<li><button class="pd-aba${x.id === P.ativo ? ' ativa' : ''}" data-pd="quem" data-id="${x.id}"><span class="pd-cod">${esc(codCurto(x.id))}</span><span class="pd-nome">${esc(x.nome)}</span><span class="pd-cont">desejos: <b>${P.contOk ? int(P.cont[x.id]) : '?'}</b></span></button></li>`).join('');
   const at = A.SER[P.ativo] || {};
   $('#pdQuem').textContent = `${codCurto(P.ativo)} · ${at.nome || ''}`;
@@ -522,7 +561,7 @@ function desenharParede() {
   $('#pdLegenda').textContent = P.nivel === null ? 'selecione a profundidade' : LEGENDAS[P.nivel];
   $('#pdChave').hidden = !!chaveParede();
   const b = $('#pdOferecer'); b.disabled = P.pensando; b.classList.toggle('pensando', P.pensando); b.textContent = P.pensando ? 'A Parede considera…' : 'Oferecer à Parede';
-  const hist = ls.get('acf-parede-hist', []).filter(h => A.mestre || h.s === A.meu).slice(-20).reverse();
+  const hist = ls.get('acf-parede-hist', []).filter(h => A.mestre || A.aux || h.s === A.meu).slice(-20).reverse();
   $('#pdHist').hidden = !hist.length;
   const dv = est().dividas || {};
   $('#pdHistLista').innerHTML = hist.map(h => { const q = dataHora(h.ts); return `<article class="pd-hist-item${h.k && dv[h.k] === 'pago' ? ' pago' : ''}"><header><b>${esc(nomeDe(h.s))}</b> · preço ${int(h.n)} · ${q.data} ${q.hora}${h.k ? ` · <i>${dv[h.k] === 'pago' ? 'cobrado' : 'pendente'}</i>` : ''}</header><p class="pd-hist-d">“${esc(h.d)}”</p><p class="pd-hist-p">${esc(h.p)}</p></article>`; }).join('');
@@ -554,7 +593,7 @@ async function oferecer() {
   const chave = chaveParede();
   if (!chave) { $('#pdChave').hidden = false; $('#pdChaveIn').focus(); avisoParede('Sem a chave, a Parede não abre. Peça ao Mestre.'); return; }
   const id = P.ativo, nome = nomeDe(id), nivel = P.nivel;
-  if (!A.mestre && id !== A.meu) return;
+  if (!(A.mestre || A.aux) && id !== A.meu) return;
   P.pensando = true; desenharParede();
   try {
     const r = await fetch(WORKER + '/wish', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-parede-key': chave }, body: JSON.stringify({ id: codCurto(id), nome, desejo, nivel }) });
@@ -573,7 +612,7 @@ async function oferecer() {
     A.Rede.set('desejos/' + k, reg).catch(() => {});
     // a dívida fica na ficha ativa do jogador (seção "O que devo à Parede"); o Mestre marca "cobrado"
     const FXA = window.ACF_FICHAS, at = FXA && FXA.ativa && FXA.ativa();
-    if (at && at.d && at.d.dono === id && !A.mestre) FXA.aplicarNaAtiva([['dividas.' + k, { n: nivel, d: reg.d, p: reg.p, ts: reg.ts }]]);
+    if (at && at.d && at.d.dono === id && !A.mestre && !A.aux) FXA.aplicarNaAtiva([['dividas.' + k, { n: nivel, d: reg.d, p: reg.p, ts: reg.ts }]]);
   } catch (e) {
     avisoParede('A Parede recusou o pedido. Verifique a chave e a conexão. Detalhe: ' + (e.message || e));
   } finally { P.pensando = false; desenharParede(); desenharMesaParede(); }
@@ -602,7 +641,7 @@ function aoClicarParede(e) {
   const b = e.target.closest('[data-pd]'); if (!b) return;
   const a = b.dataset.pd;
   if (a === 'fechar') fecharParede();
-  else if (a === 'quem') { if (A.mestre) { P.ativo = b.dataset.id; desenharParede(); } }
+  else if (a === 'quem') { if (A.mestre || A.aux) { P.ativo = b.dataset.id; desenharParede(); } }
   else if (a === 'nivel') { P.nivel = int(b.dataset.n); desenharParede(); }
   else if (a === 'oferecer') oferecer();
   else if (a === 'chave') guardarChave();
@@ -616,9 +655,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = 
 
 /* ---------- Mestre: desejos recebidos ---------- */
 function ligarDesejos() {
-  if (A.mestre && !P.off && A.pronto) {
+  const quem = A.mestre ? 'm' : A.aux ? 'a' : '';
+  if (P.de !== quem && P.off) { P.off(); P.off = null; P.desejos = null; }
+  P.de = quem;
+  if (quem && !P.off && A.pronto) {
     P.off = A.Rede.on('desejos', v => { P.desejos = v || {}; avisarDesejos(); desenharMesaParede(); }, () => { P.desejos = {}; });
-  } else if (!A.mestre && P.off) { P.off(); P.off = null; P.desejos = null; }
+  }
 }
 function avisarDesejos() {
   const novos = Object.entries(P.desejos || {}).filter(([, d]) => d && num(d.ts) > P.visto).sort((a, b) => num(a[1].ts) - num(b[1].ts));
@@ -632,7 +674,7 @@ function avisarDesejos() {
   ls.set('acf-parede-visto', P.visto);
 }
 function desenharMesaParede() {
-  const c = $('#mesaParede'); if (!c || !A.mestre || !semFoco('#mesaParede')) return;
+  const c = $('#mesaParede'); if (!c || !(A.mestre || A.aux) || !semFoco('#mesaParede')) return;
   if (!P.contTentou) { P.contTentou = true; carregarContagens(); }
   const lista = Object.entries(P.desejos || {}).sort((a, b) => num(b[1].ts) - num(a[1].ts));
   const on = paredeAberta(), dv = est().dividas || {};
@@ -645,7 +687,7 @@ function desenharMesaParede() {
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-pdm]'); if (!b || !A.mestre) return;
+  const b = e.target.closest('[data-pdm]'); if (!b || !(A.mestre || A.aux)) return;
   const a = b.dataset.pdm;
   if (a === 'abrir') abrirParede();
   else if (a === 'contar') carregarContagens();
@@ -653,15 +695,15 @@ document.addEventListener('click', e => {
   else if (a === 'apagar') { if (confirm('Apagar este registro de desejo? (A contagem do Worker não muda.)')) A.Rede.set('desejos/' + b.dataset.k, null).catch(() => {}); }
 });
 document.addEventListener('change', e => {
-  if (e.target.matches && e.target.matches('[data-pdm="on"]') && A.mestre) { A.definir(['parede'], e.target.checked ? { on: true, ts: Date.now() } : null); setTimeout(desenharMesaParede, 30); }
+  if (e.target.matches && e.target.matches('[data-pdm="on"]') && (A.mestre || A.aux)) { A.definir(['parede'], e.target.checked ? { on: true, ts: Date.now() } : null); setTimeout(desenharMesaParede, 30); }
 });
 
 /* ---------- botão do jogador ---------- */
 function atualizarBotaoParede() {
   const b = $('#btnParede'); if (!b) return;
-  const ver = !A.mestre && !!A.meu && paredeAberta();
+  const ver = !A.mestre && !A.aux && !!A.meu && paredeAberta();
   if (b.hidden === ver) b.hidden = !ver;
-  if (!ver) { const o = $('#paredeTela'); if (o && !o.hidden && !A.mestre) fecharParede(); }
+  if (!ver) { const o = $('#paredeTela'); if (o && !o.hidden && !A.mestre && !A.aux) fecharParede(); }
 }
 const bp = $('#btnParede'); if (bp) bp.addEventListener('click', abrirParede);
 
@@ -675,13 +717,19 @@ function tudo() {
     agendado = false;
     try {
       ligarSenhas(); ligarDesejos(); vigiarSugestoes();
-      // o Mestre publica o NEX uma vez ao entrar, se já usa a calculadora
-      if (A.mestre && A.segredosProntos && !nexPublicado) { nexPublicado = true; if (sg()._nex) publicarNex(); }
-      if (!A.mestre) nexPublicado = false;
+      ligarNexCalc();
+      // versões antigas guardavam o NEX nos segredos do Mestre: muda para "nexCalc" uma vez
+      if (A.mestre && A.segredosProntos && NXC.pronto && sg()._nex) {
+        if (!Object.keys(nexSg()).length) { const velho = JSON.parse(JSON.stringify(sg()._nex)); NXC.dados = velho; NXC.vistos = new Set(Object.keys(velho.ev || {})); A.Rede.set('nexCalc', velho).then(() => A.gravarSegredo(['_nex'], null), () => {}); }
+        else A.gravarSegredo(['_nex'], null);
+      }
+      // quem usa a calculadora publica o NEX uma vez ao entrar
+      if (podeNex() && NXC.pronto && !nexPublicado) { nexPublicado = true; if (Object.keys(nexSg()).length) publicarNex(); }
+      if (!podeNex()) nexPublicado = false;
       // cada parte isolada: um erro numa não deixa as outras presas em "Carregando"
-      const seguro = (fn, onde) => { try { fn(); } catch (e) { console.error('ferramentas/' + onde + ':', e); const c = onde && $(onde); if (c && A.mestre) c.innerHTML = `<p class="mini sn-alerta">Erro ao desenhar: ${esc(e && e.message || e)}. Recarregue a página; se continuar, mande esta mensagem.</p>`; } };
+      const seguro = (fn, onde) => { try { fn(); } catch (e) { console.error('ferramentas/' + onde + ':', e); const c = onde && $(onde); if (c && (A.mestre || A.aux)) c.innerHTML = `<p class="mini sn-alerta">Erro ao desenhar: ${esc(e && e.message || e)}. Recarregue a página; se continuar, mande esta mensagem.</p>`; } };
       seguro(desenharMesaNex, '#mesaNex'); seguro(desenharSenhas, A.mestre ? '#listaSenhas' : '#listaSenhasAux'); seguro(desenharMesaParede, '#mesaParede'); seguro(atualizarBotaoParede);
-      const o = $('#nexTela'); if (o && !o.hidden) { if (!A.mestre) fecharNex(); else desenharNex(); }
+      const o = $('#nexTela'); if (o && !o.hidden) { if (!podeNex()) fecharNex(); else desenharNex(); }
     } catch (e) { console.warn('ferramentas:', e); }
   });
 }
