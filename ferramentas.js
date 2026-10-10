@@ -119,10 +119,14 @@ function exportarNex() {
 /* ---------- bloco da Mesa ---------- */
 function desenharMesaNex() {
   const c = $('#mesaNex'); if (!c || !A.mestre || !semFoco('#mesaNex')) return;
-  if (!A.segredosProntos) { c.innerHTML = '<p class="mini">Carregando…</p>'; return; }
-  const ant = antigosNesteNavegador();
+  // sem os segredos ainda: mostra o que está no mapa e tenta de novo logo
+  const pronto = A.segredosProntos;
+  if (!pronto) setTimeout(desenharMesaNex, 1000);
+  const valor = id => (pronto ? nexAtual(id) : (typeof (est().nex || {})[id] === 'number' ? est().nex[id] : baseDe(id)));
+  const ant = pronto ? antigosNesteNavegador() : 0;
   const html = `<p class="mini">Exposição paranormal das cobaias (não é o nível). Cada aumento entra no histórico, na ficha do jogador e no Relatório.</p>
-    <ul class="nx-mini">${cobaias().map(x => { const n = nexAtual(x.id); return `<li style="--nex:${corNex(n)}"><span>${esc(x.nome)}</span><i><b style="width:${n}%"></b></i><strong>${n}%</strong></li>`; }).join('')}</ul>
+    ${pronto ? '' : '<p class="mini">Carregando o histórico…</p>'}
+    <ul class="nx-mini">${cobaias().map(x => { const n = valor(x.id); return `<li style="--nex:${corNex(n)}"><span>${esc(x.nome)}</span><i><b style="width:${n}%"></b></i><strong>${n}%</strong></li>`; }).join('')}</ul>
     ${ant ? `<p class="nx-aviso">Encontrei ${ant} registro${ant === 1 ? '' : 's'} da Calculadora de NEX antiga neste navegador. <button data-nxm="antigos">Trazer para a Planta</button></p>` : ''}
     <button data-nxm="abrir" class="btn-protocolo">☢ Abrir a Calculadora de NEX</button>`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
@@ -544,13 +548,17 @@ function tudo() {
       // o Mestre publica o NEX uma vez ao entrar, se já usa a calculadora
       if (A.mestre && A.segredosProntos && !nexPublicado) { nexPublicado = true; if (sg()._nex) publicarNex(); }
       if (!A.mestre) nexPublicado = false;
-      desenharMesaNex(); desenharSenhas(); desenharMesaParede(); atualizarBotaoParede();
+      // cada parte isolada: um erro numa não deixa as outras presas em "Carregando"
+      const seguro = (fn, onde) => { try { fn(); } catch (e) { console.error('ferramentas/' + onde + ':', e); const c = onde && $(onde); if (c && A.mestre) c.innerHTML = `<p class="mini sn-alerta">Erro ao desenhar: ${esc(e && e.message || e)}. Recarregue a página; se continuar, mande esta mensagem.</p>`; } };
+      seguro(desenharMesaNex, '#mesaNex'); seguro(desenharSenhas, A.mestre ? '#listaSenhas' : '#listaSenhasAux'); seguro(desenharMesaParede, '#mesaParede'); seguro(atualizarBotaoParede);
       const o = $('#nexTela'); if (o && !o.hidden) { if (!A.mestre) fecharNex(); else desenharNex(); }
     } catch (e) { console.warn('ferramentas:', e); }
   });
 }
 A.aoMudar(tudo);
 document.addEventListener('acf-tudo', tudo);
+document.addEventListener('acf-segredos', tudo);
+setInterval(() => { if (A.mestre || A.aux) tudo(); }, 3000);   // reserva: nada fica preso esperando
 document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 setTimeout(tudo, 900);
 window.ACF_FERRAMENTAS = { abrirNex, abrirParede, publicarNex, nexAtual, exportarSenhas };
