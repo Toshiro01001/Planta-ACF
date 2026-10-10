@@ -561,6 +561,7 @@ function desenharFicha() {
         <div class="fx-nex">
           <label class="fx-nex-grande">${cl.estagio ? 'Estágio' : 'NEX'} ${nivelCampo}</label>
           <div class="fx-nex-mini"><span>${det ? 'PD' : 'PE'}/turno</span><output data-calc="peTurno"></output></div>
+          <div class="fx-nex-mini fx-gasto" title="Gasto neste turno (botões de −${det ? 'PD' : 'PE'} e rituais). Zera a cada turno da perseguição."><span>Neste turno</span><span><output data-calc="peGasto"></output>${ed ? '<button class="fx-mini" data-acao="zerar-gasto" aria-label="Zerar o gasto do turno">↺</button>' : ''}</span></div>
           <div class="fx-nex-mini"><span>Desloc.</span><span class="fx-desl">${campo('desl', 'n', ' min="0" step="1.5"')}<output data-calc="desl"></output></span></div>
         </div>
       </div>
@@ -707,6 +708,7 @@ function atualizarDerivados() {
   const d = at.d, r = calc(d), raiz = $('#fxCorpo');
   const put = (k, v) => $$(`[data-calc="${k}"]`, raiz).forEach(e => { e.textContent = v; });
   put('peTurno', r.peTurno);
+  atualizarGasto();
   put('desl', `m / ${Math.floor(r.desl / 1.5)} q${r.sobrecarga ? ' (−3m carga)' : ''}`);
   put('defesa', r.defesa); put('defEquip', r.defEquip); put('defCarga', [r.sobrecarga ? '−5 sobrecarga' : '', ...r.defCond.f].filter(Boolean).join(' · '));
   const cx = $('[data-conds]', raiz);
@@ -782,8 +784,10 @@ function abaCombate(d, ed) {
     const dano = alts.map(x => x + extra).join(' / ');
     const marg = int(a.margem) || 20, mult = int(a.mult) || 2;
     const mods = lista(it.mods).map(m => m.n).join(', ');
+    const mun = !desarmado && a.mun ? municaoDa(d, it) : null;
+    const munTxt = mun ? (mun.falta ? `<span class="fx-mun-falta">Munição <b>sem ${esc(a.mun)}</b></span>` : `<span class="${qtdDe(mun) <= 0 ? 'fx-mun-falta' : ''}">Munição <b>${esc(textoMun(mun))}</b></span>`) : '';
     return `<div class="fx-ataque"><div><b>${esc(it.n)}</b><small>${esc([a.prof, a.tipo, a.emp].filter(Boolean).join(' · '))}${mods ? ' · ' + esc(mods) : ''}</small></div>
-      <div class="fx-ataque-num"><span>Ataque <b>${PER[per][1]}</b> ${bAtk >= 0 ? '+' : ''}${bAtk}</span><span>Dano <b>${esc(dano)}</b>${a.td ? ' ' + esc(a.td) : ''}</span><span>Crítico <b>${marg < 20 ? marg + '/' : ''}x${mult}</b></span>${a.alc ? `<span>Alcance <b>${esc(a.alc)}</b></span>` : ''}</div>
+      <div class="fx-ataque-num"><span>Ataque <b>${PER[per][1]}</b> ${bAtk >= 0 ? '+' : ''}${bAtk}</span><span>Dano <b>${esc(dano)}</b>${a.td ? ' ' + esc(a.td) : ''}</span><span>Crítico <b>${marg < 20 ? marg + '/' : ''}x${mult}</b></span>${a.alc ? `<span>Alcance <b>${esc(a.alc)}</b></span>` : ''}${munTxt}</div>
       <div class="fx-ataque-btns"><button data-acao="atacar" data-id="${esc(it.id || '')}" data-per="${per}">🎲 Ataque</button>${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">🎲 Dano${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-mult="${mult}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">💥 Crítico${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}</div></div>`;
   };
   return `<div class="fx-combate">
@@ -855,7 +859,7 @@ function itemHTML(it, ed) {
   const ce = catEfetiva(it);
   const a = it.a || {};
   const mods = lista(it.mods);
-  const cab = `<summary><b>${esc(it.n || 'Item')}</b>${int(it.qtd) > 1 ? `<small>×${int(it.qtd)}</small>` : ''}<small>${TIPOS_ITEM[it.t] || ''}</small>${it.el ? `<i class="fx-el" style="--el:${corEl(it.el)}">${esc(it.el)}</i>` : ''}<span class="fx-cat">Categoria: ${ROM[ce] || ce} · Espaços: ${num(it.esp)}</span>${it.t === 'protecao' && it.vest ? '<i class="fx-vest">vestida</i>' : ''}</summary>`;
+  const cab = `<summary><b>${esc(it.n || 'Item')}</b>${it.t === 'municao' ? `<small class="fx-mun${qtdDe(it) <= 0 ? ' fx-mun-falta' : ''}">${esc(textoMun(it))}</small>` : int(it.qtd) > 1 ? `<small>×${int(it.qtd)}</small>` : ''}<small>${TIPOS_ITEM[it.t] || ''}</small>${it.el ? `<i class="fx-el" style="--el:${corEl(it.el)}">${esc(it.el)}</i>` : ''}<span class="fx-cat">Categoria: ${ROM[ce] || ce} · Espaços: ${num(it.esp)}</span>${it.t === 'protecao' && it.vest ? '<i class="fx-vest">vestida</i>' : ''}</summary>`;
   if (!ed) {
     const linhas = [];
     if (it.t === 'arma') linhas.push(`${esc([a.prof, a.tipo, a.emp].filter(Boolean).join(' · '))}<br>Dano ${esc(a.dano || '')} · Crítico ${int(a.margem) < 20 && int(a.margem) ? int(a.margem) + '/' : ''}x${int(a.mult) || 2}${a.td ? ' · ' + esc(a.td) : ''}${a.alc ? ' · Alcance ' + esc(a.alc) : ''}`);
@@ -877,7 +881,10 @@ function itemHTML(it, ed) {
         <label>Empunhadura <input data-c="${base}.a.emp" list="fxEmp" value="${esc(a.emp || '')}"></label>
         <label>Dano ${campo(base + '.a.dano')}</label><label>Crítico (margem) ${campo(base + '.a.margem', 'n', ' min="2" max="20"')}</label>
         <label>Multiplicador ${campo(base + '.a.mult', 'n', ' min="2"')}</label><label>Tipo de dano ${campo(base + '.a.td')}</label>
-        <label>Alcance ${campo(base + '.a.alc')}</label><label>Bônus ataque ${campo(base + '.a.bAtk', 'n')}</label><label>Bônus dano ${campo(base + '.a.bDano', 'n')}</label>` : ''}
+        <label>Alcance ${campo(base + '.a.alc')}</label><label>Bônus ataque ${campo(base + '.a.bAtk', 'n')}</label><label>Bônus dano ${campo(base + '.a.bDano', 'n')}</label>
+        <label>Munição <input data-c="${base}.a.mun" list="fxMunLista" value="${esc(a.mun || '')}" placeholder="nenhuma"></label>` : ''}
+      ${it.t === 'municao' ? `<label>Duração <select data-c="${base}.cenas"><option value="">Do livro (${{ 1: '1 cena', 2: '2 cenas', missao: 'missão', tiro: '1 disparo' }[durMun({ ...it, cenas: '' })]})</option>${[['1', '1 cena'], ['2', '2 cenas'], ['missao', 'Missão inteira'], ['tiro', 'Um disparo']].map(([k, n]) => `<option value="${k}" ${String(it.cenas || '') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <p class="fx-legenda fx-l2">${esc(textoMun(it))}. Atacar com a arma ligada a esta munição marca o pacote; a "Nova cena" do Mestre desconta.${it.usou || (restamMun(it) !== null && restamMun(it) < int(durMun(it))) ? ` <button class="fx-mini" data-acao="mun-novo" data-id="${it.id}">Abrir pacote novo</button>` : ''}</p>` : ''}
     </div>
     ${area(base + '.d', 4, 'Descrição')}
     ${it.t === 'arma' || it.t === 'protecao' || it.t === 'municao' ? `<div class="fx-mods"><span>Melhorias${mods.length ? ` (+${mods.length} categoria)` : ''}</span>${mods.map(m => `<span class="fx-chip${m.mal ? ' mal' : ''}" title="${esc(m.d || '')}">${esc(m.n)}${m.el ? ` · ${esc(m.el)}` : ''}<button data-acao="rem-mod" data-id="${it.id}" data-m="${m.id}" aria-label="Remover">×</button></span>`).join('')}<button class="fx-btn-roxo fx-mini" data-acao="add-mod" data-id="${it.id}">Adicionar</button></div>` : ''}
@@ -885,6 +892,7 @@ function itemHTML(it, ed) {
     <datalist id="fxProf"><option value="Armas Simples"><option value="Armas Táticas"><option value="Armas Pesadas"></datalist>
     <datalist id="fxTipoArma"><option value="Corpo a Corpo"><option value="Arma de Disparo"><option value="Arma de Fogo"><option value="Arremesso"></datalist>
     <datalist id="fxEmp"><option value="Leve"><option value="Uma Mão"><option value="Duas Mãos"></datalist>
+    <datalist id="fxMunLista">${[...new Set([...lista(F.atual.d.itens).filter(x => x.t === 'municao').map(x => x.n), 'Balas Curtas', 'Balas Longas', 'Cartuchos', 'Combustível', 'Flechas', 'Foguete'])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <datalist id="fxElementos2">${['Conhecimento', 'Energia', 'Morte', 'Sangue', 'Medo', 'Varia'].map(e => `<option value="${e}">`).join('')}</datalist>
   </div></details>`;
 }
@@ -1082,6 +1090,7 @@ function rolarPericia(id, extra = 0, titulo, tipo = '') {
   F.ultimaRol = { nome, t, d6: 0 };
   mostrarRolagem(`${d.nome} · ${nome}`, htmlRolagem(F.ultimaRol, d));
   if (minhaFicha()) A.rolagemDaFicha(`${nome}: ${t.total} (${t.dados.length}d20: ${t.dados.join(', ')}${t.desv ? ', menor' : ''}; ${t.bonus >= 0 ? '+' : '−'}${Math.abs(t.bonus)}${t.pen.length ? '; ' + textoPen(t) : ''})`, id === 'iniciativa' ? t.total : undefined, t.dados, t.bonus);
+  if (minhaFicha() && window.ACF_MESA && (t.esc === 20 || t.esc === 1)) window.ACF_MESA.momento(String(t.esc), nome, d);
   return t;
 }
 function htmlRolagem(u, d) {
@@ -1098,6 +1107,90 @@ function rolarDano(expr, mult, nome) {
   const r = rolarExpr(expr, mult);
   mostrarRolagem(`${F.atual.d.nome} · ${mult > 1 ? 'Crítico' : 'Dano'}: ${nome}`, `<p class="fx-det-dano">${esc(r.det)}</p><p>Total <span class="fx-total">${r.total}</span></p>`);
   if (minhaFicha()) A.rolagemDaFicha(`${mult > 1 ? 'Crítico' : 'Dano'} (${nome}): ${r.total} · ${r.det}`);
+}
+
+/* ---------------- LIMITE DE PE POR TURNO ----------------
+   Soma o que a ficha gastou no turno (botões de −PE e custo de rituais) e avisa quando passa do limite.
+   Na perseguição, cada vez começa um turno novo; fora dela, zera depois de um minuto parado. */
+function chaveTurno() { const p = A.estado.persg || {}; return p.on ? 'v' + (p.vts || p.rod || 0) : 'livre'; }
+function gastoTurno(d) {
+  const g = d.peGasto || {};
+  if (g.k !== chaveTurno()) return 0;
+  if (g.k === 'livre' && Date.now() - num(g.ts) > 60000) return 0;
+  return int(g.v);
+}
+function registrarGasto(d, qtd) {
+  if (!(qtd > 0) || !F.atual || F.atual.d !== d) return;
+  const r = calc(d), antes = gastoTurno(d), novo = antes + qtd;
+  gravar('peGasto', { k: chaveTurno(), v: novo, ts: Date.now() }, true);
+  const K = d.regra === 'determinacao' ? 'PD' : 'PE';
+  if (novo > r.peTurno && antes <= r.peTurno) A.aviso(`⚠ Limite de ${K} por turno passou: ${novo} de ${r.peTurno}. Pela regra, ninguém gasta mais que o limite num mesmo turno.`);
+  atualizarGasto();
+}
+function atualizarGasto() {
+  const o = $('[data-calc="peGasto"]'); if (!o || !F.atual || !F.atual.d || F.atual.d.tipo === 'ameaca') return;
+  const d = F.atual.d, r = calc(d), g = gastoTurno(d);
+  const txt = `${g}/${r.peTurno}`;
+  if (o.textContent !== txt) o.textContent = txt;
+  const caixa = o.closest('.fx-gasto'); if (caixa) { caixa.classList.toggle('passou', g > r.peTurno); caixa.classList.toggle('cheio', g === r.peTurno && g > 0); }
+}
+
+/* ---------------- MUNIÇÃO ----------------
+   Duração tirada da descrição do livro (duas cenas, uma cena, missão inteira, um disparo).
+   Atacar marca o pacote como "em uso"; a "Nova cena" do Mestre desconta; foguete sai um por disparo;
+   flechas descontam no fim de missão. */
+function durMun(it) {
+  if (it.cenas) return String(it.cenas);
+  const t = `${it.n || ''} ${it.d || ''}`.toLowerCase();
+  if (/único disparo|unico disparo|cada foguete/.test(t)) return 'tiro';
+  if (/missão inteira|missao inteira/.test(t)) return 'missao';
+  if (/duas cenas/.test(t)) return '2';
+  return '1';
+}
+const qtdDe = it => (it.qtd === undefined || it.qtd === null || it.qtd === '' ? 1 : int(it.qtd));
+const restamMun = it => { const dm = durMun(it); if (dm !== '1' && dm !== '2') return null; return it.restam === undefined || it.restam === null || it.restam === '' ? int(dm) : int(it.restam); };
+function municaoDa(d, arma) {
+  const nome = String((arma.a || {}).mun || '').trim().toLowerCase(); if (!nome) return null;
+  const ms = lista(d.itens).filter(x => x.t === 'municao');
+  return ms.find(x => String(x.n || '').trim().toLowerCase() === nome) || ms.find(x => String(x.n || '').toLowerCase().includes(nome)) || { falta: true, n: arma.a.mun };
+}
+const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
+function textoMun(it) {
+  const dm = durMun(it), q = qtdDe(it);
+  if (dm === 'tiro') return plural(q, 'disparo', 'disparos');
+  if (dm === 'missao') return `${plural(q, 'pacote', 'pacotes')} · dura a missão${it.usou ? ' (em uso)' : ''}`;
+  const r = restamMun(it);
+  const aberto = it.usou || r < int(dm);
+  return `${plural(q, 'pacote', 'pacotes')} · ${aberto ? `aberto: ${plural(r, 'cena restante', 'cenas restantes')}${it.usou ? ', em uso nesta cena' : ''}` : `cada um dura ${plural(int(dm), 'cena', 'cenas')}`}`;
+}
+function gastarMun(m) {
+  const dm = durMun(m), b = `itens.${m.id}`;
+  if (dm === 'tiro') { const q = Math.max(0, qtdDe(m) - 1); gravar(b + '.qtd', q, true); if (!q) A.aviso(`Último ${String(m.n || 'disparo').toLowerCase()} usado.`); }
+  else if (!m.usou) gravar(b + '.usou', true, true);
+}
+// "Nova cena" do Mestre: a ficha ativa desconta os pacotes usados na cena que acabou
+function verCena() {
+  if (ehMestre() || !F.ativaD || !F.ativaRef) return;
+  const d = F.ativaD;
+  const c = A.estado.cena || { id: 'inicio' };   // sem cena registrada ainda: a próxima "Nova cena" já desconta
+  if (d.cenaVista === c.id || F.cenaAplicando === c.id) return;
+  if (!c.id) return;
+  F.cenaAplicando = c.id;
+  const l = [['cenaVista', c.id]], msgs = [];
+  if (d.cenaVista) lista(d.itens).filter(x => x.t === 'municao' && x.usou).forEach(m => {
+    const dm = durMun(m), b = `itens.${m.id}`;
+    if (dm !== '1' && dm !== '2') return;
+    const r = restamMun(m) - 1;
+    if (r <= 0) { const q = Math.max(0, qtdDe(m) - 1); l.push([b + '.qtd', q], [b + '.restam', null], [b + '.usou', null]); msgs.push(`${m.n}: pacote acabou, ${q === 1 ? 'resta 1' : `restam ${q}`}`); }
+    else l.push([b + '.restam', r], [b + '.usou', null]);
+  });
+  aplicarNaAtiva(l).then(ok => { if (ok && msgs.length) A.aviso('🔫 ' + msgs.join(' · ')); });
+}
+// fim de missão: pacotes que duram a missão inteira e foram usados
+function consumoMissao(d) {
+  const l = [];
+  lista(d.itens).filter(x => x.t === 'municao' && x.usou && durMun(x) === 'missao').forEach(m => { l.push([`itens.${m.id}.qtd`, Math.max(0, qtdDe(m) - 1)], [`itens.${m.id}.usou`, null]); });
+  return l;
 }
 
 /* ---------------- EVENTOS ---------------- */
@@ -1118,7 +1211,7 @@ function aoEditar(e) {
   if (['classe', 'regra', 'itens'].includes(path.split('.')[0]) && (t.tagName === 'SELECT' || t.type === 'checkbox')) {
     if (path === 'classe') { const cl = CLASSES[v]; if (cl && (!F.atual.d.prof || Object.values(CLASSES).some(c => c.prof === F.atual.d.prof))) gravar('prof', cl.prof, true); desenharFicha(); return; }
     if (path === 'regra') { desenharFicha(); return; }
-    if (/\.t$|\.vest$|\.cat$/.test(path)) { desenharAba(); return; }
+    if (/\.t$|\.vest$|\.cat$|\.cenas$/.test(path)) { desenharAba(); return; }
   }
   if (path === 'nex' || path === 'estagio') { atualizarDerivados(); }
   if (F.atual.d.tipo === 'ameaca' && path === 'el') { desenharFicha(); return; }
@@ -1174,6 +1267,11 @@ function aoClicar(e) {
   if (ac === 'rolar-per') { rolarPericia(v); return; }
   if (ac === 'atacar') {
     const it = b.dataset.id ? lista(at.d.itens).find(x => x.id === b.dataset.id) : null;
+    if (it && ed && (it.a || {}).mun) {
+      const m = municaoDa(at.d, it);
+      if (!m || m.falta || qtdDe(m) <= 0) { if (!confirm(`Sem ${it.a.mun} no inventário. Atacar mesmo assim?`)) return; }
+      else { gastarMun(m); setTimeout(() => { if (F.aba === 'combate') desenharAba(); }, 0); }
+    }
     rolarPericia(b.dataset.per, it ? int((it.a || {}).bAtk) : 0, `Ataque${it ? ' · ' + it.n : ' desarmado'}`, b.dataset.per === 'luta' ? 'cac' : 'ataque');
     return;
   }
@@ -1193,7 +1291,14 @@ function aoClicar(e) {
     const mx = r[{ pv: 'pvMax', pe: 'peMax', san: 'sanMax', pd: 'pdMax' }[k]];
     const cur = at.d[k] && at.d[k].a !== undefined && at.d[k].a !== null && at.d[k].a !== '' ? int(at.d[k].a) : mx;
     gravar(k + '.a', cur + int(v));
+    if (k === 'pe' && int(v) < 0) registrarGasto(at.d, Math.min(cur, -int(v)));
     atualizarDerivados();
+    return;
+  }
+  if (ac === 'zerar-gasto') { gravar('peGasto', null, true); atualizarGasto(); return; }
+  if (ac === 'mun-novo') {
+    const m = (at.d.itens || {})[b.dataset.id]; if (!m) return;
+    gravar(`itens.${b.dataset.id}.restam`, null, true); gravar(`itens.${b.dataset.id}.usou`, null, true); desenharAba();
     return;
   }
   if (ac === 'treino') {
@@ -1208,7 +1313,7 @@ function aoClicar(e) {
     const alvos = {}; $$('[data-alvo]').forEach(x => { if (x.checked) alvos[x.dataset.alvo] = true; });
     if (!Object.keys(alvos).length) { A.aviso('Escolha ao menos uma cobaia.'); return; }
     const id = A.Rede.chave();
-    A.definir(['chamado'], { id, t: 'presenca', nome: d.nome || 'Criatura', el: d.el || '', dt: int(pres.dt), dano: String(pres.dano || '1d6'), nex: int(pres.nex), extras: int(($('#fxPresExtra') || {}).value), alvos, ts: Date.now() });
+    A.definir(['chamado'], { id, t: 'presenca', nome: d.nome || 'Criatura', el: d.el || '', dt: int(pres.dt), dano: String(pres.dano || '1d6'), nex: int(pres.nex), vd: int(d.vd), extras: int(($('#fxPresExtra') || {}).value), alvos, ts: Date.now() });
     A.aviso('Pedido de Vontade enviado.');
     acompanharPresenca(id);
     return;
@@ -1259,6 +1364,8 @@ function aoClicar(e) {
     const r = calc(d);
     const cur = atualDe(d, k, r[k + 'Max']);
     if (cur < custo && !confirm(`Você tem ${cur} ${K} e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
+    const jaGasto = gastoTurno(d), limT = calc(d).peTurno;
+    if (jaGasto + custo > limT && !confirm(`Limite de ${K} por turno: você já gastou ${jaGasto} de ${limT} neste turno e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
     // O Custo do Paranormal (OPRPG p. 121): Ocultismo DT 20 + custo; Medo sempre cobra Sanidade
     const medo = /medo/i.test(h.el || '');
     let perda = 0, perm = 0, teste = null;
@@ -1280,12 +1387,13 @@ function aoClicar(e) {
         resumo = `perdeu ${perda} SAN${perm ? ` e ${perm} de Sanidade máxima (permanente)` : ''}`;
       } else resumo = 'mente intacta';
     }
+    registrarGasto(d, custo);
     atualizarDerivados();
     const nomeF = forma.k === 'n' ? '' : ` (${forma.n.toLowerCase()})`;
     const desc = `conjurou ${h.n}${nomeF} · ${h.el || ''} ${int(h.c) || 1}º círculo · −${custo} ${K}${alq ? ' (alquebrado +1)' : ''} · ${teste ? `Ocultismo ${teste.total} vs DT ${dt}: ${teste.total >= dt ? 'passou' : 'falhou'}, ` : 'Medo: '}${resumo}`;
     mostrarRolagem(`${d.nome} · ${h.n}${nomeF}`, `${teste ? htmlDados(teste) + `<p>Ocultismo <span class="fx-total">${teste.total}</span> contra DT ${dt}: <b>${teste.total >= dt ? 'passou' : 'falhou'}</b></p>${teste.pen.length ? `<p class="fx-legenda">Condições: ${esc(textoPen(teste))}</p>` : ''}` : '<p>Rituais de Medo sempre cobram Sanidade.</p>'}
       <p>−${custo} ${K}${alq ? ' (alquebrado: +1)' : ''} · ${esc(resumo)}.</p>`);
-    try { A.Rede.set('efeito', { t: 'sigilo', el: h.el || 'Varia', n: h.n || 'Ritual', q: d.nome || '', ts: Date.now() }); } catch (e) {}
+    try { A.Rede.set('efeito', { t: 'sigilo', el: h.el || 'Varia', n: h.n || 'Ritual', q: d.nome || '', quem: minhaFicha() ? (d.dono || A.meu || '') : '', c: int(h.c) || 1, ts: Date.now() }); } catch (e) {}
     if (minhaFicha()) A.rolagemDaFicha(desc);
     return;
   }
@@ -1356,6 +1464,8 @@ function atualizarBotao() {
   if (F.aberto && F.tela === 'lista') irLista();
 }
 document.addEventListener('acf-perfil', () => setTimeout(() => { atualizarBotao(); ligarAtiva(); }, 0));
+document.addEventListener('acf-ativa', verCena);
+A.aoMudar(() => { verCena(); if (F.aberto && F.tela === 'ficha') atualizarGasto(); });
 setTimeout(ligarAtiva, 600);
 const btn = $('#btnFichas');
 if (btn) btn.addEventListener('click', () => (F.aberto ? fechar() : abrir()));
@@ -1374,6 +1484,7 @@ window.ACF_FICHAS = {
     const tem = r.contagem[i], max = r.patente.lim[i];
     return tem + 1 > max ? { cat: ROM[int(x.cat)], tem, max, pat: r.patente.n } : null;
   },
+  consumoMissao,
   abrirAtiva: () => { if (F.ativaRef) { abrir(); abrirFicha(F.ativaRef); } else abrir(); },
   religar: () => { F.ativaId = undefined; ligarAtiva(); },
 };
