@@ -2117,10 +2117,11 @@ body.em-persg .faixa-inv { top: 40px; }
 .mm-raios { position: absolute; width: 120vmax; height: 120vmax; left: 50%; top: 50%; translate: -50% -50%; background: repeating-conic-gradient(rgba(255,214,102,.22) 0 6deg, transparent 6deg 18deg); mask: radial-gradient(circle, #000 0 20%, transparent 55%); animation: mm-gira 3.4s linear; z-index: -1; }
 .k-20.ativo { background: radial-gradient(circle, rgba(60,40,0,.55), rgba(0,0,0,.25) 60%); }
 .mm-1 { position: relative; }
-.mm-1 .mm-num { color: #ff5c5c; text-shadow: 0 0 18px #b3121b, 0 6px 0 #3a0305; animation: mm-treme .5s .45s; }
-.mm-trinca { position: absolute; inset: 4% 25% 18%; width: 50%; height: 78%; }
-.mm-trinca path { fill: none; stroke: #0a0003; stroke-width: 2.4; stroke-dasharray: 220; stroke-dashoffset: 220; animation: sg-desenha .5s .4s forwards; }
-.k-1.ativo { background: radial-gradient(circle, rgba(70,0,6,.6), rgba(0,0,0,.4) 65%); }
+.mm-1 .mm-num { color: #050505; -webkit-text-stroke: 3px #3a3a3a; text-shadow: 0 0 2px #000, 0 10px 30px rgba(0,0,0,.9), 0 0 60px rgba(120,120,140,.35); animation: mm-murcha 3.6s .3s ease-in forwards; transform-origin: 50% 100%; }
+.mm-choro { position: absolute; left: 50%; top: 42%; font-style: normal; font-size: min(10vmin, 64px); translate: calc(-50% + var(--x)) calc(-50% + var(--y)); opacity: 0; animation: mm-chora 3.6s var(--d) ease-out forwards; filter: drop-shadow(0 4px 6px rgba(0,0,0,.6)); }
+@keyframes mm-murcha { 0% { transform: none; } 30% { transform: rotate(-4deg); } 60% { transform: rotate(3deg) translateY(4px); } 100% { transform: rotate(-9deg) translateY(18px) scaleY(.94); } }
+@keyframes mm-chora { 0% { opacity: 0; transform: scale(.3); } 15% { opacity: 1; transform: scale(1.15); } 25% { transform: scale(1); } 70% { opacity: 1; transform: translateY(2vmin); } 100% { opacity: 0; transform: translateY(9vmin); } }
+.k-1.ativo { background: radial-gradient(circle, rgba(70,70,80,.55), rgba(0,0,0,.82) 70%); backdrop-filter: grayscale(1); }
 .k-obito.ativo, .k-insano.ativo { background: rgba(4,2,6,.82); backdrop-filter: grayscale(1) blur(2px); }
 .mm-papel { position: relative; width: min(300px, 80vw); background: #efe6cf; color: #221d14; padding: 14px 16px 18px; border-radius: 3px; box-shadow: 0 30px 80px #000; display: grid; justify-items: center; gap: 4px; rotate: -2deg; }
 .mm-cab { font: 10px var(--mono); letter-spacing: .2em; color: #6b604b; }
@@ -2328,3 +2329,39 @@ body.arq-aberto .hud-retratos { visibility: hidden; }
 .cf-palpite > *, .cf-palpite label > * { min-width: 0; }
 .cf-palpite input { width: 100%; box-sizing: border-box; }
 .cf-pp-btns button { min-width: 0; width: auto; }
+
+/* cores dos personagens */
+.cor-pop { position: fixed; z-index: 130; width: min(280px, calc(100vw - 16px)); background: #120f1a; border: 1px solid var(--linha); border-radius: 10px; padding: 10px; box-shadow: 0 16px 50px rgba(0,0,0,.7); display: grid; gap: 10px; }
+.cor-pop[hidden] { display: none; }
+.cor-pop-topo { display: flex; align-items: center; gap: 8px; }
+.cor-pop-topo b { flex: 1; font-family: var(--display); }
+.cor-pop-topo .fechar { background: none; border: 0; font-size: 22px; color: var(--texto-dim); }
+.cor-pop .pinta, .btn-cor .pinta, .cores-tray .pinta { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--cor) center/cover; box-shadow: 0 0 0 2px var(--cor); flex: none; }
+.cores-tray .pinta.filho { border-radius: 4px; }
+.cor-grade { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.cor-grade button { aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,255,255,.12); background: var(--c); padding: 0; }
+.cor-grade button.on { border-color: #fff; box-shadow: 0 0 0 2px var(--c); }
+.cor-espectro { display: flex; align-items: center; gap: 8px; font: 12px var(--mono); color: var(--texto-dim); }
+.cor-espectro input { flex: 1; height: 36px; border: 1px solid var(--linha); border-radius: 6px; background: #0b0910; padding: 2px; cursor: pointer; }
+.cor-espectro output { font: 12px var(--mono); color: var(--texto); }
+.cor-pop-acoes button { width: 100%; background: transparent; border: 1px solid var(--linha); color: var(--texto-dim); border-radius: 6px; padding: 6px; font-size: 13px; }
+.btn-cor { display: flex; align-items: center; gap: 8px; justify-content: center; }
+#btnMinhaCor { width: 100%; margin-top: 8px; }
+.cores-tray button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* escuta dos auxiliares: mancha borrada, rastro e seta */
+.eco-zona { position: absolute; width: calc(5 * 40px * 2.1); height: calc(5 * 40px * 2.1); translate: -50% -50%; border-radius: 50%; pointer-events: none; z-index: 1;
+  background: radial-gradient(circle, rgba(255,40,60,calc(.12 + var(--som, 0) * .1)) 0%, rgba(255,40,60,calc(var(--som, 0) * .05)) 45%, transparent 70%); filter: blur(6px); animation: eco-bate calc(2.2s - var(--som, 1) * .3s) ease-in-out infinite; }
+.eco-zona.rastro { background: radial-gradient(circle, rgba(255,80,100,calc(var(--rastro, 0) * .22)) 0%, transparent 60%); animation: none; }
+.eco-zona.pulso::after { content: ''; position: absolute; inset: 30%; border-radius: 50%; border: 3px solid rgba(255,60,80,.9); animation: eco-onda 1.2s ease-out forwards; }
+@keyframes eco-bate { 50% { transform: scale(1.08); opacity: .8; } }
+@keyframes eco-onda { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.eco-seta { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 6; }
+.eco-seta i { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; transform: rotate(var(--ang)) translateY(-46px); }
+.eco-seta i::before { content: ''; position: absolute; inset: 0; background: rgba(255,60,80,calc(.5 + var(--som, 1) * .1)); clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%); filter: drop-shadow(0 0 4px #ff3b5c); animation: eco-seta 1.2s ease-in-out infinite; }
+@keyframes eco-seta { 50% { transform: translateY(-5px); } }
+.escuta-aux { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.escuta-aux li { border-left: 3px solid var(--cor, #ff3b5c); padding: 2px 8px; }
+.escuta-aux li.vazio { border-left-color: var(--linha); color: var(--texto-dim); }
+.kit-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+#blocoKitAux input { background: #0b0910; border: 1px solid var(--linha); color: var(--texto); border-radius: 6px; padding: 6px 8px; font: 14px var(--mono); }

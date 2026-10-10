@@ -601,14 +601,19 @@ function desenharMesaRol() {
     <div id="mesaRolRes" class="mesa-rol-res"></div>`;
 }
 let ameaOff = null;
+const ameaListas = { m: {}, a: {} };
 function desenharMesaAmea() {
-  if (ameaOff || !$('#mesaAmea')) return;
-  ameaOff = A.Rede.on('agentesMestre', v => {
-    const lista = Object.entries(v || {}).filter(([, d]) => d && d.tipo === 'ameaca');
-    $('#mesaAmea').innerHTML = `<p class="mini">Fichas de criatura com Presença Perturbadora, ataques e PV. Crie em 📋 Fichas › Minhas fichas › + Nova ameaça.</p>`
-      + (lista.length ? lista.map(([k, d]) => `<div class="mesa-amea" style="--el:${corEl(d.el)}"><b>${esc(d.nome)}</b><small>VD ${int(d.vd)} · Vontade DT ${int((d.pres || {}).dt)} · ${esc((d.pres || {}).dano || '')}</small></div>`).join('') : '<p class="mini">Nenhuma ameaça criada.</p>')
+  if (ameaOff || !$('#mesaAmea') || !A.mestre) return;
+  const pinta = () => {
+    const item = (d, aux) => { const f = d.filho ? A.SER[d.filho] : null; return `<div class="mesa-amea" style="--el:${f ? f.cor : corEl(d.el)}"><b>${esc(d.nome)}${aux ? ' <small>(auxiliares)</small>' : ''}</b><small>${f ? `Filho ${esc(f.codigo)} · ` : ''}VD ${int(d.vd)} · Vontade DT ${int((d.pres || {}).dt)} · ${esc((d.pres || {}).dano || '')}</small></div>`; };
+    const ms = Object.values(ameaListas.m).filter(d => d && d.tipo === 'ameaca'), as = Object.values(ameaListas.a).filter(d => d && d.tipo === 'ameaca');
+    $('#mesaAmea').innerHTML = `<p class="mini">Fichas de criatura com Presença Perturbadora, ataques e PV. As suas ficam em 📋 Fichas › Minhas fichas; as divididas com os auxiliares (ameaças e Filhos), na aba "Ameaças e Filhos".</p>`
+      + (ms.length || as.length ? ms.map(d => item(d)).join('') + as.map(d => item(d, true)).join('') : '<p class="mini">Nenhuma ameaça criada.</p>')
       + '<button data-mi="fichas">Abrir fichas</button>';
-  }, () => {});
+  };
+  const o1 = A.Rede.on('agentesMestre', v => { ameaListas.m = v || {}; pinta(); }, () => {});
+  const o2 = A.Rede.on('agentesAux', v => { ameaListas.a = v || {}; pinta(); }, () => {});
+  ameaOff = () => { o1(); o2(); };
 }
 function aoClicarMesa(e) {
   const b = e.target.closest('[data-mi]'); if (!b || !A.mestre) return;
@@ -828,7 +833,12 @@ function mostrarMomento(e) {
   const k = e.k;
   let html = '';
   if (k === '20') html = `<div class="mm mm-20"><i class="mm-raios"></i><b class="mm-num">20</b><p><b>${esc(e.q)}</b>${e.n ? ' · ' + esc(e.n) : ''}</p></div>`;
-  else if (k === '1') html = `<div class="mm mm-1"><b class="mm-num">1</b><svg class="mm-trinca" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M48 0L52 22L41 38L57 55L46 72L54 100M52 22L68 30M41 38L24 44M57 55L76 60M46 72L30 82"/></svg><p><b>${esc(e.q)}</b>${e.n ? ' · ' + esc(e.n) : ''}</p></div>`;
+  else if (k === '1') {
+    // 1 preto, emojis de choro em volta e a música de derrota
+    const choro = ['😭', '😢', '😿', '🥲', '😭', '💧', '😢', '😭', '😥', '💧', '😭', '😢'];
+    const roda = choro.map((c, i) => { const a = (i / choro.length) * Math.PI * 2, r = 30 + (i % 3) * 6; return `<i class="mm-choro" style="--x:${(Math.cos(a) * r).toFixed(1)}vmin;--y:${(Math.sin(a) * r * 0.85).toFixed(1)}vmin;--d:${(i * 0.07).toFixed(2)}s">${c}</i>`; }).join('');
+    html = `<div class="mm mm-1">${roda}<b class="mm-num">1</b><p><b>${esc(e.q)}</b>${e.n ? ' · ' + esc(e.n) : ''}</p></div>`;
+  }
   else if (k === 'obito' || k === 'insano') {
     const ob = k === 'obito';
     html = `<div class="mm mm-ficha ${ob ? 'mm-obito' : 'mm-insano'}" style="--cor:${s.cor || '#888'}"><div class="mm-papel"><span class="mm-cab">O.R.F.E.U. · REGISTRO DE AGENTE</span>
@@ -839,10 +849,15 @@ function mostrarMomento(e) {
   o.className = 'momento-tela k-' + k;
   o.innerHTML = html;
   o.classList.remove('ativo'); void o.offsetWidth; o.classList.add('ativo');
-  clearTimeout(mostrarMomento.t); mostrarMomento.t = setTimeout(() => o.classList.remove('ativo'), k === '20' || k === '1' ? 3400 : 6500);
+  clearTimeout(mostrarMomento.t); mostrarMomento.t = setTimeout(() => o.classList.remove('ativo'), k === '20' ? 3400 : k === '1' ? 4200 : 6500);
   if (!somOk() || !A.Som) return;
   if (k === '20') [523, 659, 784, 1047].forEach((f, i) => A.Som.tom(f, i * 0.09, 0.5, 'triangle', 0.07));
-  else if (k === '1') { A.Som.tom(220, 0, 0.6, 'sawtooth', 0.07, 70); A.Som.tom(110, 0.05, 0.8, 'square', 0.04, 40); }
+  else if (k === '1') {
+    // trombone triste: três notas descendo e a última tremendo até sumir
+    [[392, 0], [370, 0.42], [349, 0.84]].forEach(([f, t]) => { A.Som.tom(f, t, 0.38, 'sawtooth', 0.05); A.Som.tom(f / 2, t, 0.38, 'triangle', 0.05); });
+    for (let i = 0; i < 9; i++) { const f = 330 + (i % 2 ? -9 : 9); A.Som.tom(f, 1.26 + i * 0.13, 0.15, 'sawtooth', 0.05 - i * 0.004, f - 4); A.Som.tom(f / 2, 1.26 + i * 0.13, 0.15, 'triangle', 0.045 - i * 0.004); }
+    A.Som.tom(311, 2.45, 0.8, 'sawtooth', 0.03, 240);
+  }
   else if (k === 'obito') { A.Som.tom(98, 0, 2.4, 'sine', 0.14, 49); A.Som.tom(147, 0.5, 2, 'sine', 0.06, 73); }
   else { [311, 330, 349, 370].forEach((f, i) => A.Som.tom(f, i * 0.12, 1.4, 'sine', 0.05, f * 0.5)); }
 }
@@ -867,7 +882,7 @@ function desenharMesaMom() {
   if (!semFoco('#mesaMom')) return;
   const html = `<p class="mini">Animação curta na tela de todos. O 20 e o 1 saem das rolagens das fichas; óbito e insanidade, quando o contador de Morrendo ou Enlouquecendo chega a 3.</p>
     <div class="lista-apagao">${MOMENTOS.map(([k, n]) => `<label class="chave"><input type="checkbox" data-mom="${k}" ${momentoLigado(k) ? 'checked' : ''}><span>${n}</span></label>`).join('')}</div>
-    <div class="mesa-linha"><button data-mi="mom-teste" data-v="20">Testar 20</button><button data-mi="mom-teste" data-v="obito">Testar óbito</button></div>`;
+    <div class="mesa-linha"><button data-mi="mom-teste" data-v="20">Testar 20</button><button data-mi="mom-teste" data-v="1">Testar 1</button><button data-mi="mom-teste" data-v="obito">Testar óbito</button></div>`;
   const c = $('#mesaMom');
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $$('[data-mom]', c).forEach(i => i.onchange = () => A.definir(['momentos', 'off', i.dataset.mom], i.checked ? null : true)); }
 }

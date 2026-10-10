@@ -90,7 +90,9 @@ Diário, anotações, funções, Balança e a lista do apagão ficam em `segredo
 
 - **Jogadores:** linha tracejada com os metros ao arrastar; Caderno (só no aparelho); aviso de conexão perdida; botão **?** com a ajuda do seu perfil; botão **🔊** para desligar os sons.
 - **Mestre:** painel em abas (Mapa, Sessão, Registro, Segredos); "Ver pelos olhos de" um jogador ou auxiliar; gatilhos nas salas (alerta quando uma cobaia entra); cenas prontas; Shift+clique para mover em grupo e "Trazer todas as cobaias para cá"; resumo da sessão para imprimir ou salvar em PDF; lista de quem está conectado.
-- **Auxiliares:** rastro de som que vai apagando; sinal no mapa visível aos outros auxiliares e ao Mestre; iniciativa de todos os Filhos do andar de uma vez.
+- **Auxiliares:** escuta imprecisa (mancha borrada perto de onde veio o som, nunca a sala exata, e seta em cada Filho e no robô apontando o som mais forte, com direção e distância aproximada); rastro que vai apagando; sinal no mapa visível aos outros auxiliares e ao Mestre; iniciativa de todos os Filhos do andar de uma vez.
+- **Kit do auxiliar:** colocar Filhos ocultos no andar aberto e tirar os que ainda estão ocultos; fichas de ameaças e Filhos divididas com o Mestre (`agentesAux`), com o pedido de Presença Perturbadora; Escudo do Mestre; rolagem secreta; cores dos Filhos e do próprio robô.
+- **Cores:** cada jogador muda a cor da própria cobaia (🎨 no painel), os auxiliares a dos Filhos e do robô, e o Mestre a de todos (bloco Cores na aba Mapa). Paleta pronta ou qualquer cor no espectro; "Voltar à cor original" usa a do `data.js`. Fica em `cores` no Firebase.
 
 ## Fichas de agente (📋 Fichas, atalho F)
 
@@ -112,7 +114,7 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **Clima:** a tela do jogador desbota com a SAN baixa e pulsa em vermelho morrendo; conjurar mostra um sigilo na cor do elemento para todos e rola o Custo do Paranormal; o Mestre liga um ambiente sonoro por elemento.
 - **Ferramentas:** cena de investigação (urgência, rodadas, falhas e pistas numa faixa no mapa), rolagem secreta e Escudo do Mestre com os resumos de regra.
 - **Membrana:** cada sala tem estabilidade de 0 a 100. Ritual conjurado na sala tira 5 por círculo (Medo tira o dobro) e Presença Perturbadora tira de 3 a 20 conforme o VD. A sala racha e brilha na cor do elemento; ao romper, o Mestre recebe um alerta. O número só aparece para quem tem um *Medidor de Estabilidade da Membrana* na ficha ativa (no cartão da sala e no retrato). O Mestre ajusta e restaura pelo cartão da sala ou pela aba Mesa.
-- **Momentos marcantes:** 20 natural e 1 natural nas rolagens da ficha, óbito e insanidade (contador de Morrendo ou Enlouquecendo chegando a 3) viram uma animação curta na tela de todos. O Mestre liga e desliga cada um.
+- **Momentos marcantes:** 20 natural (20 dourado e música de vitória) e 1 natural (1 preto, emojis de choro e música de derrota) nas rolagens da ficha, óbito e insanidade (contador de Morrendo ou Enlouquecendo chegando a 3) viram uma animação curta na tela de todos. O Mestre liga e desliga cada um.
 - **Limite de PE por turno:** a ficha soma o PE gasto no turno (botões de −PE e custo de rituais) e avisa ao passar do limite. Na perseguição, cada vez é um turno novo; fora dela, zera depois de um minuto parado.
 - **Munição:** a arma aponta para a munição do inventário (as do catálogo já vêm ligadas). Atacar marca o pacote como usado; a "Nova cena" do Mestre desconta (balas curtas e barras de aço duram duas cenas; balas longas, cartuchos, combustível e nitrogênio, uma; foguete sai um por disparo; flechas descontam no fim de missão).
 - **Relatório da missão:** enquanto a tela do Mestre estiver aberta, o site anota dano, cura, SAN, PD, PE, rituais, quedas, pistas, Presenças, rupturas, cenas e momentos. "Gerar relatório" monta um dossiê por agente e uma linha do tempo, pronto para imprimir em PDF ou copiar para o grupo. "Nova missão" zera.

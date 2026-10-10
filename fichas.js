@@ -257,7 +257,9 @@ function chaveAtiva() {
 const ehAtiva = ref => !!ref && !ref.gm && ref.dono === quem() && ref.chave === chaveAtiva();
 function indice() { try { return JSON.parse(localStorage.getItem(KEY_IDX) || '[]') || []; } catch (e) { return []; } }
 function salvarIndice(l) { try { localStorage.setItem(KEY_IDX, JSON.stringify(l)); } catch (e) {} }
-const caminho = ref => ref.gm ? `agentesMestre/${ref.chave}` : `agentes/${ref.dono}/${ref.chave}`;
+const caminho = ref => ref.aux ? `agentesAux/${ref.chave}` : ref.gm ? `agentesMestre/${ref.chave}` : `agentes/${ref.dono}/${ref.chave}`;
+// auxiliar (robô S.T.A.F.F.): divide com o Mestre as fichas de ameaças e Filhos
+const ehAux = () => !!A.aux && !A.mestre;
 const codigoDe = ref => `${ref.dono}:${ref.chave}`;
 function novaChave() {
   const r = Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('');
@@ -292,8 +294,9 @@ function montarTela() {
   t.addEventListener('change', aoEditar);
   t.addEventListener('click', aoClicar);
 }
-function abrir() {
+function abrir(aba) {
   montarTela();
+  if (typeof aba === 'string') { F.abaLista = aba; F.tela = 'lista'; }
   F.aberto = true;
   $('#telaFichas').hidden = false;
   document.body.classList.add('fx-aberta');
@@ -314,7 +317,8 @@ function desenharNav() {
     nav.innerHTML = `<button data-acao="voltar">‹ Voltar à lista</button>`;
     return;
   }
-  const abas = ehMestre() ? [['jogadores', 'Fichas dos jogadores'], ['minhas', 'Minhas fichas (Mestre)']] : [['minhas', 'Minhas fichas']];
+  const abas = ehMestre() ? [['jogadores', 'Fichas dos jogadores'], ['minhas', 'Minhas fichas (Mestre)'], ['aux', 'Ameaças e Filhos (auxiliares)']]
+    : ehAux() ? [['aux', 'Ameaças e Filhos'], ['minhas', 'Minhas fichas']] : [['minhas', 'Minhas fichas']];
   if (!F.abaLista || !abas.some(a => a[0] === F.abaLista)) F.abaLista = abas[0][0];
   nav.innerHTML = abas.map(([k, n]) => `<button data-acao="aba-lista" data-v="${k}" class="${F.abaLista === k ? 'on' : ''}">${n}</button>`).join('');
 }
@@ -326,7 +330,9 @@ function irLista() {
   desenharNav();
   const corpo = $('#fxCorpo');
   if (!ehMestre() && !quem()) { corpo.innerHTML = '<p class="fx-vazio">Entre como jogador (escolha sua cobaia) para criar e ver suas fichas.</p>'; return; }
-  if (ehMestre() && F.abaLista === 'jogadores') {
+  if ((ehMestre() || ehAux()) && F.abaLista === 'aux') {
+    F.offs.push(A.Rede.on('agentesAux', v => { F.resumo = {}; Object.entries(v || {}).forEach(([chave, d]) => { F.resumo['aux:' + chave] = { ref: { aux: true, dono: 'aux', chave }, d }; }); desenharLista(); }, () => { $('#fxCorpo').innerHTML = '<p class="fx-vazio">Sem permissão para as fichas dos auxiliares. Entre com a senha dos auxiliares.</p>'; }));
+  } else if (ehMestre() && F.abaLista === 'jogadores') {
     F.offs.push(A.Rede.on('agentes', v => { F.resumo = {}; Object.entries(v || {}).forEach(([dono, fs]) => Object.entries(fs || {}).forEach(([chave, d]) => { F.resumo[dono + ':' + chave] = { ref: { dono, chave }, d }; })); desenharLista(); }, () => {}));
   } else if (ehMestre()) {
     F.offs.push(A.Rede.on('agentesMestre', v => { F.resumo = {}; Object.entries(v || {}).forEach(([chave, d]) => { F.resumo['mestre:' + chave] = { ref: { gm: true, dono: 'mestre', chave }, d }; }); desenharLista(); }, () => {}));
@@ -347,9 +353,11 @@ function desenharLista() {
   const corpo = $('#fxCorpo');
   const todos = Object.values(F.resumo).sort((a, b) => (a.d.criado || 0) - (b.d.criado || 0));
   const gmJog = ehMestre() && F.abaLista === 'jogadores';
+  const abaAux = (ehMestre() || ehAux()) && F.abaLista === 'aux';
   const podeCriar = !gmJog;
   let cab = '';
-  if (gmJog) cab = `<p class="fx-dica">Você vê as fichas de todos os jogadores, ao vivo, mas só para leitura. O código de cada ficha aparece no cartão: passe ao jogador se ele precisar abrir a ficha em outro aparelho.</p>`;
+  if (abaAux) cab = `<p class="fx-dica">Fichas de ameaças e de Filhos da O.R.F.E.U. divididas entre o Mestre e os auxiliares: todos editam. Pela ficha, "Chamar o teste" pede a Presença Perturbadora aos jogadores.</p>`;
+  else if (gmJog) cab = `<p class="fx-dica">Você vê as fichas de todos os jogadores, ao vivo, mas só para leitura. O código de cada ficha aparece no cartão: passe ao jogador se ele precisar abrir a ficha em outro aparelho.</p>`;
   else if (ehMestre()) cab = `<p class="fx-dica">Fichas suas (NPCs, inimigos, aliados). Só você vê e edita.</p>`;
   else cab = `<p class="fx-dica">Suas fichas ficam ligadas a este aparelho. Em outro aparelho, use "Abrir por código" com o código que aparece dentro da ficha. O Mestre vê suas fichas, mas não pode alterá-las.</p>`;
   const grupos = {};
@@ -360,9 +368,10 @@ function desenharLista() {
     const cl = CLASSES[d.classe] || {};
     const amea = d.tipo === 'ameaca';
     const nivel = amea ? `VD ${int(d.vd)}` : cl.estagio ? `Estágio ${d.estagio || 1}` : d.classe === 'mundano' ? 'NEX 0%' : `NEX ${d.nex || 5}%`;
-    const k = esc(codigoDe(x.ref)), gmA = x.ref.gm ? 1 : '';
+    const k = esc(codigoDe(x.ref)), gmA = x.ref.aux ? 'a' : x.ref.gm ? 1 : '';
+    const sf = d.filho ? A.SER[d.filho] : null;
     return `<article class="fx-cartao" style="${estiloAc(d.dono)}">
-      <span class="fx-cartao-aba"${amea ? ` style="background:${corEl(d.el)}"` : ''}>${esc(amea ? 'AMEAÇA' : x.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</span>
+      <span class="fx-cartao-aba"${amea ? ` style="background:${sf ? sf.cor : corEl(d.el)}"` : ''}>${esc(amea ? (sf ? `FILHO ${sf.codigo}` : d.filho ? 'FILHO' : 'AMEAÇA') : x.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</span>
       <div class="fx-cartao-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}><span class="fx-cartao-nex">${esc(nivel)}</span></div>
       <div class="fx-cartao-info"><small class="fx-k">${amea ? 'Ameaça · ' + esc(d.el || '') : esc(cl.n || '') + (d.trilha ? ' · ' + esc(d.trilha) : '')}</small><h3>${esc(d.nome || 'Sem nome')}</h3>
       <small class="fx-cartao-data">Aberta em ${new Date(d.criado || Date.now()).toLocaleDateString('pt-BR')}${d.jogador ? ' · ' + esc(d.jogador) : ''}</small>
@@ -371,7 +380,8 @@ function desenharLista() {
       ${podeCriar ? `<button data-acao="apagar-ficha" data-k="${k}" data-gm="${gmA}" class="fx-btn-perigo" title="Apagar ficha" aria-label="Apagar ficha">✕</button>` : ''}</div></div></article>`;
   };
   let html = cab;
-  if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${ehMestre() ? '<button data-acao="nova-ameaca">+ Nova ameaça</button>' : ''}${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
+  if (abaAux) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ameaca">+ Nova ameaça</button><button data-acao="novo-filho">+ Novo Filho</button></div>`;
+  else if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${ehMestre() ? '<button data-acao="nova-ameaca">+ Nova ameaça</button>' : ''}${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
   if (!todos.length) html += `<p class="fx-vazio">${gmJog ? 'Nenhum jogador criou ficha ainda.' : 'Nenhuma ficha ainda. Crie a primeira!'}</p>`;
   Object.entries(grupos).forEach(([g, xs]) => {
     if (gmJog) { const s = A.SER[g] || {}; html += `<h2 class="fx-grupo" style="${estiloAc(g)}"><span class="fx-pinta"></span>${esc(s.nome || g)}${s.jogador ? ` <small>${esc(s.jogador)}</small>` : ''}</h2>`; }
@@ -382,11 +392,14 @@ function desenharLista() {
 function refDoCodigo(k, gm) {
   const i = k.indexOf(':');
   const dono = k.slice(0, i), chave = k.slice(i + 1);
-  return gm ? { gm: true, dono: 'mestre', chave } : { dono, chave };
+  return gm === 'a' ? { aux: true, dono: 'aux', chave } : gm ? { gm: true, dono: 'mestre', chave } : { dono, chave };
 }
-async function criarAmeaca() {
-  const ref = { gm: true, dono: 'mestre', chave: novaChave() };
-  try { await A.Rede.set(caminho(ref), novaAmeaca()); } catch (e) { A.aviso('O servidor recusou a criação.'); return; }
+async function criarAmeaca(filho) {
+  const naAux = F.abaLista === 'aux' || ehAux();
+  const ref = naAux ? { aux: true, dono: 'aux', chave: novaChave() } : { gm: true, dono: 'mestre', chave: novaChave() };
+  const d = novaAmeaca(); d.dono = ref.dono;
+  if (filho) { const f1 = (A.SERES || []).find(x => x.tipo === 'filho'); Object.assign(d, { nome: f1 ? f1.nome : 'Novo Filho', filho: f1 ? f1.id : '', porte: 'Filho da O.R.F.E.U.' }); }
+  try { await A.Rede.set(caminho(ref), d); } catch (e) { A.aviso('O servidor recusou a criação.'); return; }
   abrirFicha(ref);
 }
 async function criarFicha() {
@@ -416,7 +429,7 @@ async function apagarFicha(ref) {
   if (!confirm(`Apagar a ficha "${r ? r.d.nome : ''}" de vez? Isso não pode ser desfeito.`)) return;
   if (!confirm('Tem certeza? A ficha some para todos, inclusive para o Mestre.')) return;
   try { await A.Rede.set(caminho(ref), null); } catch (e) { A.aviso('Não consegui apagar.'); return; }
-  if (!ref.gm) { salvarIndice(indice().filter(x => x.chave !== ref.chave)); F.ativaId = undefined; ligarAtiva(); }
+  if (!ref.gm && !ref.aux) { salvarIndice(indice().filter(x => x.chave !== ref.chave)); F.ativaId = undefined; ligarAtiva(); }
   irLista();
 }
 
@@ -469,7 +482,7 @@ async function importarFicha(f) {
 /* ---------------- FICHA ---------------- */
 function abrirFicha(ref) {
   pararLista(); pararFicha();
-  const editavel = ref.gm ? ehMestre() : (!ehMestre() && ref.dono === quem());
+  const editavel = ref.aux ? (ehMestre() || ehAux()) : ref.gm ? ehMestre() : (!ehMestre() && ref.dono === quem());
   F.tela = 'ficha';
   F.atual = { ref, d: null, editavel, off: null, pend: {} };
   desenharNav();
@@ -619,7 +632,7 @@ function desenharAmeaca() {
   corpo.innerHTML = `<div class="fx-ficha fx-ameaca" style="--ac:${corEl(d.el)};--ac-txt:${luz(corEl(d.el)) > 0.5 ? '#16130c' : '#fff'}">
     <section class="fx-col fx-col-esq">
       <div class="fx-dossie fx-painel">
-        <label class="fx-foto"${d.foto ? ` style="background-image:url('${esc(d.foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">AMEAÇA</i></label>
+        <label class="fx-foto"${d.foto ? ` style="background-image:url('${esc(d.foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">${d.filho !== undefined ? 'FILHO' : 'AMEAÇA'}</i></label>
         <div class="fx-dossie-campos">
           <label class="fx-nome"><span>Ameaça</span>${campo('nome')}</label>
           <div class="fx-dossie-grade">
@@ -627,6 +640,7 @@ function desenharAmeaca() {
             <label class="fx-origem">Tipo e tamanho ${campo('porte')}</label>
             <label>Deslocamento ${campo('desl')}</label>
             <label>Sentidos ${campo('sentidos')}</label>
+            ${d.filho !== undefined ? `<label>Filho no mapa <select data-c="filho"${RO()}>${(A.SERES || []).filter(x => x.tipo === 'filho').map(x => `<option value="${x.id}" ${d.filho === x.id ? 'selected' : ''}>${esc(x.codigo + ' ' + x.nome)}</option>`).join('')}</select></label>` : ''}
           </div>
         </div>
         <div class="fx-nex"><label class="fx-nex-grande">VD ${campo('vd', 'n', ' min="0"')}</label></div>
@@ -1240,10 +1254,11 @@ function aoClicar(e) {
   if (ac === 'voltar') { irLista(); return; }
   if (ac === 'aba-lista') { F.abaLista = v; irLista(); return; }
   if (ac === 'nova-ficha') { criarFicha(); return; }
-  if (ac === 'nova-ameaca' && ehMestre()) { criarAmeaca(); return; }
+  if (ac === 'nova-ameaca' && (ehMestre() || ehAux())) { criarAmeaca(); return; }
+  if (ac === 'novo-filho' && (ehMestre() || ehAux())) { criarAmeaca(true); return; }
   if (ac === 'abrir-codigo') { abrirPorCodigo(); return; }
-  if (ac === 'abrir-ficha') { abrirFicha(refDoCodigo(b.dataset.k, !!b.dataset.gm)); return; }
-  if (ac === 'apagar-ficha') { apagarFicha(refDoCodigo(b.dataset.k, !!b.dataset.gm)); return; }
+  if (ac === 'abrir-ficha') { abrirFicha(refDoCodigo(b.dataset.k, b.dataset.gm)); return; }
+  if (ac === 'apagar-ficha') { apagarFicha(refDoCodigo(b.dataset.k, b.dataset.gm)); return; }
   if (ac === 'fechar-modal') { F.cat = null; $('#fxModal').hidden = true; return; }
   if (ac === 'fechar-rolagem') { $('#fxRolagem').hidden = true; return; }
   if (ac === 'usar-d6' && F.ultimaRol && F.atual && F.atual.editavel) {
