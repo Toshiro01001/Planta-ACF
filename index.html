@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261009i">
+<link rel="stylesheet" href="style.css?v=20261009j">
 </head>
 <body>
 
@@ -31,10 +31,11 @@
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
     <button id="btnSom" class="btn-fantasma btn-icone" title="Ligar ou desligar os sons neste aparelho" aria-label="Som">🔊</button>
     <button id="btnAjuda" class="btn-fantasma btn-icone" title="Ajuda rápida" aria-label="Ajuda">?</button>
-    <button id="btnChat" class="btn-fantasma btn-chat" hidden aria-label="Abrir o chat">💬 Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
+    <button id="btnFichas" class="btn-fantasma btn-fichas btn-pilha" hidden aria-label="Fichas de agente" title="Fichas de agente (F)"><span class="ic">📋</span> Fichas</button>
+    <button id="btnChat" class="btn-fantasma btn-chat btn-pilha" hidden aria-label="Abrir o chat"><span class="ic">💬</span> Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
     <button id="btnMestre" class="btn-fantasma">Entrar</button>
     <button id="btnRecolher" class="btn-fantasma so-desktop" title="Esconder ou mostrar o painel lateral">Painel ⟩</button>
-    <button id="btnPainel" class="btn-fantasma btn-painel so-celular" aria-label="Abrir painel">☰ Painel</button>
+    <button id="btnPainel" class="btn-fantasma btn-painel btn-pilha so-celular" aria-label="Abrir painel"><span class="ic">☰</span> Painel</button>
   </div>
 </header>
 
@@ -612,8 +613,10 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261009i"></script>
-<script src="config.js?v=20261009i"></script>
-<script src="app.js?v=20261009i"></script>
+<script src="data.js?v=20261009j"></script>
+<script src="config.js?v=20261009j"></script>
+<script src="app.js?v=20261009j"></script>
+<script src="catalogo-op.js?v=20261009j"></script>
+<script src="fichas.js?v=20261009j"></script>
 </body>
 </html>
