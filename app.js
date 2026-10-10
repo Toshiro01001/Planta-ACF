@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261010t';
+const VERSAO_SITE = '20261010u';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -199,9 +199,13 @@ const Store = {
     try { await this.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch (e) {}
     this.auth.onAuthStateChanged(u => {
       const ehAux = !!u && !u.isAnonymous && (u.email || '').toLowerCase() === EMAIL_AUXILIARES;
-      auxLogado = ehAux;
-      definirMestre(!!u && !u.isAnonymous && !ehAux);
-      Priv.ligar(mestre || ehAux);
+      const ehGM = !!u && !u.isAnonymous && !ehAux;
+      // a conta do Mestre também pode jogar como auxiliar sem sair (as regras do Firebase permitem tudo ao Mestre)
+      const comoAux = ehGM && lerPerfil().startsWith('aux:');
+      auxLogado = ehAux || ehGM;
+      definirMestre(ehGM && !comoAux);
+      Priv.ligar(ehGM || ehAux);
+      if (comoAux && !aux) { const pf = lerPerfil(); if (SER[pf.slice(4)]) { aux = pf.slice(4); atualizarBotaoPerfil(); montarAndar(); atualizarTudo(); } }
       // jogador precisa de um login anônimo para poder mover a própria ficha
       if (!u && meu) this.garantirLogin();
       // auxiliar sem a conta dos auxiliares (aba nova): pede a senha de novo
@@ -484,6 +488,9 @@ function recusaLocal(caminho, valor) {
     return typeof n === 'number' && valor === n - 1 && valor >= 0 ? '' : 'A despensa não tem mais isso hoje.';
   }
   if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
+  // ferramentas que o Mestre divide com os auxiliares
+  if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas'].includes(caminho[0])) return '';
+  if (aux && caminho[0] === 'cond' && caminho.length === 3 && ['_mt', '_et', '_ms'].includes(caminho[2])) return '';
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
   // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
@@ -2232,10 +2239,15 @@ function atualizarBotaoPerfil() {
   $('#blocoCobaias').hidden = !!aux && !mestre;
   $('#blocoRuido').hidden = !!aux && !mestre;
   $('#blocoSons').hidden = !(aux && !mestre);
+  // blocos da Mesa que o Mestre divide com os auxiliares (Cena e Escudo, Ameaças, Membrana, NEX, Parede)
+  $$('.mestre-aux').forEach(el => { el.hidden = !(mestre || aux); });
 }
 
 function mostrarPerfil(passo) {
   $('#perfil').hidden = false;
+  const conta = contaAtual();
+  const sc = $('#perfilConta');
+  if (sc) { sc.hidden = !conta || passo !== 1; $('#perfilContaTxt').textContent = conta === 'mestre' ? 'Conectado com a conta do Mestre: Mestre e Mestre Auxiliar entram sem senha.' : conta === 'aux' ? 'Conectado com a conta dos auxiliares: Mestre Auxiliar entra sem senha.' : ''; }
   $('#perfilPasso1').hidden = passo !== 1;
   $('#perfilPasso2').hidden = passo !== 2;
   $('#perfilPasso3').hidden = passo !== 3;
@@ -2259,7 +2271,9 @@ function escolherPersonagem(id) {
   meu = id;
   salvarPerfil('jogador:' + id);
   $('#perfil').hidden = true;
-  if (Store.modo === 'firebase') Store.garantirLogin().then(() => Chat.ligar()).catch(erroGravacao);
+  const u = Store.modo === 'firebase' && Store.auth.currentUser;
+  if (u && !u.isAnonymous) { Store.auth.signOut().then(() => Store.garantirLogin()).then(() => Chat.ligar()).catch(erroGravacao); }
+  else if (Store.modo === 'firebase') Store.garantirLogin().then(() => Chat.ligar()).catch(erroGravacao);
   else Chat.ligar();
   atualizarBotaoPerfil();
   atualizarTudo();
@@ -2272,14 +2286,50 @@ function escolherRobo(id) {
   aux = id; meu = null;
   salvarPerfil('aux:' + id);
   $('#perfil').hidden = true;
+  if (mestre) definirMestre(false);
   if (Store.modo !== 'firebase') Priv.ligar(true);
+  else auxLogado = !!contaAtual();
   atualizarBotaoPerfil();
   Chat.ligar();
   montarAndar();
   atualizarTudo();
 }
 
+/* ---------- Senha uma vez só ----------
+   Com Firebase, o login fica guardado na aba (sobrevive a recarregar). A conta do Mestre vale também para o
+   modo auxiliar; a conta dos auxiliares vale para o modo auxiliar. Trocar de papel não desconecta.
+   No modo local, a aba lembra qual senha já foi digitada. */
+const credLocal = () => { try { return sessionStorage.getItem('acf-cred') || ''; } catch (e) { return ''; } };
+const marcarCred = v => { try { if (v === 'mestre' || credLocal() !== 'mestre') sessionStorage.setItem('acf-cred', v); } catch (e) {} };
+function contaAtual() {
+  if (Store.modo === 'firebase') {
+    const u = Store.auth && Store.auth.currentUser;
+    if (!u || u.isAnonymous) return '';
+    return (u.email || '').toLowerCase() === EMAIL_AUXILIARES ? 'aux' : 'mestre';
+  }
+  return credLocal();
+}
+function entrarComoMestreDireto() {
+  salvarPerfil('mestre'); meu = null; aux = null;
+  $('#perfil').hidden = true;
+  if (Store.modo !== 'firebase') { try { localStorage.setItem('acf-mestre', '1'); } catch (e) {} }
+  definirMestre(true);
+  Chat.ligar();
+  montarAndar(); atualizarTudo();
+}
+function sairDaConta() {
+  if (Presenca.quem) { Rede.set('presenca/' + Presenca.id, null).catch(() => {}); Presenca.quem = ''; clearInterval(Presenca.timer); }
+  try { sessionStorage.removeItem('acf-cred'); localStorage.removeItem('acf-mestre'); } catch (e) {}
+  meu = null; aux = null; salvarPerfil('');
+  if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
+  if (Store.modo !== 'firebase') Priv.ligar(false);
+  definirMestre(false);
+  Chat.ligar(); selecionar(null);
+  mostrarPerfil(1);
+}
+
 function abrirLoginMestre() {
+  if (contaAtual() === 'mestre') { entrarComoMestreDireto(); return; }
   $('#perfil').hidden = true;
   $('#campoEmail').hidden = Store.modo !== 'firebase';
   $('#mestreErro').hidden = true;
@@ -2291,8 +2341,8 @@ function trocarPerfil() {
   if (Presenca.quem) { Rede.set('presenca/' + Presenca.id, null).catch(() => {}); Presenca.quem = ''; clearInterval(Presenca.timer); }
   meu = null; aux = null;
   salvarPerfil('');
-  if (Store.modo === 'firebase' && Store.auth.currentUser) Store.auth.signOut();
-  if (Store.modo !== 'firebase') Priv.ligar(false);
+  // não desconecta: quem já digitou a senha troca entre Mestre e auxiliar sem digitar de novo
+  if (Store.modo !== 'firebase' && !contaAtual()) Priv.ligar(false);
   definirMestre(false);
   Chat.ligar();
   selecionar(null);
@@ -2303,7 +2353,8 @@ $('#btnSouJogador').addEventListener('click', () => mostrarPerfil(2));
 $('#btnSouMestre').addEventListener('click', abrirLoginMestre);
 $('#btnVoltarPerfil').addEventListener('click', () => mostrarPerfil(1));
 $$('.voltar-perfil').forEach(b => b.addEventListener('click', () => mostrarPerfil(1)));
-$('#btnSouAux').addEventListener('click', () => mostrarPerfil(3));
+$('#btnSouAux').addEventListener('click', () => { if (contaAtual()) { if (Store.modo !== 'firebase') Priv.ligar(true); mostrarPerfil(4); } else mostrarPerfil(3); });
+$('#btnSairConta').addEventListener('click', () => { if (confirm('Sair da conta? Para voltar como Mestre ou auxiliar, a senha será pedida de novo.')) sairDaConta(); });
 $('#formAux').addEventListener('submit', async e => {
   e.preventDefault();
   const senha = $('#auxSenha').value.trim();
@@ -2320,7 +2371,7 @@ $('#formAux').addEventListener('submit', async e => {
     }
     return;
   }
-  if (await hash(senha) === SENHA_AUX) mostrarPerfil(4);
+  if (await hash(senha) === SENHA_AUX) { marcarCred('aux'); mostrarPerfil(4); }
   else $('#auxErro').hidden = false;
 });
 $('#btnMestre').addEventListener('click', trocarPerfil);
@@ -2339,12 +2390,12 @@ $('#formMestre').addEventListener('submit', async e => {
       $('#dlgMestre').close();
     } catch (err) { erro('E-mail ou senha recusados.'); }
   } else {
-    if (await hash(senha) === SENHA_MESTRE) { salvarPerfil('mestre'); meu = null; aux = null; definirMestre(true); $('#dlgMestre').close(); }
+    if (await hash(senha) === SENHA_MESTRE) { marcarCred('mestre'); salvarPerfil('mestre'); meu = null; aux = null; definirMestre(true); $('#dlgMestre').close(); }
     else erro('Senha recusada.');
   }
 });
 
-$('#btnSair').addEventListener('click', trocarPerfil);
+$('#btnSair').addEventListener('click', () => { if (confirm('Sair da conta do Mestre? A senha será pedida de novo na próxima vez.')) sairDaConta(); });
 
 $('#chkElementos').addEventListener('change', e => Store.definir(['rev', 'a' + andarAtual], e.target.checked ? true : null));
 
@@ -2798,9 +2849,11 @@ function baixar(nome, conteudo, tipo) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-$('#btnBackup').addEventListener('click', () => {
+$('#btnBackup').addEventListener('click', async () => {
   const privado = { ...Priv.dados }; delete privado.tokens;
-  const pacote = { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado };
+  // a Calculadora de NEX mora em "nexCalc" (Mestre e auxiliares): vai junto no backup
+  const nexCalc = await Rede.once('nexCalc').catch(() => null);
+  const pacote = { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado, nexCalc };
   baixar(`backup-caixa-${carimbo()}.json`, JSON.stringify(pacote, null, 1), 'application/json');
   Diario.registrar('sessao', `Backup baixado · ${dataCurta(Date.now())} ${hora(Date.now())}`);
 });
@@ -2819,6 +2872,7 @@ $('#arqBackup').addEventListener('change', async e => {
   Store.state = { ...CAMPOS_VAZIOS(), ...m, tokens: m.tokens || {} };
   Store.gravarTudo();
   if (pacote.privado) ['salas', 'saidas', 'andares'].forEach(k => Priv.gravar([k], pacote.privado[k] || null));
+  { const nx = pacote.nexCalc || (pacote.segredos || {})._nex; if (nx) Rede.set('nexCalc', nx).catch(erroGravacao); }
   const seg = { ...(pacote.segredos || {}) };
   delete seg._diario;
   if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
@@ -5128,8 +5182,8 @@ window.addEventListener('resize', () => enquadrar());
   if (perfil.startsWith('aux:') && SER[perfil.slice(4)]) aux = perfil.slice(4);
   if (!FIREBASE && perfil === 'mestre') { try { if (localStorage.getItem('acf-mestre') === '1') mestre = true; } catch (e) {} }
   await Store.iniciar();
-  if (mestre && Store.modo === 'local') definirMestre(true);
-  if (aux && Store.modo === 'local') Priv.ligar(true);
+  if (mestre && Store.modo === 'local') { marcarCred('mestre'); definirMestre(true); }
+  if (aux && Store.modo === 'local') { marcarCred('aux'); Priv.ligar(true); }
   if (Store.modo === 'local') Chat.ligar();
   atualizarBotaoPerfil();
   atualizarTudo();
@@ -5218,6 +5272,6 @@ window.ACF = {
   podeCor,
   hash, alertaMestre,
   infoSala: cn => infoSala(Math.ceil(cn / 25), cn),
-  get auxLogado() { return !!aux && (Store.modo !== 'firebase' || !!(Store.auth && Store.auth.currentUser && Store.auth.currentUser.email === EMAIL_AUXILIARES)); },
+  get auxLogado() { return !!aux && (Store.modo !== 'firebase' || auxLogado); },
 };
 })();

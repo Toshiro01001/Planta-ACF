@@ -2768,3 +2768,8 @@ body.parede-aberta { overflow: hidden; }
 .alertas-mestre { right: auto; left: 50%; translate: -50% 0; width: min(420px, 92vw); }
 @media (max-width: 700px) { .alertas-mestre { right: auto; } }
 .alerta-mestre.sug-nex span::before { content: none; }
+/* perfil: conta já conectada */
+.perfil-conta { margin: 14px 0 0; text-align: center; font-size: 13px; color: var(--texto-dim); }
+.perfil-conta[hidden] { display: none; }
+.perfil-conta button { margin-left: 8px; background: transparent; border: 1px solid var(--linha); border-radius: 6px; color: var(--texto); padding: 4px 10px; font: 12px var(--corpo); cursor: pointer; }
+.perfil-conta button:hover { border-color: var(--perigo); color: var(--perigo); }
