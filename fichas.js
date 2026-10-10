@@ -108,6 +108,11 @@ function nivelDe(d) {
   return nex >= 99 ? 20 : Math.max(1, Math.floor(nex / 5));
 }
 function calc(d) {
+  if (d && d.tipo === 'ameaca') {
+    const pvMax = Math.max(1, int(d.pvMax) || 1);
+    return { n: 1, pvMax, peMax: 0, sanMax: 0, pdMax: 0, peTurno: 0, dt: 0, carga: 0, cargaMax: 0, sobrecarga: false, contagem: [0, 0, 0, 0], patente: PATENTES[0],
+      defEquip: 0, defCond: { v: 0, f: [] }, defesa: int(d.def), bonus: () => 0, esquiva: int(d.def), bloqueio: 0, desl: 0, conds: new Set() };
+  }
   const at = k => int((d.atr || {})[k]);
   const cl = CLASSES[d.classe] || CLASSES.combatente;
   const n = nivelDe(d);
@@ -129,7 +134,8 @@ function calc(d) {
   itens.forEach(it => { const c = catEfetiva(it); if (c >= 1 && c <= 4) r.contagem[c - 1] += Math.max(1, int(it.qtd === undefined ? 1 : it.qtd)); });
   r.patente = patenteDe(d);
   r.defEquip = itens.filter(it => it.t === 'protecao' && it.vest).reduce((s, it) => s + int(it.def), 0);
-  r.defesa = 10 + at('agi') + r.defEquip + int(d.defOutros) - (r.sobrecarga ? 5 : 0);
+  r.defCond = efeitosNaDefesa(d);
+  r.defesa = 10 + at('agi') + r.defEquip + int(d.defOutros) - (r.sobrecarga ? 5 : 0) + r.defCond.v;
   r.bonus = id => {
     const p = (d.per || {})[id] || {};
     let b = int(p.t) + int(p.o);
@@ -139,6 +145,10 @@ function calc(d) {
   r.esquiva = r.defesa + r.bonus('reflexos');
   r.bloqueio = Math.max(0, r.bonus('fortitude'));
   r.desl = Math.max(0, num(d.desl === undefined ? 9 : d.desl) - (r.sobrecarga ? 3 : 0));
+  const cs = condicoesDe(d);
+  if (cs.has('imovel')) r.desl = 0;
+  else { if (cs.has('lento')) r.desl = Math.floor(r.desl / 2 / 1.5) * 1.5; if (cs.has('caido')) r.desl = Math.min(r.desl, 1.5); }
+  r.conds = cs;
   return r;
 }
 function patenteDe(d) {
@@ -151,14 +161,59 @@ const atrDaPericia = (d, id) => { const a = ((d.per || {})[id] || {}).a; return 
 const catEfetiva = it => int(it.cat) + lista(it.mods).length;
 const lista = o => Object.entries(o || {}).map(([id, v]) => ({ ...v, id })).sort((a, b) => (a.o || 0) - (b.o || 0));
 
+/* ---------------- CONDIÇÕES (do mapa e da própria ficha) ----------------
+   Resumo do Apêndice de Condições (OPRPG v1.3). –O = um d20 a menos no teste. */
+const COND_EXPANDE = {
+  fatigado: ['fraco', 'vulneravel'], exausto: ['debilitado', 'lento', 'vulneravel'], cego: ['desprevenido', 'lento'],
+  agarrado: ['desprevenido', 'imovel'], atordoado: ['desprevenido'], surpreendido: ['desprevenido'], enredado: ['lento', 'vulneravel'],
+  paralisado: ['indefeso', 'imovel'], inconsciente: ['indefeso'], indefeso: ['desprevenido'], morrendo: ['inconsciente'],
+};
+const COND_NOME = { abalado: 'Abalado', assustada: 'Apavorado', fraco: 'Fraco', debilitado: 'Debilitado', frustrado: 'Frustrado', esmorecido: 'Esmorecido',
+  cego: 'Cego', ofuscado: 'Ofuscado', agarrado: 'Agarrado', enredado: 'Enredado', caido: 'Caído', desprevenido: 'Desprevenido', surdo: 'Surdo',
+  fascinado: 'Fascinado', vulneravel: 'Vulnerável', indefeso: 'Indefeso', alquebrado: 'Alquebrado', lento: 'Lento', imovel: 'Imóvel' };
+function condicoesDe(d) {
+  const ativas = new Set();
+  const est = A.estado || {};
+  const c = d && d.dono && d.dono !== 'mestre' ? ((est.cond || {})[d.dono] || {}) : {};
+  Object.keys(c).forEach(k => { if (k[0] !== '_' && c[k]) ativas.add(k); });
+  if (d && d.pv && d.pv.a !== undefined && d.pv.a !== null && d.pv.a !== '' && int(d.pv.a) <= 0 && d.tipo !== 'ameaca') ativas.add('morrendo');
+  let mudou = true;
+  while (mudou) { mudou = false; [...ativas].forEach(k => (COND_EXPANDE[k] || []).forEach(x => { if (!ativas.has(x)) { ativas.add(x); mudou = true; } })); }
+  return ativas;
+}
+// penalidade em dados para um teste: [{n, fonte}]
+function penalidadesDados(d, perId, attr, tipo) {
+  const a = condicoesDe(d), out = [];
+  const pega = (k, n) => out.push({ n, fonte: COND_NOME[k] || k });
+  if (a.has('assustada')) pega('assustada', -2); else if (a.has('abalado')) pega('abalado', -1);
+  if (['agi', 'for', 'vig'].includes(attr)) { if (a.has('debilitado')) pega('debilitado', -2); else if (a.has('fraco')) pega('fraco', -1); }
+  if (['int', 'pre'].includes(attr)) { if (a.has('esmorecido')) pega('esmorecido', -2); else if (a.has('frustrado')) pega('frustrado', -1); }
+  if (a.has('cego') && ['agi', 'for'].includes(attr)) pega('cego', -2);
+  if (tipo === 'ataque' || tipo === 'cac') { if (a.has('ofuscado')) pega('ofuscado', -1); if (a.has('agarrado')) pega('agarrado', -1); if (a.has('enredado')) pega('enredado', -1); }
+  if (tipo === 'cac' && a.has('caido')) pega('caido', -2);
+  if (perId === 'percepcao') { if (a.has('ofuscado')) pega('ofuscado', -1); if (a.has('fascinado')) pega('fascinado', -2); }
+  if (perId === 'reflexos' && a.has('desprevenido')) pega('desprevenido', -1);
+  if (perId === 'iniciativa' && a.has('surdo')) pega('surdo', -2);
+  return out;
+}
+function efeitosNaDefesa(d) {
+  const a = condicoesDe(d); let v = 0; const f = [];
+  if (a.has('indefeso')) { v -= 10; f.push('indefeso −10'); } else if (a.has('desprevenido')) { v -= 5; f.push('desprevenido −5'); }
+  if (a.has('vulneravel')) { v -= 2; f.push('vulnerável −2'); }
+  return { v, f, caido: a.has('caido') };
+}
+
 /* ---------------- DADOS ---------------- */
 const d20 = () => 1 + Math.floor(Math.random() * 20);
-function rolarTeste(qtdAtr, bonus) {
-  const desv = qtdAtr <= 0;
-  const q = desv ? 2 : Math.min(qtdAtr, 10);
+// 1d20 por ponto de atributo, fica com o maior. Se bônus e penalidades em dados deixarem menos de 1 dado,
+// rola a quantidade que rolaria se fosse bônus e fica com o menor (atributo 0 → 2 dados, o pior).
+function rolarTeste(qtdAtr, bonus, extraDados = 0) {
+  const n = qtdAtr + extraDados;
+  const desv = n < 1;
+  const q = Math.min(desv ? 2 - n : n, 12);
   const dados = Array.from({ length: q }, d20);
   const esc = desv ? Math.min(...dados) : Math.max(...dados);
-  return { dados, esc, desv, total: esc + bonus, bonus };
+  return { dados, esc, desv, total: esc + bonus, bonus, extraDados };
 }
 // "2d6+1d8+3" → total e detalhes; mult multiplica só os dados (crítico)
 function rolarExpr(expr, mult = 1) {
@@ -190,6 +245,16 @@ const F = {
 const ehMestre = () => A.mestre;
 const quem = () => A.meu || A.aux || null;
 const KEY_IDX = 'acf-fichas-minhas';
+// ficha ativa: a que o jogador usa no mapa (PV, PE e SAN vão para o token dele)
+const KEY_ATIVA = q => 'acf-ficha-ativa-' + q;
+function chaveAtiva() {
+  const q = quem(); if (!q || ehMestre()) return null;
+  const idx = indice().filter(r => r && r.chave && r.dono === q);
+  let k = null; try { k = localStorage.getItem(KEY_ATIVA(q)); } catch (e) {}
+  if (!idx.some(r => r.chave === k)) k = idx.length ? idx[0].chave : null;
+  return k;
+}
+const ehAtiva = ref => !!ref && !ref.gm && ref.dono === quem() && ref.chave === chaveAtiva();
 function indice() { try { return JSON.parse(localStorage.getItem(KEY_IDX) || '[]') || []; } catch (e) { return []; } }
 function salvarIndice(l) { try { localStorage.setItem(KEY_IDX, JSON.stringify(l)); } catch (e) {} }
 const caminho = ref => ref.gm ? `agentesMestre/${ref.chave}` : `agentes/${ref.dono}/${ref.chave}`;
@@ -293,19 +358,20 @@ function desenharLista() {
     const d = x.d, s = A.SER[d.dono] || {};
     const foto = d.foto || s.img || '';
     const cl = CLASSES[d.classe] || {};
-    const nivel = cl.estagio ? `Estágio ${d.estagio || 1}` : d.classe === 'mundano' ? 'NEX 0%' : `NEX ${d.nex || 5}%`;
+    const amea = d.tipo === 'ameaca';
+    const nivel = amea ? `VD ${int(d.vd)}` : cl.estagio ? `Estágio ${d.estagio || 1}` : d.classe === 'mundano' ? 'NEX 0%' : `NEX ${d.nex || 5}%`;
     const k = esc(codigoDe(x.ref)), gmA = x.ref.gm ? 1 : '';
     return `<article class="fx-cartao" style="${estiloAc(d.dono)}">
-      <span class="fx-cartao-aba">${esc(x.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</span>
+      <span class="fx-cartao-aba"${amea ? ` style="background:${corEl(d.el)}"` : ''}>${esc(amea ? 'AMEAÇA' : x.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</span>
       <div class="fx-cartao-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}><span class="fx-cartao-nex">${esc(nivel)}</span></div>
-      <div class="fx-cartao-info"><small class="fx-k">${esc(cl.n || '')}${d.trilha ? ' · ' + esc(d.trilha) : ''}</small><h3>${esc(d.nome || 'Sem nome')}</h3>
+      <div class="fx-cartao-info"><small class="fx-k">${amea ? 'Ameaça · ' + esc(d.el || '') : esc(cl.n || '') + (d.trilha ? ' · ' + esc(d.trilha) : '')}</small><h3>${esc(d.nome || 'Sem nome')}</h3>
       <small class="fx-cartao-data">Aberta em ${new Date(d.criado || Date.now()).toLocaleDateString('pt-BR')}${d.jogador ? ' · ' + esc(d.jogador) : ''}</small>
       ${gmJog ? `<small class="fx-cod">${k}</small>` : ''}
       <div class="fx-cartao-acoes"><button class="fx-btn-roxo" data-acao="abrir-ficha" data-k="${k}" data-gm="${gmA}">Abrir ficha</button>
       ${podeCriar ? `<button data-acao="apagar-ficha" data-k="${k}" data-gm="${gmA}" class="fx-btn-perigo" title="Apagar ficha" aria-label="Apagar ficha">✕</button>` : ''}</div></div></article>`;
   };
   let html = cab;
-  if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
+  if (podeCriar) html += `<div class="fx-lista-acoes"><button class="fx-btn-roxo" data-acao="nova-ficha">+ Nova ficha</button>${ehMestre() ? '<button data-acao="nova-ameaca">+ Nova ameaça</button>' : ''}${!ehMestre() ? '<button data-acao="abrir-codigo">Abrir por código</button>' : ''}<label class="fx-btn-arq" title="Cria uma ficha nova a partir de um arquivo exportado">⬆ Importar arquivo<input type="file" accept=".json,application/json" data-acao-arq="importar" hidden></label></div>`;
   if (!todos.length) html += `<p class="fx-vazio">${gmJog ? 'Nenhum jogador criou ficha ainda.' : 'Nenhuma ficha ainda. Crie a primeira!'}</p>`;
   Object.entries(grupos).forEach(([g, xs]) => {
     if (gmJog) { const s = A.SER[g] || {}; html += `<h2 class="fx-grupo" style="${estiloAc(g)}"><span class="fx-pinta"></span>${esc(s.nome || g)}${s.jogador ? ` <small>${esc(s.jogador)}</small>` : ''}</h2>`; }
@@ -318,6 +384,11 @@ function refDoCodigo(k, gm) {
   const dono = k.slice(0, i), chave = k.slice(i + 1);
   return gm ? { gm: true, dono: 'mestre', chave } : { dono, chave };
 }
+async function criarAmeaca() {
+  const ref = { gm: true, dono: 'mestre', chave: novaChave() };
+  try { await A.Rede.set(caminho(ref), novaAmeaca()); } catch (e) { A.aviso('O servidor recusou a criação.'); return; }
+  abrirFicha(ref);
+}
 async function criarFicha() {
   const gm = ehMestre();
   const dono = gm ? 'mestre' : quem();
@@ -326,7 +397,7 @@ async function criarFicha() {
   const d = novaFicha(gm ? null : dono);
   if (gm) { d.nome = 'Novo NPC'; d.dono = 'mestre'; }
   try { await A.Rede.set(caminho(ref), d); } catch (e) { A.aviso('O servidor recusou a criação da ficha. Confira as regras do Firebase.'); return; }
-  if (!gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); }
+  if (!gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); ligarAtiva(); }
   abrirFicha(ref);
 }
 async function abrirPorCodigo() {
@@ -337,7 +408,7 @@ async function abrirPorCodigo() {
   try { d = await A.Rede.once(caminho(ref)); } catch (e) {}
   if (!d) { A.aviso('Não encontrei ficha com esse código.'); return; }
   const idx = indice();
-  if (!idx.some(r => r.chave === ref.chave)) { idx.push(ref); salvarIndice(idx); }
+  if (!idx.some(r => r.chave === ref.chave)) { idx.push(ref); salvarIndice(idx); ligarAtiva(); }
   abrirFicha(ref);
 }
 async function apagarFicha(ref) {
@@ -345,7 +416,7 @@ async function apagarFicha(ref) {
   if (!confirm(`Apagar a ficha "${r ? r.d.nome : ''}" de vez? Isso não pode ser desfeito.`)) return;
   if (!confirm('Tem certeza? A ficha some para todos, inclusive para o Mestre.')) return;
   try { await A.Rede.set(caminho(ref), null); } catch (e) { A.aviso('Não consegui apagar.'); return; }
-  if (!ref.gm) salvarIndice(indice().filter(x => x.chave !== ref.chave));
+  if (!ref.gm) { salvarIndice(indice().filter(x => x.chave !== ref.chave)); F.ativaId = undefined; ligarAtiva(); }
   irLista();
 }
 
@@ -390,7 +461,7 @@ async function importarFicha(f) {
   if (!confirm(`Criar uma ficha nova com "${d.nome || 'Sem nome'}"${gm ? ' nas suas fichas de Mestre' : ''}?`)) return;
   const ref = { gm, dono, chave: novaChave() };
   try { await A.Rede.set(caminho(ref), d); } catch (e) { A.aviso('O servidor recusou a ficha importada.'); return; }
-  if (!gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); }
+  if (!gm) { const idx = indice(); idx.push({ dono: ref.dono, chave: ref.chave }); salvarIndice(idx); ligarAtiva(); }
   A.aviso(`Ficha "${d.nome || 'Sem nome'}" importada.`);
   abrirFicha(ref);
 }
@@ -416,7 +487,13 @@ function abrirFicha(ref) {
     desenharFicha();
   }, () => { $('#fxCorpo').innerHTML = '<p class="fx-vazio">Sem permissão para abrir esta ficha.</p>'; });
 }
+function novaAmeaca() {
+  return { v: 1, tipo: 'ameaca', dono: 'mestre', criado: Date.now(), nome: 'Nova ameaça', foto: '', el: 'Sangue', vd: 40, porte: 'Criatura de Sangue · Médio',
+    pres: { dt: 20, dano: '2d6', nex: 25 }, def: 15, pvMax: 50, pv: {}, desl: '9m', atr: { agi: 1, for: 2, int: 0, pre: 1, vig: 2 },
+    sentidos: '', per: '', resist: '', imun: '', vuln: '', ataques: {}, hab: '', acoes: '', enigma: '', notas: '' };
+}
 function normalizar(d) {
+  if (d && d.tipo === 'ameaca') { const n = novaAmeaca(); return { ...n, ...d, pres: { ...n.pres, ...(d.pres || {}) }, atr: { ...n.atr, ...(d.atr || {}) }, pv: d.pv || {}, ataques: d.ataques || {} }; }
   const n = novaFicha(d.dono);
   const r = { ...n, ...d };
   ['atr', 'pv', 'pe', 'san', 'pd', 'desc'].forEach(k => { r[k] = { ...n[k], ...(d[k] || {}) }; });
@@ -453,6 +530,7 @@ function desenharFicha() {
   const at = F.atual;
   if (!at || !at.d) return;
   const d = at.d;
+  if (d.tipo === 'ameaca') { desenharAmeaca(); return; }
   const s = A.SER[d.dono] || {};
   const cl = CLASSES[d.classe] || CLASSES.combatente;
   const foto = d.foto || s.img || '';
@@ -492,9 +570,9 @@ function desenharFicha() {
         <div class="fx-painel fx-p-atr"><h4 class="fx-ph"><i>01</i>Atributos</h4>
           <div class="fx-atributos">${ATRS.map(([k, n, sg]) => `<label class="fx-atr"><span class="fx-atr-sg">${sg}</span><input data-c="atr.${k}" type="number" data-n="1" min="0" max="9" value="${int(d.atr[k])}"${RO()}><small>${n}</small><span class="fx-pips" data-pips="${k}">${'<b></b>'.repeat(5)}</span></label>`).join('')}</div>
           <label class="fx-larga">Proficiências ${campo('prof')}</label>
-          <div class="fx-codigo">${ed && !at.ref.gm ? `<span>Código <code>${esc(codigoDe(at.ref))}</code></span><button class="fx-mini" data-acao="copiar-codigo">copiar</button>` : ''}<button class="fx-mini" data-acao="exportar" title="Baixa um arquivo com a ficha inteira (cópia de segurança ou para importar em outro lugar)">exportar</button></div>
+          <div class="fx-codigo">${ed && !at.ref.gm ? `<button class="fx-mini fx-ativa${ehAtiva(at.ref) ? ' on' : ''}" data-acao="ativa" title="A ficha ativa manda PV, PE e SAN para o mapa e para o painel de retratos">${ehAtiva(at.ref) ? '★ ficha ativa no mapa' : '☆ usar no mapa'}</button><span>Código <code>${esc(codigoDe(at.ref))}</code></span><button class="fx-mini" data-acao="copiar-codigo">copiar</button>` : ''}<button class="fx-mini" data-acao="exportar" title="Baixa um arquivo com a ficha inteira (cópia de segurança ou para importar em outro lugar)">exportar</button></div>
         </div>
-        <div class="fx-painel fx-p-vit"><h4 class="fx-ph"><i>02</i>Sinais vitais</h4><div class="fx-barras">${barras(d)}</div></div>
+        <div class="fx-painel fx-p-vit"><h4 class="fx-ph"><i>02</i>Sinais vitais</h4><div class="fx-barras">${barras(d)}</div><div class="fx-conds" data-conds></div></div>
         <div class="fx-painel fx-p-def"><h4 class="fx-ph"><i>03</i>Defesa</h4>
           <div class="fx-def-tiles">
             <div class="fx-tile fx-tile-g"><output data-calc="defesa"></output><span>Defesa</span></div>
@@ -531,6 +609,88 @@ function desenharFicha() {
   corpo.scrollTop = rolagemTopo;
 }
 
+/* ---------------- AMEAÇA (ficha de criatura do Mestre) ---------------- */
+function desenharAmeaca() {
+  const at = F.atual, d = at.d, ed = at.editavel;
+  const corpo = $('#fxCorpo'); const topo = corpo.scrollTop;
+  const ataques = lista(d.ataques);
+  const pres = d.pres || {};
+  corpo.innerHTML = `<div class="fx-ficha fx-ameaca" style="--ac:${corEl(d.el)};--ac-txt:${luz(corEl(d.el)) > 0.5 ? '#16130c' : '#fff'}">
+    <section class="fx-col fx-col-esq">
+      <div class="fx-dossie fx-painel">
+        <label class="fx-foto"${d.foto ? ` style="background-image:url('${esc(d.foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">AMEAÇA</i></label>
+        <div class="fx-dossie-campos">
+          <label class="fx-nome"><span>Ameaça</span>${campo('nome')}</label>
+          <div class="fx-dossie-grade">
+            <label>Elemento <select data-c="el"${RO()}>${['Sangue', 'Morte', 'Conhecimento', 'Energia', 'Medo', 'Varia'].map(e => `<option ${d.el === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
+            <label class="fx-origem">Tipo e tamanho ${campo('porte')}</label>
+            <label>Deslocamento ${campo('desl')}</label>
+            <label>Sentidos ${campo('sentidos')}</label>
+          </div>
+        </div>
+        <div class="fx-nex"><label class="fx-nex-grande">VD ${campo('vd', 'n', ' min="0"')}</label></div>
+      </div>
+      <div class="fx-faixa">
+        <div class="fx-painel fx-p-pres"><h4 class="fx-ph"><i>01</i>Presença Perturbadora</h4>
+          <div class="fx-pres-grade"><label>DT ${campo('pres.dt', 'n')}</label><label>Dano mental ${campo('pres.dano')}</label><label>Imune a partir de NEX ${campo('pres.nex', 'n')}</label></div>
+          <p class="fx-legenda">Quem enxerga a criatura faz Vontade: falhou, sofre o dano mental; passou, sofre metade. Com mais de uma criatura, use a de VD mais alto, +1d6 por criatura a mais.</p>
+          <button class="fx-btn-roxo" data-acao="presenca">Chamar o teste dos jogadores</button>
+        </div>
+        <div class="fx-painel fx-p-vit"><h4 class="fx-ph"><i>02</i>Vida e defesa</h4>
+          <div class="fx-barras">${['pv'].map(k => `<div class="fx-barra fx-barra-v" data-barra="pv" data-max="pvMax">
+            <div class="fx-barra-cab"><span class="fx-barra-tit">Vida <i>PV</i></span><span class="fx-barra-txt"><input data-c="pv.a" type="number" data-n="1" class="fx-barra-at"${RO()}><i>/</i>${campo('pvMax', 'n', ' class="fx-pvmax"')}</span></div>
+            <div class="fx-barra-trilho"><div class="fx-barra-fill"></div></div>
+            <div class="fx-barra-ctl">${ed ? [-10, -5, -1, 1, 5, 10].map(v => `<button data-acao="barra" data-k="pv" data-v="${v}">${v > 0 ? '+' : '−'}${Math.abs(v)}</button>`).join('') : ''}</div></div>`).join('')}</div>
+          <div class="fx-def-tiles"><div class="fx-tile fx-tile-g"><input data-c="def" type="number" data-n="1" value="${int(d.def)}"${RO()}><span>Defesa</span></div></div>
+        </div>
+        <div class="fx-painel fx-p-atr"><h4 class="fx-ph"><i>03</i>Atributos</h4>
+          <div class="fx-atributos">${ATRS.map(([k, n, sg]) => `<label class="fx-atr"><span class="fx-atr-sg">${sg}</span><input data-c="atr.${k}" type="number" data-n="1" min="0" max="9" value="${int(d.atr[k])}"${RO()}><small>${n}</small><span class="fx-pips" data-pips="${k}">${'<b></b>'.repeat(5)}</span></label>`).join('')}</div>
+        </div>
+      </div>
+    </section>
+    <section class="fx-col fx-col-meio fx-painel"><h4 class="fx-ph"><i>04</i>Perícias e defesas</h4>
+      <label class="fx-larga">Perícias ${area('per', 4, 'Ex.: Luta 3O+15, Percepção 2O+10, Iniciativa 3O+5')}</label>
+      <label class="fx-larga">Resistências ${campo('resist')}</label>
+      <label class="fx-larga">Imunidades ${campo('imun')}</label>
+      <label class="fx-larga">Vulnerabilidades ${campo('vuln')}</label>
+      <label class="fx-larga">Enigma de Medo ${area('enigma', 3)}</label>
+      <label class="fx-larga">Notas do Mestre ${area('notas', 4)}</label>
+    </section>
+    <section class="fx-col fx-col-dir"><div class="fx-aba-corpo fx-painel"><h4 class="fx-ph"><i>05</i>Ataques e ações</h4>
+      <div class="fx-itens">${ataques.map(a => `<div class="fx-ataque"><div class="fx-amea-atq">${ed ? `<label class="fx-l2">Ataque ${campo(`ataques.${a.id}.n`)}</label><label>d20 ${campo(`ataques.${a.id}.dados`, 'n', ' min="0"')}</label><label>Bônus ${campo(`ataques.${a.id}.bonus`, 'n')}</label><label>Dano ${campo(`ataques.${a.id}.dano`)}</label><label>Crítico ${campo(`ataques.${a.id}.crit`)}</label>` : `<b>${esc(a.n)}</b><small>${int(a.dados) || 1}d20${int(a.bonus) >= 0 ? '+' : ''}${int(a.bonus)} · ${esc(a.dano || '')}${a.crit ? ' · ' + esc(a.crit) : ''}</small>`}</div>
+        <div class="fx-ataque-btns"><button data-acao="amea-atk" data-id="${a.id}">🎲 Ataque</button><button data-acao="dano" data-expr="${esc(a.dano || '')}" data-n="${esc(a.n || '')}">🎲 Dano</button><button data-acao="dano" data-expr="${esc(a.dano || '')}" data-mult="${int(String(a.crit || '').replace(/.*x/i, '')) || 2}" data-n="${esc(a.n || '')}">💥 Crítico</button>${ed ? `<button class="fx-btn-perigo" data-acao="remover" data-v="ataques" data-id="${a.id}">Remover</button>` : ''}</div></div>`).join('') || '<p class="fx-vazio-p">Nenhum ataque ainda.</p>'}</div>
+      ${ed ? '<div class="fx-novo"><button data-acao="novo-ataque">+ Ataque</button></div>' : ''}
+      <label class="fx-larga">Habilidades ${area('hab', 6, 'Origem Paranormal, Percepção às Cegas, habilidades especiais…')}</label>
+      <label class="fx-larga">Ações ${area('acoes', 5)}</label>
+    </div></section></div>`;
+  atualizarDerivados();
+  corpo.scrollTop = topo;
+}
+const luz = c => { const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return 0.5; const n = parseInt(m[1], 16); return (0.2126 * (n >> 16) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255; };
+// modal do Mestre: escolhe quem faz o teste e acompanha as respostas
+function abrirPresenca() {
+  const d = F.atual.d, pres = d.pres || {};
+  const cobaias = (A.SERES || []).filter(x => x.tipo === 'cobaia');
+  const m = $('#fxModal'); m.hidden = false; F.cat = null;
+  m.innerHTML = `<div class="fx-modal-caixa" style="--ac:${corEl(d.el)}"><div class="fx-modal-topo"><h3>Presença Perturbadora · ${esc(d.nome)}</h3><button class="fx-fechar" data-acao="fechar-modal" aria-label="Fechar">×</button></div>
+    <div class="fx-pres-modal">
+      <p>Vontade <b>DT ${int(pres.dt)}</b> · dano mental <b>${esc(pres.dano || '')}</b>${int(pres.nex) ? ` · imune com NEX ${int(pres.nex)}% ou mais` : ''}</p>
+      <p class="fx-k">Quem enxerga a criatura</p>
+      <div class="fx-pres-alvos">${cobaias.map(c => `<label class="fx-check"><input type="checkbox" data-alvo="${c.id}" checked> ${esc(c.nome)}</label>`).join('')}</div>
+      <label class="fx-check">Criaturas a mais na cena <input type="number" id="fxPresExtra" min="0" max="9" value="0" style="width:52px"> (+1d6 cada)</label>
+      <p class="fx-legenda">Cada jogador recebe o pedido na tela, rola Vontade com a própria ficha e confirma o dano. Quem usa a regra de Determinação recebe o dano ajustado (dados um passo menores e pela metade).</p>
+      <div class="fx-det-acoes"><button class="fx-btn-roxo" data-acao="presenca-enviar">Pedir o teste</button></div>
+      <div id="fxPresResp"></div></div></div>`;
+}
+function acompanharPresenca(id) {
+  if (F.presOff) F.presOff();
+  F.presOff = A.Rede.on('mesaResp/' + id, v => {
+    const el = $('#fxPresResp'); if (!el) { if (F.presOff) { F.presOff(); F.presOff = null; } return; }
+    const rs = Object.entries(v || {});
+    el.innerHTML = `<p class="fx-k">Respostas</p>${rs.length ? rs.map(([q, r]) => `<p>${esc((A.SER[q] || {}).nome || q)}: ${r.imune ? 'imune pelo NEX' : `Vontade ${int(r.total)} · ${r.passou ? 'passou' : 'falhou'} · −${int(r.dano)} ${r.det ? 'PD' : 'SAN'}`}</p>`).join('') : '<p class="fx-legenda">Aguardando os jogadores…</p>'}`;
+  }, () => {});
+}
+
 function barras(d) {
   const det = d.regra === 'determinacao';
   const defs = det ? [['pv', 'Vida', 'PV', 'pvMax', 'v'], ['pd', 'Determinação', 'PD', 'pdMax', 'd']] : [['pv', 'Vida', 'PV', 'pvMax', 'v'], ['san', 'Sanidade', 'SAN', 'sanMax', 's'], ['pe', 'Esforço', 'PE', 'peMax', 'e']];
@@ -548,7 +708,16 @@ function atualizarDerivados() {
   const put = (k, v) => $$(`[data-calc="${k}"]`, raiz).forEach(e => { e.textContent = v; });
   put('peTurno', r.peTurno);
   put('desl', `m / ${Math.floor(r.desl / 1.5)} q${r.sobrecarga ? ' (−3m carga)' : ''}`);
-  put('defesa', r.defesa); put('defEquip', r.defEquip); put('defCarga', r.sobrecarga ? ' −5 sobrecarga' : '');
+  put('defesa', r.defesa); put('defEquip', r.defEquip); put('defCarga', [r.sobrecarga ? '−5 sobrecarga' : '', ...r.defCond.f].filter(Boolean).join(' · '));
+  const cx = $('[data-conds]', raiz);
+  if (cx) {
+    const nomes = [...r.conds].filter(k => (A.COND || {})[k] || COND_NOME[k]);
+    const bi = d.bonusInt || {};
+    const extra = [int(bi.ex) ? `🏋️ exercício ×${int(bi.ex)}` : '', int(bi.le) ? `📖 leitura ×${int(bi.le)}` : ''].filter(Boolean);
+    const html = (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
+      + (extra.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}` : '');
+    if (cx.innerHTML !== html) cx.innerHTML = html;
+  }
   put('bloqueio', r.bloqueio); put('esquiva', r.esquiva);
   ['pvMax', 'peMax', 'sanMax', 'pdMax'].forEach(k => put(k, r[k]));
   PERICIAS.forEach(([id]) => {
@@ -636,6 +805,15 @@ function abaLista(campoD, nomeCat, d, ed) {
         : `<p class="fx-texto">${esc(h.d)}</p>`}</div></details>`).join('') || `<p class="fx-vazio-p">${filtro ? 'Nada encontrado.' : 'Você ainda não possui habilidades.'}</p>`}</div>`;
 }
 
+// formas avançadas descritas no texto do ritual: "Discente (+3 PE)" e "Verdadeiro (+7 PE)"
+function formasDoRitual(h) {
+  const t = String(h.d || '');
+  const out = [{ k: 'n', n: 'Conjurar', extra: 0 }];
+  const md = /Discente\s*\(\s*\+\s*(\d+)\s*PE\s*\)/i.exec(t), mv = /Verdadeir[oa]\s*\(\s*\+\s*(\d+)\s*PE\s*\)/i.exec(t);
+  if (md) out.push({ k: 'd', n: 'Discente', extra: int(md[1]) });
+  if (mv) out.push({ k: 'v', n: 'Verdadeiro', extra: int(mv[1]) });
+  return out;
+}
 function abaRituais(d, ed) {
   const filtro = (F.filtros.rit || '').toLowerCase();
   const its = lista(d.rit).filter(h => !filtro || (h.n + ' ' + h.d + ' ' + h.el).toLowerCase().includes(filtro));
@@ -650,7 +828,7 @@ function abaRituais(d, ed) {
       <div class="fx-det">${ed ? `<div class="fx-rit-campos"><label>Nome ${campo(`rit.${h.id}.n`)}</label><label>Elemento <input data-c="rit.${h.id}.el" list="fxElementos" value="${esc(h.el || '')}"></label><label>Círculo <select data-c="rit.${h.id}.c" data-n="1">${[1, 2, 3, 4].map(c => `<option ${int(h.c) === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         ${campos.map(([k, n]) => `<label>${n} ${campo(`rit.${h.id}.${k}`)}</label>`).join('')}</div>${area(`rit.${h.id}.d`, 6)}
         <datalist id="fxElementos">${['Conhecimento', 'Energia', 'Morte', 'Sangue', 'Medo', 'Varia'].map(e => `<option value="${e}">`).join('')}</datalist>
-        <div class="fx-det-acoes"><button class="fx-btn-roxo" data-acao="conjurar" data-id="${h.id}">Conjurar (−${custo} ${pe})</button><button class="fx-btn-perigo" data-acao="remover" data-v="rit" data-id="${h.id}">Remover</button></div>`
+        <div class="fx-det-acoes">${formasDoRitual(h).map(f => `<button class="fx-btn-roxo" data-acao="conjurar" data-id="${h.id}" data-forma="${f.k}">${f.n} (−${custo + f.extra} ${pe})</button>`).join('')}<button class="fx-btn-perigo" data-acao="remover" data-v="rit" data-id="${h.id}">Remover</button></div>`
         : `<p class="fx-rit-linhas">${campos.filter(([k]) => h[k]).map(([k, n]) => `<b>${n}:</b> ${esc(h[k])}`).join('<br>')}</p><p class="fx-texto">${esc(h.d)}</p>`}</div></details>`;
     }).join('') || `<p class="fx-vazio-p">${filtro ? 'Nada encontrado.' : 'Você ainda não possui rituais.'}</p>`}</div>`;
 }
@@ -884,16 +1062,37 @@ function mostrarRolagem(titulo, html) {
   A.Som && A.Som.tom && A.Som.tom(520, 0, 0.06, 'triangle', 0.08);
 }
 const minhaFicha = () => F.atual && F.atual.editavel && !F.atual.ref.gm;
-function rolarPericia(id, extra = 0, titulo) {
-  const d = F.atual.d, r = calc(d);
-  const p = PER[id];
-  const qtd = int(d.atr[atrDaPericia(d, id)]);
-  const t = rolarTeste(qtd, r.bonus(id) + extra);
-  const nome = titulo || p[1];
-  mostrarRolagem(`${d.nome} · ${nome}`, `<div class="dados-faces">${t.dados.map(v => `<span class="face${v === t.esc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>
-    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)} = <span class="fx-total">${t.total}</span></p>`);
-  if (minhaFicha()) A.rolagemDaFicha(`${nome}: ${t.total} (${t.dados.length}d20: ${t.dados.join(', ')}${t.desv ? ', menor' : ''}; ${t.bonus >= 0 ? '+' : '−'}${Math.abs(t.bonus)})`, id === 'iniciativa' ? t.total : undefined, t.dados, t.bonus);
+// teste de perícia de uma ficha qualquer, já com as condições (sem mostrar nada)
+function testarPericia(d, id, extra = 0, tipo = '') {
+  const r = calc(d);
+  const attr = atrDaPericia(d, id);
+  const pen = penalidadesDados(d, id, attr, tipo);
+  const extraDados = pen.reduce((s, x) => s + x.n, 0);
+  const t = rolarTeste(int(d.atr[attr]), r.bonus(id) + extra, extraDados);
+  t.pen = pen; t.attr = attr; t.per = id;
   return t;
+}
+const htmlDados = t => `<div class="dados-faces">${t.dados.map(v => `<span class="face${v === t.esc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>`;
+const textoPen = t => (t.pen && t.pen.length ? t.pen.map(x => `${x.n}d20 ${x.fonte}`).join(', ') : '');
+function rolarPericia(id, extra = 0, titulo, tipo = '') {
+  const d = F.atual.d;
+  const p = PER[id];
+  const t = testarPericia(d, id, extra, tipo);
+  const nome = titulo || p[1];
+  F.ultimaRol = { nome, t, d6: 0 };
+  mostrarRolagem(`${d.nome} · ${nome}`, htmlRolagem(F.ultimaRol, d));
+  if (minhaFicha()) A.rolagemDaFicha(`${nome}: ${t.total} (${t.dados.length}d20: ${t.dados.join(', ')}${t.desv ? ', menor' : ''}; ${t.bonus >= 0 ? '+' : '−'}${Math.abs(t.bonus)}${t.pen.length ? '; ' + textoPen(t) : ''})`, id === 'iniciativa' ? t.total : undefined, t.dados, t.bonus);
+  return t;
+}
+function htmlRolagem(u, d) {
+  const t = u.t;
+  const bi = d.bonusInt || {};
+  const fis = ['agi', 'for', 'vig'].includes(t.attr), men = ['int', 'pre'].includes(t.attr);
+  const podeEx = F.atual && F.atual.editavel && fis && int(bi.ex) > 0 && !u.usou, podeLe = F.atual && F.atual.editavel && men && int(bi.le) > 0 && !u.usou;
+  return `${htmlDados(t)}
+    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)}${u.d6 ? ` + <b>${u.d6}</b> (1d6)` : ''} = <span class="fx-total">${t.total + u.d6}</span></p>
+    ${t.pen && t.pen.length ? `<p class="fx-legenda">Condições: ${esc(textoPen(t))}</p>` : ''}
+    ${podeEx || podeLe ? `<p><button class="fx-mini" data-acao="usar-d6" data-v="${podeEx ? 'ex' : 'le'}">+1d6 de ${podeEx ? 'exercício' : 'leitura'} (${int(podeEx ? bi.ex : bi.le)} restante${int(podeEx ? bi.ex : bi.le) > 1 ? 's' : ''})</button></p>` : ''}`;
 }
 function rolarDano(expr, mult, nome) {
   const r = rolarExpr(expr, mult);
@@ -922,6 +1121,7 @@ function aoEditar(e) {
     if (/\.t$|\.vest$|\.cat$/.test(path)) { desenharAba(); return; }
   }
   if (path === 'nex' || path === 'estagio') { atualizarDerivados(); }
+  if (F.atual.d.tipo === 'ameaca' && path === 'el') { desenharFicha(); return; }
   // nome do item/habilidade: atualiza o título sem redesenhar
   const m = /^(itens|hab|rit)\.([^.]+)\.n$/.exec(path);
   if (m) { const s = $(`details[data-id="${m[2]}"] > summary > b`); if (s) s.textContent = v || 'Sem nome'; }
@@ -947,11 +1147,22 @@ function aoClicar(e) {
   if (ac === 'voltar') { irLista(); return; }
   if (ac === 'aba-lista') { F.abaLista = v; irLista(); return; }
   if (ac === 'nova-ficha') { criarFicha(); return; }
+  if (ac === 'nova-ameaca' && ehMestre()) { criarAmeaca(); return; }
   if (ac === 'abrir-codigo') { abrirPorCodigo(); return; }
   if (ac === 'abrir-ficha') { abrirFicha(refDoCodigo(b.dataset.k, !!b.dataset.gm)); return; }
   if (ac === 'apagar-ficha') { apagarFicha(refDoCodigo(b.dataset.k, !!b.dataset.gm)); return; }
   if (ac === 'fechar-modal') { F.cat = null; $('#fxModal').hidden = true; return; }
   if (ac === 'fechar-rolagem') { $('#fxRolagem').hidden = true; return; }
+  if (ac === 'usar-d6' && F.ultimaRol && F.atual && F.atual.editavel) {
+    const k = v, d = F.atual.d, u = F.ultimaRol;
+    const resto = int((d.bonusInt || {})[k]);
+    if (resto < 1 || u.usou) return;
+    u.d6 = 1 + Math.floor(Math.random() * 6); u.usou = true;
+    gravar(`bonusInt.${k}`, resto - 1, true);
+    mostrarRolagem(`${d.nome} · ${u.nome}`, htmlRolagem(u, d));
+    if (minhaFicha()) A.rolagemDaFicha(`${u.nome}: +1d6 de ${k === 'ex' ? 'exercício' : 'leitura'} (${u.d6}) → ${u.t.total + u.d6}`);
+    return;
+  }
   if (!at || !at.d) return;
   if (ac === 'aba') { F.aba = v; desenharAba(); return; }
   if (ac === 'aba-mob') {
@@ -963,11 +1174,18 @@ function aoClicar(e) {
   if (ac === 'rolar-per') { rolarPericia(v); return; }
   if (ac === 'atacar') {
     const it = b.dataset.id ? lista(at.d.itens).find(x => x.id === b.dataset.id) : null;
-    rolarPericia(b.dataset.per, it ? int((it.a || {}).bAtk) : 0, `Ataque${it ? ' · ' + it.n : ' desarmado'}`);
+    rolarPericia(b.dataset.per, it ? int((it.a || {}).bAtk) : 0, `Ataque${it ? ' · ' + it.n : ' desarmado'}`, b.dataset.per === 'luta' ? 'cac' : 'ataque');
     return;
   }
   if (ac === 'dano') { rolarDano(b.dataset.expr, int(b.dataset.mult) || 1, b.dataset.n); return; }
   if (ac === 'exportar') { exportarFicha(); return; }
+  if (ac === 'ativa' && at && !at.ref.gm && at.ref.dono === quem()) {
+    try { localStorage.setItem(KEY_ATIVA(quem()), at.ref.chave); } catch (e) {}
+    F.ativaId = undefined; ligarAtiva();
+    A.aviso('Esta é a sua ficha ativa: PV, PE e SAN aparecem no mapa.');
+    desenharFicha();
+    return;
+  }
   if (ac === 'copiar-codigo') { navigator.clipboard && navigator.clipboard.writeText(codigoDe(at.ref)).then(() => A.aviso('Código copiado.')).catch(() => {}); return; }
   if (!ed) return;
   if (ac === 'barra') {
@@ -984,6 +1202,24 @@ function aoClicar(e) {
     atualizarDerivados();
     return;
   }
+  if (ac === 'presenca') { abrirPresenca(); return; }
+  if (ac === 'presenca-enviar') {
+    const d = at.d, pres = d.pres || {};
+    const alvos = {}; $$('[data-alvo]').forEach(x => { if (x.checked) alvos[x.dataset.alvo] = true; });
+    if (!Object.keys(alvos).length) { A.aviso('Escolha ao menos uma cobaia.'); return; }
+    const id = A.Rede.chave();
+    A.definir(['chamado'], { id, t: 'presenca', nome: d.nome || 'Criatura', el: d.el || '', dt: int(pres.dt), dano: String(pres.dano || '1d6'), nex: int(pres.nex), extras: int(($('#fxPresExtra') || {}).value), alvos, ts: Date.now() });
+    A.aviso('Pedido de Vontade enviado.');
+    acompanharPresenca(id);
+    return;
+  }
+  if (ac === 'amea-atk') {
+    const a = (at.d.ataques || {})[b.dataset.id]; if (!a) return;
+    const t = rolarTeste(int(a.dados) || 1, int(a.bonus));
+    mostrarRolagem(`${at.d.nome} · ${a.n || 'Ataque'}`, `${htmlDados(t)}<p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)} = <span class="fx-total">${t.total}</span></p>`);
+    return;
+  }
+  if (ac === 'novo-ataque') { const id = A.Rede.chave(); gravar('ataques.' + id, { n: 'Garras', dados: 2, bonus: 10, dano: '2d6+5', crit: 'x2', o: Date.now() }, true); desenharFicha(); return; }
   if (ac === 'catalogo') { abrirCatalogo(v); return; }
   if (ac === 'mod-sub') { F.cat.sub = v; F.cat.busca = ''; desenharCatalogo(); return; }
   if (ac === 'cat-seg') { F.cat.seg = v; desenharCatalogo(); return; }
@@ -1011,21 +1247,45 @@ function aoClicar(e) {
   if (ac === 'remover') {
     const x = lista(at.d[v]).find(i => i.id === b.dataset.id);
     if (!confirm(`Remover "${x ? x.n : ''}"?`)) return;
-    gravar(`${v}.${b.dataset.id}`, null, true); desenharAba();
+    gravar(`${v}.${b.dataset.id}`, null, true); if (at.d.tipo === 'ameaca') desenharFicha(); else desenharAba();
     return;
   }
   if (ac === 'conjurar') {
-    const h = (at.d.rit || {})[b.dataset.id]; if (!h) return;
-    const custo = CUSTO_RITUAL[int(h.c)] || 1;
-    const k = at.d.regra === 'determinacao' ? 'pd' : 'pe';
-    const r = calc(at.d);
-    const mx = r[k + 'Max'];
-    const cur = at.d[k] && at.d[k].a !== undefined && at.d[k].a !== null && at.d[k].a !== '' ? int(at.d[k].a) : mx;
-    if (cur < custo && !confirm(`Você tem ${cur} ${k.toUpperCase()} e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
-    gravar(k + '.a', cur - custo, true);
+    const d = at.d, h = (d.rit || {})[b.dataset.id]; if (!h) return;
+    const forma = formasDoRitual(h).find(f => f.k === (b.dataset.forma || 'n')) || { k: 'n', n: 'Conjurar', extra: 0 };
+    const alq = condicoesDe(d).has('alquebrado') ? 1 : 0;
+    const custo = (CUSTO_RITUAL[int(h.c)] || 1) + forma.extra + alq;
+    const det = d.regra === 'determinacao', k = det ? 'pd' : 'pe', K = k.toUpperCase();
+    const r = calc(d);
+    const cur = atualDe(d, k, r[k + 'Max']);
+    if (cur < custo && !confirm(`Você tem ${cur} ${K} e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
+    // O Custo do Paranormal (OPRPG p. 121): Ocultismo DT 20 + custo; Medo sempre cobra Sanidade
+    const medo = /medo/i.test(h.el || '');
+    let perda = 0, perm = 0, teste = null;
+    const dt = 20 + custo;
+    if (medo) { perda = custo; perm = forma.k === 'v' ? 3 : forma.k === 'd' ? 2 : 1; }
+    else { teste = testarPericia(d, 'ocultismo'); if (teste.total < dt) { perda = custo; if (dt - teste.total >= 5) perm = 1; } }
+    let resumo = '';
+    if (det) {
+      const novo = Math.max(0, cur - custo - perda - perm);
+      gravar('pd.a', novo, true);
+      resumo = perda || perm ? `perdeu mais ${perda + perm} PD (Custo do Paranormal)` : 'sem perda extra';
+    } else {
+      gravar('pe.a', Math.max(0, cur - custo), true);
+      if (perda || perm) {
+        const sanAt = atualDe(d, 'san', r.sanMax);
+        if (perm) gravar('san.aj', int((d.san || {}).aj) - perm, true);
+        const novoMax = calc(d).sanMax;
+        gravar('san.a', Math.max(0, Math.min(novoMax, sanAt - perda)), true);
+        resumo = `perdeu ${perda} SAN${perm ? ` e ${perm} de Sanidade máxima (permanente)` : ''}`;
+      } else resumo = 'mente intacta';
+    }
     atualizarDerivados();
-    const desc = `conjurou ${h.n} (${h.el || ''} ${int(h.c) || 1}º círculo, −${custo} ${k.toUpperCase()})`;
-    mostrarRolagem(`${at.d.nome}`, `<p>${esc(desc)}</p><p class="fx-legenda">Lembre do Custo do Paranormal: Ocultismo DT ${20 + custo}.</p>`);
+    const nomeF = forma.k === 'n' ? '' : ` (${forma.n.toLowerCase()})`;
+    const desc = `conjurou ${h.n}${nomeF} · ${h.el || ''} ${int(h.c) || 1}º círculo · −${custo} ${K}${alq ? ' (alquebrado +1)' : ''} · ${teste ? `Ocultismo ${teste.total} vs DT ${dt}: ${teste.total >= dt ? 'passou' : 'falhou'}, ` : 'Medo: '}${resumo}`;
+    mostrarRolagem(`${d.nome} · ${h.n}${nomeF}`, `${teste ? htmlDados(teste) + `<p>Ocultismo <span class="fx-total">${teste.total}</span> contra DT ${dt}: <b>${teste.total >= dt ? 'passou' : 'falhou'}</b></p>${teste.pen.length ? `<p class="fx-legenda">Condições: ${esc(textoPen(teste))}</p>` : ''}` : '<p>Rituais de Medo sempre cobram Sanidade.</p>'}
+      <p>−${custo} ${K}${alq ? ' (alquebrado: +1)' : ''} · ${esc(resumo)}.</p>`);
+    try { A.Rede.set('efeito', { t: 'sigilo', el: h.el || 'Varia', n: h.n || 'Ritual', q: d.nome || '', ts: Date.now() }); } catch (e) {}
     if (minhaFicha()) A.rolagemDaFicha(desc);
     return;
   }
@@ -1042,16 +1302,79 @@ function aoClicar(e) {
   }
 }
 
+/* ---------------- FICHA ATIVA → MAPA ---------------- */
+function ligarAtiva() {
+  if (!A.pronto) { clearTimeout(F.tAtiva); F.tAtiva = setTimeout(ligarAtiva, 500); return; }
+  const k = chaveAtiva(), q = quem();
+  const id = k ? q + ':' + k : null;
+  if (F.ativaId === id) return;
+  if (F.ativaOff) F.ativaOff();
+  F.ativaOff = null; F.ativaId = id; F.ativaD = null; F.ativaRef = null;
+  if (!k) { document.dispatchEvent(new Event('acf-ativa')); return; }
+  const ref = { dono: q, chave: k };
+  F.ativaRef = ref;
+  const ouvir = () => { if (F.ativaId !== id) return; F.ativaOff = A.Rede.on(caminho(ref), d => {
+    if (F.ativaId !== id) return;
+    F.ativaD = d ? normalizar(d) : null;
+    publicarVitais();
+    document.dispatchEvent(new Event('acf-ativa'));
+  }, () => {}); };
+  (A.garantirLogin ? A.garantirLogin() : Promise.resolve()).then(ouvir, ouvir);
+}
+function vitaisDe(d) {
+  const r = calc(d);
+  const cur = (k, mx) => (d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx);
+  const det = d.regra === 'determinacao';
+  const v = { nome: d.nome || '', pv: cur('pv', r.pvMax), pvM: r.pvMax, nex: CLASSES[d.classe] && CLASSES[d.classe].estagio ? 'E' + (int(d.estagio) || 1) : (d.classe === 'mundano' ? 0 : int(d.nex) || 5) };
+  if (det) { v.det = 1; v.pd = cur('pd', r.pdMax); v.pdM = r.pdMax; if (d.enl) v.enl = 1; }
+  else { v.pe = cur('pe', r.peMax); v.peM = r.peMax; v.san = cur('san', r.sanMax); v.sanM = r.sanMax; }
+  return v;
+}
+function publicarVitais() {
+  if (!A.publicarVitais || ehMestre() || !F.ativaD) return;
+  A.publicarVitais(vitaisDe(F.ativaD));
+}
+// aplica mudanças na ficha ativa (interlúdio, Presença Perturbadora, recompensas). lista: [[caminho, valor]]
+async function aplicarNaAtiva(lista) {
+  if (!F.ativaRef || !F.ativaD) return false;
+  const ref = F.ativaRef;
+  try {
+    await Promise.all(lista.map(([c, v]) => A.Rede.set(caminho(ref) + '/' + c.replace(/\./g, '/'), v === undefined ? null : v)));
+  } catch (e) { A.aviso('O servidor recusou a alteração na ficha.'); return false; }
+  if (F.atual && F.atual.d && !F.atual.ref.gm && F.atual.ref.chave === ref.chave) {
+    lista.forEach(([c, v]) => setPath(F.atual.d, c, v === undefined ? null : v));
+    if (F.tela === 'ficha') { atualizarDerivados(); if (F.aba) desenharAba(); }
+  }
+  return true;
+}
+const atualDe = (d, k, mx) => (d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx);
+
 /* ---------------- BOTÃO NO TOPO ---------------- */
 function atualizarBotao() {
   const b = $('#btnFichas'); if (!b) return;
   b.hidden = !(A.mestre || A.meu || A.aux);
   if (F.aberto && F.tela === 'lista') irLista();
 }
-document.addEventListener('acf-perfil', () => setTimeout(atualizarBotao, 0));
+document.addEventListener('acf-perfil', () => setTimeout(() => { atualizarBotao(); ligarAtiva(); }, 0));
+setTimeout(ligarAtiva, 600);
 const btn = $('#btnFichas');
 if (btn) btn.addEventListener('click', () => (F.aberto ? fechar() : abrir()));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && F.aberto) { if (!$('#fxModal').hidden) { F.cat = null; $('#fxModal').hidden = true; } else fechar(); } });
 setTimeout(atualizarBotao, 300);
-window.ACF_FICHAS = { abrir, fechar, calc, rolarExpr };
+window.ACF_FICHAS = {
+  abrir, fechar, calc, rolarExpr, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, PATENTES,
+  ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
+  // categoria do item pelo nome no catálogo; devolve o estouro do limite da patente, se houver
+  checarLimite: nome => {
+    if (!F.ativaD) return null;
+    const n = String(nome || '').trim().toLowerCase();
+    const x = C.itens.find(i => i.n.toLowerCase() === n);
+    if (!x || !int(x.cat) || int(x.cat) > 4) return null;
+    const r = calc(F.ativaD), i = int(x.cat) - 1;
+    const tem = r.contagem[i], max = r.patente.lim[i];
+    return tem + 1 > max ? { cat: ROM[int(x.cat)], tem, max, pat: r.patente.n } : null;
+  },
+  abrirAtiva: () => { if (F.ativaRef) { abrir(); abrirFicha(F.ativaRef); } else abrir(); },
+  religar: () => { F.ativaId = undefined; ligarAtiva(); },
+};
 })();

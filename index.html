@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261009l">
+<link rel="stylesheet" href="style.css?v=20261010m">
 </head>
 <body>
 
@@ -125,6 +125,7 @@
     <nav id="abasMestre" class="abas-mestre mestre-only" hidden aria-label="Abas do Mestre">
       <button data-aba="mapa" class="ativo">Mapa</button>
       <button data-aba="sessao">Sessão</button>
+      <button data-aba="mesa">Mesa</button>
       <button data-aba="registro">Registro</button>
       <button data-aba="segredos">Segredos</button>
       <button id="btnFecharPainelM" class="fechar-abas so-celular" aria-label="Fechar painel">×</button>
@@ -380,6 +381,25 @@
       <button id="btnApagao" class="btn-protocolo">Ligar apagão</button>
     </section>
 
+    <!-- Aba Mesa: ferramentas de Ordem Paranormal (montadas pelo mesa.js) -->
+    <section class="bloco mestre-only" id="blocoMesaRetratos" data-aba="mesa" hidden>
+      <h2>Painel de retratos</h2>
+      <p class="mini">Foto, nome, PV e PE de cada cobaia sobre o mapa. Cada jogador vê só o próprio; você escolhe o que aparece na sua tela e na tela de cada jogador.</p>
+      <h3>Na minha tela</h3><div id="mesaHudMeu" class="lista-apagao"></div>
+      <h3>Na tela de cada jogador</h3><div id="mesaHudJog" class="lista-apagao"></div>
+    </section>
+    <section class="bloco mestre-only" id="blocoMesaCena" data-aba="mesa" hidden>
+      <h2>Cena e escudo</h2>
+      <div class="mesa-linha"><button id="mesaNovaCena">Nova cena</button><button id="mesaEscudo">📜 Escudo do Mestre</button></div>
+      <p class="mini">Nova cena zera os contadores de Morrendo e Enlouquecendo. Os turnos contam sozinhos na perseguição, e você também ajusta pelo cartão da cobaia.</p>
+    </section>
+    <section class="bloco mestre-only" id="blocoMesaInv" data-aba="mesa" hidden><h2>Cena de investigação</h2><div id="mesaInv"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaInt" data-aba="mesa" hidden><h2>Interlúdio</h2><div id="mesaInt"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaRec" data-aba="mesa" hidden><h2>Fim de missão</h2><div id="mesaRec"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaAmb" data-aba="mesa" hidden><h2>Ambiente</h2><div id="mesaAmb"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaRol" data-aba="mesa" hidden><h2>Rolagem secreta</h2><div id="mesaRol"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaAmea" data-aba="mesa" hidden><h2>Ameaças</h2><div id="mesaAmea"></div></section>
+
     <section class="bloco mestre-only" id="blocoDiario" data-aba="registro" hidden>
       <h2>Diário da sessão</h2>
       <p class="mini">Registro automático, só do Mestre: movimentos, rolagens, quebras, Protocolo, perseguição e revelações. Ele grava enquanto a sua tela de Mestre estiver aberta.</p>
@@ -614,11 +634,12 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261009l"></script>
-<script src="config.js?v=20261009l"></script>
-<script src="app.js?v=20261009l"></script>
-<script src="catalogo-op.js?v=20261009l"></script>
-<script src="fichas.js?v=20261009l"></script>
-<script src="quadro.js?v=20261009l"></script>
+<script src="data.js?v=20261010m"></script>
+<script src="config.js?v=20261010m"></script>
+<script src="app.js?v=20261010m"></script>
+<script src="catalogo-op.js?v=20261010m"></script>
+<script src="fichas.js?v=20261010m"></script>
+<script src="quadro.js?v=20261010m"></script>
+<script src="mesa.js?v=20261010m"></script>
 </body>
 </html>

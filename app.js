@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261009l';
+const VERSAO_SITE = '20261010m';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1313,7 +1313,7 @@ function desenharCartao() {
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
   const condMestre = mestre && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
-  const fichaMinha = !mestre && tk.s === meu ? `<div class="cartao-ficha">${barrasFicha(fichaDe(meu))}</div>` : '';
+  const fichaMinha = !mestre && tk.s === meu ? `<div class="cartao-ficha">${barrasFicha(fichaComVitais(meu))}</div>` : '';
   const fichaEdit = mestre && s.tipo === 'cobaia' ? htmlEditarFicha(s.id) : '';
   if (c.dataset.ficha === selecionado && c.contains(document.activeElement) && document.activeElement.matches('input')) return;
   const abertos = c.dataset.ficha === selecionado ? $$('details', c).map(d => d.open) : [];
@@ -2059,18 +2059,53 @@ $('#btnReiniciarCrono').addEventListener('click', () => { if (P().on) Store.defi
 const COND = {
   sangrando: { i: '🩸', n: 'Sangrando' }, morrendo: { i: '💀', n: 'Morrendo' }, enlouquecendo: { i: '🌀', n: 'Enlouquecendo' },
   envenenada: { i: '🧪', n: 'Envenenada' }, inconsciente: { i: '💤', n: 'Inconsciente' }, assustada: { i: '😱', n: 'Apavorada' },
+  abalado: { i: '😨', n: 'Abalada', o: 1 }, perturbado: { i: '🫨', n: 'Perturbada', o: 1 }, machucado: { i: '🩹', n: 'Machucada', o: 1 },
+  caido: { i: '⤵️', n: 'Caída', o: 1 }, desprevenido: { i: '❗', n: 'Desprevenida', o: 1 }, vulneravel: { i: '🛡️', n: 'Vulnerável', o: 1 },
+  cego: { i: '🙈', n: 'Cega', o: 1 }, surdo: { i: '🙉', n: 'Surda', o: 1 }, ofuscado: { i: '😵‍💫', n: 'Ofuscada', o: 1 },
+  fraco: { i: '🥀', n: 'Fraca', o: 1 }, debilitado: { i: '🦴', n: 'Debilitada', o: 1 }, fatigado: { i: '😮‍💨', n: 'Fatigada', o: 1 }, exausto: { i: '🥵', n: 'Exausta', o: 1 },
+  frustrado: { i: '😤', n: 'Frustrada', o: 1 }, esmorecido: { i: '😶‍🌫️', n: 'Esmorecida', o: 1 }, alquebrado: { i: '💔', n: 'Alquebrada', o: 1 },
+  lento: { i: '🐢', n: 'Lenta', o: 1 }, imovel: { i: '⛓️', n: 'Imóvel', o: 1 }, agarrado: { i: '🤼', n: 'Agarrada', o: 1 }, enredado: { i: '🕸️', n: 'Enredada', o: 1 },
+  atordoado: { i: '💫', n: 'Atordoada', o: 1 }, paralisado: { i: '🧊', n: 'Paralisada', o: 1 }, confuso: { i: '❓', n: 'Confusa', o: 1 },
+  enjoado: { i: '🤢', n: 'Enjoada', o: 1 }, fascinado: { i: '✨', n: 'Fascinada', o: 1 }, emchamas: { i: '🔥', n: 'Em chamas', o: 1 },
 };
+// estados que vêm da própria ficha do jogador (PV, SAN, PD publicados no token)
+function condicoesDaFicha(id) {
+  const tk = (Store.state.tokens || {})[id], v = tk && tk.vit;
+  if (!v) return [];
+  const out = [];
+  if (num0(v.pvM) && num0(v.pv) <= 0) out.push('morrendo');
+  else if (num0(v.pvM) && num0(v.pv) <= num0(v.pvM) / 2) out.push('machucado');
+  if (v.det ? v.enl : (num0(v.sanM) && num0(v.san) <= 0)) out.push('enlouquecendo');
+  else if (v.det ? (num0(v.pdM) && num0(v.pd) < num0(v.pdM) / 2) : (num0(v.sanM) && num0(v.san) < num0(v.sanM) / 2)) out.push('perturbado');
+  return out;
+}
+const num0 = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 function condicoesVisiveis(id) {
   const c = (Store.state.cond || {})[id] || {};
-  return Object.keys(COND).filter(k => c[k] === 1 || (c[k] === 2 && (V().mestre || id === meu)));
+  const daFicha = condicoesDaFicha(id);
+  return Object.keys(COND).filter(k => c[k] === 1 || (c[k] === 2 && (V().mestre || id === meu)) || daFicha.includes(k));
 }
 function htmlCondMestre(id) {
   const c = (Store.state.cond || {})[id] || {};
-  return `<details class="cartao-sec cond-mestre"><summary>Condições</summary>
-    <p class="mini">Toque para alternar: desligada → todos veem → só o dono vê.</p>
-    <div class="cond-botoes">${Object.entries(COND).map(([k, v]) => `<button data-cond="${k}" class="c${c[k] || 0}">${v.i} ${v.n}<small>${c[k] === 1 ? 'todos' : c[k] === 2 ? 'só o dono' : ''}</small></button>`).join('')}</div></details>`;
+  const bt = ([k, v]) => `<button data-cond="${k}" class="c${c[k] || 0}">${v.i} ${v.n}<small>${c[k] === 1 ? 'todos' : c[k] === 2 ? 'só o dono' : ''}</small></button>`;
+  const daFicha = condicoesDaFicha(id);
+  const mt = (c._mt || 0), et = (c._et || 0);
+  const contador = (k, n, rot) => `<span class="cond-cont">${rot} <b>${n}/3</b> <button data-contar="${k}" data-v="-1">−</button><button data-contar="${k}" data-v="1">+</button></span>`;
+  return `<details class="cartao-sec cond-mestre"${daFicha.some(x => ['morrendo', 'enlouquecendo'].includes(x)) ? ' open' : ''}><summary>Condições${daFicha.length ? ` · ficha: ${daFicha.map(x => COND[x].i + ' ' + COND[x].n).join(', ')}` : ''}</summary>
+    ${daFicha.includes('morrendo') || mt ? `<p class="cond-alerta">💀 Morrendo: turnos iniciados nesta cena ${contador('_mt', mt, '')} (com 3, morre). Encerra com Medicina DT ${20 + 5 * (c._ms || 0)}.</p>` : ''}
+    ${daFicha.includes('enlouquecendo') || et ? `<p class="cond-alerta">🌀 Enlouquecendo: turnos iniciados nesta cena ${contador('_et', et, '')} (com 3, fica insana e vira NPC). Encerra com Diplomacia DT 20 +5 por vez já acalmada, ou curando 1 de SAN.</p>` : ''}
+    <p class="mini">Toque para alternar: desligada → todos veem → só o dono vê. As penalidades entram sozinhas nas rolagens da ficha.</p>
+    <div class="cond-botoes">${Object.entries(COND).filter(([, v]) => !v.o).map(bt).join('')}</div>
+    <details class="cond-mais"><summary>Mais condições de Ordem Paranormal</summary><div class="cond-botoes">${Object.entries(COND).filter(([, v]) => v.o).map(bt).join('')}</div></details></details>`;
 }
 function ligarCondMestre(raiz, id) {
+  $$('[data-contar]', raiz).forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const k = b.dataset.contar, at = ((((Store.state.cond || {})[id]) || {})[k]) || 0;
+    const nv = Math.max(0, Math.min(3, at + (+b.dataset.v)));
+    Store.definir(['cond', id, k], nv || null);
+    if (nv === 3) aviso(`${SER[id] ? SER[id].nome : id}: ${k === '_mt' ? 'terceiro turno morrendo. Pela regra, morre.' : 'terceiro turno enlouquecendo. Pela regra, fica insana e vira NPC.'}`);
+  });
   $$('[data-cond]', raiz).forEach(b => b.onclick = () => {
     const k = b.dataset.cond, at = (((Store.state.cond || {})[id]) || {})[k] || 0;
     const nv = (at + 1) % 3;
@@ -3862,6 +3897,14 @@ $('#chkApagao00').addEventListener('change', e => Segredos.gravar(['_apagao00'],
    ========================================================= */
 const CAMPOS_FICHA = [['pv', 'PV'], ['san', 'SAN'], ['pe', 'PE']];
 const fichaDe = id => (Store.state.fichas || {})[id] || null;
+// PV, SAN e PE vêm da ficha de agente quando o jogador tem uma ativa; sucatas continuam na ficha resumida do Mestre
+function fichaComVitais(id) {
+  const f = fichaDe(id), tk = (Store.state.tokens || {})[id], v = tk && tk.vit;
+  if (!v) return f;
+  const o = { ...(f || {}), pv: v.pv, pvm: v.pvM, nex: v.nex };
+  if (v.det) { o.pe = v.pd; o.pem = v.pdM; delete o.san; delete o.sanm; } else { o.san = v.san; o.sanm = v.sanM; o.pe = v.pe; o.pem = v.peM; }
+  return o;
+}
 function barrasFicha(f) {
   if (!f) return '<p class="vazio">O Mestre ainda não preencheu.</p>';
   return CAMPOS_FICHA.map(([k, r]) => {
@@ -3893,7 +3936,7 @@ function desenharMinhaFicha() {
   bloco.hidden = !meu || mestre || TV;
   if (bloco.hidden) return;
   const s = SER[meu];
-  $('#minhaFicha').innerHTML = `<div class="minha-topo">${bola(s)}<div><strong>${s.nome}</strong><span class="sub">${s.jogador || ''}</span></div></div>${barrasFicha(fichaDe(meu))}`;
+  $('#minhaFicha').innerHTML = `<div class="minha-topo">${bola(s)}<div><strong>${s.nome}</strong><span class="sub">${s.jogador || ''}</span></div></div>${barrasFicha(fichaComVitais(meu))}`;
 }
 
 /* =========================================================
@@ -4322,7 +4365,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Teclado:</b> algumas portas trancadas têm um teclado ao lado do botão. Digite o código que vocês encontraram. Errar faz barulho.</li>
     <li><b>Régua 📏:</b> ligue no canto do mapa e arraste para medir a distância em metros.</li>
     <li><b>Atalhos:</b> Q/E giram o mapa, R liga a régua, C abre o chat, F abre as fichas, B abre o quadro.</li></ul>
-    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre. <b>🖍 Quadro:</b> quadro branco ou preto compartilhado com a mesa, ao vivo: caneta, marca-texto, texto com fontes, notas adesivas, formas, setas e imagens (escolha, cole ou arraste). Cada um escolhe a própria cor.</li></ul>`;
+    <h3>Topo</h3><ul><li><b>Símbolo do Eco:</b> muda conforme os rumos da Caixa. <b>🔊</b> liga e desliga os sons. <b>💬 Chat:</b> Geral e Sussurro ao Mestre. <b>📋 Fichas:</b> a ficha de Ordem Paranormal da sua cobaia (atributos, perícias, PV, SAN, PE, habilidades, rituais e inventário). Toque no nome de uma perícia ou nos botões de ataque para rolar; o resultado vai para o chat, e a rolagem de Iniciativa já responde ao pedido de iniciativa do Mestre. <b>🖍 Quadro:</b> quadro branco ou preto compartilhado com a mesa, ao vivo: caneta, marca-texto, texto com fontes, notas adesivas, formas, setas e imagens (escolha, cole ou arraste). Cada um escolhe a própria cor. <b>Retrato:</b> com uma ficha ativa (★ na ficha), seu PV e PE aparecem no canto do mapa; o Mestre pode pedir testes (Presença Perturbadora), abrir interlúdios e mandar recompensas, que aparecem numa janela na sua tela.</li></ul>`;
   const jog = `<h3>Sua cobaia</h3><ul>
     <li><b>Arraste a sua ficha</b> (a de contorno tracejado). A linha mostra os metros do movimento.</li>
     <li><b>↶ Desfazer</b> (ou Ctrl+Z) volta o último movimento.</li>
@@ -4342,6 +4385,7 @@ $('#btnAjuda').addEventListener('click', () => {
     <li><b>Condições:</b> no cartão da ficha, toque em "Condições" e alterne cada uma: todos veem, só o dono vê ou desligada.</li>
     <li><b>Replay:</b> na aba Registro, "Replay no mapa" refaz os movimentos da sessão em velocidade acelerada, só na sua tela.</li>
     <li><b>Atalhos do Mestre:</b> N próximo turno · A apagão · L loja · V revelar ou esconder a sala aberta · P replay · Ctrl+Z desfazer · R régua · C chat · F fichas · B quadro.</li>
+    <li><b>Aba Mesa:</b> painel de retratos (o que aparece na sua tela e na de cada jogador), nova cena, Escudo do Mestre, cena de investigação com urgência e pistas, interlúdio, fim de missão (PP e NEX vão para as fichas), ambiente sonoro por elemento, rolagem secreta e ameaças. Morrendo e Enlouquecendo contam os turnos sozinhos na perseguição.</li>
     <li><b>📋 Fichas:</b> na aba "Fichas dos jogadores" você vê a ficha de cada cobaia ao vivo, só para leitura (o Firebase recusa qualquer alteração vinda da sua conta). Em "Minhas fichas" você cria e edita NPCs e inimigos, que só você vê.</li>
     <li><b>Shift+clique</b> nas fichas forma um grupo; arraste uma e o grupo vai junto. Esc limpa.</li>
     <li><b>Ver pelos olhos de</b> (aba Sessão) mostra o mapa como um jogador ou auxiliar vê.</li>
@@ -4457,9 +4501,12 @@ function pedirItem(it, op) {
   if (lojaSoZN() && (!tk || salaEm(tk.a, tk.x, tk.y) !== 25)) { aviso('O Maurício só atende na Zona Neutra.'); return; }
   const custo = op.p || it.custo;
   if (!podePagar(custo) && !confirm('Pelas suas sucatas anotadas, não dá para pagar. Pedir mesmo assim?')) return;
+  // limite de itens por categoria da patente (pela ficha ativa)
+  const lim = window.ACF_FICHAS && window.ACF_FICHAS.checarLimite ? window.ACF_FICHAS.checarLimite(op.n) : null;
+  if (lim && !confirm(`${op.n} é categoria ${lim.cat}. Sua patente (${lim.pat}) permite ${lim.max} item(ns) dessa categoria e você já tem ${lim.tem}. Pedir mesmo assim?`)) return;
   if (!Chat.chaveLigada) { aviso('Sem conexão com o chat.'); return; }
-  Chat.enviar(`🛒 Pedido ao Maurício: ${op.n} (${it.t}) · ${txtCusto(custo)}`, 'sus');
-  criarPedido({ tipo: 'loja', item: it.id, t: `${op.n} (${it.t})`, custo: custo || null, pg: 'ficha' });
+  Chat.enviar(`🛒 Pedido ao Maurício: ${op.n} (${it.t}) · ${txtCusto(custo)}${lim ? ` · acima do limite da patente (categoria ${lim.cat}: ${lim.tem}/${lim.max})` : ''}`, 'sus');
+  criarPedido({ tipo: 'loja', item: it.id, t: `${op.n} (${it.t})`, custo: custo || null, pg: 'ficha', ...(lim ? { lim: `Categoria ${lim.cat}: tem ${lim.tem}, limite ${lim.max} (${lim.pat})` } : {}) });
   aviso('Pedido enviado ao Mestre. A resposta chega no seu Sussurro.');
 }
 function limparFormLoja() {
@@ -4798,7 +4845,7 @@ function desenharPedidos() {
   $('#listaPedidos').innerHTML = lista.map(([k, p]) => {
     const s = SER[p.de];
     const sf = saldoDe('ficha', p.de), sc = cofre();
-    return `<li data-k="${k}"><div class="ped-topo">${s ? bola(s) : ''}<span><b>${esc(p.n || '?')}</b> pede <b>${esc(p.t)}</b><small>${p.tipo === 'melh' ? 'Melhoria da ZN' : 'Loja do Maurício'} · ${p.custo ? txtCusto(p.custo) : 'sem custo'} · ${hora(p.ts).slice(0, 5)}</small></span></div>
+    return `<li data-k="${k}"><div class="ped-topo">${s ? bola(s) : ''}<span><b>${esc(p.n || '?')}</b> pede <b>${esc(p.t)}</b><small>${p.tipo === 'melh' ? 'Melhoria da ZN' : 'Loja do Maurício'} · ${p.custo ? txtCusto(p.custo) : 'sem custo'} · ${hora(p.ts).slice(0, 5)}</small>${p.lim ? `<small class="ped-lim">⚠ ${esc(p.lim)}</small>` : ''}</span></div>
       <label class="campo-linha">Pagar com <select class="ped-pg">
         <option value="ficha" ${p.pg === 'ficha' ? 'selected' : ''}>Ficha de ${esc(p.n || '?')} (${txtCusto(sf) === 'grátis' ? 'sem sucatas' : txtCusto(sf)})${cabe(sf, p.custo) ? '' : ' · não dá'}</option>
         <option value="cofre" ${p.pg === 'cofre' ? 'selected' : ''}>Cofre do grupo (${txtCusto(sc) === 'grátis' ? 'vazio' : txtCusto(sc)})${cabe(sc, p.custo) ? '' : ' · não dá'}</option>
@@ -4909,8 +4956,23 @@ function rolagemDaFicha(texto, total, dados, bonus) {
   if (quem && Store.state.tokens[quem] && total !== undefined) Store.definir(['tokens', quem], { ...Store.state.tokens[quem], r: { t: total, d: dados || [], b: bonus || 0, ts: Date.now() } });
   postarRolagem(texto);
 }
+// a ficha ativa do jogador publica PV, PE, SAN e PD no próprio token (o Mestre e o painel de retratos leem dali)
+function publicarVitais(v) {
+  const quem = meu;
+  if (!quem || mestre) return;
+  const tk = Store.state.tokens[quem];
+  if (!tk || tk.h) return;
+  if (JSON.stringify(tk.vit || null) === JSON.stringify(v || null)) return;
+  const novo = { ...tk }; if (v) novo.vit = v; else delete novo.vit;
+  Store.definir(['tokens', quem], novo);
+}
+function enviarChat(texto, canal) { return Chat.enviar(texto, canal || 'geral', true); }
 window.ACF = {
-  Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som,
+  Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som, COND, publicarVitais, enviarChat, condicoesVisiveis,
+  get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), definir: (c, v) => Store.definir(c, v),
+  get mudo() { return mudo; }, get vez() { return vezAtual(); }, get tv() { return TV; },
+  get pronto() { return Store.modo === 'firebase' || !FIREBASE; },
+  garantirLogin: () => (Store.modo === 'firebase' && !mestre && Store.auth && !Store.auth.currentUser ? Store.garantirLogin() : Promise.resolve()),
   get mestre() { return mestre; }, get meu() { return meu; }, get aux() { return aux; },
   get firebase() { return Store.modo === 'firebase'; },
 };
