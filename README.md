@@ -12,6 +12,7 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `data.js` | Nomes das salas, elementos e lista de seres. **É aqui que se edita o conteúdo** |
 | `config.js` | Senhas (em hash) e a conexão com o Firebase |
 | `fichas.js` | Fichas de agente de Ordem Paranormal (botão 📋 Fichas) |
+| `mesa.js` | Ferramentas de Ordem Paranormal: retratos, Presença Perturbadora, interlúdio, fim de missão, investigação, ambiente, sigilo e Escudo do Mestre |
 | `quadro.js` | Quadro colaborativo da mesa (botão 🖍 Quadro) |
 | `catalogo-op.js` | Catálogo de habilidades, rituais, itens, melhorias e maldições usado nas fichas |
 | `img/` | Retratos das cobaias e o ícone da aba |
@@ -99,6 +100,17 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **Catálogo:** habilidades por classe, trilha, origem, poderes paranormais e homebrew; rituais por elemento e círculo; itens por tipo e fonte. A aba "Minhas" reúne o que você criou nas suas fichas, para reaproveitar.
 - **Exportar e importar:** cada ficha baixa um arquivo `.json` (cópia de segurança). "Importar arquivo" cria uma ficha nova a partir dele.
 - No Firebase, as fichas ficam em `agentes` (jogadores) e `agentesMestre` (Mestre). As regras novas estão no arquivo de regras entregue junto com esta versão.
+
+## Mesa de Ordem Paranormal (aba Mesa do Mestre)
+
+- **Painel de retratos:** foto, nome, PV e PE (ou PD) sobre o mapa, no estilo das transmissões. Cada jogador vê só o próprio; o Mestre marca quem aparece na tela dele e na de cada jogador. Os números vêm da **ficha ativa** (★ na ficha), que manda PV, PE e SAN para o token.
+- **Ficha ligada ao mapa:** PV 0 vira Morrendo, SAN 0 vira Enlouquecendo (com Determinação, dano mental maior que os PD). Os turnos contam sozinhos na perseguição; "Nova cena" zera. As condições de Ordem Paranormal marcadas no cartão da cobaia entram nas rolagens da ficha (−O, −OO, Defesa, deslocamento).
+- **Ameaças:** ficha de criatura (VD, Presença Perturbadora, PV, ataques). "Chamar o teste" abre na tela de cada jogador o teste de Vontade com a ficha dele; o jogador confirma o dano de SAN (ou PD) e o Mestre vê as respostas.
+- **Interlúdio:** cada jogador escolhe até duas ações; o site aplica PV, PE, SAN e os bônus de +1d6 de exercício e leitura.
+- **Fim de missão:** PP e NEX por cobaia; a ficha ativa recebe uma vez só (patente, crédito e limites sobem). A loja avisa quando um item passa do limite da patente.
+- **Clima:** a tela do jogador desbota com a SAN baixa e pulsa em vermelho morrendo; conjurar mostra um sigilo na cor do elemento para todos e rola o Custo do Paranormal; o Mestre liga um ambiente sonoro por elemento.
+- **Ferramentas:** cena de investigação (urgência, rodadas, falhas e pistas numa faixa no mapa), rolagem secreta e Escudo do Mestre com os resumos de regra.
+- No Firebase: `mesaResp` (respostas dos jogadores) e `efeito` (sigilo); o resto fica em `mapa`.
 
 ## Quadro da equipe (🖍 Quadro, atalho B)
 
