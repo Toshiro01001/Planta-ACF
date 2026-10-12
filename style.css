@@ -3380,3 +3380,5 @@ body.parede-aberta { overflow: hidden; }
 .minhas-lista li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(236,230,74,.35); background: rgba(236,230,74,.05); }
 .minhas-lista li > span { font-size: 26px; line-height: 1; }
 .minhas-lista b { display: block; font: 600 15px var(--display); color: #f3eedd; } .minhas-lista small { display: block; font-size: 12px; color: #cfc6dc; } .minhas-lista em { display: block; font: 11px var(--mono); color: var(--texto-dim); font-style: normal; margin-top: 2px; }
+/* idioma do Mostarda */
+.msg-bz.gr, .bz-bips.gr { color: #d98c2b; font-style: italic; letter-spacing: .04em; text-shadow: 0 0 6px rgba(217,140,43,.25); }

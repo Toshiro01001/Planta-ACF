@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012zb';
+const VERSAO_SITE = '20261012zc';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1252,7 +1252,7 @@ const desembaralhar = s => { try { return decodeURIComponent(escape(atob(String(
 const ehBz = m => !!m && typeof m.t === 'string' && m.t.startsWith(BZ_MARCA);
 const idMsg = m => `${String(m.a || '').replace(/[.#$\[\]/]/g, '')}_${m.ts}`;
 const BZ = { todos: {}, off: null, meus: (() => { try { return JSON.parse(localStorage.getItem('acf-bz-trad') || '{}'); } catch (e) { return {}; } })() };
-function bzTraduzido(m) { return mestre || !!aux || !!BZ.todos[idMsg(m)] || !!BZ.meus[idMsg(m)]; }
+function bzTraduzido(m) { return mestre || !!aux || (!!meu && m.a === meu) || !!BZ.todos[idMsg(m)] || !!BZ.meus[idMsg(m)]; }
 // voz da C2P0: "bip" sobe curto, "zip" desce arrastado; Sim, Não e Não sei têm melodia própria
 const BZ_MEL = {
   sim: [[880, 0, .09, 1175], [1175, .11, .09, 1568], [1568, .22, .16, 2093]],                 // sobe alegre
@@ -1274,35 +1274,87 @@ function vozBz(orig) {
   notas.forEach(([f, d, du, ff, tp]) => Som.tom(f, d, du, tp, tp === 'sawtooth' ? 0.035 : 0.05, ff));
 }
 function bipsSonoros(txt, orig) { if (orig !== undefined) { vozBz(orig); return; } String(txt).split(' ').slice(0, 14).forEach((w, i) => Som.tom(/^b/i.test(w) ? 1320 : 760, i * 0.09, 0.06, 'square', 0.05, /^b/i.test(w) ? 1760 : 520)); }
+/* ---------- Idioma do Mostarda (grunhidos, estalos e chiados) ----------
+   Mesmo mecanismo da C2P0: ele escreve normal, o site guarda embaralhado e mostra só os sons.
+   Cada palavra vira até três sons tirados das letras dela (vogal = grunhido, consoante dura = estalo,
+   s/f/z/x = chiado); "sim", "não" e "não sei" são fixos. Tradução: Compreensão Paranormal. */
+const GR_LETRA = { a: 'hraa', b: 'bgh', c: 'tsk', d: 'drk', e: 'hhe', f: 'fff', g: 'grr', h: 'hhh', i: 'iik', j: 'tch', k: 'kk', l: 'lrr', m: 'mmh', n: 'nngh',
+  o: 'hroo', p: 'pkh', q: 'kq', r: 'rrr', s: 'sss', t: 'tk', u: 'uurgh', v: 'vrr', w: 'wrr', x: 'ksh', y: 'yhh', z: 'zzt' };
+const GR_DIC = { 'nao sei': 'Tsk… tsk… hrrm', sim: 'Krrh! Tsk-tsk', nao: 'Hhhrrrgh' };
+function grunhido(txt) {
+  const partes = semAc(txt).match(/[a-z0-9]+|[.!?…,;:]+/g) || [];
+  const out = [];
+  for (let i = 0; i < partes.length; i++) {
+    const p = partes[i];
+    if (/^[.!?…,;:]+$/.test(p)) { if (out.length) out[out.length - 1] += p.replace(/…/g, '...'); continue; }
+    if (p === 'nao' && partes[i + 1] === 'sei') { out.push(GR_DIC['nao sei']); i++; continue; }
+    if (GR_DIC[p]) { out.push(GR_DIC[p]); continue; }
+    if (/^\d+$/.test(p)) { out.push(Array.from({ length: Math.min(4, p.length) }, () => 'tk').join('-')); continue; }
+    // primeira letra, uma do meio e a última (palavras curtas: menos sons)
+    const idx = p.length <= 2 ? [0] : p.length <= 4 ? [0, p.length - 1] : [0, Math.floor(p.length / 2), p.length - 1];
+    let w = idx.map(k => GR_LETRA[p[k]] || 'hh').join('-');
+    if (p.length >= 8) w += '-sss';
+    out.push(w);
+  }
+  return out.join(' ').replace(/(^|[.!?]\s+)([a-z])/g, (m0, a, b) => a + b.toUpperCase());
+}
+// voz: grunhido grave (vogais), estalo seco de quelícera (c, t, k, p…) e chiado (s, f, z, x)
+function vozGrunhido(orig) {
+  const notas = []; let t = 0;
+  const grunhe = () => { const f = 95 + Math.random() * 60; notas.push([f, t, .16, f * 0.75, 'sawtooth', .06]); t += .17; };
+  const estala = () => { notas.push([1900 + Math.random() * 900, t, .022, 1200, 'square', .045]); t += .05; };
+  const chia = () => { notas.push([3200, t, .09, 2600, 'sawtooth', .018]); t += .1; };
+  const DIC = {
+    sim: () => { notas.push([120, t, .12, 180, 'sawtooth', .06], [150, t + .16, .12, 230, 'sawtooth', .06]); t += .32; estala(); estala(); },
+    nao: () => { notas.push([190, t, .55, 70, 'sawtooth', .07]); t += .6; },
+    'nao sei': () => { estala(); t += .08; estala(); t += .08; notas.push([100, t, .3, 210, 'sawtooth', .06]); t += .35; },
+  };
+  const partes = semAc(orig).match(/[a-z0-9]+/g) || [];
+  for (let i = 0; i < partes.length && t < 4.5; i++) {
+    let p = partes[i];
+    if (p === 'nao' && partes[i + 1] === 'sei') { p = 'nao sei'; i++; }
+    if (DIC[p]) { DIC[p](); t += .1; continue; }
+    grunhido(p).toLowerCase().split('-').forEach(sil => { if (/^(tsk|tk|kk|tch|pkh|kq|drk|bgh)/.test(sil)) estala(); else if (/^(sss|fff|zzt|ksh)/.test(sil)) chia(); else grunhe(); });
+    t += .1;
+  }
+  notas.forEach(([f, d, du, ff, tp, v]) => Som.tom(f, d, du, tp, v, ff));
+}
+// quem fala uma língua própria e como ela soa
+const LINGUAS = {
+  c2p0: { nome: 'C2P0', k: 'IDIOMA DESCONHECIDO', alvo: 'a C2P0', fala: bipZip, voz: vozBz, cls: '' },
+  mostarda: { nome: 'Mostarda', k: 'SONS INCOMPREENSÍVEIS', alvo: 'o Mostarda', fala: grunhido, voz: vozGrunhido, cls: 'gr' },
+};
+const linguaDe = m => LINGUAS[m && m.a] || LINGUAS[ROBO_BZ];
+const falaDe = m => linguaDe(m).fala(desembaralhar(m.t));
 // mensagem nova da C2P0 no chat: todos ouvem a voz dela
 const BZ_OUVIDAS = { primeira: true, ids: new Set() };
 function ouvirBzNovas(msgs) {
   const lista = Object.values(msgs || {}).filter(ehBz);
   if (BZ_OUVIDAS.primeira) { BZ_OUVIDAS.primeira = false; lista.forEach(m => BZ_OUVIDAS.ids.add(idMsg(m))); return; }
-  lista.forEach(m => { const id = idMsg(m); if (BZ_OUVIDAS.ids.has(id)) return; BZ_OUVIDAS.ids.add(id); if (Date.now() - (+m.ts || 0) < 30000) vozBz(desembaralhar(m.t)); });
+  lista.forEach(m => { const id = idMsg(m); if (BZ_OUVIDAS.ids.has(id)) return; BZ_OUVIDAS.ids.add(id); if (Date.now() - (+m.ts || 0) < 30000) linguaDe(m).voz(desembaralhar(m.t)); });
 }
 function abrirTraducao(m) {
-  const id = idMsg(m), orig = desembaralhar(m.t);
+  const id = idMsg(m), orig = desembaralhar(m.t), L = linguaDe(m);
   let o = $('#bzModal');
   if (!o) { o = document.createElement('div'); o.id = 'bzModal'; o.className = 'bz-modal'; document.body.appendChild(o); o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-bz="fechar"]')) o.hidden = true; }); }
   const FX = window.ACF_FICHAS, at = FX && FX.ativa && FX.ativa();
   const temRit = at && Object.values(at.d.rit || {}).some(r => r && semAc(r.n) === 'compreensao paranormal');
-  o.innerHTML = `<div class="bz-caixa"><p class="bz-k">C2P0 · IDIOMA DESCONHECIDO</p><p class="bz-bips">${esc(bipZip(orig))}</p>
-    <p>Para entender, conjure <b>Compreensão Paranormal</b> (1º círculo, Conhecimento) tocando a C2P0. O ritual cobra o custo normal da sua ficha ativa.</p>
+  o.innerHTML = `<div class="bz-caixa"><p class="bz-k">${esc(L.nome.toUpperCase())} · ${esc(L.k)}</p><p class="bz-bips ${L.cls}">${esc(L.fala(orig))}</p>
+    <p>Para entender, conjure <b>Compreensão Paranormal</b> (1º círculo, Conhecimento) tocando ${esc(L.alvo)}. O ritual cobra o custo normal da sua ficha ativa.</p>
     ${!at ? '<p class="bz-aviso">Você não tem ficha ativa.</p>' : !temRit ? '<p class="bz-aviso">Sua ficha ativa não conhece esse ritual.</p>' : ''}
     <div class="bz-botoes">${at && temRit ? '<button data-bz="eu" class="pri">✦ Conjurar e traduzir só para mim</button><button data-bz="todos">✦ Conjurar e traduzir para todos</button>' : ''}<button data-bz="fechar">Fechar</button></div></div>`;
   o.hidden = false;
-  bipsSonoros(bipZip(orig), orig);
+  L.voz(orig);
   $$('[data-bz="eu"], [data-bz="todos"]', o).forEach(b => b.onclick = async () => {
     b.disabled = true;
     const r = await FX.conjurarAtiva('Compreensão Paranormal');
     if (!r || !r.ok) { aviso(r && r.motivo ? r.motivo : 'O ritual não saiu.'); b.disabled = false; return; }
     if (b.dataset.bz === 'todos') {
       await Rede.set('chatTrad/' + id, { q: meu || '', ts: Date.now() }).catch(() => {});
-      Chat.enviar(`✦ ${(SER[meu] || {}).nome || 'Alguém'} conjurou Compreensão Paranormal: a mensagem da C2P0 agora está traduzida para todos.`, 'geral', true);
+      Chat.enviar(`✦ ${(SER[meu] || {}).nome || 'Alguém'} conjurou Compreensão Paranormal: a mensagem ${L.alvo === 'o Mostarda' ? 'do Mostarda' : 'da C2P0'} agora está traduzida para todos.`, 'geral', true);
     } else { BZ.meus[id] = true; try { localStorage.setItem('acf-bz-trad', JSON.stringify(BZ.meus)); } catch (e) {} }
     o.hidden = true; Chat.desenhar();
-    aviso(`C2P0 disse: "${orig}"`);
+    aviso(`${L.nome} disse: "${orig}"`);
   });
 }
 
@@ -2979,7 +3031,7 @@ $('#arqBackup').addEventListener('change', async e => {
 const MAPA_FICA = ['cfg', 'nomes', 'cego', 'loja', 'melhorias', 'regrasPub', 'senhasAndar', 'docs', 'cifras', 'hud', 'momentos', 'trancaAndar', 'trilha'];
 const REST_CATS = [
   { id: 'mapa', n: 'Mapa e jogo', d: 'Fichas na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança.', on: true },
-  { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões e entregas pendentes.', on: true,
+  { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0 e do Mostarda, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões e entregas pendentes.', on: true,
     nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas'] },
   { id: 'registros', n: 'Registros', d: 'Relatório da missão, diário, noite secreta, marcas da noite, testes pedidos, Balança, total secreto das salas, histórico de NEX (o NEX inicial fica) e desejos da Parede.', on: true,
     nos: ['relatorio', 'desejos', 'nexCalc/ev'], seg: ['_diario', '_noite', '_marcas', '_testes', '_balanca', '_expoRun', '_nex'] },
@@ -3990,9 +4042,9 @@ const Chat = {
       const btn = mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '';
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
-        ${ehBz(m) ? `<div class="msg-txt msg-bz" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(bipZip(desembaralhar(m.t)))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
+        ${ehBz(m) ? `<div class="msg-txt msg-bz ${linguaDe(m).cls}" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(falaDe(m))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
-    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) bipsSonoros(el.textContent, desembaralhar(m.t)); else abrirTraducao(m); });
+    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t)); else abrirTraducao(m); });
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();
@@ -4022,7 +4074,7 @@ const Chat = {
     if (!texto || !this.chaveLigada) return;
     const m = { a: this.autorId(), n: this.autorNome(), t: texto, ts: Date.now() };
     if (d) m.d = true;
-    else if (m.a === ROBO_BZ) m.t = embaralhar(texto.slice(0, 360));
+    else if (LINGUAS[m.a]) m.t = embaralhar(texto.slice(0, 360));
     if (canal === 'geral') Rede.push('chat/geral', m).pronto.catch(erroGravacao);
     else if (canal === 'filhos') Rede.push('chat/filhos', m).pronto.catch(erroGravacao);
     else if (canal === 'sus') {
