@@ -540,9 +540,9 @@ function pintarNoite(it, resp) {
     if (!x.alvo) return `<p>🔒 <b>${esc(nomeDe(x.s))}</b>: ${esc(x.x || 'ação noturna')}</p>`;
     const [dt, nomeEst] = estado(x.alvo), tot = int(x.tot), tem = x.tot !== null && x.tot !== undefined && tot >= 0;
     const m = tot - dt;
-    const cat = !tem ? '' : m >= 0 ? `<b class="int-ok">sucesso</b> (por ${m})` : m <= -10 ? `<b class="int-grave">falha grave</b> (por ${-m}): notado, todos acordam` : `<b class="int-falha">falha</b> (por ${-m}): não chega, não é notado`;
+    const cat = !tem ? '' : m >= 0 ? `<b class="int-ok">sucesso</b> (passou por ${m})` : m <= -10 ? `<b class="int-grave">falha por 10 ou mais</b> (${-m} abaixo)` : `<b class="int-falha">falha</b> (${-m} abaixo da DT)`;
     return `<p>🌙 <b>${esc(nomeDe(x.s))}</b> · ${esc(x.x || 'ação noturna')} → <b>${esc(nomeDe(x.alvo))}</b> <small>(${esc(nomeEst)}, DT ${dt})</small><br>${tem ? `Furtividade ${tot} · ${cat}` : ''}${int(x.nat) === 1 ? ' · <b class="int-grave">🎲 1 natural</b> (falha crítica? você decide)' : ''}</p>`;
-  }).join('') + '<p class="mini">Falha crítica: como falha grave, mas a identidade é revelada. Você decide as consequências (grito, fuga, confronto ou denúncia).</p>';
+  }).join('') + '<p class="mini">O que cada faixa causa está na regra de cada ação (Escudo → Regras restritas e Cenas fora de combate). A falha crítica fica a seu critério; o 1 natural vem marcado.</p>';
 }
 
 /* ---------- 4c. Fim de missão ---------- */
