@@ -768,14 +768,20 @@ function atualizarDerivados() {
   put('defesa', r.defesa); put('defEquip', r.defEquip); put('defCarga', [r.sobrecarga ? '−5 sobrecarga' : '', ...r.defCond.f].filter(Boolean).join(' · '));
   const cx = $('[data-conds]', raiz);
   if (cx) {
-    const nomes = [...r.conds].filter(k => (A.COND || {})[k] || COND_NOME[k]);
+    const sonoK = Object.keys(d.condSono || {}).filter(k => d.condSono[k]);
+    const nomes = [...r.conds].filter(k => ((A.COND || {})[k] || COND_NOME[k]) && !sonoK.includes(k));
+    const gmT = ehMestre() && F.atual && !F.atual.ref.gm && (A.SER[d.dono] || {}).tipo === 'cobaia';
+    const xg = p => (gmT ? ` <button class="fx-x" data-acao="gm-tirar" data-v="${p}" title="Tirar desta ficha (chega quando o jogador estiver com o site aberto)">×</button>` : '');
     const bi = d.bonusInt || {};
-    const extra = [int(bi.ex) ? `🏋️ exercício ×${int(bi.ex)}` : '', int(bi.le) ? `📖 leitura ×${int(bi.le)}` : '', d.rapido ? '🍙 +5 prato rápido' : '', int(d.semDormir) ? `🌙 ${int(d.semDormir)} dia${int(d.semDormir) > 1 ? 's' : ''} sem dormir` : ''].filter(Boolean);
+    const extra = [int(bi.ex) || int(bi.le) ? `${int(bi.ex) ? `🏋️ exercício ×${int(bi.ex)} ` : ''}${int(bi.le) ? `📖 leitura ×${int(bi.le)}` : ''}${xg('bonusInt')}` : '', d.rapido ? `🍙 +5 prato rápido${xg('rapido')}` : '', int(d.semDormir) ? `🌙 ${int(d.semDormir)} dia${int(d.semDormir) > 1 ? 's' : ''} sem dormir${xg('semDormir')}` : ''].filter(Boolean);
     const tr = Object.entries(d.treino || {}).filter(([, v]) => v);
     const podeT = F.atual && F.atual.editavel;
-    const html = (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
-      + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : ''}</i>`).join('')}` : '')
-      + (d.bonusProx ? `<span class="fx-k">Guardado</span><i class="fx-cond fx-bonus">⚡ ${esc(d.bonusProx.b)} · ${esc(d.bonusProx.n)}${podeT ? ' <button class="fx-x" data-acao="tirar-bp" title="Descartar">×</button>' : ''}</i>` : '');
+    const sono = Object.keys(d.condSono || {}).filter(k => d.condSono[k]);
+    const html = (sono.length ? `<span class="fx-k">Do sono</span>${sono.map(k => `<i class="fx-cond">${esc(COND_NOME[k] || k)}${xg('condSono/' + k)}</i>`).join('')}` : '')
+      + (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
+      + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : xg('treino/' + p)}</i>`).join('')}` : '')
+      + (d.bonusProx ? `<span class="fx-k">Guardado</span><i class="fx-cond fx-bonus">⚡ ${esc(d.bonusProx.b)} · ${esc(d.bonusProx.n)}${podeT ? ' <button class="fx-x" data-acao="tirar-bp" title="Descartar">×</button>' : xg('bonusProx')}</i>` : '')
+      + (gmT && (sono.length || tr.length || d.rapido || d.bonusProx || int(d.semDormir) || int(bi.ex) || int(bi.le)) ? '<button class="fx-mini fx-gm-limpa" data-acao="gm-tirar" data-v="*">🧹 Limpar tudo</button>' : '');
     if (cx.innerHTML !== html) cx.innerHTML = html;
   }
   put('bloqueio', r.bloqueio); put('esquiva', r.esquiva);
@@ -1458,6 +1464,13 @@ function aoClicar(e) {
     return;
   }
   if (ac === 'tirar-treino' && F.atual && F.atual.editavel) { if (confirm(`Tirar o +1d6 de ${(PER[v] || [, v])[1]}? (a semana do bônus acabou)`)) gravar('treino.' + v, null, true); return; }
+  if (ac === 'gm-tirar' && ehMestre() && at && at.d && !at.ref.gm) {
+    const R = window.ACF_REGRAS; if (!R || !R.entregarFicha) return;
+    const lst = v === '*' ? ['condSono', 'semDormir', 'treino', 'rapido', 'bonusProx', 'bonusInt'] : [v];
+    if (v === '*' && !confirm('Tirar desta ficha as condições do sono e todos os bônus de interlúdio?')) return;
+    R.entregarFicha(at.d.dono, at.ref.chave, { tirar: lst }).then(() => A.aviso('Enviado: some da ficha assim que o jogador estiver com o site aberto.'), () => A.aviso('O servidor recusou.'));
+    return;
+  }
   if (!at || !at.d) return;
   if (ac === 'aba') { F.aba = v; desenharAba(); return; }
   if (ac === 'aba-mob') {
@@ -1659,6 +1672,41 @@ function aoClicar(e) {
   }
 }
 
+// conjura, pela ficha ativa, um ritual que ela conhece (mesmas regras do botão Conjurar: custo, limite e Custo do Paranormal)
+async function conjurarAtiva(nome) {
+  const d = F.ativaD; if (!d) return { ok: false, motivo: 'Você não tem ficha ativa.' };
+  const sa = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const h = lista(d.rit).find(x => sa(x.n) === sa(nome)); if (!h) return { ok: false, motivo: `Sua ficha não conhece ${nome}.` };
+  const alq = condicoesDe(d).has('alquebrado') ? 1 : 0, custo = (CUSTO_RITUAL[int(h.c)] || 1) + alq;
+  const det = d.regra === 'determinacao', k = det ? 'pd' : 'pe', K = k.toUpperCase(), r = calc(d), cur = atualDe(d, k, r[k + 'Max']);
+  if (cur < custo) return { ok: false, motivo: `Você tem ${cur} ${K} e o ritual custa ${custo}.` };
+  const elN = String(h.el || '').toLowerCase().trim();
+  if (elN && !/medo|varia/.test(elN)) {
+    const temComp = lista(d.itens).some(it => (String(it.el || '').toLowerCase() === elN || (/componente/i.test(it.n || '') && String(it.n).toLowerCase().includes(elN))) && (it.qtd === undefined || it.qtd === '' || int(it.qtd) > 0));
+    if (!temComp && !confirm(`Você não tem Componentes Ritualísticos de ${h.el} no inventário, e a regra pede. Conjurar mesmo assim?`)) return { ok: false, motivo: 'Ritual cancelado.' };
+  }
+  const medo = /medo/i.test(h.el || ''), dt = 20 + custo;
+  let perda = 0, perm = 0, teste = null;
+  if (medo) { perda = custo; perm = 1; } else { teste = testarPericia(d, 'ocultismo'); if (teste.total < dt) { perda = custo; if (dt - teste.total >= 5) perm = 1; } }
+  const mud = [];
+  let resumo;
+  if (det) { mud.push(['pd.a', Math.max(0, cur - custo - perda - perm)]); resumo = perda || perm ? `perdeu mais ${perda + perm} PD` : 'sem perda extra'; }
+  else {
+    mud.push(['pe.a', Math.max(0, cur - custo)]);
+    if (perda || perm) {
+      const sanAt = atualDe(d, 'san', r.sanMax);
+      if (perm) mud.push(['san.aj', int((d.san || {}).aj) - perm]);
+      mud.push(['san.a', Math.max(0, Math.min(r.sanMax - perm, sanAt - perda))]);
+      resumo = `perdeu ${perda} SAN${perm ? ` e ${perm} de Sanidade máxima` : ''}`;
+    } else resumo = 'mente intacta';
+  }
+  mud.push(['reg.rit', int((d.reg || {}).rit) + 1]);
+  const ok = await aplicarNaAtiva(mud); if (!ok) return { ok: false, motivo: 'O servidor recusou a alteração na ficha.' };
+  try { A.Rede.set('efeito', { t: 'sigilo', el: h.el || 'Varia', n: h.n || 'Ritual', q: d.nome || '', quem: d.dono || A.meu || '', c: int(h.c) || 1, ts: Date.now() }); } catch (e) {}
+  A.rolagemDaFicha(`conjurou ${h.n} · ${h.el || ''} ${int(h.c) || 1}º círculo · −${custo} ${K} · ${teste ? `Ocultismo ${teste.total} vs DT ${dt}: ${teste.total >= dt ? 'passou' : 'falhou'}, ` : ''}${resumo}`);
+  return { ok: true, resumo };
+}
+
 /* ---------------- FICHA ATIVA → MAPA ---------------- */
 function ligarAtiva() {
   if (!A.pronto) { clearTimeout(F.tAtiva); F.tAtiva = setTimeout(ligarAtiva, 500); return; }
@@ -1731,7 +1779,7 @@ if (btn) btn.addEventListener('click', () => (F.aberto ? fechar() : abrir()));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && F.aberto) { if (!$('#fxModal').hidden) { F.cat = null; $('#fxModal').hidden = true; } else fechar(); } });
 setTimeout(atualizarBotao, 300);
 window.ACF_FICHAS = {
-  abrir, fechar, calc, rolarExpr, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, NIVEIS, PATENTES, nivelDe, nexDe, corNex,
+  abrir, fechar, calc, rolarExpr, conjurarAtiva, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, NIVEIS, PATENTES, nivelDe, nexDe, corNex,
   ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
   // chaves das fichas deste aparelho para a cobaia escolhida (regras restritas usam o hash delas)
   minhasChaves: () => { const q = A.meu; return q ? indice().filter(r => r && r.chave && r.dono === q).map(r => r.chave) : []; },
