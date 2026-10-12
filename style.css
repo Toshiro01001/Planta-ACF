@@ -2828,3 +2828,75 @@ body.parede-aberta { overflow: hidden; }
 .fx-x:hover { opacity: 1; }
 .int-acordado .mesa-linha { gap: 18px; }
 .int-acordado .mesa-linha input, .int-slot .chave input { flex: 0 0 auto; min-width: 0; }
+
+/* ---------- Noite do Mestre: efeitos e marcas ---------- */
+.nt-reg { border-left: 2px solid var(--linha); padding: 2px 0 4px 8px; margin: 6px 0; }
+.nt-reg p { margin: 2px 0; }
+.nt-efs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.nt-ef { font-size: 12px; padding: 4px 9px; }
+.nt-ef.pri { border-color: #3c9e7a; color: #9fe3c5; }
+.nt-ef[disabled] { opacity: .65; cursor: default; }
+.nt-marcas { font-size: 13px; margin: 4px 0 8px; color: #e8c9a0; }
+.nt-mini { padding: 0 6px; font-size: 12px; line-height: 1.3; }
+
+/* ---------- Escudo: tópicos liberados para os jogadores ---------- */
+.esc-pub { display: inline-flex; align-items: center; gap: 5px; margin-left: 12px; font: 11px var(--mono); letter-spacing: .06em; text-transform: none; color: #6b604b; cursor: pointer; vertical-align: middle; }
+.esc-pub input { accent-color: #8a1a14; }
+.esc-pub-linha { margin: 0 0 10px; }
+.escudo[data-modo="jog"] .escudo-caixa > header span { color: #3c6e8a; }
+.btn-regras { width: 100%; margin-top: 8px; border-color: #5b7d8a; color: #dbe9ef; }
+
+/* ---------- Teste pedido pelo Mestre ---------- */
+.mesa-alvos { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0; }
+.mesa-campo-in { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-dim); }
+.mesa-campo-in input { width: 70px; }
+#mesaTesteTxt { width: 100%; box-sizing: border-box; margin: 6px 0; background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 6px 8px; font: 14px var(--corpo); }
+#mesaTestePer { background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 6px 8px; font: 14px var(--corpo); }
+
+/* ---------- Ficha: aba Em jogo, turno, usos, registro ---------- */
+.fx-jogo { display: grid; gap: 10px; }
+.fx-jogo h4 { margin: 6px 0 0; font: 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--fx-dim2, #9a8f7a); }
+.fx-jogo h4 small { letter-spacing: 0; margin-left: 6px; }
+.fx-jg-vits { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.fx-jg-vit { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; padding: 8px 10px; border: 1px solid var(--fx-linha, #3a2f44); border-top: 3px solid #c2272f; }
+.fx-jg-pe, .fx-jg-pd { border-top-color: #e08a1f; }
+.fx-jg-san { border-top-color: #8a3fd1; }
+.fx-jg-vit b { font: 11px var(--mono); letter-spacing: .12em; }
+.fx-jg-vit output { font: 24px var(--mono); text-align: right; }
+.fx-jg-vit output small { font-size: 13px; opacity: .6; }
+.fx-jg-vit span { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fx-jg-vit span button { padding: 8px 0; font: 18px var(--mono); }
+.fx-jg-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.fx-jg-btns button { display: grid; gap: 2px; text-align: left; padding: 10px 12px; min-height: 44px; }
+.fx-jg-btns button small { font-size: 11px; opacity: .7; }
+.fx-jg-btns button[style*="--el"] { border-left: 3px solid var(--el); }
+.fx-jg-per { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); }
+.fx-jg-per button b { margin-left: 8px; }
+.fx-jg-per button { display: flex; justify-content: space-between; align-items: baseline; }
+.fx-jg-per button b { font: 16px var(--mono); color: var(--ac); font-weight: 400; }
+.fx-jg-bp { margin: 0; padding: 6px 10px; border: 1px dashed var(--ac); font-size: 13px; }
+.fx-turno { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.fx-turno > span { font: 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin-right: 4px; }
+.fx-turno button[data-v] { padding: 6px 12px; }
+.fx-turno button.on { background: var(--ac); color: var(--ac-txt); border-color: var(--ac); text-decoration: line-through; }
+.fx-btn-atk { border-color: var(--ac) !important; }
+.fx-usar { margin-left: auto; }
+.fx-uso { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 10px; margin: 8px 0; padding: 8px 10px; border: 1px dashed var(--fx-linha, #3a2f44); }
+.fx-uso > span { grid-column: 1 / -1; font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+.fx-uso small { grid-column: 1 / -1; opacity: .7; font-size: 11.5px; }
+.fx-rol-dano { margin: 8px 0 4px; padding: 6px 10px; border-left: 3px solid var(--ac); }
+.fx-rol-dano.crit { border-left-color: #e0b33a; background: rgba(224,179,58,.1); }
+.fx-registro h4 { margin: 0 0 8px; }
+.fx-reg-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.fx-reg { display: grid; justify-items: center; gap: 2px; padding: 10px 6px; border: 1px solid var(--fx-linha, #3a2f44); text-align: center; opacity: .55; }
+.fx-reg.bronze, .fx-reg.prata, .fx-reg.ouro { opacity: 1; }
+.fx-reg.bronze { border-color: #a0703c; } .fx-reg.prata { border-color: #b9c0c8; } .fx-reg.ouro { border-color: #e0b33a; box-shadow: 0 0 12px rgba(224,179,58,.25); }
+.fx-reg-ic { font-size: 20px; }
+.fx-reg b { font: 22px var(--mono); }
+.fx-reg small { font-size: 11px; opacity: .8; }
+.fx-reg i { font-size: 11px; font-style: normal; opacity: .7; }
+.fx-jogo button, .fx-turno button, .fx-uso button { background: transparent; border: 1px solid var(--fx-linha2); color: var(--fx-tinta); cursor: pointer; font-family: var(--mono); letter-spacing: .04em; border-radius: 0; transition: border-color .15s, color .15s; }
+.fx-jogo button:hover:not(:disabled), .fx-turno button:hover:not(:disabled) { border-color: var(--ac); color: var(--ac); }
+.fx-jogo button:disabled, .fx-turno button:disabled { opacity: .55; cursor: default; }
+.fx-turno button.on, .fx-turno button.on:hover { background: var(--ac); color: var(--ac-txt); border-color: var(--ac); }
+.fx-jg-btns button b { color: var(--ac); }

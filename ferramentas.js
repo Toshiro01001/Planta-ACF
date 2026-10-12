@@ -241,7 +241,7 @@ function vigiarSugestoes() {
         else if (x.t === 'noite') {
           // ação da noite (esgueirar-se, alerta ou ação noturna de uma regra restrita): só o Mestre vê
           const tem = x.tot !== undefined && x.tot !== null && int(x.tot) >= 0;
-          A.gravarSegredo(['_noite', String(x.it || 'avulso').replace(/[.#$\[\]/]/g, ''), k], { s: x.s, k: String(x.k || '').slice(0, 10), x: x.x || '', alvo: x.alvo || '', tot: tem ? int(x.tot) : null, nat: tem ? int(x.nat) : null, ts: num(x.ts) });
+          A.gravarSegredo(['_noite', String(x.it || 'avulso').replace(/[.#$\[\]/]/g, ''), k], { s: x.s, k: String(x.k || '').slice(0, 10), x: x.x || '', alvo: x.alvo || '', tot: tem ? int(x.tot) : null, nat: tem ? int(x.nat) : null, r: String(x.r || '').slice(0, 40), at: String(x.at || '').slice(0, 30), si: x.si ? true : null, ts: num(x.ts) });
           if (A.alertaMestre) A.alertaMestre(`🌙 ${nomeDe(x.s)}: ${x.x || 'ação noturna'}${x.alvo ? ' → ' + nomeDe(x.alvo) : ''}${tem ? ` · Furtividade ${int(x.tot)}` : ''}`);
         }
         else if (x.t === 'cofre') {
@@ -741,7 +741,7 @@ function txtRegra(t) {
   fecha();
   return html;
 }
-const cartaoRegra = r => ({ tit: String(r.tit || 'Regra').slice(0, 100), txt: String(r.txt || '').slice(0, 8000), noite: !!r.noite, custo: Math.max(0, Math.min(2, int(r.custo === undefined ? 2 : r.custo))), ord: num(r.ord) });
+const cartaoRegra = r => ({ tit: String(r.tit || 'Regra').slice(0, 100), txt: String(r.txt || '').slice(0, 8000), noite: !!r.noite, si: !!r.si, custo: Math.max(0, Math.min(2, int(r.custo === undefined ? 2 : r.custo))), ord: num(r.ord) });
 async function publicarRegras() {
   if (!A.mestre || !A.segredosProntos) return;
   const aux = {}, porCob = {};
@@ -800,6 +800,11 @@ function topicoRegras() {
             ${cobaias().map(x => `<label class="chave"><input type="checkbox" data-rr-campo="para" data-rr-cob="${x.id}" ${(r.para || {})[x.id] ? 'checked' : ''} ${r.todos ? 'disabled' : ''}><span>${esc(x.nome)}${fun(x.id) ? ` <small>(${esc(fun(x.id))})</small>` : ''}</span></label>`).join('')}
             <label class="chave"><input type="checkbox" data-rr-campo="noite" ${c.noite ? 'checked' : ''}><span>Aparece como ação noturna no interlúdio de quem vê</span></label>
             <label class="rr-custo">Custo <select data-rr-campo="custo">${[0, 1, 2].map(n => `<option value="${n}" ${c.custo === n ? 'selected' : ''}>${n} aç${n === 1 ? 'ão' : 'ões'}</option>`).join('')}</select></label>
+            <label class="chave"><input type="checkbox" data-rr-campo="si" ${r.si ? 'checked' : ''}><span>Pode mirar em si mesmo (sem teste)</span></label>
+            <p class="rr-mini">Efeitos que viram botões na sua lista da noite:</p>
+            <label class="rr-custo">Cura <input data-rr-campo="cura" maxlength="30" value="${esc(r.cura || '')}" placeholder="ex.: 3d8+VIG"></label>
+            <label class="rr-custo">NEX <select data-rr-campo="nexd">${[0, -5, 5].map(n => `<option value="${n}" ${int(r.nexd) === n ? 'selected' : ''}>${n ? (n > 0 ? '+' : '−') + Math.abs(n) + '%' : 'nada'}</option>`).join('')}</select></label>
+            <label class="rr-custo">Marca <select data-rr-campo="marca">${[['', 'nada'], ['por', 'marcar o alvo'], ['tirar', 'tirar a marca do alvo']].map(([v, n]) => `<option value="${v}" ${(r.marca || '') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
           </div></details>
         <div class="rr-botoes"><button data-rr="editar" data-id="${esc(id)}">✎ Editar</button><button data-rr="apagar" data-id="${esc(id)}" class="perigo">Apagar</button></div>`;
       return { titulo: c.tit, tipo: 'html', html, linhas: [c.txt], fonte: '' };
@@ -818,6 +823,9 @@ function salvarCampoRegra(id, campo, el) {
   const r = regrasM()[id]; if (!r) return;
   if (campo === 'para') A.gravarSegredo(['_regras', id, 'para', el.dataset.rrCob], el.checked ? true : null);
   else if (campo === 'custo') A.gravarSegredo(['_regras', id, 'custo'], int(el.value));
+  else if (campo === 'cura') A.gravarSegredo(['_regras', id, 'cura'], String(el.value || '').trim().slice(0, 30) || null);
+  else if (campo === 'nexd') A.gravarSegredo(['_regras', id, 'nexd'], int(el.value) || null);
+  else if (campo === 'marca') A.gravarSegredo(['_regras', id, 'marca'], el.value || null);
   else A.gravarSegredo(['_regras', id, campo], el.checked ? true : null);
   agendarPublicarRegras();
   setTimeout(() => { const o = $('#escudoMestre'); if (o && !o.hidden && MESA().desenharEscudo) { const aberto = id; MESA().desenharEscudo(); const d = $(`[data-rr-id="${aberto}"]`); if (d) d.closest('details').open = true; } }, 30);
@@ -859,7 +867,7 @@ function importarRegras(o) {
   let t = Date.now();
   novas.forEach(r => {
     const para = {}; (Array.isArray(r.para) ? r.para : []).forEach(c => { if ((A.SER[c] || {}).tipo === 'cobaia') para[c] = true; });
-    A.gravarSegredo(['_regras', A.Rede.chave()], { tit: String(r.tit).slice(0, 100), txt: String(r.txt).slice(0, 8000), aux: r.aux ? true : null, todos: r.todos ? true : null, para: Object.keys(para).length ? para : null, noite: r.noite ? true : null, custo: r.custo === undefined ? 2 : int(r.custo), ord: t++ });
+    A.gravarSegredo(['_regras', A.Rede.chave()], { tit: String(r.tit).slice(0, 100), txt: String(r.txt).slice(0, 8000), aux: r.aux ? true : null, todos: r.todos ? true : null, para: Object.keys(para).length ? para : null, noite: r.noite ? true : null, custo: r.custo === undefined ? 2 : int(r.custo), si: r.si ? true : null, cura: r.cura ? String(r.cura).slice(0, 30) : null, nexd: int(r.nexd) || null, marca: ['por', 'tirar'].includes(r.marca) ? r.marca : null, ord: t++ });
   });
   agendarPublicarRegras();
   if (MESA().desenharEscudo) MESA().desenharEscudo();
@@ -872,12 +880,57 @@ document.addEventListener('click', e => {
   else if (a === 'editar') abrirEditorRegra(id);
   else if (a === 'apagar') { const r = regrasM()[id]; if (r && confirm(`Apagar a regra "${r.tit}"? Ela some também para quem podia ver.`)) { A.gravarSegredo(['_regras', id], null); agendarPublicarRegras(); if (MESA().desenharEscudo) MESA().desenharEscudo(); } }
   else if (a === 'importar') lerArquivo(importarRegras);
-  else if (a === 'exportar') { baixar(`regras-restritas-${new Date().toISOString().slice(0, 10)}.json`, { tipo: 'planta-acf-regras', versao: 1, regras: ordRegras(regrasM()).map(([, r]) => ({ tit: r.tit, txt: r.txt, aux: !!r.aux, todos: !!r.todos, para: Object.keys(r.para || {}), noite: !!r.noite, custo: cartaoRegra(r).custo })) }); A.aviso('Regras exportadas. O arquivo diz quem vê cada uma: guarde só com você.'); }
+  else if (a === 'exportar') { baixar(`regras-restritas-${new Date().toISOString().slice(0, 10)}.json`, { tipo: 'planta-acf-regras', versao: 1, regras: ordRegras(regrasM()).map(([, r]) => ({ tit: r.tit, txt: r.txt, aux: !!r.aux, todos: !!r.todos, para: Object.keys(r.para || {}), noite: !!r.noite, custo: cartaoRegra(r).custo, si: !!r.si, cura: r.cura || '', nexd: int(r.nexd), marca: r.marca || '' })) }); A.aviso('Regras exportadas. O arquivo diz quem vê cada uma: guarde só com você.'); }
   else if (a === 'reenviar') { publicarRegras().then(() => A.aviso('Regras reenviadas para as fichas atuais.'), () => A.aviso('Não consegui reenviar.')); }
 });
 // opções de ação noturna para o interlúdio do jogador (vêm das regras pessoais dele)
-const opcoesNoite = () => ordRegras(regrasPessoais()).filter(([, c]) => c && c.noite).map(([id, c]) => ({ id, tit: c.tit, custo: Math.max(0, Math.min(2, int(c.custo))) }));
-window.ACF_REGRAS = { topicoEscudo: topicoRegras, pessoais: regrasPessoais, opcoesNoite, txtRegra };
+const opcoesNoite = () => ordRegras(regrasPessoais()).filter(([, c]) => c && c.noite).map(([id, c]) => ({ id, tit: c.tit, si: !!c.si, custo: Math.max(0, Math.min(2, int(c.custo))) }));
+
+/* ---------- Entregas do Mestre na ficha (ex.: cura de uma ação noturna) ----------
+   O Mestre não edita fichas. Ele deixa a entrega em entregas/<hash da chave da ficha>, um endereço que só o dono acha;
+   o aparelho do jogador aplica na ficha ativa e apaga a entrega de todas as fichas dele. */
+async function entregar(cob, obj) {
+  if (!A.mestre) return 0;
+  const fichas = (await A.Rede.once('agentes/' + cob).catch(() => null)) || {};
+  const k = A.Rede.chave(), v = { ...obj, ts: Date.now() };
+  let n = 0;
+  for (const chave of Object.keys(fichas)) { await A.Rede.set(`entregas/${await A.hash('entrega:' + chave)}/${k}`, v).catch(() => {}); n++; }
+  return n;
+}
+const ENT = { de: '', off: [], hs: {}, v: {} };
+function ligarEntregas() {
+  const FXA = window.ACF_FICHAS;
+  const chaves = !A.mestre && A.meu && FXA && FXA.minhasChaves ? FXA.minhasChaves() : [];
+  const assin = (A.meu || '') + ':' + chaves.join(',');
+  if (ENT.de === assin) return;
+  ENT.de = assin; ENT.off.forEach(f => { try { f(); } catch (e) {} }); ENT.off = []; ENT.hs = {}; ENT.v = {};
+  if (!chaves.length) return;
+  A.garantirLogin().then(async () => {
+    for (const c of chaves) {
+      const h = await A.hash('entrega:' + c);
+      if (ENT.de !== assin) return;
+      ENT.hs[h] = c;
+      ENT.off.push(A.Rede.on('entregas/' + h, v => { ENT.v[h] = v || {}; aplicarEntregas(); }, () => {}));
+    }
+  }, () => {});
+}
+function aplicarEntregas() {
+  const FXA = window.ACF_FICHAS, at = FXA && FXA.ativa();
+  if (!at || !at.ref) return;
+  const h = Object.keys(ENT.hs).find(x => ENT.hs[x] === at.ref.chave); if (!h) return;
+  Object.entries(ENT.v[h] || {}).forEach(([k, e]) => {
+    if (!e || ENT['feito' + k]) return;
+    ENT['feito' + k] = true;
+    const lista = [];
+    if (int(e.pv)) lista.push(['pv.a', Math.min(at.r.pvMax, FXA.atualDe(at.d, 'pv', at.r.pvMax) + int(e.pv))]);
+    const fim = () => Object.keys(ENT.hs).forEach(hh => A.Rede.set(`entregas/${hh}/${k}`, null).catch(() => {}));
+    if (!lista.length) { fim(); return; }
+    FXA.aplicarNaAtiva(lista).then(ok => { if (!ok) { ENT['feito' + k] = false; return; } fim(); A.aviso(`🌙 Você acordou melhor do que dormiu: +${int(e.pv)} PV.`); });
+  });
+}
+document.addEventListener('acf-ativa', () => setTimeout(aplicarEntregas, 300));
+
+window.ACF_REGRAS = { topicoEscudo: topicoRegras, pessoais: regrasPessoais, opcoesNoite, txtRegra, entregar };
 
 /* =========================================================
    LIGAÇÕES
@@ -888,7 +941,7 @@ function tudo() {
   requestAnimationFrame(() => {
     agendado = false;
     try {
-      ligarSenhas(); ligarDesejos(); vigiarSugestoes(); ligarRegras();
+      ligarSenhas(); ligarDesejos(); vigiarSugestoes(); ligarRegras(); ligarEntregas();
       // o Mestre reenvia as regras restritas uma vez ao entrar (pega fichas criadas desde a última vez)
       if (A.mestre && A.segredosProntos && !RR.pubFeito) { RR.pubFeito = true; if (Object.keys(regrasM()).length) agendarPublicarRegras(); }
       if (!A.mestre) RR.pubFeito = false;
@@ -914,5 +967,5 @@ document.addEventListener('acf-segredos', tudo);
 setInterval(() => { if (A.mestre || A.aux) tudo(); }, 3000);   // reserva: nada fica preso esperando
 document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 setTimeout(tudo, 900);
-window.ACF_FERRAMENTAS = { abrirNex, abrirParede, publicarNex, nexAtual, exportarSenhas };
+window.ACF_FERRAMENTAS = { abrirNex, abrirParede, publicarNex, nexAtual, exportarSenhas, aplicarNex };
 })();
