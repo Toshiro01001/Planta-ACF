@@ -2773,3 +2773,58 @@ body.parede-aberta { overflow: hidden; }
 .perfil-conta[hidden] { display: none; }
 .perfil-conta button { margin-left: 8px; background: transparent; border: 1px solid var(--linha); border-radius: 6px; color: var(--texto); padding: 4px 10px; font: 12px var(--corpo); cursor: pointer; }
 .perfil-conta button:hover { border-color: var(--perigo); color: var(--perigo); }
+
+/* ---------- Regras restritas (Escudo, Arquivo) ---------- */
+.esc-rr { border-top-color: #5b3a8a; }
+.esc-rr p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+.rr-txt h5 { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; margin: 10px 0 4px; color: #5b3a8a; }
+.rr-txt p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+.rr-txt ul { margin: 0 0 6px; }
+.rr-quem { margin: 8px 0 4px; font-size: 12.5px; }
+.rr-quem summary { cursor: pointer; color: #5b3a8a; font-weight: 600; }
+.rr-opcoes { display: grid; gap: 4px; margin: 6px 0; padding: 6px 8px; background: rgba(91,58,138,.07); border-radius: 4px; }
+.rr-opcoes .chave { display: flex; gap: 6px; align-items: center; color: #221d14; }
+.rr-opcoes small { color: #6b604b; }
+.rr-custo { display: flex; gap: 6px; align-items: center; color: #221d14; }
+.rr-custo select { font: 12px var(--corpo); padding: 2px 4px; }
+.rr-botoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.rr-botoes button { font-size: 12px; padding: 4px 10px; }
+.rr-mini { font-size: 12px; color: #6b604b; line-height: 1.4; }
+.rr-modal { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.6); }
+.rr-modal[hidden] { display: none; }
+.rr-modal-caixa { width: min(640px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; background: #fbf7ec; color: #221d14; border-top: 3px solid #5b3a8a; border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; }
+.rr-modal-caixa h3 { margin: 0; font: 400 18px 'Special Elite', var(--mono); text-transform: uppercase; }
+.rr-modal-caixa label { display: grid; gap: 4px; font: 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #6b604b; }
+.rr-modal-caixa input, .rr-modal-caixa textarea { font: 14px var(--corpo); color: #221d14; background: #fff; border: 1px solid rgba(34,29,20,.25); border-radius: 4px; padding: 6px 8px; text-transform: none; letter-spacing: 0; width: 100%; box-sizing: border-box; }
+.rr-modal-caixa textarea { font-family: var(--mono); font-size: 13px; resize: vertical; }
+.rr-doc h5 { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; margin: 12px 0 4px; }
+.rr-doc ul { padding-left: 18px; }
+
+/* ---------- Interlúdio (cenas fora de combate) ---------- */
+.int-slots { display: grid; gap: 8px; margin: 10px 0; }
+.int-slot { padding: 8px 10px; border: 1px solid var(--linha); border-radius: 8px; display: grid; gap: 6px; }
+.int-slot[hidden] { display: none; }
+.int-slot label, .int-opc label { display: grid; gap: 4px; font: 11px var(--mono); color: var(--texto-dim); text-transform: uppercase; letter-spacing: .1em; }
+.int-slot label.chave { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font: 13px var(--corpo); color: var(--texto); }
+.int-slot select, .int-slot input:not([type=checkbox]):not([type=radio]) { background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 6px; font: 14px var(--corpo); text-transform: none; letter-spacing: 0; width: 100%; box-sizing: border-box; }
+.int-opc { display: grid; gap: 6px; }
+.int-opc[hidden] { display: none; }
+.int-opc small { color: var(--texto-dim); font-size: 12px; }
+.int-desc { margin: 0 !important; font-size: 12.5px; color: var(--texto-dim); }
+.int-desc:empty { display: none; }
+.int-regra summary { cursor: pointer; font-size: 12px; color: #b49cd8; }
+.int-regra h5 { margin: 8px 0 2px; font: 600 11px var(--mono); text-transform: uppercase; }
+.int-regra p, .int-regra li { font-size: 12.5px; }
+.int-acordado { margin: 10px 0; padding: 8px 10px; border: 1px solid #6b4a1e; border-radius: 8px; background: rgba(180,120,40,.08); }
+.int-acordado[hidden] { display: none; }
+.int-acordado .chave { display: inline-flex; gap: 6px; align-items: center; margin-right: 14px; }
+.int-gratis { margin: 6px 0; }
+.int-res { padding-left: 18px; line-height: 1.5; }
+.int-res li { margin-bottom: 6px; }
+.int-ok { color: #3c9e7a; }
+.int-falha { color: #d9a514; }
+.int-grave { color: #e0565e; }
+.fx-x { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 0 0 4px; font-size: 13px; line-height: 1; opacity: .7; }
+.fx-x:hover { opacity: 1; }
+.int-acordado .mesa-linha { gap: 18px; }
+.int-acordado .mesa-linha input, .int-slot .chave input { flex: 0 0 auto; min-width: 0; }

@@ -186,6 +186,8 @@ function condicoesDe(d) {
   const est = A.estado || {};
   const c = d && d.dono && d.dono !== 'mestre' ? ((est.cond || {})[d.dono] || {}) : {};
   Object.keys(c).forEach(k => { if (k[0] !== '_' && c[k]) ativas.add(k); });
+  // condições de ficar acordado (interlúdio): ficam na própria ficha até um sono restaurador
+  Object.keys((d && d.condSono) || {}).forEach(k => { if (d.condSono[k]) ativas.add(k); });
   if (d && d.pv && d.pv.a !== undefined && d.pv.a !== null && d.pv.a !== '' && int(d.pv.a) <= 0 && d.tipo !== 'ameaca') ativas.add('morrendo');
   let mudou = true;
   while (mudou) { mudou = false; [...ativas].forEach(k => (COND_EXPANDE[k] || []).forEach(x => { if (!ativas.has(x)) { ativas.add(x); mudou = true; } })); }
@@ -215,6 +217,7 @@ function efeitosNaDefesa(d) {
 
 /* ---------------- DADOS ---------------- */
 const d20 = () => 1 + Math.floor(Math.random() * 20);
+const d6 = () => 1 + Math.floor(Math.random() * 6);
 // 1d20 por ponto de atributo, fica com o maior. Se bônus e penalidades em dados deixarem menos de 1 dado,
 // rola a quantidade que rolaria se fosse bônus e fica com o menor (atributo 0 → 2 dados, o pior).
 function rolarTeste(qtdAtr, bonus, extraDados = 0) {
@@ -767,9 +770,11 @@ function atualizarDerivados() {
   if (cx) {
     const nomes = [...r.conds].filter(k => (A.COND || {})[k] || COND_NOME[k]);
     const bi = d.bonusInt || {};
-    const extra = [int(bi.ex) ? `🏋️ exercício ×${int(bi.ex)}` : '', int(bi.le) ? `📖 leitura ×${int(bi.le)}` : ''].filter(Boolean);
+    const extra = [int(bi.ex) ? `🏋️ exercício ×${int(bi.ex)}` : '', int(bi.le) ? `📖 leitura ×${int(bi.le)}` : '', d.rapido ? '🍙 +5 prato rápido' : '', int(d.semDormir) ? `🌙 ${int(d.semDormir)} dia${int(d.semDormir) > 1 ? 's' : ''} sem dormir` : ''].filter(Boolean);
+    const tr = Object.entries(d.treino || {}).filter(([, v]) => v);
+    const podeT = F.atual && F.atual.editavel;
     const html = (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
-      + (extra.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}` : '');
+      + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : ''}</i>`).join('')}` : '');
     if (cx.innerHTML !== html) cx.innerHTML = html;
   }
   put('bloqueio', r.bloqueio); put('esquiva', r.esquiva);
@@ -1143,6 +1148,8 @@ function testarPericia(d, id, extra = 0, tipo = '') {
   const extraDados = pen.reduce((s, x) => s + x.n, 0);
   const t = rolarTeste(int(d.atr[attr]), r.bonus(id) + extra, extraDados);
   t.pen = pen; t.attr = attr; t.per = id;
+  // exercitar-se / ler no interlúdio: +1d6 nos testes da perícia escolhida
+  if ((d.treino || {})[id]) { t.treino = d6(); t.total += t.treino; }
   return t;
 }
 const htmlDados = t => `<div class="dados-faces">${t.dados.map(v => `<span class="face${v === t.esc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>`;
@@ -1164,8 +1171,9 @@ function htmlRolagem(u, d) {
   const fis = ['agi', 'for', 'vig'].includes(t.attr), men = ['int', 'pre'].includes(t.attr);
   const podeEx = F.atual && F.atual.editavel && fis && int(bi.ex) > 0 && !u.usou, podeLe = F.atual && F.atual.editavel && men && int(bi.le) > 0 && !u.usou;
   return `${htmlDados(t)}
-    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)}${u.d6 ? ` + <b>${u.d6}</b> (1d6)` : ''} = <span class="fx-total">${t.total + u.d6}</span></p>
+    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)}${t.treino ? ` + <b>${t.treino}</b> (1d6 ${d.treino && d.treino[t.per] === 'le' ? 'leitura' : 'treino'})` : ''}${u.d6 ? ` + <b>${u.d6}</b> (1d6)` : ''}${u.r5 ? ' + <b>5</b> (prato rápido)' : ''} = <span class="fx-total">${t.total + u.d6 + (u.r5 || 0)}</span></p>
     ${t.pen && t.pen.length ? `<p class="fx-legenda">Condições: ${esc(textoPen(t))}</p>` : ''}
+    ${F.atual && F.atual.editavel && d.rapido && !u.r5 ? '<p><button class="fx-mini" data-acao="usar-rapido">+5 do prato rápido</button></p>' : ''}
     ${podeEx || podeLe ? `<p><button class="fx-mini" data-acao="usar-d6" data-v="${podeEx ? 'ex' : 'le'}">+1d6 de ${podeEx ? 'exercício' : 'leitura'} (${int(podeEx ? bi.ex : bi.le)} restante${int(podeEx ? bi.ex : bi.le) > 1 ? 's' : ''})</button></p>` : ''}`;
 }
 function rolarDano(expr, mult, nome) {
@@ -1322,6 +1330,14 @@ function aoClicar(e) {
     if (minhaFicha()) A.rolagemDaFicha(`${u.nome}: +1d6 de ${k === 'ex' ? 'exercício' : 'leitura'} (${u.d6}) → ${u.t.total + u.d6}`);
     return;
   }
+  if (ac === 'usar-rapido' && F.ultimaRol && F.atual && F.atual.editavel && F.atual.d.rapido && !F.ultimaRol.r5) {
+    const d = F.atual.d, u = F.ultimaRol;
+    u.r5 = 5; gravar('rapido', null, true);
+    mostrarRolagem(`${d.nome} · ${u.nome}`, htmlRolagem(u, d));
+    if (minhaFicha()) A.rolagemDaFicha(`${u.nome}: +5 do prato rápido → ${u.t.total + u.d6 + 5}`);
+    return;
+  }
+  if (ac === 'tirar-treino' && F.atual && F.atual.editavel) { if (confirm(`Tirar o +1d6 de ${(PER[v] || [, v])[1]}? (a semana do bônus acabou)`)) gravar('treino.' + v, null, true); return; }
   if (!at || !at.d) return;
   if (ac === 'aba') { F.aba = v; desenharAba(); return; }
   if (ac === 'aba-mob') {
@@ -1550,6 +1566,8 @@ setTimeout(atualizarBotao, 300);
 window.ACF_FICHAS = {
   abrir, fechar, calc, rolarExpr, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, NIVEIS, PATENTES, nivelDe, nexDe, corNex,
   ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
+  // chaves das fichas deste aparelho para a cobaia escolhida (regras restritas usam o hash delas)
+  minhasChaves: () => { const q = A.meu; return q ? indice().filter(r => r && r.chave && r.dono === q).map(r => r.chave) : []; },
   // categoria do item pelo nome no catálogo; devolve o estouro do limite da patente, se houver
   checarLimite: nome => {
     if (!F.ativaD) return null;
