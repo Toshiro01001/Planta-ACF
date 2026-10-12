@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261011x';
+const VERSAO_SITE = '20261012y';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -5332,5 +5332,9 @@ window.ACF = {
   hash, alertaMestre,
   infoSala: cn => infoSala(Math.ceil(cn / 25), cn),
   get auxLogado() { return !!aux && (Store.modo !== 'firebase' || auxLogado); },
+  // holofote: leva a câmera até uma sala ou uma ficha (só se o andar estiver liberado para quem vê)
+  focarSala(cn) { const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1); if (!podeVer(a) || !POS[p]) return false; irParaAndar(a); const s = retSala(p); focar(s.x + s.w / 2, s.y + s.h / 2); if (salaVisivel(a, cn)) selecionarSala(cn); return true; },
+  focarToken(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a || !podeVer(tk.a)) return false; irParaAndar(tk.a); focar(tk.x, tk.y); return true; },
+  get andarAtual() { return andarAtual; },
 };
 })();
