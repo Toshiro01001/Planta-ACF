@@ -844,7 +844,10 @@ function verAmbiente() {
    sonsIdx/<id>: nome, tipo (arquivo ou link) e endereço; sons/<id>: o áudio em si (até 4 MB).
    Os jogadores baixam um som só quando ele toca, e guardam na memória da página. */
 const SONS = { idx: {}, off: null, cache: {}, ultimoFx: undefined };
+// músicas que moram no próprio site (pasta audio/)
+const SONS_FIXOS = { '@deadwaltz': { n: 'Dead Waltz', url: 'audio/dead-waltz.mp3' } };
 async function urlDoSom(id) {
+  if (SONS_FIXOS[id]) return SONS_FIXOS[id].url;
   if (SONS.cache[id]) return SONS.cache[id];
   const v = await A.Rede.once('sons/' + id).catch(() => null);
   const src = v ? (v.data || v.url || '') : '';
@@ -998,6 +1001,8 @@ function desenharMesaAmb(forcar) {
     <p class="mesa-k">A CAIXA</p>
     <div class="mesa-amb">${AMB_CAIXA.map(([e, ic]) => `<button data-mi="amb" data-v="${e}" class="${on('el', e)}">${ic} ${e}</button>`).join('')}</div>
     <div class="mesa-linha amb-vol"><button data-mi="amb" data-v="" class="${!a.el && !a.som ? 'on' : ''}">🔇 Silêncio</button><label>Volume <input type="range" id="ambVol" min="0" max="100" step="5" value="${vol}"></label><output>${vol}%</output></div>
+    <p class="mesa-k">MÚSICAS DO SITE</p>
+    <ul class="amb-sons">${Object.entries(SONS_FIXOS).map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>🎻 ${esc(s.n)}</span><button data-mi="amb-som" data-k="${k}">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}">🔔 Uma vez</button><span></span></li>`).join('')}</ul>
     <p class="mesa-k">SONS PRÓPRIOS</p>
     ${sons.length ? `<ul class="amb-sons">${sons.map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>${s.tipo === 'link' ? '🔗' : '🎵'} ${esc(s.n)}${s.tam ? ` <small>${s.tam / 1.37 < 1048576 ? Math.max(1, Math.round(s.tam / 1.37 / 1024)) + ' KB' : (s.tam / 1.37 / 1048576).toFixed(1) + ' MB'}</small>` : ''}</span><button data-mi="amb-som" data-k="${k}" title="Tocar em repetição para todos">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}" title="Tocar uma vez para todos">🔔 Uma vez</button><button data-mi="amb-del" data-k="${k}" class="perigo" aria-label="Apagar">×</button></li>`).join('')}</ul>` : '<p class="mini">Nenhum ainda. Envie um áudio (até 4 MB) ou cole um link direto de mp3/ogg (pode ser um arquivo dentro do próprio repositório, como audio/chuva.mp3).</p>'}
     <div class="mesa-linha"><label class="amb-arq">⬆ Enviar áudio<input type="file" id="ambArq" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden></label><button data-mi="amb-link">🔗 Link</button><button data-mi="amb-exp" ${sons.length ? '' : 'disabled'}>⬇ Exportar</button><label class="amb-arq">⬆ Importar<input type="file" id="ambImp" accept=".json,application/json" hidden></label></div>`;
@@ -1468,6 +1473,26 @@ function desenharMesaRel() {
   }
 }
 const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena', nex: 'NEX', desejo: 'desejou à Parede', cofre: 'abriu o cofre' };
+// números do relatório por cobaia (usado no Encerramento e no "Anteriormente" da abertura)
+async function agregarRelatorio() {
+  const dados = await A.Rede.once('relatorio').catch(() => null) || {};
+  const evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
+  const por = {};
+  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: 0, m20: 0, m1: 0, caiu: 0, enl: 0, nex: 0, des: 0, fim: '' }; });
+  const pistas = [], pres = [];
+  let cenas = 0;
+  evs.forEach(e => {
+    const p = por[e.q];
+    if (p) {
+      if (['dano', 'cura', 'san', 'pd', 'pe', 'nex'].includes(e.t)) p[e.t] += int(e.v);
+      if (e.t === 'ritual') p.rit++; if (e.t === 'm20') p.m20++; if (e.t === 'm1') p.m1++;
+      if (e.t === 'caiu') p.caiu++; if (e.t === 'enl') p.enl++; if (e.t === 'desejo') p.des++;
+      if (e.t === 'mobito') p.fim = 'óbito'; if (e.t === 'minsano' && !p.fim) p.fim = 'insano';
+    }
+    if (e.t === 'pista') pistas.push(e.x); if (e.t === 'presenca') pres.push(e.x); if (e.t === 'cena') cenas++;
+  });
+  return { por, pistas, pres, cenas, nome: (dados.meta || {}).nome || '' };
+}
 async function abrirRelatorio() {
   const dados = await A.Rede.once('relatorio').catch(() => null) || {};
   const meta = dados.meta || {}, evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
@@ -1576,5 +1601,5 @@ document.addEventListener('acf-regras', () => { const o = $('#escudoMestre'); if
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
 setInterval(pintarMembrana, 1200);
-window.ACF_MESA = { abrirEscudo, desenharEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
+window.ACF_MESA = { agregarRelatorio, urlDoSom, sonsLista: () => ({ fixos: SONS_FIXOS, proprios: SONS.idx }), ligarSons, abrirEscudo, desenharEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
 })();
