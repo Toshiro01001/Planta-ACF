@@ -19,6 +19,7 @@ const int = v => Math.round(num(v));
 const FX = () => window.ACF_FICHAS;
 const est = () => A.estado || {};
 const cobaias = () => (A.SERES || []).filter(x => x.tipo === 'cobaia');
+const nomeDe = id => (A.SER[id] || {}).nome || id || '';
 const ls = { get(k, p) { try { const v = localStorage.getItem(k); return v === null ? p : JSON.parse(v); } catch (e) { return p; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 const ELEM = { Sangue: '#c2272f', Morte: '#8c8c8c', Conhecimento: '#d9a514', Energia: '#8a3fd1', Medo: '#e9e4f2', Varia: '#5fa8a0' };
 const corEl = el => ELEM[Object.keys(ELEM).find(k => String(el || '').toLowerCase().startsWith(k.toLowerCase()))] || '#8b5cf6';
@@ -274,19 +275,41 @@ function abrirPresencaJogador(ch) {
 }
 function responder(id, dados) { if (!A.meu) return; A.Rede.set(`mesaResp/${id}/${A.meu}`, { ...dados, ts: Date.now() }).catch(() => {}); }
 
-/* ---------- 4b. Interlúdio ---------- */
-const DESCANSO = { precaria: ['Precária', 0], normal: ['Normal', 1], confortavel: ['Confortável', 2], luxuosa: ['Luxuosa', 3] };
-const PASSOS = [0.5, 1, 2, 3, 4];
+/* ---------- 4b. Interlúdio (Cenas fora de combate, regra da casa) ---------- */
+// condição do lugar onde dormem: multiplica o sono leve
+const DESCANSO = { precaria: ['Precária', 0.5], normal: ['Normal', 1], confortavel: ['Confortável', 2], luxuosa: ['Luxuosa', 3] };
+// curto: 1 ação, só gerais · longo: 2 ações, gerais e especiais (dormir, alerta, esgueirar-se…)
+const TIPO_DESC = { curto: ['Descanso curto', 1], longo: ['Descanso longo', 2] };
+// [chave, nome, custo, 'g' geral | 'e' especial, descrição, opções]
+// opções: priv = só o Mestre fica sabendo · alvo = escolhe uma cobaia · prato · ex/le = perícia treinada · rev · fab · txt
 const ACOES_INT = [
-  ['alimentar', 'Alimentar-se', 'Uma refeição especial e o benefício do prato.'],
-  ['dormir', 'Dormir', 'Recupera PV e PE conforme o limite de PE e o descanso.'],
-  ['relaxar', 'Relaxar', 'Recupera Sanidade como o dormir; +1 por colega que também relaxar.'],
-  ['exercitar', 'Exercitar-se', '+1d6 guardado para um teste de Agilidade, Força ou Vigor (máximo igual ao Vigor).'],
-  ['ler', 'Ler', '+1d6 guardado para um teste de Intelecto ou Presença (máximo igual ao Intelecto).'],
-  ['manutencao', 'Manutenção', 'Conserta um item quebrado.'],
-  ['revisar', 'Revisar caso', 'Teste de perícia para achar uma pista que passou batido.'],
+  ['relaxar', 'Relaxar', 1, 'g', 'Recupera Sanidade igual ao seu nível; +1 para cada colega que também relaxar neste interlúdio. Só uma vez por interlúdio.', ''],
+  ['alimentar', 'Alimentar-se', 1, 'g', 'Consome 1 comida (pegue na despensa). Escolha o prato.', 'prato'],
+  ['exercitar', 'Exercitar-se', 1, 'g', '+1d6 nos testes de uma perícia de Agilidade, Força ou Vigor por 1 semana. Número de perícias treinadas: até o seu Vigor.', 'ex'],
+  ['ler', 'Ler', 1, 'g', '+1d6 nos testes de uma perícia de Intelecto ou Presença por 1 semana. Número de perícias lidas: até o seu Intelecto.', 'le'],
+  ['revisar', 'Revisar caso', 1, 'g', 'Escolha uma cena de investigação e uma perícia apropriada. A DT é a da cena; sucesso dá uma pista. Pode repetir.', 'rev'],
+  ['manutencao', 'Manutenção', 1, 'g', 'Conserta um item quebrado (PV dele ao máximo). Treinado na Profissão do item: conserta todos os itens daquele tipo.', 'txt'],
+  ['fabricar', 'Fabricação de campo', 1, 'g', 'Teste de Profissão para fabricar um item de categoria 0 a IV (nada paranormal). Gasta sucata.', 'fab'],
+  ['sono_leve', 'Sono leve', 1, 'e', 'PV e PE iguais ao seu nível, multiplicados pela condição do descanso. Você dormiu, mas segue em alerta.', ''],
+  ['sono_rest', 'Sono restaurador', 2, 'e', 'Recupera todos os PV, PE e Sanidade e tira as condições de ficar acordado.', ''],
+  ['alerta', 'Alerta', 1, 'e', 'Paranoia contra espreitadores noturnos: fica muito difícil alguém se esgueirar até você. Só o Mestre fica sabendo.', 'priv'],
+  ['esgueirar', 'Esgueirar-se', 2, 'e', 'Você se esgueira pela zona neutra para espionar uma cobaia. Furtividade contra a DT do estado do alvo. Só o Mestre fica sabendo.', 'priv alvo'],
+  ['staff', 'Aprendendo com a S.T.A.F.F.', 1, 'e', 'Conversa com um dos robôs ajudantes para tentar colher informações.', 'txt'],
 ];
-const PRATOS = [['favorito', 'Prato favorito (+2 SAN ao relaxar)'], ['nutritivo', 'Prato nutritivo (dormir recupera mais PV)'], ['energetico', 'Prato energético (dormir recupera mais PE)'], ['rapido', 'Prato rápido (+5 no revisar caso)']];
+const PRATOS = [['saboroso', 'Prato saboroso: +1d6 Sanidade'], ['nutritivo', 'Prato nutritivo: +2d6 PV'], ['energetico', 'Prato energético: +1d6 PE'], ['rapido', 'Prato rápido: +5 em um teste (neste interlúdio ou no dia seguinte)']];
+const CAT_FAB = [['0', 15], ['I', 20], ['II', 25], ['III', 30], ['IV', 35]];
+// DT de Furtividade para chegar até o alvo, pelo estado dele na noite
+const DT_NOITE = { alerta: [30, 'em alerta'], acordado: [25, 'acordado'], leve: [20, 'sono leve'], rest: [15, 'sono restaurador'] };
+// Ficar acordado: DT de Fortitude / Vontade e condições por dia sem dormir
+const ACORDADO = {
+  1: { f: 10, v: 15, ok: [], falha: ['fraco', 'frustrado'] },
+  2: { f: 15, v: 20, ok: ['fraco', 'frustrado'], falha: ['debilitado', 'esmorecido'] },
+  3: { f: 20, v: 25, ok: ['debilitado', 'esmorecido'], falha: ['exausto', 'alquebrado'] },
+};
+const NOME_COND = { fraco: 'fraco', frustrado: 'frustrado', debilitado: 'debilitado', esmorecido: 'esmorecido', exausto: 'exausto', alquebrado: 'alquebrado', inconsciente: 'inconsciente', indefeso: 'indefeso' };
+const acaoInt = k => ACOES_INT.find(x => x[0] === k);
+const tipoDe = it => (TIPO_DESC[it.tipo] ? it.tipo : 'longo');
+const noiteOpc = () => (window.ACF_REGRAS && window.ACF_REGRAS.opcoesNoite ? window.ACF_REGRAS.opcoesNoite() : []);
 function verInterludio() {
   const it = est().interludio;
   if (!it || A.mestre || !A.meu) return;
@@ -295,76 +318,199 @@ function verInterludio() {
   const m = $('#mesaJanela'); if (m && !m.hidden && m.dataset.id) return;
   abrirInterludio(it);
 }
-function calcInterludio(it, esc2, prato, d, r, det) {
-  const lim = r.peTurno;
-  const base = DESCANSO[it.cond] ? DESCANSO[it.cond][1] : 1;
-  const passo = k => PASSOS[Math.min(PASSOS.length - 1, base + (k ? 1 : 0))];
-  const out = { pv: 0, pe: 0, san: 0, pd: 0, ex: 0, le: 0, txt: [] };
-  if (esc2.includes('dormir')) {
-    out.pv = Math.floor(lim * passo(prato === 'nutritivo'));
-    if (!det) out.pe = Math.floor(lim * passo(prato === 'energetico'));
-    out.txt.push(`dormiu (+${out.pv} PV${det ? '' : `, +${out.pe} PE`})`);
+// opções de uma ação escolhida num espaço (prato, perícia, alvo…)
+function htmlOpcInt(k, i, d) {
+  const sel = (nome, ops) => `<select data-io="${nome}" data-slot="${i}">${ops}</select>`;
+  const perOps = attrs => FX().PER ? Object.values(FX().PER).filter(p => !attrs || attrs.includes(p[2])).map(p => `<option value="${p[0]}" ${(d.treino || {})[p[0]] ? 'disabled' : ''}>${esc(p[1])}${(d.treino || {})[p[0]] ? ' (já tem)' : ''}</option>`).join('') : '';
+  const alvos = () => cobaias().filter(x => x.id !== A.meu).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
+  if (String(k).startsWith('n:')) {
+    const c = (window.ACF_REGRAS.pessoais() || {})[k.slice(2)] || {};
+    return `<label>Alvo ${sel('alvo', alvos())}</label><details class="int-regra"><summary>Ler a regra</summary>${window.ACF_REGRAS.txtRegra(c.txt || '')}</details>`;
   }
-  if (esc2.includes('relaxar')) {
-    const v = Math.floor(lim * passo(false)) + (prato === 'favorito' && !det ? 2 : 0);
-    if (det) out.pd = v; else out.san = v;
-    out.txt.push(`relaxou (+${v} ${det ? 'PD' : 'SAN'})`);
+  const o = (acaoInt(k) || [])[5] || '';
+  if (o.includes('alvo')) return `<label>Alvo ${sel('alvo', alvos())}</label>`;
+  if (o === 'prato') return `<label>Prato ${sel('prato', PRATOS.map(([v, n]) => `<option value="${v}">${esc(n)}</option>`).join(''))}</label>`;
+  if (o === 'ex' || o === 'le') {
+    const tem = Object.values(d.treino || {}).filter(x => x === o).length, lim = Math.max(1, int(d.atr[o === 'ex' ? 'vig' : 'int']));
+    return `<label>Perícia ${sel('per', perOps(o === 'ex' ? ['agi', 'for', 'vig'] : ['int', 'pre']))}</label><small>${tem}/${lim} perícia${lim > 1 ? 's' : ''} com bônus${tem >= lim ? ': limite atingido, peça ao Mestre para tirar um bônus vencido' : ''}.</small>`;
   }
-  if (det && esc2.includes('alimentar') && prato === 'favorito') { out.pdTemp = 2; out.txt.push('prato favorito (+2 PD temporários)'); }
-  if (esc2.includes('exercitar')) { out.ex = 1; out.txt.push('se exercitou (+1d6 físico guardado)'); }
-  if (esc2.includes('ler')) { out.le = 1; out.txt.push('leu (+1d6 mental guardado)'); }
-  if (esc2.includes('alimentar') && !(det && prato === 'favorito')) out.txt.push('comeu ' + (PRATOS.find(p => p[0] === prato) || [, 'bem'])[1].split(' (')[0].toLowerCase());
-  if (esc2.includes('manutencao')) out.txt.push('fez manutenção');
-  if (esc2.includes('revisar')) out.txt.push(`revisou o caso${prato === 'rapido' ? ' (+5 pelo prato rápido)' : ''}`);
-  return out;
+  if (o === 'rev') return `<label>Cena <input data-io="txt" data-slot="${i}" maxlength="80" placeholder="Qual cena você revisa?"></label><label>Perícia ${sel('per', perOps(null).replace(/ disabled/g, '').replace(/ \(já tem\)/g, ''))}</label>`;
+  if (o === 'fab') return `<label>Item <input data-io="txt" data-slot="${i}" maxlength="60" placeholder="O que você fabrica?"></label><label>Categoria ${sel('cat', CAT_FAB.map(([c, dt], n) => `<option value="${n}">${c} (DT ${dt})</option>`).join(''))}</label><label class="chave"><input type="checkbox" data-io="impro" data-slot="${i}"><span>Improvisado (DT −5, um terço da sucata; quebra depois de uma cena)</span></label>`;
+  if (o === 'txt') return `<label>${k === 'staff' ? 'O que você pergunta' : 'Qual item'} <input data-io="txt" data-slot="${i}" maxlength="80"></label>`;
+  return '';
 }
 function abrirInterludio(it) {
   const at = FX() && FX().ativa();
-  const desc = DESCANSO[it.cond] ? DESCANSO[it.cond][0] : 'Normal';
+  const tipo = tipoDe(it), desc = (DESCANSO[it.cond] || DESCANSO.normal)[0], nAc = TIPO_DESC[tipo][1];
+  const topo = `<p class="mesa-k">INTERLÚDIO · ${esc(TIPO_DESC[tipo][0].toLowerCase())} · condição ${esc(desc.toLowerCase())}</p>`;
   if (!at) {
-    janela('int-' + it.id, `<p class="mesa-k">INTERLÚDIO</p><h3>Hora de respirar</h3><p>Descanso ${esc(desc.toLowerCase())}. Você não tem ficha ativa: crie ou ative sua ficha para escolher as ações aqui.</p><div class="mesa-botoes"><button data-mj="abrir-fichas">Abrir fichas</button><button data-mj="adiar">Depois</button></div>`, 'interludio');
+    janela('int-' + it.id, `${topo}<h3>Hora de respirar</h3><p>Você não tem ficha ativa: crie ou ative sua ficha para escolher as ações aqui.</p><div class="mesa-botoes"><button data-mj="abrir-fichas">Abrir fichas</button><button data-mj="adiar">Depois</button></div>`, 'interludio');
     estadoJanela = null;
     return;
   }
-  const det = at.d.regra === 'determinacao';
-  janela('int-' + it.id, `<p class="mesa-k">INTERLÚDIO · descanso ${esc(desc.toLowerCase())}</p><h3>Escolha até duas ações</h3>
-    <div class="mesa-acoes">${ACOES_INT.map(([k, n, d]) => `<label class="mesa-acao"><input type="checkbox" data-int="${k}"><b>${n}</b><small>${d}${det && k === 'dormir' ? ' Com Determinação, só PV.' : ''}${det && k === 'relaxar' ? ' Com Determinação, recupera PD.' : ''}</small></label>`).join('')}</div>
-    <label class="mesa-prato" hidden>Prato <select id="mjPrato">${PRATOS.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
-    <p id="mjPrev" class="mesa-prev"></p>
+  const d = at.d, det = d.regra === 'determinacao';
+  const noite = tipo === 'longo' ? noiteOpc() : [];
+  const opcoes = custoMax => ACOES_INT.filter(a => (tipo === 'longo' || a[3] === 'g') && a[2] <= custoMax).map(a => `<option value="${a[0]}">${a[3] === 'e' ? '🌙 ' : ''}${esc(a[1])}${a[2] > 1 ? ` (${a[2]} ações)` : ''}</option>`).join('')
+    + noite.filter(n => n.custo >= 1 && n.custo <= custoMax).map(n => `<option value="n:${esc(n.id)}">🔒 ${esc(n.tit)}${n.custo > 1 ? ` (${n.custo} ações)` : ''}</option>`).join('');
+  const gratis = noite.filter(n => n.custo === 0);
+  janela('int-' + it.id, `${topo}<h3>Escolha ${nAc === 1 ? 'sua ação' : 'suas duas ações'}</h3>
+    <div class="int-slots">${Array.from({ length: nAc }, (_, i) => `<div class="int-slot" data-slot-box="${i}"><label>Ação ${i + 1} <select data-io="acao" data-slot="${i}"><option value="">—</option>${opcoes(nAc - i)}</select></label><p class="int-desc" data-desc="${i}"></p><div class="int-opc" data-opc="${i}"></div></div>`).join('')}</div>
+    ${gratis.length ? `<div class="int-gratis"><p class="mesa-k">SEM CUSTO</p>${gratis.map(n => `<div class="int-slot"><label class="chave"><input type="checkbox" data-gratis="${esc(n.id)}"><span>🔒 ${esc(n.tit)}</span></label><div class="int-opc" data-opc="g${esc(n.id)}" hidden>${htmlOpcInt('n:' + n.id, 'g' + n.id, d)}</div></div>`).join('')}</div>` : ''}
+    <div class="int-acordado" hidden></div>
+    <p class="mini">${tipo === 'longo' ? '🌙 ações especiais da noite · 🔒 só você e o Mestre sabem.' : 'No descanso curto só valem as ações gerais.'}${det ? ' Com Determinação, o que recupera Sanidade ou PE recupera PD.' : ''}</p>
     <div class="mesa-botoes"><button data-mj="confirmar" class="pri" disabled>Confirmar</button><button data-mj="adiar">Depois</button></div>`, 'interludio');
-  const atualizar = () => {
-    const marc = $$('#mesaJanela [data-int]').filter(x => x.checked).map(x => x.dataset.int);
-    $$('#mesaJanela [data-int]').forEach(x => { x.disabled = !x.checked && marc.length >= 2; });
-    $('#mesaJanela .mesa-prato').hidden = !marc.includes('alimentar');
+  const J = s => $('#mesaJanela ' + s), JJ = s => $$('#mesaJanela ' + s);
+  const escolhas = () => JJ('[data-io="acao"]').map(s => s.value);
+  const atualizar = e => {
     const at2 = FX().ativa(); if (!at2) return;
-    const o = calcInterludio(it, marc, marc.includes('alimentar') ? $('#mjPrato').value : '', at2.d, at2.r, det);
-    $('#mjPrev').textContent = marc.length ? 'Resultado: ' + o.txt.join(', ') + '.' : '';
-    $('[data-mj="confirmar"]').disabled = !marc.length;
+    const d2 = at2.d, esc2 = escolhas();
+    // ação de 2 custos no primeiro espaço ocupa o segundo
+    const custo0 = esc2[0] ? (esc2[0].startsWith('n:') ? ((noite.find(n => 'n:' + n.id === esc2[0]) || {}).custo || 1) : acaoInt(esc2[0])[2]) : 0;
+    const box1 = J('[data-slot-box="1"]');
+    if (box1) { box1.hidden = custo0 >= 2; if (custo0 >= 2) { J('[data-slot="1"][data-io="acao"]').value = ''; J('[data-desc="1"]').textContent = ''; J('[data-opc="1"]').innerHTML = ''; } }
+    JJ('[data-io="acao"]').forEach(s => {
+      const i = s.dataset.slot, k = s.value;
+      if (e && e.target !== s) return;
+      J(`[data-desc="${i}"]`).textContent = k ? (k.startsWith('n:') ? 'Ação noturna sua. Furtividade contra a DT do estado do alvo; o Mestre narra o resultado.' : acaoInt(k)[4]) : '';
+      J(`[data-opc="${i}"]`).innerHTML = k ? htmlOpcInt(k, i, d2) : '';
+    });
+    JJ('[data-gratis]').forEach(c => { J(`[data-opc="g${c.dataset.gratis}"]`).hidden = !c.checked; });
+    const fin = escolhas().filter(Boolean);
+    const dorme = fin.some(k => k === 'sono_leve' || k === 'sono_rest');
+    const ac = J('.int-acordado');
+    const precisa = tipo === 'longo' && (fin.length > 0 || JJ('[data-gratis]').some(c => c.checked)) && !dorme;
+    if (ac.hidden !== !precisa || (precisa && !ac.innerHTML)) {
+      ac.hidden = !precisa;
+      const dia = int(d2.semDormir) + 1, t = ACORDADO[dia];
+      ac.innerHTML = !precisa ? '' : `<p class="mesa-k">FICAR ACORDADO · ${dia}º dia sem dormir</p>` + (t
+        ? `<p>Sem dormir esta noite, você testa para resistir. Sucesso: ${t.ok.length ? t.ok.map(c => NOME_COND[c]).join(' e ') : 'nada'}. Falha: ${t.falha.map(c => NOME_COND[c]).join(' e ')}. Só um sono restaurador tira essas condições.</p>
+          <div class="mesa-linha"><label class="chave"><input type="radio" name="intAcord" value="fortitude" checked><span>Fortitude DT ${t.f}</span></label><label class="chave"><input type="radio" name="intAcord" value="vontade"><span>Vontade DT ${t.v}</span></label></div>`
+        : '<p>Quatro dias sem dormir: você fica <b>inconsciente e indefeso</b>, sem teste.</p>');
+    }
+    J('[data-mj="confirmar"]').disabled = !fin.length && !JJ('[data-gratis]').some(c => c.checked);
   };
-  $$('#mesaJanela [data-int]').forEach(x => { x.onchange = atualizar; });
-  $('#mjPrato').onchange = atualizar;
+  J('.mesa-caixa').addEventListener('change', e => { if (e.target.matches('[data-io="acao"], [data-gratis]')) atualizar(e); });
+  atualizar();
   estadoJanela = { on: a => {
-    if (a !== 'confirmar') return;
-    const marc = $$('#mesaJanela [data-int]').filter(x => x.checked).map(x => x.dataset.int);
-    const prato = marc.includes('alimentar') ? $('#mjPrato').value : '';
+    if (a !== 'confirmar' || estadoJanela.feito) return;
     const at2 = FX().ativa(); if (!at2) return;
-    const d = at2.d, r = at2.r;
-    const o = calcInterludio(it, marc, prato, d, r, det);
+    const lerOpc = i => { const g = n => J(`[data-io="${n}"][data-slot="${i}"]`); return { alvo: g('alvo') && g('alvo').value, prato: g('prato') && g('prato').value, per: g('per') && g('per').value, txt: g('txt') ? g('txt').value.trim() : '', cat: g('cat') ? int(g('cat').value) : 0, impro: g('impro') ? g('impro').checked : false }; };
     const lista = [];
-    const soma = (k, mx, n, folga = 0) => { if (!n) return; lista.push([`${k}.a`, Math.min(mx + folga, FX().atualDe(d, k, mx) + n)]); };
-    soma('pv', r.pvMax, o.pv);
-    if (det) { soma('pd', r.pdMax, (o.pd || 0) + (o.pdTemp || 0), o.pdTemp || 0); if (o.pd || o.pdTemp) lista.push(['enl', null]); }
-    else { soma('pe', r.peMax, o.pe); soma('san', r.sanMax, o.san); }
-    const bi = d.bonusInt || {};
-    if (o.ex) lista.push(['bonusInt.ex', Math.min(Math.max(1, int(d.atr.vig)), int(bi.ex) + 1)]);
-    if (o.le) lista.push(['bonusInt.le', Math.min(Math.max(1, int(d.atr.int)), int(bi.le) + 1)]);
-    FX().aplicarNaAtiva(lista);
-    responder(it.id, { acoes: marc, prato, relaxar: marc.includes('relaxar') });
-    if (marc.includes('relaxar')) ls.set('acf-relaxou-' + it.id, true);
-    A.rolagemDaFicha(`🛋️ ${d.nome} no interlúdio: ${o.txt.join(', ')}.`);
+    JJ('[data-io="acao"]').forEach(s => { if (s.value && !s.closest('[hidden]')) lista.push({ k: s.value, ...lerOpc(s.dataset.slot) }); });
+    JJ('[data-gratis]').filter(c => c.checked).forEach(c => lista.push({ k: 'n:' + c.dataset.gratis, ...lerOpc('g' + c.dataset.gratis) }));
+    if (lista.filter(x => x.k === 'relaxar').length > 1) { A.aviso('Relaxar só uma vez por interlúdio.'); return; }
+    const pers = lista.filter(x => x.k === 'exercitar' || x.k === 'ler').map(x => x.per);
+    if (new Set(pers).size < pers.length) { A.aviso('O bônus não acumula: escolha perícias diferentes.'); return; }
+    for (const x of lista) {
+      if ((x.k === 'esgueirar' || x.k.startsWith('n:')) && !x.alvo) { A.aviso('Escolha o alvo.'); return; }
+      if (x.k === 'exercitar' || x.k === 'ler') {
+        const o = x.k === 'exercitar' ? 'ex' : 'le', d0 = at2.d;
+        const tem = Object.values(d0.treino || {}).filter(v => v === o).length + lista.filter(y => y.k === x.k).length;
+        if (!x.per || (d0.treino || {})[x.per]) { A.aviso('Escolha uma perícia que ainda não tem esse bônus.'); return; }
+        if (tem > Math.max(1, int(d0.atr[o === 'ex' ? 'vig' : 'int']))) { A.aviso(`Limite de perícias com bônus de ${x.k === 'exercitar' ? 'exercício (Vigor)' : 'leitura (Intelecto)'} atingido.`); return; }
+      }
+    }
+    const acord = J('input[name="intAcord"]:checked');
+    estadoJanela.feito = true;
+    const res = aplicarInterludio(it, lista, acord ? acord.value : 'fortitude');
     marcar('int-' + it.id);
-    fecharJanela();
+    janela('int-' + it.id, `${topo}<h3>Interlúdio feito</h3><ul class="int-res">${res.map(x => `<li>${x}</li>`).join('')}</ul><div class="mesa-botoes"><button data-mj="fechar" class="pri">Fechar</button></div>`, 'interludio');
+    estadoJanela = null;
   } };
+}
+// aplica tudo na ficha ativa; o que é público vai para mesaResp, o que é secreto vai só para o Mestre (avisos)
+function aplicarInterludio(it, lista, testeAcord) {
+  const at = FX().ativa(), d = at.d, r = at.r, det = d.regra === 'determinacao';
+  const tipo = tipoDe(it), mult = (DESCANSO[it.cond] || DESCANSO.normal)[1], nv = Math.max(1, FX().nivelDe(d));
+  const nomePer = id => ((FX().PER || {})[id] || [, id])[1];
+  const dado = t => `${t.total} <small>(d20 ${t.esc}${t.treino ? ` + 1d6 treino ${t.treino}` : ''})</small>`;
+  const ganho = { pv: 0, pe: 0, san: 0, pd: 0 }, mud = [], res = [], pub = [], priv = [];
+  let dormiu = '', relaxou = false;
+  const mente = n => { if (det) ganho.pd += n; else ganho.san += n; };
+  const energia = n => { if (det) ganho.pd += n; else ganho.pe += n; };
+  lista.forEach(x => {
+    if (x.k.startsWith('n:')) {
+      const c = (window.ACF_REGRAS.pessoais() || {})[x.k.slice(2)] || {};
+      const t = FX().testarPericia(d, 'furtividade');
+      priv.push({ k: 'regra', x: String(c.tit || 'Ação noturna').slice(0, 120), alvo: x.alvo, tot: t.total, nat: t.esc });
+      res.push(`🔒 ${esc(c.tit || 'Ação noturna')} em ${esc(nomeDe(x.alvo))}: Furtividade ${dado(t)}. O Mestre narra o que acontece.`);
+      return;
+    }
+    if (x.k === 'relaxar') { mente(nv); relaxou = true; res.push(`Relaxou: +${nv} ${det ? 'PD' : 'SAN'} (mais 1 por colega que relaxar, quando o Mestre encerrar).`); pub.push('relaxou'); }
+    else if (x.k === 'alimentar') {
+      const p = x.prato || 'saboroso';
+      if (p === 'saboroso') { const v = FX().rolarExpr('1d6').total; mente(v); res.push(`Prato saboroso: +${v} ${det ? 'PD' : 'SAN'}.`); }
+      else if (p === 'nutritivo') { const v = FX().rolarExpr('2d6').total; ganho.pv += v; res.push(`Prato nutritivo: +${v} PV.`); }
+      else if (p === 'energetico') { const v = FX().rolarExpr('1d6').total; energia(v); res.push(`Prato energético: +${v} ${det ? 'PD' : 'PE'}.`); }
+      else { mud.push(['rapido', true]); res.push('Prato rápido: +5 guardado para um teste (aparece um botão quando você rolar).'); }
+      pub.push('comeu um prato ' + p.replace('energetico', 'energético'));
+    }
+    else if (x.k === 'exercitar' || x.k === 'ler') {
+      mud.push(['treino.' + x.per, x.k === 'exercitar' ? 'ex' : 'le']);
+      res.push(`${x.k === 'exercitar' ? 'Treinou' : 'Estudou'} ${esc(nomePer(x.per))}: +1d6 nos testes dessa perícia por 1 semana.`);
+      pub.push(`${x.k === 'exercitar' ? 'se exercitou' : 'leu'} (${nomePer(x.per)})`);
+    }
+    else if (x.k === 'revisar') {
+      const t = FX().testarPericia(d, x.per || 'investigacao');
+      res.push(`Revisou ${x.txt ? `"${esc(x.txt)}"` : 'o caso'}: ${esc(nomePer(x.per || 'investigacao'))} ${dado(t)}. O Mestre compara com a DT da cena.`);
+      pub.push(`revisou ${x.txt ? `"${x.txt}"` : 'o caso'}: ${nomePer(x.per || 'investigacao')} ${t.total}`);
+    }
+    else if (x.k === 'manutencao') { res.push(`Manutenção${x.txt ? ': ' + esc(x.txt) : ''}.`); pub.push('manutenção' + (x.txt ? ` (${x.txt})` : '')); }
+    else if (x.k === 'fabricar') {
+      const t = FX().testarPericia(d, 'profissao'), [cat, dt0] = CAT_FAB[x.cat] || CAT_FAB[0], dt = dt0 - (x.impro ? 5 : 0);
+      const ok = t.total >= dt, mais = ok ? Math.floor((t.total - dt) / 5) : 0;
+      res.push(`Fabricação${x.txt ? ` de ${esc(x.txt)}` : ''} (categoria ${cat}${x.impro ? ', improvisado' : ''}): Profissão ${dado(t)} contra DT ${dt}: <b>${ok ? 'conseguiu' : 'falhou'}</b>${mais ? ` e pode fazer +${mais} item${mais > 1 ? 's' : ''} de mesma categoria ou menor (pagando a sucata)` : ''}.`);
+      pub.push(`fabricou ${x.txt || 'um item'} (cat. ${cat}${x.impro ? ', improvisado' : ''}): Profissão ${t.total} vs DT ${dt}, ${ok ? 'conseguiu' : 'falhou'}${mais ? ` (+${mais})` : ''}`);
+    }
+    else if (x.k === 'sono_leve') { const v = Math.max(1, Math.floor(nv * mult)); ganho.pv += v; energia(v); dormiu = dormiu || 'leve'; res.push(`Sono leve: +${v} PV e +${v} ${det ? 'PD' : 'PE'}.`); pub.push('sono leve'); }
+    else if (x.k === 'sono_rest') { dormiu = 'rest'; res.push(`Sono restaurador: PV, ${det ? 'PD' : 'PE e Sanidade'} cheios${d.condSono ? '; as condições de ficar acordado saíram' : ''}.`); pub.push('sono restaurador'); }
+    else if (x.k === 'alerta') { priv.push({ k: 'alerta', x: 'Alerta' }); res.push('🔒 Você passa a noite em alerta. Só o Mestre sabe.'); }
+    else if (x.k === 'esgueirar') {
+      const t = FX().testarPericia(d, 'furtividade');
+      priv.push({ k: 'esg', x: 'Esgueirar-se', alvo: x.alvo, tot: t.total, nat: t.esc });
+      res.push(`🔒 Esgueirou-se até ${esc(nomeDe(x.alvo))}: Furtividade ${dado(t)}. O Mestre narra o que acontece.`);
+    }
+    else if (x.k === 'staff') { res.push(`Conversou com a S.T.A.F.F.${x.txt ? ': ' + esc(x.txt) : ''}. O Mestre responde.`); pub.push('conversou com a S.T.A.F.F.' + (x.txt ? ` (${x.txt})` : '')); }
+  });
+  // noite: dormiu ou ficou acordado
+  let acordado = false;
+  if (tipo === 'longo') {
+    if (dormiu === 'rest') { mud.push(['semDormir', 0], ['condSono', null]); }
+    else if (dormiu === 'leve') { if (int(d.semDormir)) mud.push(['semDormir', 0]); }
+    else {
+      acordado = true;
+      const dia = int(d.semDormir) + 1, tb = ACORDADO[dia], conds = { ...(d.condSono || {}) };
+      mud.push(['semDormir', dia]);
+      if (!tb) { conds.inconsciente = true; conds.indefeso = true; res.push(`Ficou acordado (${dia}º dia sem dormir): <b>inconsciente e indefeso</b>.`); pub.push(`ficou acordado, ${dia}º dia: inconsciente e indefeso`); }
+      else {
+        const per = testeAcord === 'vontade' ? 'vontade' : 'fortitude', dt = per === 'vontade' ? tb.v : tb.f;
+        const t = FX().testarPericia(d, per), ok = t.total >= dt, novas = ok ? tb.ok : tb.falha;
+        novas.forEach(c => { conds[c] = true; });
+        res.push(`Ficou acordado (${dia}º dia sem dormir): ${nomePer(per)} ${dado(t)} contra DT ${dt}, <b>${ok ? 'passou' : 'falhou'}</b>${novas.length ? `: fica ${novas.map(c => NOME_COND[c]).join(' e ')}` : ': sem condições'}.`);
+        pub.push(`ficou acordado (${dia}º dia): ${nomePer(per)} ${t.total} vs DT ${dt}, ${ok ? 'passou' : 'falhou'}${novas.length ? ' → ' + novas.join(', ') : ''}`);
+      }
+      mud.push(['condSono', Object.keys(conds).length ? conds : null]);
+    }
+  }
+  // soma na ficha
+  const soma = (k, mx, n) => { if (n) mud.push([`${k}.a`, Math.min(mx, FX().atualDe(d, k, mx) + n)]); };
+  if (dormiu === 'rest') {
+    mud.push(['pv.a', r.pvMax]);
+    if (det) { mud.push(['pd.a', r.pdMax], ['enl', null]); }
+    else { mud.push(['pe.a', r.peMax], ['san.a', r.sanMax]); }
+  } else {
+    soma('pv', r.pvMax, ganho.pv);
+    if (det) { soma('pd', r.pdMax, ganho.pd); if (ganho.pd) mud.push(['enl', null]); }
+    else { soma('pe', r.peMax, ganho.pe); soma('san', r.sanMax, ganho.san); }
+  }
+  if (mud.length) FX().aplicarNaAtiva(mud);
+  const pubK = lista.map(x => x.k).filter(k => !k.startsWith('n:') && k !== 'alerta' && k !== 'esgueirar');
+  responder(it.id, { acoes: pubK, txt: pub.join('; ').slice(0, 500), sono: dormiu, acordado, relaxar: relaxou });
+  if (relaxou) ls.set('acf-relaxou-' + it.id, true);
+  priv.forEach(p => A.Rede.set('avisos/' + A.Rede.chave(), { t: 'noite', s: A.meu, k: p.k, x: p.x, alvo: p.alvo || '', tot: p.tot === undefined ? -1 : p.tot, nat: p.nat === undefined ? -1 : p.nat, it: String(it.id).slice(0, 40), ts: Date.now() }).catch(() => {}));
+  if (pub.length) A.rolagemDaFicha(`🛋️ ${d.nome} no interlúdio: ${pub.join(', ')}.`);
+  else if (acordado) A.rolagemDaFicha(`🛋️ ${d.nome} passou a noite acordado.`);
+  return res;
 }
 // relaxar: +1 de Sanidade para cada outro personagem que relaxou no mesmo interlúdio (aplicado quando o Mestre encerra)
 async function bonusRelaxar(it) {
@@ -377,6 +523,26 @@ async function bonusRelaxar(it) {
   const det = at.d.regra === 'determinacao', k = det ? 'pd' : 'san', mx = det ? at.r.pdMax : at.r.sanMax;
   FX().aplicarNaAtiva([[`${k}.a`, Math.min(mx, FX().atualDe(at.d, k, mx) + outros)]]);
   A.aviso(`Relaxar em grupo: +${outros} ${det ? 'PD' : 'SAN'} (${outros} colega${outros > 1 ? 's' : ''} também relaxou).`);
+}
+// Mestre: o que aconteceu na noite (só ele vê). A DT sai do estado do alvo: alerta 30, acordado 25, sono leve 20, sono restaurador 15.
+function pintarNoite(it, resp) {
+  const el = $('#mesaIntNoite'); if (!el || !A.mestre) return;
+  const regs = Object.values(((A.segredos || {})._noite || {})[it.id] || {}).filter(Boolean).sort((a, b) => num(a.ts) - num(b.ts));
+  if (!regs.length) { el.innerHTML = '<p class="mini">Nenhuma ação secreta ainda.</p>'; return; }
+  const estado = q => {
+    if (regs.some(x => x.s === q && (x.k === 'alerta' || x.x === 'Alerta'))) return DT_NOITE.alerta;
+    const rr = (resp || {})[q];
+    if (!rr) return [25, 'acordado? ainda não respondeu'];
+    return rr.sono === 'rest' ? DT_NOITE.rest : rr.sono === 'leve' ? DT_NOITE.leve : DT_NOITE.acordado;
+  };
+  el.innerHTML = regs.map(x => {
+    if (x.k === 'alerta' || (!x.alvo && x.x === 'Alerta')) return `<p>🛡 <b>${esc(nomeDe(x.s))}</b> passou a noite em alerta.</p>`;
+    if (!x.alvo) return `<p>🔒 <b>${esc(nomeDe(x.s))}</b>: ${esc(x.x || 'ação noturna')}</p>`;
+    const [dt, nomeEst] = estado(x.alvo), tot = int(x.tot), tem = x.tot !== null && x.tot !== undefined && tot >= 0;
+    const m = tot - dt;
+    const cat = !tem ? '' : m >= 0 ? `<b class="int-ok">sucesso</b> (por ${m})` : m <= -10 ? `<b class="int-grave">falha grave</b> (por ${-m}): notado, todos acordam` : `<b class="int-falha">falha</b> (por ${-m}): não chega, não é notado`;
+    return `<p>🌙 <b>${esc(nomeDe(x.s))}</b> · ${esc(x.x || 'ação noturna')} → <b>${esc(nomeDe(x.alvo))}</b> <small>(${esc(nomeEst)}, DT ${dt})</small><br>${tem ? `Furtividade ${tot} · ${cat}` : ''}${int(x.nat) === 1 ? ' · <b class="int-grave">🎲 1 natural</b> (falha crítica? você decide)' : ''}</p>`;
+  }).join('') + '<p class="mini">Falha crítica: como falha grave, mas a identidade é revelada. Você decide as consequências (grito, fuga, confronto ou denúncia).</p>';
 }
 
 /* ---------- 4c. Fim de missão ---------- */
@@ -560,25 +726,30 @@ function desenharMesaInv() {
 function desenharMesaInt() {
   if (!semFoco('#mesaInt')) return;
   const it = est().interludio || {};
-  $('#mesaInt').innerHTML = it.on ? `<p class="mini">Interlúdio aberto (descanso ${esc((DESCANSO[it.cond] || DESCANSO.normal)[0].toLowerCase())}). Cada jogador escolhe até duas ações na própria tela.</p><div id="mesaIntResp" class="mesa-resp"></div><button data-mi="int-fim" class="perigo">Encerrar interlúdio</button>`
-    : `<p class="mini">Cada jogador escolhe até duas ações (dormir, relaxar, alimentar-se, exercitar-se, ler, manutenção, revisar caso) e o site aplica na ficha dele.</p>
-      <label class="mesa-campo">Descanso <select id="mesaDesc">${Object.entries(DESCANSO).map(([k, v]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>
-      <button data-mi="int-ini" class="btn-protocolo">Abrir interlúdio</button>`;
-  if (it.on && it.id) ouvirRespostas('mesaIntResp', it.id, r => `${esc(((r.acoes || []).map(a => (ACOES_INT.find(x => x[0] === a) || [, a])[1]).join(' e ')) || '—')}`);
+  const tipo = tipoDe(it);
+  const fmt = r => (r.txt ? esc(r.txt) : esc(((r.acoes || []).map(a => (acaoInt(a) || [, a])[1]).join(' e ')) || (r.acordado ? '' : '—'))) + (r.acordado && !String(r.txt || '').includes('acordado') ? ' · 🌙 acordado' : '');
+  $('#mesaInt').innerHTML = it.on ? `<p class="mini">${esc(TIPO_DESC[tipo][0])} aberto · condição ${esc((DESCANSO[it.cond] || DESCANSO.normal)[0].toLowerCase())}. Cada jogador escolhe ${TIPO_DESC[tipo][1] === 1 ? '1 ação geral' : '2 ações (gerais ou especiais)'} na própria tela.</p><div id="mesaIntResp" class="mesa-resp"></div>
+      ${tipo === 'longo' ? '<p class="mesa-k">🌙 NOITE · SÓ VOCÊ VÊ</p><div id="mesaIntNoite" class="mesa-resp"></div>' : ''}<button data-mi="int-fim" class="perigo">Encerrar interlúdio</button>`
+    : `<p class="mini">Curto: 1 ação geral (relaxar, alimentar-se, exercitar-se, ler, revisar caso, manutenção, fabricação). Longo: 2 ações, com dormir, alerta, esgueirar-se, S.T.A.F.F. e as ações noturnas das regras restritas. Quem não dorme no longo testa para ficar acordado. O grupo faz no máximo 2 descansos curtos por dia. O site aplica tudo na ficha de cada um.</p>
+      <label class="mesa-campo">Tipo <select id="mesaTipoDesc">${Object.entries(TIPO_DESC).map(([k, v]) => `<option value="${k}" ${k === 'longo' ? 'selected' : ''}>${v[0]} (${v[1]} aç${v[1] > 1 ? 'ões' : 'ão'})</option>`).join('')}</select></label>
+      <label class="mesa-campo">Condição <select id="mesaDesc">${Object.entries(DESCANSO).map(([k, v]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${v[0]}${v[1] !== 1 ? ` (sono ×${String(v[1]).replace('.', ',')})` : ''}</option>`).join('')}</select></label>
+      <button data-mi="int-ini" class="btn-protocolo">Abrir interlúdio</button>
+      ${it.id && tipo === 'longo' && Object.keys(((A.segredos || {})._noite || {})[it.id] || {}).length ? '<details><summary>🌙 Última noite</summary><div id="mesaIntNoite" class="mesa-resp"></div></details>' : ''}`;
+  if (it.id && (it.on || $('#mesaIntNoite'))) ouvirRespostas('mesaIntResp', it.id, fmt, v => pintarNoite(it, v));
 }
 let respOff = {};
-function ouvirRespostas(alvo, id, fmt) {
+function ouvirRespostas(alvo, id, fmt, depois) {
   const pinta = v => {
-    const el = $('#' + alvo); if (!el) return;
-    const rs = Object.entries(v || {});
-    el.innerHTML = rs.length ? rs.map(([q, r]) => `<p>${esc((A.SER[q] || {}).nome || q)}: ${fmt(r)}</p>`).join('') : '<p class="mini">Ninguém respondeu ainda.</p>';
+    const el = $('#' + alvo);
+    if (el) { const rs = Object.entries(v || {}); el.innerHTML = rs.length ? rs.map(([q, r]) => `<p>${esc((A.SER[q] || {}).nome || q)}: ${fmt(r)}</p>`).join('') : '<p class="mini">Ninguém respondeu ainda.</p>'; }
+    if (depois) depois(v);
   };
   const atual = respOff[alvo];
-  if (atual && atual.id === id) { pinta(atual.v); return; }
+  if (atual && atual.id === id) { atual.pinta = pinta; pinta(atual.v); return; }
   if (atual) atual.off();
-  const reg = { id, v: null, off: () => {} };
+  const reg = { id, v: null, off: () => {}, pinta };
   respOff[alvo] = reg;
-  reg.off = A.Rede.on('mesaResp/' + id, v => { reg.v = v; pinta(v); }, () => {});
+  reg.off = A.Rede.on('mesaResp/' + id, v => { reg.v = v; reg.pinta(v); }, () => {});
 }
 function desenharMesaRec() {
   if (!semFoco('#mesaRec')) return;
@@ -641,7 +812,7 @@ function aoClicarMesa(e) {
     if (somOk() && A.Som) A.Som.tom(660, 0, 0.12, 'triangle', 0.08, 990);
   } else if (a === 'tirar') A.definir(['inv', 'pistas', b.dataset.k], null);
   else if (a === 'quadro') { if (window.ACF_QUADRO) window.ACF_QUADRO.abrir(); }
-  else if (a === 'int-ini') A.definir(['interludio'], { on: true, id: A.Rede.chave(), cond: $('#mesaDesc').value, ts: Date.now() });
+  else if (a === 'int-ini') A.definir(['interludio'], { on: true, id: A.Rede.chave(), tipo: $('#mesaTipoDesc').value, cond: $('#mesaDesc').value, ts: Date.now() });
   else if (a === 'int-fim') { if (confirm('Encerrar o interlúdio?')) A.definir(['interludio'], { ...(est().interludio || {}), on: false }); }
   else if (a === 'rec') {
     const por = {};
@@ -689,9 +860,13 @@ function topicosEscudo() {
   const C = (FX() && FX().PATENTES) || [];
   const eq = base.find(t => t.id === 'equipamento');
   if (eq && C.length) eq.cards.push({ titulo: 'Patentes', tipo: 'tabela', fonte: 'OPRPG p. 51', linhas: [['Patente', 'PP', 'Crédito', 'Itens I · II · III · IV']].concat(C.map(x => [x.n, String(x.pp), x.cred, x.lim.join(' · ')])) });
+  // regras restritas (ações noturnas etc.): Mestre gerencia; auxiliares leem as liberadas para eles
+  const rr = window.ACF_REGRAS && window.ACF_REGRAS.topicoEscudo();
+  if (rr && rr.cards.length) base.push(rr);
   return base;
 }
 function cardEscudo(c) {
+  if (c.tipo === 'html') return `<article class="esc-card esc-rr">${c.html}</article>`;
   const corpo = c.tipo === 'tabela'
     ? `<table>${c.linhas.map((l, i) => `<tr>${l.map(x => i ? `<td>${x}</td>` : `<th>${x}</th>`).join('')}</tr>`).join('')}</table>`
     : `<ul>${c.linhas.map(x => `<li>${x}</li>`).join('')}</ul>`;
@@ -976,7 +1151,7 @@ function vigiarRelatorio() {
   if (relIni && ch && ch.id && ch.id !== chamadoAnt && ch.t === 'presenca') registrarRel('presenca', '', Object.keys(ch.alvos || {}).length, ch.nome, 'p' + ch.id);
   chamadoAnt = ch && ch.id;
   const it = e.interludio;
-  if (relIni && it && it.on && it.id !== intAnt) registrarRel('interludio', '', 0, (DESCANSO[it.cond] || DESCANSO.normal)[0], 'l' + it.id);
+  if (relIni && it && it.on && it.id !== intAnt) registrarRel('interludio', '', 0, `${TIPO_DESC[tipoDe(it)][0]} · ${(DESCANSO[it.cond] || DESCANSO.normal)[0]}`, 'l' + it.id);
   intAnt = it && it.on ? it.id : null;
   const cena = e.cena;
   if (relIni && cena && cena.id && cena.id !== cenaAnt) registrarRel('cena', '', 0, '', 'cn' + cena.id);
@@ -1008,7 +1183,6 @@ const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanida
 async function abrirRelatorio() {
   const dados = await A.Rede.once('relatorio').catch(() => null) || {};
   const meta = dados.meta || {}, evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
-  const nomeDe = id => (A.SER[id] || {}).nome || id || '';
   const por = {};
   cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: [], m20: 0, m1: 0, caiu: 0, enl: 0, fim: '', nex: 0, des: [] }; });
   const pistas = [], pres = [], memb = [], cof = [];
@@ -1098,6 +1272,7 @@ function agendar() { if (agendado) return; agendado = true; requestAnimationFram
 A.aoMudar(agendar);
 document.addEventListener('acf-perfil', () => setTimeout(agendar, 50));
 document.addEventListener('acf-ativa', agendar);
+document.addEventListener('acf-segredos', () => { if (A.mestre) setTimeout(desenharMesaInt, 30); });
 document.addEventListener('click', e => { if (e.target.closest('#painel [data-mi]')) aoClicarMesa(e); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = $('#escudoMestre'); if (o && !o.hidden) o.hidden = true; } });
 const bNova = $('#mesaNovaCena'); if (bNova) bNova.addEventListener('click', () => { if (confirm('Começar uma nova cena? Zera os contadores de Morrendo e Enlouquecendo e desconta a munição usada.')) novaCena(); });
@@ -1106,5 +1281,5 @@ const bEsc = $('#mesaEscudo'); if (bEsc) bEsc.addEventListener('click', abrirEsc
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
 setInterval(pintarMembrana, 1200);
-window.ACF_MESA = { abrirEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
+window.ACF_MESA = { abrirEscudo, desenharEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
 })();

@@ -129,6 +129,10 @@ function docsPub() {
   const hs = new Set(Object.values(ab));
   Object.entries(base).forEach(([id, d]) => { if (d && d.tranca && ab[d.tranca]) return; out[id] = d; });
   Object.entries(cofreDocs).forEach(([h, docs]) => { if (hs.has(h)) Object.entries(docs || {}).forEach(([id, d]) => { if (d) out[id] = { ...d, cofre: true }; }); });
+  // regras restritas que o Mestre liberou só para esta cobaia
+  if (!A.mestre && window.ACF_REGRAS) Object.entries(window.ACF_REGRAS.pessoais()).forEach(([id, c]) => {
+    if (c) out['rr-' + id] = { tit: c.tit, pasta: 'Regras pessoais', cab: 'O.R.F.E.U. · SÓ PARA VOCÊ', data: '', txt: c.txt, partes: [{ t: c.txt }], ts: num(c.ord), pessoal: true };
+  });
   return out;
 }
 function ligarCofres() {
@@ -215,7 +219,8 @@ function htmlDoc(id, d, mestreVe) {
   const partes = mestreVe ? null : (Array.isArray(d.partes) ? d.partes : Object.values(d.partes || {}));
   const vistos = docVistos[id] || (docVistos[id] = new Map());
   let corpo;
-  if (mestreVe) {
+  if (d.pessoal && window.ACF_REGRAS) corpo = window.ACF_REGRAS.txtRegra(d.txt);
+  else if (mestreVe) {
     let i = 0;
     corpo = String(d.txt || '').split(/\[\[([\s\S]*?)\]\]/).map((t, k) => {
       if (k % 2 === 0) return marcaTxt(t);
@@ -231,7 +236,7 @@ function htmlDoc(id, d, mestreVe) {
     }).join('');
     docVistos[id].pronto = true;
   }
-  return `<article class="doc-folha"><header><span class="doc-cab">${esc(d.cab || 'O.R.F.E.U. · DOCUMENTO INTERNO')}</span><h3>${esc(d.tit || 'Documento')}</h3></header><div class="doc-corpo">${corpo}</div>
+  return `<article class="doc-folha"><header><span class="doc-cab">${esc(d.cab || 'O.R.F.E.U. · DOCUMENTO INTERNO')}</span><h3>${esc(d.tit || 'Documento')}</h3></header><div class="doc-corpo${d.pessoal ? ' rr-doc' : ''}">${corpo}</div>
     <footer><span>${esc(d.data !== undefined && d.data !== null ? d.data : new Date(num(d.ts) || Date.now()).toLocaleDateString('pt-BR'))}</span><i class="doc-carimbo">CONFIDENCIAL</i></footer></article>`;
 }
 async function publicarDoc(id) {
@@ -889,6 +894,7 @@ function redesenhar() {
 }
 A.aoMudar(redesenhar);
 document.addEventListener('acf-tudo', redesenhar);
+document.addEventListener('acf-regras', redesenhar);
 document.addEventListener('acf-perfil', () => { setTimeout(redesenhar, 60); });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || !Arq.aberto || ($('#cfPalpite') && !$('#cfPalpite').hidden)) return;
