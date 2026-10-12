@@ -28,7 +28,7 @@ const P_ARCO = 'M182 178 C 112 236 104 368 182 414 C 262 460 352 394 340 286 C 3
 const GOTAS = [[176, 215, 26], [214, 205, 40], [246, 196, 22], [168, 262, 34], [232, 250, 46], [180, 308, 30], [244, 296, 38], [205, 470, 30], [128, 340, 26], [338, 330, 34], [300, 420, 24], [222, 432, 30]];
 function htmlSigilo(cls = '') {
   const caminhos = [P_ESPIRAL, P_HASTE, ...P_RISCOS, P_ARCO];
-  const traco = (larg, extra = '') => caminhos.map((d, i) => `<path d="${d}" pathLength="1" style="--i:${[0, 1, 2, 2.4, 2.8, 3.4][i]}" stroke-width="${i === 5 ? larg * 1.15 : larg}" ${extra}/>`).join('');
+  const traco = (larg, extra = '') => caminhos.map((d, i) => `<path d="${d}" data-i="${[0, 1, 2, 2.4, 2.8, 3.4][i]}" stroke-width="${i === 5 ? larg * 1.15 : larg}" ${extra}/>`).join('');
   return `<svg class="eco-sig ${cls}" viewBox="60 20 300 500" xmlns="http://www.w3.org/2000/svg" aria-label="Sigilo do Eco">
     <defs>
       <radialGradient id="ecoLua"><stop offset="0" stop-color="#9b9640" stop-opacity=".55"/><stop offset=".72" stop-color="#55531f" stop-opacity=".45"/><stop offset="1" stop-color="#2a2910" stop-opacity="0"/></radialGradient>
@@ -115,8 +115,17 @@ function capaHtml(x, fim) {
 
 /* ---------- Tela cheia: abertura e encerramento ---------- */
 const TELA = { id: null, timers: [] };
-function fecharTela() { TELA.timers.forEach(clearTimeout); TELA.timers = []; TELA.id = null; pararMusica(true); const o = $('#abTela'); if (o) { o.classList.add('saindo'); setTimeout(() => { o.hidden = true; o.classList.remove('saindo'); o.innerHTML = ''; }, 900); } }
-function cena(o, html, cls) { $$('.ab-cena.fora', o).forEach(x => { if (!x._tira) x._tira = setTimeout(() => x.remove(), 1200); }); const d = document.createElement('div'); d.className = 'ab-cena ' + (cls || ''); d.innerHTML = html; o.appendChild(d); requestAnimationFrame(() => d.classList.add('on')); return d; }
+function fecharTela() { TELA.timers.forEach(clearTimeout); TELA.timers = []; TELA.id = null; pararMusica(true); document.body.classList.remove('tela-cheia'); const o = $('#abTela'); if (o) { o.classList.add('saindo'); setTimeout(() => { o.hidden = true; o.classList.remove('saindo'); o.innerHTML = ''; }, 900); } }
+// desenha os traços do sigilo com o comprimento real de cada caminho (funciona igual em todo celular)
+function animarSigilos(el) {
+  $$('.eco-sig.anima .eco-traco path, .eco-sig.anima .eco-roxo path', el).forEach(p => {
+    let L = 0; try { L = p.getTotalLength(); } catch (e) {}
+    if (!L || !p.animate) return;
+    p.style.strokeDasharray = L + ' ' + L; p.style.strokeDashoffset = L;
+    p.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 1100, delay: (num(p.dataset.i) * 0.8 + 0.3) * 1000, easing: 'ease-in-out', fill: 'forwards' });
+  });
+}
+function cena(o, html, cls) { $$('.ab-cena.fora', o).forEach(x => { if (!x._tira) x._tira = setTimeout(() => x.remove(), 1200); }); const d = document.createElement('div'); d.className = 'ab-cena ' + (cls || ''); d.innerHTML = html; o.appendChild(d); animarSigilos(d); requestAnimationFrame(() => d.classList.add('on')); return d; }
 // quem entra atrasado vê o símbolo já no ponto certo do desenho
 function adiantar(el, seg) { if (!el || !(seg > 0) || !el.getAnimations) return; requestAnimationFrame(() => el.getAnimations({ subtree: true }).forEach(a => { try { a.currentTime = (a.currentTime || 0) + seg * 1000; } catch (e) {} })); }
 function agendar(ms, fn) { TELA.timers.push(setTimeout(fn, Math.max(0, ms))); }
@@ -124,6 +133,7 @@ function telaBase(id, estilo) {
   let o = $('#abTela');
   if (!o) { o = document.createElement('div'); o.id = 'abTela'; document.body.appendChild(o); }
   o.className = 'ab-tela estilo-' + nomeEstilo(estilo);
+  document.body.classList.add('tela-cheia');
   TELA.timers.forEach(clearTimeout); TELA.timers = []; TELA.id = id;
   const publico = A.mestre && ['abertura', 'encerramento'].some(k => { const x = est()[k]; return x && x.on && (k === 'abertura' ? 'ab' : 'en') + x.id === id; });
   o.innerHTML = '<button class="ab-som" hidden>▶ Toque para ouvir a música</button><button class="ab-x" aria-label="Fechar" title="Fechar só na sua tela">×</button>' + (publico ? '<button class="ab-parar">■ Parar para todos</button>' : '');
