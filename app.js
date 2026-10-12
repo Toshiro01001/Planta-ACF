@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012za';
+const VERSAO_SITE = '20261012zb';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
