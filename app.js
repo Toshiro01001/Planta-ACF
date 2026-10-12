@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012zc';
+const VERSAO_SITE = '20261012zd';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -3999,8 +3999,19 @@ const Chat = {
   lista(c) {
     let l;
     if (c === 'sus' && !mestre) l = this.enviados.concat(Object.values(this.respostas || {}));
-    else l = Object.values(this.msgs[c] || {});
+    else l = Object.entries(this.msgs[c] || {}).map(([k, m]) => (m ? { ...m, _k: k } : m));
     return l.filter(m => m && m.ts).sort((x, y) => x.ts - y.ts).slice(-250);
+  },
+  // apaga uma mensagem do servidor (some para todos); resposta do Mestre sai também da caixa do jogador
+  async apagarMsg(c, k) {
+    if (!mestre || !k) return;
+    const no = c === 'sus' ? 'sussurros' : c === 'filhos' ? 'filhos' : 'geral';
+    const m = (this.msgs[c] || {})[k];
+    await Rede.set(`chat/${no}/${k}`, null).catch(erroGravacao);
+    if (m && m.para && m.ts) {
+      const rs = (await Rede.once('chat/respostas/' + m.para).catch(() => null)) || {};
+      for (const [rk, r] of Object.entries(rs)) if (r && r.ts === m.ts && r.t === m.t) await Rede.set(`chat/respostas/${m.para}/${rk}`, null).catch(() => {});
+    }
   },
   naoLidas(c) {
     const eu = this.autorId();
@@ -4039,12 +4050,18 @@ const Chat = {
       const s = SER[m.a];
       const avatar = s ? `<span class="bola" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>` : '<span class="bola mestre-bola">M</span>';
       const para = mestre && c === 'sus' && m.para ? ` <small>→ ${esc(this.nomeDoCx(m.para))}</small>` : '';
-      const btn = mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '';
+      const btn = (mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '')
+        + (mestre && m._k ? `<button class="msg-lixo" data-k="${esc(m._k)}" title="Apagar esta mensagem para todos" aria-label="Apagar mensagem">🗑</button>` : '');
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
         ${ehBz(m) ? `<div class="msg-txt msg-bz ${linguaDe(m).cls}" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(falaDe(m))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
     $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t)); else abrirTraducao(m); });
+    // Mestre: 🗑 pede confirmação no próprio botão (segundo toque em até 3 s apaga)
+    $$('.msg-lixo', lista).forEach(b => b.onclick = () => {
+      if (!b.classList.contains('confirma')) { b.classList.add('confirma'); b.textContent = 'apagar?'; clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove('confirma'); b.textContent = '🗑'; }, 3000); return; }
+      this.apagarMsg(c, b.dataset.k);
+    });
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();
