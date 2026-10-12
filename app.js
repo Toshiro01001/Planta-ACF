@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012ze';
+const VERSAO_SITE = '20261012zf';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2190,13 +2190,18 @@ function desenharPerseguicao() {
 }
 
 // jogador: abre os dados quando o Mestre pede a iniciativa
+// cada pedido abre uma vez só por aparelho (lembrado no navegador); pedido com mais de 10 minutos
+// é só marcado como visto. Antes, no celular, o primeiro estado (vazio, antes de o servidor responder)
+// fazia o pedido antigo parecer novo e os dados abriam toda vez que o site era aberto.
 function verificarPedidoIniciativa() {
-  const req = P().req || 0;
-  if (pedidoVisto === null) { pedidoVisto = req; return; }
-  if (req && req !== pedidoVisto) {
-    pedidoVisto = req;
-    if ((meu || aux) && !mestre) abrirDados('O Mestre pediu: role a iniciativa');
-  }
+  const req = +(P().req || 0);
+  if (!req || (Store.modo === 'firebase' && !Store.pub)) return;
+  let visto = 0; try { visto = +localStorage.getItem('acf-ini-vista') || 0; } catch (e) {}
+  if (req <= visto || req === pedidoVisto) return;
+  pedidoVisto = req;
+  try { localStorage.setItem('acf-ini-vista', String(req)); } catch (e) {}
+  if (Date.now() - req > 10 * 60e3) return;
+  if ((meu || aux) && !mestre) abrirDados('O Mestre pediu: role a iniciativa');
 }
 
 $('#btnPedirIni').addEventListener('click', () => { Store.definir(['persg'], { ...P(), on: false, req: Date.now() }); aviso('Pedido enviado aos jogadores.'); });
