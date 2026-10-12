@@ -3407,3 +3407,32 @@ body.tela-cheia .topo, body.tela-cheia .corpo, body.tela-cheia .painel-chat, bod
 #mesaSessao select, #mesaSessao textarea { width: 100%; }
 /* baú: a tampa abre sem cobrir o título */
 .bau-arte { margin-top: 26px; }
+
+/* =========================================================
+   CELULAR EM PÉ: cartão da sala/ficha, gaveta e símbolo do Eco
+   ========================================================= */
+@media (max-width: 860px) {
+  /* o cartão cabe inteiro dentro do mapa (antes o topo, com o ×, ficava escondido atrás da faixa dos andares) */
+  .cartao, body.em-persg .cartao {
+    top: auto; bottom: 216px; left: 8px; right: 8px; width: auto;
+    max-height: min(46vh, calc(100% - 232px)); padding-top: 0;
+    overscroll-behavior: contain; touch-action: pan-y;
+  }
+  body.em-persg .cartao { max-height: min(42vh, calc(100% - 262px)); }
+  .cartao > .fechar + * { padding-top: 12px; padding-right: 40px; }
+  /* o × acompanha a rolagem do cartão e tem tamanho de dedo */
+  .cartao > .fechar {
+    position: sticky; top: 0; z-index: 3; display: block; margin: 0 -6px -44px auto;
+    width: 44px; height: 44px; font-size: 26px; line-height: 1; color: var(--texto);
+    background: rgba(18,15,26,.92); border-radius: 0 0 0 10px;
+  }
+  .cartao .nota-sala textarea { height: 92px; min-height: 0; }
+  /* gaveta fechada: some de verdade (o "Próximo" do teclado não pula para campos escondidos nela) */
+  .painel { visibility: hidden; transition: transform .25s, visibility 0s linear .25s; touch-action: pan-y; overscroll-behavior: contain; }
+  .painel.aberto { visibility: visible; transition: transform .25s, visibility 0s; }
+  /* pinça fora do mapa não amplia a página inteira */
+  .topo, .elevador, .camera, .btn-dados, .painel-dados { touch-action: pan-x pan-y; }
+  /* símbolo do Eco: sem mistura de cor por cima do mapa 2.5D (no Chrome do Android deixava partes da tela em branco) */
+  .eco-simbolo { mix-blend-mode: normal; }
+}
+@media (pointer: coarse) { .eco-simbolo { mix-blend-mode: normal; } }

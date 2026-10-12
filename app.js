@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012zf';
+const VERSAO_SITE = '20261012zi';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -3395,6 +3395,20 @@ function atualizarBotaoMinha() {
     const dy = e.clientY - y0; y0 = null;
     if (dy < -20 || Math.abs(dy) < 8) $('#painel').classList.add('aberto');
   });
+})();
+
+// celular: o corpo do site nunca rola. Se o navegador empurrar alguma dessas caixas sozinho
+// (teclado, foco num campo, pinça), elas voltam para o lugar e o topo não some.
+(() => {
+  const fixas = () => [document.documentElement, document.body, $('.corpo'), $('.palco-area'), $('.topo'), $('.elevador')];
+  const voltar = () => {
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    fixas().forEach(el => { if (el && (el.scrollTop || el.scrollLeft)) { el.scrollTop = 0; el.scrollLeft = 0; } });
+  };
+  window.addEventListener('scroll', voltar, { passive: true });
+  document.addEventListener('scroll', e => { if (fixas().includes(e.target)) voltar(); }, { capture: true, passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(voltar, 250));
+  document.addEventListener('focusout', () => setTimeout(voltar, 300));
 })();
 
 /* =========================================================
