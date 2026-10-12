@@ -897,6 +897,14 @@ async function entregar(cob, obj) {
   for (const chave of Object.keys(fichas)) { await A.Rede.set(`entregas/${await A.hash('entrega:' + chave)}/${k}`, v).catch(() => {}); n++; }
   return n;
 }
+// entrega para uma ficha só (o Mestre viu a ficha e sabe a chave dela)
+async function entregarFicha(cob, chave, obj) {
+  if (!A.mestre || !cob || !chave) return 0;
+  await A.Rede.set(`entregas/${await A.hash('entrega:' + chave)}/${A.Rede.chave()}`, { ...obj, ts: Date.now() });
+  return 1;
+}
+// o que o Mestre pode tirar de uma ficha (condições do sono e bônus de interlúdio)
+const TIRAVEL = /^(condSono(\/[a-z]+)?|semDormir|treino(\/[a-z]+)?|rapido|bonusProx|bonusInt)$/;
 const ENT = { de: '', off: [], hs: {}, v: {} };
 function ligarEntregas() {
   const FXA = window.ACF_FICHAS;
@@ -916,21 +924,31 @@ function ligarEntregas() {
 }
 function aplicarEntregas() {
   const FXA = window.ACF_FICHAS, at = FXA && FXA.ativa();
-  if (!at || !at.ref) return;
-  const h = Object.keys(ENT.hs).find(x => ENT.hs[x] === at.ref.chave); if (!h) return;
-  Object.entries(ENT.v[h] || {}).forEach(([k, e]) => {
-    if (!e || ENT['feito' + k]) return;
-    ENT['feito' + k] = true;
+  Object.entries(ENT.hs).forEach(([h, chave]) => Object.entries(ENT.v[h] || {}).forEach(([k, e]) => {
+    if (!e || ENT['feito' + h + k]) return;
+    // "tirar": vale para a ficha a que foi mandada, ativa ou não
+    if (e.tirar) {
+      ENT['feito' + h + k] = true;
+      const lst = (Array.isArray(e.tirar) ? e.tirar : Object.values(e.tirar)).map(String).filter(p => TIRAVEL.test(p));
+      Promise.all(lst.map(p => A.Rede.set(`agentes/${A.meu}/${chave}/${p}`, null))).then(() => {
+        A.Rede.set(`entregas/${h}/${k}`, null).catch(() => {});
+        if (lst.length) A.aviso('O Mestre ajustou sua ficha: ' + lst.map(p => ({ condSono: 'condições do sono', semDormir: 'dias sem dormir', treino: 'bônus de treino', rapido: 'prato rápido', bonusProx: 'bônus guardado', bonusInt: 'bônus antigos' }[p.split('/')[0]] + (p.includes('/') ? ` (${p.split('/')[1]})` : ''))).join(', ') + '.');
+      }, () => { ENT['feito' + h + k] = false; });
+      return;
+    }
+    // cura e afins: só na ficha ativa
+    if (!at || !at.ref || at.ref.chave !== chave) return;
+    ENT['feito' + h + k] = true;
     const lista = [];
     if (int(e.pv)) lista.push(['pv.a', Math.min(at.r.pvMax, FXA.atualDe(at.d, 'pv', at.r.pvMax) + int(e.pv))]);
     const fim = () => Object.keys(ENT.hs).forEach(hh => A.Rede.set(`entregas/${hh}/${k}`, null).catch(() => {}));
     if (!lista.length) { fim(); return; }
-    FXA.aplicarNaAtiva(lista).then(ok => { if (!ok) { ENT['feito' + k] = false; return; } fim(); A.aviso(`🌙 Você acordou melhor do que dormiu: +${int(e.pv)} PV.`); });
-  });
+    FXA.aplicarNaAtiva(lista).then(ok => { if (!ok) { ENT['feito' + h + k] = false; return; } fim(); A.aviso(`🌙 Você acordou melhor do que dormiu: +${int(e.pv)} PV.`); });
+  }));
 }
 document.addEventListener('acf-ativa', () => setTimeout(aplicarEntregas, 300));
 
-window.ACF_REGRAS = { topicoEscudo: topicoRegras, pessoais: regrasPessoais, opcoesNoite, txtRegra, entregar };
+window.ACF_REGRAS = { topicoEscudo: topicoRegras, pessoais: regrasPessoais, opcoesNoite, txtRegra, entregar, entregarFicha };
 
 /* =========================================================
    LIGAÇÕES

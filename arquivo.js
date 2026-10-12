@@ -296,6 +296,7 @@ function receberVisao(v) {
   }
   const hist = ls.get(chaveVisoes(), []);
   if (hist.some(h => h.id === v.id)) return;
+  if (ls.get(chaveVisoes() + '-apagadas', []).includes(v.id)) return;   // o jogador já apagou esta: não volta ao recarregar
   hist.unshift({ id: v.id, txt: v.txt || '', img: v.img || '', ts: num(v.ts) });
   // imagens só nas 6 mais recentes (o navegador tem pouco espaço)
   ls.set(chaveVisoes(), hist.slice(0, 20).map((h, i) => (i < 6 ? h : { ...h, img: '' })));
@@ -320,6 +321,29 @@ function mostrarVisao(v) {
     else if (v.ef === 'sussurro') { S.tom(330, 0, 2.5, 'sine', 0.025, 311); S.tom(415, 0.2, 2.2, 'sine', 0.02, 392); }
     else { S.tom(1200, 0, 0.5, 'sine', 0.06, 300); S.tom(48, 0, 2.5, 'sine', 0.18, 30); }
   }
+}
+// Mestre: a visão que cada cobaia tem guardada no servidor (visoes/<cobaia>).
+// Ela chega em todo navegador novo daquela cobaia; apagar aqui troca por um aviso de exclusão,
+// e os navegadores que já tinham a visão também a tiram do Arquivo.
+async function abrirVisoesServidor() {
+  if (!A.mestre) return;
+  let o = $('#vsServ');
+  if (!o) { o = document.createElement('div'); o.id = 'vsServ'; o.className = 'rr-modal'; document.body.appendChild(o);
+    o.addEventListener('click', async e => {
+      if (e.target === o || e.target.closest('[data-vss="fechar"]')) { o.hidden = true; return; }
+      const b = e.target.closest('[data-vss="apagar"]'); if (!b) return;
+      if (!confirm(`Apagar de vez a visão guardada de ${(A.SER[b.dataset.c] || {}).nome || b.dataset.c}?`)) return;
+      await A.Rede.set('visoes/' + b.dataset.c, { id: 'del-' + A.Rede.chave(), del: b.dataset.id, ts: Date.now() }).catch(() => A.aviso('O servidor recusou.'));
+      const log = ls.get('acf-visoes-enviadas', []); ls.set('acf-visoes-enviadas', log.filter(h => h.id !== b.dataset.id));
+      abrirVisoesServidor(); desenharLista();
+    }); }
+  o.innerHTML = '<div class="rr-modal-caixa"><h3>Visões guardadas no servidor</h3><p class="rr-mini">Carregando…</p></div>';
+  o.hidden = false;
+  const linhas = await Promise.all(cobaias().map(async x => [x, await A.Rede.once('visoes/' + x.id).catch(() => null)]));
+  o.innerHTML = `<div class="rr-modal-caixa"><h3>Visões guardadas no servidor</h3>
+    <p class="rr-mini">Cada cobaia guarda só a última visão enviada. Ela aparece em qualquer navegador novo daquela cobaia até ser apagada aqui. Apagar também tira a visão do Arquivo dos navegadores que já a tinham, quando abrirem o site.</p>
+    ${linhas.map(([x, v]) => `<div class="vss-linha"><b>${esc(x.nome)}</b>${v && v.id && !v.del ? `<span>${v.img ? '🖼 ' : ''}${esc(v.txt || '(só imagem)')} <small>${new Date(num(v.ts)).toLocaleString('pt-BR')}</small></span><button data-vss="apagar" data-c="${x.id}" data-id="${esc(v.id)}" class="perigo">Apagar de vez</button>` : '<span class="rr-mini">nada guardado</span>'}</div>`).join('')}
+    <div class="rr-botoes"><button data-vss="fechar">Fechar</button></div></div>`;
 }
 async function enviarVisao() {
   const alvo = $('#vsAlvo').value, txt = ($('#vsTxt').value || '').trim().slice(0, 300), arq = $('#vsImg').files[0];
@@ -475,7 +499,7 @@ function desenharFerramentas() {
       <select data-arq-f="ordem" aria-label="Ordem">${ORDENS[aba].map(([k, n]) => `<option value="${k}" ${(Arq.ordem[aba] || ORDENS[aba][0][0]) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
   const pe = $('#arqPe');
   const novo = A.mestre ? { docs: '+ Novo documento', cifras: '+ Nova cifra', 'visoes-m': '+ Nova visão' }[aba] : '';
-  const ie = A.mestre && aba === 'docs' ? '<div class="arq-ie"><button data-arq="dc-importar" title="Importar documentos de um arquivo .json">⬆ Importar</button><button data-arq="dc-exportar" title="Baixar todos os documentos em .json">⬇ Exportar</button><input type="file" id="arqImpDocs" accept=".json,application/json" hidden></div>' : '';
+  const ie = A.mestre && aba === 'visoes-m' ? '<button data-arq="vs-servidor" title="A última visão de cada cobaia fica guardada no servidor e chega a qualquer navegador novo. Aqui você apaga de vez.">🧹 Visões guardadas no servidor</button>' : A.mestre && aba === 'docs' ? '<div class="arq-ie"><button data-arq="dc-importar" title="Importar documentos de um arquivo .json">⬆ Importar</button><button data-arq="dc-exportar" title="Baixar todos os documentos em .json">⬇ Exportar</button><input type="file" id="arqImpDocs" accept=".json,application/json" hidden></div>' : '';
   pe.innerHTML = novo ? `<button data-arq="novo" class="pri">${novo}</button>${ie}` : aba === 'chave' && A.mestre ? '<button data-arq="pal-limpar" class="perigo">Apagar todos os palpites</button>' : aba === 'visoes' && entradas('visoes').length ? '<button data-arq="vs-apagar-tudo" class="perigo">Apagar todas</button>' : '';
   pe.hidden = !pe.innerHTML;
 }
@@ -637,9 +661,12 @@ function aoClicar(e) {
   if (a === 'fixar') { const f = fixos(); f[Arq.aba] = f[Arq.aba] || {}; if (f[Arq.aba][id]) delete f[Arq.aba][id]; else f[Arq.aba][id] = 1; ls.set(KEY_FIX(), f); desenharLista(); return; }
   if (a === 'ir-cifra') { Arq.aba = 'cifras'; Arq.sel.cifras = id; Arq.mob = 'leitor'; desenharTudo(); return; }
   if (a === 'gl-pal') { const cel = $('#arqLeitor .gl-grande'); abrirPalpite(+id, cel || b); return; }
+  if (a === 'vs-servidor') { abrirVisoesServidor(); return; }
   if (a === 'vs-rever') { const h = ls.get(chaveVisoes(), []).find(x => x.id === id); if (h) mostrarVisao({ ...h, ts: Date.now() }); return; }
   if (a === 'vs-apagar' || a === 'vs-apagar-tudo') {
     if (!confirm(a === 'vs-apagar-tudo' ? 'Apagar todas as suas visões deste aparelho?' : 'Apagar esta visão?')) return;
+    const sai = a === 'vs-apagar-tudo' ? ls.get(chaveVisoes(), []).map(h => h.id) : [id];
+    ls.set(chaveVisoes() + '-apagadas', [...new Set(ls.get(chaveVisoes() + '-apagadas', []).concat(sai))].slice(-60));
     ls.set(chaveVisoes(), a === 'vs-apagar-tudo' ? [] : ls.get(chaveVisoes(), []).filter(h => h.id !== id));
     Arq.sel.visoes = undefined; Arq.mob = 'lista'; atualizarBadge(); desenharFerramentas(); desenharLista(); return;
   }

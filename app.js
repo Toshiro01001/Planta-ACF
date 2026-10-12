@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261011w';
+const VERSAO_SITE = '20261011x';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1222,6 +1222,62 @@ function ligarGanchosSala(c, cn, publico) { ganchosSala.forEach(g => { try { if 
 // gancho do chat: transforma o texto já escapado (ex.: ⟦cifra:ID⟧ vira a cifra desenhada)
 const ganchosChat = [];
 const textoChat = t => ganchosChat.reduce((h, f) => { try { return f(h); } catch (e) { return h; } }, esc(t));
+
+/* ---------- Idioma da C2P0 (bips e zips) ----------
+   Ela escreve normal; o site guarda o texto embaralhado e mostra só bips e zips.
+   Cada letra vira um par de sons (S e N "zip zip", I "zip bip", M, A e O "bip zip", como nos exemplos do Mestre);
+   "sim", "não" e "não sei" são palavras fixas. Mestre e auxiliares leem o original; os jogadores traduzem com
+   o ritual Compreensão Paranormal (só para si ou para todos). */
+const ROBO_BZ = 'c2p0';
+const BZ_PAR = { a: 'bip zip', b: 'bip bip', c: 'zip bip', d: 'bip bip', e: 'zip bip', f: 'zip zip', g: 'bip bip', h: 'zip bip', i: 'zip bip', j: 'bip bip', k: 'zip zip', l: 'bip zip', m: 'bip zip',
+  n: 'zip zip', o: 'bip zip', p: 'zip zip', q: 'bip bip', r: 'zip bip', s: 'zip zip', t: 'zip zip', u: 'bip zip', v: 'bip bip', w: 'zip bip', x: 'bip bip', y: 'zip bip', z: 'zip zip' };
+const BZ_DIC = { 'nao sei': 'zip zip zip zip zip', sim: 'zip zip zip bip bip zip', nao: 'zip zip bip zip bip zip' };
+const semAc = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function bipZip(txt) {
+  const partes = semAc(txt).match(/[a-z0-9]+|[.!?…,;:]+/g) || [];
+  const out = [];
+  for (let i = 0; i < partes.length; i++) {
+    const p = partes[i];
+    if (/^[.!?…,;:]+$/.test(p)) { if (out.length) out[out.length - 1] += p.replace(/…/g, '...'); continue; }
+    if (p === 'nao' && partes[i + 1] === 'sei') { out.push(BZ_DIC['nao sei']); i++; continue; }
+    if (BZ_DIC[p]) { out.push(BZ_DIC[p]); continue; }
+    out.push(p.split('').map(ch => (/\d/.test(ch) ? 'bzzt' : BZ_PAR[ch] || 'zip')).join(' '));
+  }
+  // maiúscula no começo e depois de ponto final, ! ou ?
+  return out.join(' ').replace(/(^|[.!?]\s+)([bz])/g, (m0, a, b) => a + b.toUpperCase());
+}
+const BZ_MARCA = '⟦bz⟧';
+const embaralhar = s => BZ_MARCA + btoa(unescape(encodeURIComponent(String(s)))).split('').reverse().join('');
+const desembaralhar = s => { try { return decodeURIComponent(escape(atob(String(s).slice(BZ_MARCA.length).split('').reverse().join('')))); } catch (e) { return ''; } };
+const ehBz = m => !!m && typeof m.t === 'string' && m.t.startsWith(BZ_MARCA);
+const idMsg = m => `${String(m.a || '').replace(/[.#$\[\]/]/g, '')}_${m.ts}`;
+const BZ = { todos: {}, off: null, meus: (() => { try { return JSON.parse(localStorage.getItem('acf-bz-trad') || '{}'); } catch (e) { return {}; } })() };
+function bzTraduzido(m) { return mestre || !!aux || !!BZ.todos[idMsg(m)] || !!BZ.meus[idMsg(m)]; }
+function bipsSonoros(txt) { String(txt).split(' ').slice(0, 14).forEach((w, i) => Som.tom(/^b/i.test(w) ? 1320 : 760, i * 0.09, 0.06, 'square', 0.05, /^b/i.test(w) ? 1760 : 520)); }
+function abrirTraducao(m) {
+  const id = idMsg(m), orig = desembaralhar(m.t);
+  let o = $('#bzModal');
+  if (!o) { o = document.createElement('div'); o.id = 'bzModal'; o.className = 'bz-modal'; document.body.appendChild(o); o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-bz="fechar"]')) o.hidden = true; }); }
+  const FX = window.ACF_FICHAS, at = FX && FX.ativa && FX.ativa();
+  const temRit = at && Object.values(at.d.rit || {}).some(r => r && semAc(r.n) === 'compreensao paranormal');
+  o.innerHTML = `<div class="bz-caixa"><p class="bz-k">C2P0 · IDIOMA DESCONHECIDO</p><p class="bz-bips">${esc(bipZip(orig))}</p>
+    <p>Para entender, conjure <b>Compreensão Paranormal</b> (1º círculo, Conhecimento) tocando a C2P0. O ritual cobra o custo normal da sua ficha ativa.</p>
+    ${!at ? '<p class="bz-aviso">Você não tem ficha ativa.</p>' : !temRit ? '<p class="bz-aviso">Sua ficha ativa não conhece esse ritual.</p>' : ''}
+    <div class="bz-botoes">${at && temRit ? '<button data-bz="eu" class="pri">✦ Conjurar e traduzir só para mim</button><button data-bz="todos">✦ Conjurar e traduzir para todos</button>' : ''}<button data-bz="fechar">Fechar</button></div></div>`;
+  o.hidden = false;
+  bipsSonoros(bipZip(orig));
+  $$('[data-bz="eu"], [data-bz="todos"]', o).forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const r = await FX.conjurarAtiva('Compreensão Paranormal');
+    if (!r || !r.ok) { aviso(r && r.motivo ? r.motivo : 'O ritual não saiu.'); b.disabled = false; return; }
+    if (b.dataset.bz === 'todos') {
+      await Rede.set('chatTrad/' + id, { q: meu || '', ts: Date.now() }).catch(() => {});
+      Chat.enviar(`✦ ${(SER[meu] || {}).nome || 'Alguém'} conjurou Compreensão Paranormal: a mensagem da C2P0 agora está traduzida para todos.`, 'geral', true);
+    } else { BZ.meus[id] = true; try { localStorage.setItem('acf-bz-trad', JSON.stringify(BZ.meus)); } catch (e) {} }
+    o.hidden = true; Chat.desenhar();
+    aviso(`C2P0 disse: "${orig}"`);
+  });
+}
 
 function desenharCartaoSala() {
   const c = $('#cartao');
@@ -3714,6 +3770,7 @@ const Chat = {
     const agora = Date.now();
     this.canais().forEach(c => { this.visto[c] = agora; });
     this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; this.atualizar(); }, () => {}));
+    this.offs.push(Rede.on('chatTrad', v => { BZ.todos = v || {}; if (this.aberto) this.desenhar(); }, () => {}));
     if (mestre) {
       this.offs.push(Rede.on('chat/sussurros', v => { this.msgs.sus = v || {}; this.atualizar(); }, () => {}));
     } else {
@@ -3779,8 +3836,9 @@ const Chat = {
       const btn = mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '';
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
-        <div class="msg-txt">${textoChat(m.t)}</div></div></li>`;
+        ${ehBz(m) ? `<div class="msg-txt msg-bz" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(bipZip(desembaralhar(m.t)))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
+    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) bipsSonoros(el.textContent); else abrirTraducao(m); });
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();
@@ -3810,6 +3868,7 @@ const Chat = {
     if (!texto || !this.chaveLigada) return;
     const m = { a: this.autorId(), n: this.autorNome(), t: texto, ts: Date.now() };
     if (d) m.d = true;
+    else if (m.a === ROBO_BZ) m.t = embaralhar(texto.slice(0, 360));
     if (canal === 'geral') Rede.push('chat/geral', m).pronto.catch(erroGravacao);
     else if (canal === 'filhos') Rede.push('chat/filhos', m).pronto.catch(erroGravacao);
     else if (canal === 'sus') {

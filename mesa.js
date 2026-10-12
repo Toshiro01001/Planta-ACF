@@ -261,6 +261,7 @@ function abrirPresencaJogador(ch) {
       const novo = Math.max(0, cur - dano);
       const lista = [[`${k}.a`, novo]];
       if (det && dano > cur) lista.push(['enl', true]);
+      if (passou) lista.push(['reg.pres', int((d.reg || {}).pres) + 1]);
       FX().aplicarNaAtiva(lista);
       responder(ch.id, { total: estadoJanela.t.total, passou, dano, det });
       A.rolagemDaFicha(`😱 ${d.nome} vê ${ch.nome}: Vontade ${estadoJanela.t.total} vs DT ${int(ch.dt)}, ${passou ? 'passou' : 'falhou'}. −${dano} ${det ? 'PD' : 'SAN'}.`);
@@ -299,7 +300,8 @@ const ACOES_INT = [
 const PRATOS = [['saboroso', 'Prato saboroso: +1d6 Sanidade'], ['nutritivo', 'Prato nutritivo: +2d6 PV'], ['energetico', 'Prato energético: +1d6 PE'], ['rapido', 'Prato rápido: +5 em um teste (neste interlúdio ou no dia seguinte)']];
 const CAT_FAB = [['0', 15], ['I', 20], ['II', 25], ['III', 30], ['IV', 35]];
 // DT de Furtividade para chegar até o alvo, pelo estado dele na noite
-const DT_NOITE = { alerta: [30, 'em alerta'], acordado: [25, 'acordado'], leve: [20, 'sono leve'], rest: [15, 'sono restaurador'] };
+// termos do texto das ações noturnas entre parênteses: Acordado 30 · Estado padrão 25 · Dormindo 20 · Sono profundo 15
+const DT_NOITE = { alerta: [30, 'em alerta (acordado)'], acordado: [25, 'sem dormir (estado padrão)'], leve: [20, 'sono leve (dormindo)'], rest: [15, 'sono restaurador (sono profundo)'] };
 // Ficar acordado: DT de Fortitude / Vontade e condições por dia sem dormir
 const ACORDADO = {
   1: { f: 10, v: 15, ok: [], falha: ['fraco', 'frustrado'] },
@@ -310,6 +312,8 @@ const NOME_COND = { fraco: 'fraco', frustrado: 'frustrado', debilitado: 'debilit
 const acaoInt = k => ACOES_INT.find(x => x[0] === k);
 const tipoDe = it => (TIPO_DESC[it.tipo] ? it.tipo : 'longo');
 const noiteOpc = () => (window.ACF_REGRAS && window.ACF_REGRAS.opcoesNoite ? window.ACF_REGRAS.opcoesNoite() : []);
+// na tela do jogador a ação de função aparece com nome neutro (quem olhar por cima do ombro não lê a função)
+const nomeNoite = id => { const l = noiteOpc(); const i = l.findIndex(n => n.id === id); return l.length > 1 ? `Ação noturna ${i + 1}` : 'Ação noturna'; };
 function verInterludio() {
   const it = est().interludio;
   if (!it || A.mestre || !A.meu) return;
@@ -322,10 +326,10 @@ function verInterludio() {
 function htmlOpcInt(k, i, d) {
   const sel = (nome, ops) => `<select data-io="${nome}" data-slot="${i}">${ops}</select>`;
   const perOps = attrs => FX().PER ? Object.values(FX().PER).filter(p => !attrs || attrs.includes(p[2])).map(p => `<option value="${p[0]}" ${(d.treino || {})[p[0]] ? 'disabled' : ''}>${esc(p[1])}${(d.treino || {})[p[0]] ? ' (já tem)' : ''}</option>`).join('') : '';
-  const alvos = () => cobaias().filter(x => x.id !== A.meu).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
+  const alvos = si => (si ? `<option value="${A.meu}">Você mesmo (sem teste)</option>` : '') + cobaias().filter(x => x.id !== A.meu).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
   if (String(k).startsWith('n:')) {
     const c = (window.ACF_REGRAS.pessoais() || {})[k.slice(2)] || {};
-    return `<label>Alvo ${sel('alvo', alvos())}</label><details class="int-regra"><summary>Ler a regra</summary>${window.ACF_REGRAS.txtRegra(c.txt || '')}</details>`;
+    return `<label>Alvo ${sel('alvo', alvos(!!c.si))}</label><details class="int-regra"><summary>Ler a regra</summary>${window.ACF_REGRAS.txtRegra(c.txt || '')}</details>`;
   }
   const o = (acaoInt(k) || [])[5] || '';
   if (o.includes('alvo')) return `<label>Alvo ${sel('alvo', alvos())}</label>`;
@@ -351,11 +355,11 @@ function abrirInterludio(it) {
   const d = at.d, det = d.regra === 'determinacao';
   const noite = tipo === 'longo' ? noiteOpc() : [];
   const opcoes = custoMax => ACOES_INT.filter(a => (tipo === 'longo' || a[3] === 'g') && a[2] <= custoMax).map(a => `<option value="${a[0]}">${a[3] === 'e' ? '🌙 ' : ''}${esc(a[1])}${a[2] > 1 ? ` (${a[2]} ações)` : ''}</option>`).join('')
-    + noite.filter(n => n.custo >= 1 && n.custo <= custoMax).map(n => `<option value="n:${esc(n.id)}">🔒 ${esc(n.tit)}${n.custo > 1 ? ` (${n.custo} ações)` : ''}</option>`).join('');
+    + noite.filter(n => n.custo >= 1 && n.custo <= custoMax).map(n => `<option value="n:${esc(n.id)}">🔒 ${esc(nomeNoite(n.id))}${n.custo > 1 ? ` (${n.custo} ações)` : ''}</option>`).join('');
   const gratis = noite.filter(n => n.custo === 0);
   janela('int-' + it.id, `${topo}<h3>Escolha ${nAc === 1 ? 'sua ação' : 'suas duas ações'}</h3>
     <div class="int-slots">${Array.from({ length: nAc }, (_, i) => `<div class="int-slot" data-slot-box="${i}"><label>Ação ${i + 1} <select data-io="acao" data-slot="${i}"><option value="">—</option>${opcoes(nAc - i)}</select></label><p class="int-desc" data-desc="${i}"></p><div class="int-opc" data-opc="${i}"></div></div>`).join('')}</div>
-    ${gratis.length ? `<div class="int-gratis"><p class="mesa-k">SEM CUSTO</p>${gratis.map(n => `<div class="int-slot"><label class="chave"><input type="checkbox" data-gratis="${esc(n.id)}"><span>🔒 ${esc(n.tit)}</span></label><div class="int-opc" data-opc="g${esc(n.id)}" hidden>${htmlOpcInt('n:' + n.id, 'g' + n.id, d)}</div></div>`).join('')}</div>` : ''}
+    ${gratis.length ? `<div class="int-gratis"><p class="mesa-k">SEM CUSTO</p>${gratis.map(n => `<div class="int-slot"><label class="chave"><input type="checkbox" data-gratis="${esc(n.id)}"><span>🔒 ${esc(nomeNoite(n.id))}</span></label><div class="int-opc" data-opc="g${esc(n.id)}" hidden>${htmlOpcInt('n:' + n.id, 'g' + n.id, d)}</div></div>`).join('')}</div>` : ''}
     <div class="int-acordado" hidden></div>
     <p class="mini">${tipo === 'longo' ? '🌙 ações especiais da noite · 🔒 só você e o Mestre sabem.' : 'No descanso curto só valem as ações gerais.'}${det ? ' Com Determinação, o que recupera Sanidade ou PE recupera PD.' : ''}</p>
     <div class="mesa-botoes"><button data-mj="confirmar" class="pri" disabled>Confirmar</button><button data-mj="adiar">Depois</button></div>`, 'interludio');
@@ -430,10 +434,16 @@ function aplicarInterludio(it, lista, testeAcord) {
   const energia = n => { if (det) ganho.pd += n; else ganho.pe += n; };
   lista.forEach(x => {
     if (x.k.startsWith('n:')) {
-      const c = (window.ACF_REGRAS.pessoais() || {})[x.k.slice(2)] || {};
+      const rid = x.k.slice(2), c = (window.ACF_REGRAS.pessoais() || {})[rid] || {};
+      const atr = ['agi', 'for', 'int', 'pre', 'vig'].map(a => int(d.atr[a])).join(',');
+      if (x.alvo === A.meu && c.si) {
+        priv.push({ k: 'regra', r: rid, x: String(c.tit || 'Ação noturna').slice(0, 120), alvo: x.alvo, si: true, at: atr });
+        res.push(`🔒 ${esc(nomeNoite(rid))} em você mesmo: sem teste. O Mestre aplica o efeito.`);
+        return;
+      }
       const t = FX().testarPericia(d, 'furtividade');
-      priv.push({ k: 'regra', x: String(c.tit || 'Ação noturna').slice(0, 120), alvo: x.alvo, tot: t.total, nat: t.esc });
-      res.push(`🔒 ${esc(c.tit || 'Ação noturna')} em ${esc(nomeDe(x.alvo))}: Furtividade ${dado(t)}. O Mestre narra o que acontece.`);
+      priv.push({ k: 'regra', r: rid, x: String(c.tit || 'Ação noturna').slice(0, 120), alvo: x.alvo, tot: t.total, nat: t.esc, at: atr });
+      res.push(`🔒 ${esc(nomeNoite(rid))} em ${esc(nomeDe(x.alvo))}: Furtividade ${dado(t)}. O Mestre narra o que acontece.`);
       return;
     }
     if (x.k === 'relaxar') { mente(nv); relaxou = true; res.push(`Relaxou: +${nv} ${det ? 'PD' : 'SAN'} (mais 1 por colega que relaxar, quando o Mestre encerrar).`); pub.push('relaxou'); }
@@ -473,7 +483,7 @@ function aplicarInterludio(it, lista, testeAcord) {
     else if (x.k === 'staff') { res.push(`Conversou com a S.T.A.F.F.${x.txt ? ': ' + esc(x.txt) : ''}. O Mestre responde.`); pub.push('conversou com a S.T.A.F.F.' + (x.txt ? ` (${x.txt})` : '')); }
   });
   // noite: dormiu ou ficou acordado
-  let acordado = false;
+  let acordado = false, falhaAcord = null;
   if (tipo === 'longo') {
     if (dormiu === 'rest') { mud.push(['semDormir', 0], ['condSono', null]); }
     else if (dormiu === 'leve') { if (int(d.semDormir)) mud.push(['semDormir', 0]); }
@@ -481,11 +491,12 @@ function aplicarInterludio(it, lista, testeAcord) {
       acordado = true;
       const dia = int(d.semDormir) + 1, tb = ACORDADO[dia], conds = { ...(d.condSono || {}) };
       mud.push(['semDormir', dia]);
-      if (!tb) { conds.inconsciente = true; conds.indefeso = true; res.push(`Ficou acordado (${dia}º dia sem dormir): <b>inconsciente e indefeso</b>.`); pub.push(`ficou acordado, ${dia}º dia: inconsciente e indefeso`); }
+      if (!tb) { conds.inconsciente = true; conds.indefeso = true; falhaAcord = ['inconsciente']; res.push(`Ficou acordado (${dia}º dia sem dormir): <b>inconsciente e indefeso</b>.`); pub.push(`ficou acordado, ${dia}º dia: inconsciente e indefeso`); }
       else {
         const per = testeAcord === 'vontade' ? 'vontade' : 'fortitude', dt = per === 'vontade' ? tb.v : tb.f;
         const t = FX().testarPericia(d, per), ok = t.total >= dt, novas = ok ? tb.ok : tb.falha;
         novas.forEach(c => { conds[c] = true; });
+        if (!ok) falhaAcord = novas;
         res.push(`Ficou acordado (${dia}º dia sem dormir): ${nomePer(per)} ${dado(t)} contra DT ${dt}, <b>${ok ? 'passou' : 'falhou'}</b>${novas.length ? `: fica ${novas.map(c => NOME_COND[c]).join(' e ')}` : ': sem condições'}.`);
         pub.push(`ficou acordado (${dia}º dia): ${nomePer(per)} ${t.total} vs DT ${dt}, ${ok ? 'passou' : 'falhou'}${novas.length ? ' → ' + novas.join(', ') : ''}`);
       }
@@ -503,13 +514,17 @@ function aplicarInterludio(it, lista, testeAcord) {
     if (det) { soma('pd', r.pdMax, ganho.pd); if (ganho.pd) mud.push(['enl', null]); }
     else { soma('pe', r.peMax, ganho.pe); soma('san', r.sanMax, ganho.san); }
   }
+  // registro da cobaia (conquistas)
+  const rg = d.reg || {};
+  mud.push(['reg.int', int(rg.int) + 1]);
+  if (acordado) mud.push(['reg.noites', int(rg.noites) + 1]);
   if (mud.length) FX().aplicarNaAtiva(mud);
   const pubK = lista.map(x => x.k).filter(k => !k.startsWith('n:') && k !== 'alerta' && k !== 'esgueirar');
   responder(it.id, { acoes: pubK, txt: pub.join('; ').slice(0, 500), sono: dormiu, acordado, relaxar: relaxou });
   if (relaxou) ls.set('acf-relaxou-' + it.id, true);
-  priv.forEach(p => A.Rede.set('avisos/' + A.Rede.chave(), { t: 'noite', s: A.meu, k: p.k, x: p.x, alvo: p.alvo || '', tot: p.tot === undefined ? -1 : p.tot, nat: p.nat === undefined ? -1 : p.nat, it: String(it.id).slice(0, 40), ts: Date.now() }).catch(() => {}));
-  if (pub.length) A.rolagemDaFicha(`🛋️ ${d.nome} no interlúdio: ${pub.join(', ')}.`);
-  else if (acordado) A.rolagemDaFicha(`🛋️ ${d.nome} passou a noite acordado.`);
+  priv.forEach(p => A.Rede.set('avisos/' + A.Rede.chave(), { t: 'noite', s: A.meu, k: p.k, x: p.x, alvo: p.alvo || '', tot: p.tot === undefined ? -1 : p.tot, nat: p.nat === undefined ? -1 : p.nat, it: String(it.id).slice(0, 40), r: p.r || '', at: p.at || '', si: !!p.si, ts: Date.now() }).catch(() => {}));
+  // chat: nada do que cada um fez (evita spoiler); só a falha no ficar acordado, sem dizer a causa
+  if (falhaAcord && falhaAcord.length) A.rolagemDaFicha(`😵 ${d.nome} amanheceu ${falhaAcord.map(c => NOME_COND[c]).join(' e ')}.`);
   return res;
 }
 // relaxar: +1 de Sanidade para cada outro personagem que relaxou no mesmo interlúdio (aplicado quando o Mestre encerra)
@@ -524,25 +539,122 @@ async function bonusRelaxar(it) {
   FX().aplicarNaAtiva([[`${k}.a`, Math.min(mx, FX().atualDe(at.d, k, mx) + outros)]]);
   A.aviso(`Relaxar em grupo: +${outros} ${det ? 'PD' : 'SAN'} (${outros} colega${outros > 1 ? 's' : ''} também relaxou).`);
 }
-// Mestre: o que aconteceu na noite (só ele vê). A DT sai do estado do alvo: alerta 30, acordado 25, sono leve 20, sono restaurador 15.
+// Mestre: o que aconteceu na noite (só ele vê). A DT sai do estado do alvo: alerta 30, sem dormir 25, sono leve 20, sono restaurador 15.
+// Efeitos das regras restritas (cura, NEX, marca) viram botões; a cura chega na ficha do alvo pelo endereço com hash da ficha.
 function pintarNoite(it, resp) {
   const el = $('#mesaIntNoite'); if (!el || !A.mestre) return;
-  const regs = Object.values(((A.segredos || {})._noite || {})[it.id] || {}).filter(Boolean).sort((a, b) => num(a.ts) - num(b.ts));
-  if (!regs.length) { el.innerHTML = '<p class="mini">Nenhuma ação secreta ainda.</p>'; return; }
+  const sg = A.segredos || {};
+  const regs = Object.entries((sg._noite || {})[it.id] || {}).filter(([, x]) => x).sort((a, b) => num(a[1].ts) - num(b[1].ts));
+  const marcas = Object.keys(sg._marcas || {}).filter(q => sg._marcas[q]);
+  const linhaMarcas = marcas.length ? `<p class="nt-marcas">✶ Marcados: ${marcas.map(q => `<b>${esc(nomeDe(q))}</b> <button class="nt-mini" data-mi="nt-desmarca" data-q="${q}" title="Tirar a marca">×</button>`).join(' · ')}</p>` : '';
+  if (!regs.length) { el.innerHTML = linhaMarcas + '<p class="mini">Nenhuma ação secreta ainda.</p>'; return; }
   const estado = q => {
-    if (regs.some(x => x.s === q && (x.k === 'alerta' || x.x === 'Alerta'))) return DT_NOITE.alerta;
+    if (regs.some(([, x]) => x.s === q && (x.k === 'alerta' || x.x === 'Alerta'))) return DT_NOITE.alerta;
     const rr = (resp || {})[q];
-    if (!rr) return [25, 'acordado? ainda não respondeu'];
+    if (!rr) return [25, 'ainda não respondeu (contando sem dormir)'];
     return rr.sono === 'rest' ? DT_NOITE.rest : rr.sono === 'leve' ? DT_NOITE.leve : DT_NOITE.acordado;
   };
-  el.innerHTML = regs.map(x => {
+  const mk = q => (marcas.includes(q) ? ' ✶' : '');
+  el.innerHTML = linhaMarcas + regs.map(([k, x]) => {
     if (x.k === 'alerta' || (!x.alvo && x.x === 'Alerta')) return `<p>🛡 <b>${esc(nomeDe(x.s))}</b> passou a noite em alerta.</p>`;
     if (!x.alvo) return `<p>🔒 <b>${esc(nomeDe(x.s))}</b>: ${esc(x.x || 'ação noturna')}</p>`;
-    const [dt, nomeEst] = estado(x.alvo), tot = int(x.tot), tem = x.tot !== null && x.tot !== undefined && tot >= 0;
-    const m = tot - dt;
-    const cat = !tem ? '' : m >= 0 ? `<b class="int-ok">sucesso</b> (passou por ${m})` : m <= -10 ? `<b class="int-grave">falha por 10 ou mais</b> (${-m} abaixo)` : `<b class="int-falha">falha</b> (${-m} abaixo da DT)`;
-    return `<p>🌙 <b>${esc(nomeDe(x.s))}</b> · ${esc(x.x || 'ação noturna')} → <b>${esc(nomeDe(x.alvo))}</b> <small>(${esc(nomeEst)}, DT ${dt})</small><br>${tem ? `Furtividade ${tot} · ${cat}` : ''}${int(x.nat) === 1 ? ' · <b class="int-grave">🎲 1 natural</b> (falha crítica? você decide)' : ''}</p>`;
-  }).join('') + '<p class="mini">O que cada faixa causa está na regra de cada ação (Escudo → Regras restritas e Cenas fora de combate). A falha crítica fica a seu critério; o 1 natural vem marcado.</p>';
+    const regra = x.r ? (sg._regras || {})[x.r] || {} : {}, ap = x.ap || {};
+    let topo, ok = false;
+    if (x.si) { topo = `em si mesmo · <b class="int-ok">sem teste</b>`; ok = true; }
+    else {
+      const [dt, nomeEst] = estado(x.alvo), tot = int(x.tot), tem = x.tot !== null && x.tot !== undefined && tot >= 0, m = tot - dt;
+      ok = tem && m >= 0;
+      const cat = !tem ? '' : m >= 0 ? `<b class="int-ok">sucesso</b> (passou por ${m})` : m <= -10 ? `<b class="int-grave">falha por 10 ou mais</b> (${-m} abaixo)` : `<b class="int-falha">falha</b> (${-m} abaixo da DT)`;
+      topo = `<small>(${esc(nomeEst)}, DT ${dt})</small><br>${tem ? `Furtividade ${tot} · ${cat}` : ''}${int(x.nat) === 1 ? ' · <b class="int-grave">🎲 1 natural</b> (falha crítica? você decide)' : ''}`;
+    }
+    const bt = (ef, rot, feito) => `<button class="nt-ef${ok ? ' pri' : ''}" data-mi="nt-ef" data-ef="${ef}" data-it="${esc(it.id)}" data-k="${esc(k)}" ${feito ? 'disabled' : ''}>${feito ? '✓ ' + feito : rot}</button>`;
+    const efs = [
+      regra.cura ? bt('cura', `💚 Curar ${esc(regra.cura)}`, ap.cura ? `+${int(ap.cura)} PV entregues` : '') : '',
+      int(regra.nexd) ? bt('nex', `☢ ${int(regra.nexd) > 0 ? '+' : '−'}${Math.abs(int(regra.nexd))}% NEX`, ap.nex ? 'NEX lançado' : '') : '',
+      regra.marca === 'por' ? bt('marca', '✶ Marcar o alvo', ap.marca ? 'marcado' : '') : '',
+      regra.marca === 'tirar' ? bt('marca', '✶ Tirar a marca', ap.marca ? 'marca tirada' : '') : '',
+    ].join('');
+    return `<div class="nt-reg"><p>🌙 <b>${esc(nomeDe(x.s))}</b> · ${esc(x.x || 'ação noturna')} → <b>${esc(nomeDe(x.alvo))}${mk(x.alvo)}</b> ${topo}</p>${efs ? `<div class="nt-efs">${efs}</div>` : ''}</div>`;
+  }).join('') + '<p class="mini">O que cada faixa causa está na regra de cada ação. A falha crítica fica a seu critério; o 1 natural vem marcado. Os botões ficam em destaque quando a ação deu certo.</p>';
+}
+// efeito de uma ação noturna (só o Mestre)
+function efeitoNoite(b) {
+  const sg = A.segredos || {}, itId = b.dataset.it, k = b.dataset.k, x = ((sg._noite || {})[itId] || {})[k];
+  if (!x || !A.mestre) return;
+  const regra = (sg._regras || {})[x.r] || {}, ef = b.dataset.ef;
+  if (ef === 'cura') {
+    const at = String(x.at || '').split(',').map(int), mapa = { AGI: at[0], FOR: at[1], INT: at[2], PRE: at[3], VIG: at[4] };
+    const expr = String(regra.cura || '').toUpperCase().replace(/VIGOR/g, 'VIG').replace(/\b(AGI|FOR|INT|PRE|VIG)\b/g, m => String(int(mapa[m]))).replace(/D/g, 'd');
+    const r = FX().rolarExpr(expr);
+    if (!window.ACF_REGRAS || !window.ACF_REGRAS.entregar) return;
+    window.ACF_REGRAS.entregar(x.alvo, { pv: Math.max(0, int(r.total)) }).then(n => {
+      A.gravarSegredo(['_noite', itId, k, 'ap', 'cura'], Math.max(1, int(r.total)));
+      A.aviso(n ? `Cura de ${r.total} PV (${r.det}) entregue a ${nomeDe(x.alvo)}: entra na ficha ativa quando ele abrir o site.` : `${nomeDe(x.alvo)} não tem ficha para receber a cura.`);
+    });
+  } else if (ef === 'nex') {
+    const F = window.ACF_FERRAMENTAS; if (!F || !F.aplicarNex) return;
+    F.aplicarNex(x.alvo, null, { l: 'Ação noturna', d: int(regra.nexd) });
+    A.gravarSegredo(['_noite', itId, k, 'ap', 'nex'], true);
+  } else if (ef === 'marca') {
+    A.gravarSegredo(['_marcas', x.alvo], regra.marca === 'por' ? { s: x.s, ts: Date.now() } : null);
+    A.gravarSegredo(['_noite', itId, k, 'ap', 'marca'], true);
+  }
+}
+
+/* ---------- 4d. Teste pedido pelo Mestre ----------
+   O Mestre escolhe a perícia e as cobaias; a DT fica nos segredos dele (segredos/_testes).
+   Cada jogador rola com a própria ficha e o Mestre vê quem passou e por quanto. */
+function verTeste() {
+  const pt = est().pedTeste;
+  if (!pt || !pt.on || !pt.id || A.mestre || !A.meu || !(pt.alvos || {})[A.meu]) return;
+  const id = 'tst-' + pt.id;
+  if (respondido(id) || adiados.has(id) || Date.now() - num(pt.ts) > 3 * 3600e3) return;
+  const m = $('#mesaJanela'); if (m && !m.hidden && m.dataset.id) return;
+  abrirTeste(pt);
+}
+function abrirTeste(pt) {
+  const id = 'tst-' + pt.id, at = FX() && FX().ativa();
+  const per = ((FX() && FX().PER) || {})[pt.per] || [pt.per, pt.per];
+  const topo = `<p class="mesa-k">TESTE PEDIDO PELO MESTRE</p><h3>${esc(per[1])}</h3>${pt.txt ? `<p>${esc(pt.txt)}</p>` : ''}`;
+  if (!at) {
+    janela(id, `${topo}<p>Você não tem ficha ativa: crie ou ative sua ficha para rolar aqui.</p><div class="mesa-botoes"><button data-mj="abrir-fichas">Abrir fichas</button><button data-mj="adiar">Depois</button></div>`, 'teste');
+    estadoJanela = null; return;
+  }
+  const bonus = at.r.bonus(pt.per);
+  janela(id, `${topo}<p>Role com a sua ficha (${bonus >= 0 ? '+' : ''}${bonus}). A dificuldade fica com o Mestre.</p><div class="mesa-botoes"><button data-mj="rolar" class="pri">🎲 Rolar ${esc(per[1])}</button><button data-mj="adiar">Depois</button></div><div id="mjRes"></div>`, 'teste');
+  estadoJanela = { on: a => {
+    if (a !== 'rolar' || estadoJanela.feito) return;
+    estadoJanela.feito = true;
+    const d = FX().ativa().d, tt = FX().testarPericia(d, pt.per);
+    responder(pt.id, { total: tt.total, nat: tt.esc });
+    marcar(id);
+    if (!pt.sec) A.rolagemDaFicha(`${per[1]} (pedido do Mestre): ${tt.total} (${tt.dados.length}d20: ${tt.dados.join(', ')}${tt.desv ? ', menor' : ''}; ${tt.bonus >= 0 ? '+' : '−'}${Math.abs(tt.bonus)})`, undefined, tt.dados, tt.bonus);
+    $('[data-mj="rolar"]').disabled = true; $('[data-mj="adiar"]').textContent = 'Fechar'; $('[data-mj="adiar"]').dataset.mj = 'fechar';
+    $('#mjRes').innerHTML = `<div class="dados-faces">${tt.dados.map(x => `<span class="face${x === tt.esc ? ' usada' : ''}${x === 20 ? ' crit' : ''}${x === 1 ? ' falha' : ''}">${x}</span>`).join('')}</div><p>${esc(per[1])} <b class="mesa-total">${tt.total}</b>${tt.treino ? ` <small>(com +${tt.treino} do treino)</small>` : ''}. O Mestre já recebeu.</p>`;
+  } };
+}
+function desenharMesaTeste() {
+  const c = $('#mesaTeste'); if (!c || !A.mestre || !semFoco('#mesaTeste')) return;
+  const pt = est().pedTeste || {}, PER = (FX() && FX().PER) || {};
+  if (pt.on && pt.id) {
+    const dt = int(((A.segredos || {})._testes || {})[pt.id]);
+    if (!$('#mesaTesteResp') || c.dataset.id !== pt.id) {
+      c.dataset.id = pt.id;
+      c.innerHTML = `<p class="mini">Pedido: <b>${esc((PER[pt.per] || [, pt.per])[1])}</b>${dt ? ` · DT ${dt} (só você vê)` : ''}${pt.sec ? ' · secreto (sem chat)' : ''}${pt.txt ? ` · “${esc(pt.txt)}”` : ''}</p><div id="mesaTesteResp" class="mesa-resp"></div><p id="mesaTesteFalta" class="mini"></p><button data-mi="teste-fim" class="perigo">Encerrar pedido</button>`;
+    }
+    const fmt = r => { const tot = int(r.total), mg = tot - dt; return `<b>${tot}</b> <small>(d20 ${int(r.nat)})</small>${dt ? ` · ${mg >= 0 ? `<b class="int-ok">passou</b> por ${mg}` : `<b class="int-falha">falhou</b> por ${-mg}`}` : ''}${int(r.nat) === 20 ? ' · 🎯 20 natural' : ''}${int(r.nat) === 1 ? ' · 💀 1 natural' : ''}`; };
+    ouvirRespostas('mesaTesteResp', pt.id, fmt, v => { const f = $('#mesaTesteFalta'); if (f) { const falta = Object.keys(pt.alvos || {}).filter(q => !(v || {})[q]); f.textContent = falta.length ? 'Esperando: ' + falta.map(nomeDe).join(', ') : 'Todos rolaram.'; } });
+    return;
+  }
+  if ($('#mesaTesteDT')) return;
+  c.dataset.id = '';
+  const lista = Object.values(PER).sort((a, b) => a[1].localeCompare(b[1], 'pt'));
+  c.innerHTML = `<p class="mini">Um botão aparece na tela das cobaias escolhidas; cada uma rola com a própria ficha e você vê aqui quem passou e por quanto. A DT não sai do seu aparelho.</p>
+    <div class="mesa-linha"><select id="mesaTestePer" aria-label="Perícia">${lista.map(p => `<option value="${p[0]}" ${p[0] === 'percepcao' ? 'selected' : ''}>${esc(p[1])}</option>`).join('')}</select><label class="mesa-campo-in">DT <input id="mesaTesteDT" type="number" min="0" max="60" value="15"></label></div>
+    <div class="mesa-alvos">${cobaias().map(x => `<label class="chave"><input type="checkbox" data-tst="${x.id}" checked><span>${esc(x.nome)}</span></label>`).join('')}</div>
+    <input id="mesaTesteTxt" maxlength="120" placeholder="Contexto (opcional): ex.: algo se mexe no escuro…">
+    <label class="chave"><input type="checkbox" id="mesaTesteSec"><span>Secreto: o resultado não vai para o chat</span></label>
+    <button data-mi="teste-ini" class="btn-protocolo">Pedir teste</button>`;
 }
 
 /* ---------- 4c. Fim de missão ---------- */
@@ -635,14 +747,30 @@ const Amb = {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(destino); o.start(t); o.stop(t + dur + 0.05);
   },
-  tocar(el) {
+  vol: 0.85,
+  lfo(c, alvo, f, prof, base) { const l = c.createOscillator(), g = c.createGain(); l.frequency.value = f; g.gain.value = prof; l.connect(g); g.connect(alvo); if (base !== undefined) alvo.value = base; l.start(); this.nos.push(l, g); },
+  ruidoEm(c, destino, vol) { const n = c.createBufferSource(); n.buffer = this.ruido(c); n.loop = true; const g = c.createGain(); g.gain.value = vol; n.connect(g); g.connect(destino); n.start(); this.nos.push(n, g); return g; },
+  ajustarVol(v) {
+    this.vol = Math.max(0, Math.min(1, v));
+    if (this.audio) this.audio.volume = this.vol;
+    if (this.saida && A.Som && A.Som.pronto()) { const c = A.Som.pronto(); this.saida.gain.cancelScheduledValues(c.currentTime); this.saida.gain.linearRampToValueAtTime(this.vol, c.currentTime + 0.4); }
+  },
+  pararAudio() { if (this.audio) { try { this.audio.pause(); } catch (e) {} this.audio = null; } },
+  tocar(el, vol) {
+    if (vol !== undefined && Math.abs(vol - this.vol) > 0.001) this.ajustarVol(vol);
     if (el === this.el) return;
-    this.parar();
+    this.parar(); this.pararAudio();
     if (!el || !somOk() || !A.Som) return;
+    // som próprio (arquivo ou link): toca em repetição
+    if (String(el).startsWith('som:')) {
+      this.el = el;
+      urlDoSom(el.slice(4)).then(src => { if (this.el !== el || !src) return; const au = new Audio(src); au.loop = true; au.volume = this.vol; this.audio = au; au.play().catch(() => { this.el = null; }); });
+      return;
+    }
     const c = A.Som.pronto(); if (!c) return;
     this.el = el;
     const saida = c.createGain(); saida.gain.value = 0; saida.connect(c.destination); this.saida = saida;
-    saida.gain.linearRampToValueAtTime(0.85, c.currentTime + 3);
+    saida.gain.linearRampToValueAtTime(this.vol, c.currentTime + 3);
     const filtro = (tipo, f, q = 1) => { const x = c.createBiquadFilter(); x.type = tipo; x.frequency.value = f; x.Q.value = q; x.connect(saida); this.nos.push(x); return x; };
     if (el === 'Sangue') {
       this.osc(c, 'sawtooth', 41, 0.035, filtro('lowpass', 120));
@@ -664,10 +792,102 @@ const Amb = {
     } else if (el === 'Medo') {
       [110, 116.54, 155.56, 233.08].forEach((f, i) => { const { g } = this.osc(c, 'sine', f, 0.02, saida); const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 0.07 + i * 0.05; lg.gain.value = 0.015; l.connect(lg); lg.connect(g.gain); l.start(); this.nos.push(l, lg); });
       this.timers.push(setInterval(() => { if (Math.random() < 0.35) this.pulso(c, 48, 0.18, 2.5, saida, 'sine', 30); }, 4000));
+    } else if (el === 'Chuva') {
+      this.ruidoEm(c, filtro('lowpass', 1400), 0.09); this.ruidoEm(c, filtro('highpass', 4000), 0.012);
+      this.timers.push(setInterval(() => { for (let i = 0; i < 3; i++) if (Math.random() < 0.6) setTimeout(() => this.pulso(c, 2500 + Math.random() * 3500, 0.012, 0.03, saida), Math.random() * 120); }, 120));
+    } else if (el === 'Goteira') {
+      this.ruidoEm(c, filtro('lowpass', 300), 0.02);
+      const pinga = () => { const f = 900 + Math.random() * 700; this.pulso(c, f, 0.16, 0.18, saida, 'sine', f / 2.2); setTimeout(() => this.pulso(c, f, 0.04, 0.2, saida, 'sine', f / 2.2), 260); this.timers.push(setTimeout(pinga, 900 + Math.random() * 2600)); };
+      pinga();
+    } else if (el === 'Fluorescente') {
+      const { g } = this.osc(c, 'sawtooth', 120, 0.014, filtro('bandpass', 240, 3)); this.osc(c, 'sine', 60, 0.03, saida);
+      this.timers.push(setInterval(() => { if (Math.random() < 0.25) { const t0 = c.currentTime; g.gain.setValueAtTime(0.0001, t0); g.gain.setValueAtTime(0.014, t0 + 0.06 + Math.random() * 0.2); this.pulso(c, 3200, 0.03, 0.02, saida, 'square'); } }, 900));
+    } else if (el === 'Maquinário') {
+      this.ruidoEm(c, filtro('lowpass', 180), 0.12); this.osc(c, 'sawtooth', 47, 0.018, filtro('lowpass', 200));
+      let n = 0; this.timers.push(setInterval(() => { n++; this.pulso(c, n % 2 ? 160 : 120, 0.09, 0.14, saida, 'square', 70); if (n % 4 === 0) this.pulso(c, 2200, 0.015, 0.4, saida, 'sawtooth', 1800); }, 800));
+    } else if (el === 'Vento') {
+      const bp = filtro('bandpass', 500, 2); const g = this.ruidoEm(c, bp, 0.12);
+      this.lfo(c, bp.frequency, 0.08, 280, 520); this.lfo(c, g.gain, 0.13, 0.06, 0.1);
+    } else if (el === 'Coração') {
+      this.osc(c, 'sine', 32, 0.04, saida);
+      const bate = () => { this.pulso(c, 58, 0.32, 0.16, saida); setTimeout(() => this.pulso(c, 50, 0.22, 0.2, saida), 210); };
+      bate(); this.timers.push(setInterval(bate, 1400));
+    } else if (el === 'Sirene') {
+      const { o } = this.osc(c, 'sawtooth', 700, 0.012, filtro('lowpass', 1200)); this.lfo(c, o.frequency, 0.22, 220, 700);
+      this.ruidoEm(c, filtro('lowpass', 250), 0.02);
+    } else if (el === 'Rádio') {
+      const g = this.ruidoEm(c, filtro('bandpass', 2200, 1.5), 0.035);
+      this.timers.push(setInterval(() => { const t0 = c.currentTime; if (Math.random() < 0.3) { g.gain.setValueAtTime(0.0001, t0); g.gain.setValueAtTime(0.035, t0 + 0.4 + Math.random()); } if (Math.random() < 0.5) this.pulso(c, 400 + Math.random() * 900, 0.03, 0.15 + Math.random() * 0.3, saida, 'sine'); }, 700));
+    } else if (el === 'Relógio') {
+      let lado = 0; this.timers.push(setInterval(() => { lado = 1 - lado; this.pulso(c, lado ? 2600 : 1900, 0.05, 0.025, saida, 'square'); }, 1000));
+      this.osc(c, 'sine', 41, 0.02, saida);
+    } else if (el === 'Sussurros') {
+      [0, 1].forEach(v => {
+        const bp = filtro('bandpass', 1500, 9), g = this.ruidoEm(c, bp, 0);
+        this.timers.push(setInterval(() => { const t0 = c.currentTime; bp.frequency.setValueAtTime(700 + Math.random() * 2400, t0); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.09 + Math.random() * 0.06, t0 + 0.15); g.gain.linearRampToValueAtTime(0.0001, t0 + 0.4 + Math.random() * 0.7); }, 900 + v * 450));
+      });
+    } else if (el === 'Tensão') {
+      const lp = filtro('lowpass', 200, 4); this.osc(c, 'sawtooth', 55, 0.03, lp); this.osc(c, 'sawtooth', 55.6, 0.03, lp);
+      const sobe = () => { const t0 = c.currentTime; lp.frequency.cancelScheduledValues(t0); lp.frequency.setValueAtTime(180, t0); lp.frequency.linearRampToValueAtTime(1600, t0 + 45); };
+      sobe(); this.timers.push(setInterval(sobe, 46000));
     }
   },
 };
-function verAmbiente() { const a = est().amb; Amb.tocar(a && a.el ? a.el : null); }
+function verAmbiente() {
+  const a = est().amb || {};
+  Amb.tocar(a.som ? 'som:' + a.som : a.el || null, a.vol === undefined ? 0.85 : Math.max(0, Math.min(1, num(a.vol) / 100)));
+  // efeito de uma vez (sino, grito…): toca se chegou há pouco
+  const fx = est().sfx;
+  if (fx && fx.id && fx.ts !== SONS.ultimoFx) { const novo = SONS.ultimoFx !== undefined; SONS.ultimoFx = fx.ts; if (novo && Date.now() - num(fx.ts) < 20000 && somOk()) urlDoSom(fx.id).then(src => { if (src) { const au = new Audio(src); au.volume = Amb.vol; au.play().catch(() => {}); } }); }
+}
+/* ---------- Sons próprios (Mestre) ----------
+   sonsIdx/<id>: nome, tipo (arquivo ou link) e endereço; sons/<id>: o áudio em si (até 4 MB).
+   Os jogadores baixam um som só quando ele toca, e guardam na memória da página. */
+const SONS = { idx: {}, off: null, cache: {}, ultimoFx: undefined };
+async function urlDoSom(id) {
+  if (SONS.cache[id]) return SONS.cache[id];
+  const v = await A.Rede.once('sons/' + id).catch(() => null);
+  const src = v ? (v.data || v.url || '') : '';
+  if (src) SONS.cache[id] = src;
+  return src;
+}
+function ligarSons() {
+  if (!A.mestre) { if (SONS.off) { SONS.off(); SONS.off = null; } return; }
+  if (SONS.off) return;
+  SONS.off = () => {};
+  A.garantirLogin().then(() => { SONS.off = A.Rede.on('sonsIdx', v => { SONS.idx = v || {}; const c = $('#mesaAmb'); if (c) { c.dataset.f = ''; desenharMesaAmb(true); } }, () => {}); });
+}
+async function guardarSom(n, tipo, src) {
+  const id = A.Rede.chave(), ts = Date.now();
+  await A.Rede.set('sons/' + id, tipo === 'link' ? { url: src, ts } : { data: src, ts });
+  await A.Rede.set('sonsIdx/' + id, { n: String(n).slice(0, 60), tipo, url: tipo === 'link' ? src : '', tam: tipo === 'link' ? 0 : src.length, ts });
+  return id;
+}
+function enviarArquivoSom(arq) {
+  if (!arq) return;
+  if (!/^audio\//.test(arq.type) && !/\.(mp3|ogg|wav|m4a|aac|webm)$/i.test(arq.name)) { A.aviso('Escolha um arquivo de áudio (mp3, ogg, wav, m4a).'); return; }
+  if (arq.size > 4 * 1024 * 1024) { A.aviso('Arquivo grande demais: até 4 MB. Corte o trecho ou use um link.'); return; }
+  const fr = new FileReader();
+  fr.onload = () => guardarSom(arq.name.replace(/\.[^.]+$/, ''), 'arq', fr.result).then(() => A.aviso(`"${arq.name}" guardado. Já dá para tocar.`), () => A.aviso('O servidor recusou o áudio.'));
+  fr.readAsDataURL(arq);
+}
+async function exportarSons() {
+  const lista = [];
+  for (const [id, s] of Object.entries(SONS.idx)) { if (!s) continue; const v = await A.Rede.once('sons/' + id).catch(() => null); lista.push({ n: s.n, tipo: s.tipo, url: s.tipo === 'link' ? s.url : '', data: s.tipo === 'arq' && v ? v.data || '' : '' }); }
+  const blob = new Blob([JSON.stringify({ tipo: 'planta-acf-sons', versao: 1, sons: lista })], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `sons-acf-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function importarSons(arq) {
+  if (!arq) return;
+  arq.text().then(async txt => {
+    let o; try { o = JSON.parse(txt); } catch (e) { A.aviso('Arquivo inválido.'); return; }
+    const lst = o && o.tipo === 'planta-acf-sons' && Array.isArray(o.sons) ? o.sons.filter(s => s && s.n && (s.url || s.data)) : [];
+    if (!lst.length) { A.aviso('Esse arquivo não tem sons da Planta.'); return; }
+    const ja = new Set(Object.values(SONS.idx).filter(Boolean).map(s => s.n));
+    let n = 0; for (const s of lst) { if (ja.has(s.n)) continue; await guardarSom(s.n, s.url ? 'link' : 'arq', s.url || s.data).then(() => n++, () => {}); }
+    A.aviso(n ? `${n} som${n > 1 ? 's' : ''} importado${n > 1 ? 's' : ''}.` : 'Esses sons já estavam aqui.');
+  });
+}
 
 /* =========================================================
    7. CENA DE INVESTIGAÇÃO (faixa para todos)
@@ -704,7 +924,7 @@ function desenharMesaMestre() {
   };
   grade('#mesaHudMeu', hudOffMeu(), (id, off) => { const o = hudOffMeu(); if (off) o[id] = true; else delete o[id]; ls.set('acf-hud-gm-off', o); desenharHud(); });
   grade('#mesaHudJog', hudOffJog(), (id, off) => A.definir(['hud', 'off', id], off ? true : null));
-  desenharMesaInv(); desenharMesaInt(); desenharMesaRec(); desenharMesaAmb(); desenharMesaRol(); desenharMesaAmea();
+  desenharMesaInv(); desenharMesaTeste(); desenharMesaInt(); desenharMesaRec(); desenharMesaAmb(); desenharMesaRol(); desenharMesaAmea();
   desenharMesaMemb(); desenharMesaMom(); desenharMesaRel();
 }
 // não redesenha um bloco enquanto alguém digita nele (botões e caixas de marcar não contam)
@@ -734,6 +954,7 @@ function desenharMesaInt() {
       <label class="mesa-campo">Tipo <select id="mesaTipoDesc">${Object.entries(TIPO_DESC).map(([k, v]) => `<option value="${k}" ${k === 'longo' ? 'selected' : ''}>${v[0]} (${v[1]} aç${v[1] > 1 ? 'ões' : 'ão'})</option>`).join('')}</select></label>
       <label class="mesa-campo">Condição <select id="mesaDesc">${Object.entries(DESCANSO).map(([k, v]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${v[0]}${v[1] !== 1 ? ` (sono ×${String(v[1]).replace('.', ',')})` : ''}</option>`).join('')}</select></label>
       <button data-mi="int-ini" class="btn-protocolo">Abrir interlúdio</button>
+      <button data-mi="int-descansar" title="Tira das fichas de todas as cobaias as condições do sono e zera os dias sem dormir">🧹 Tirar o cansaço de todos</button>
       ${it.id && tipo === 'longo' && Object.keys(((A.segredos || {})._noite || {})[it.id] || {}).length ? '<details><summary>🌙 Última noite</summary><div id="mesaIntNoite" class="mesa-resp"></div></details>' : ''}`;
   if (it.id && (it.on || $('#mesaIntNoite'))) ouvirRespostas('mesaIntResp', it.id, fmt, v => pintarNoite(it, v));
 }
@@ -761,11 +982,30 @@ function desenharMesaRec() {
     <button data-mi="rec" class="btn-protocolo">Enviar recompensas</button>
     ${rc && rc.id ? `<p class="mini">Último envio: ${esc(rc.msg || 'sem título')} · ${new Date(num(rc.ts)).toLocaleString('pt-BR')}</p>` : ''}`;
 }
-function desenharMesaAmb() {
-  if (!semFoco('#mesaAmb')) return;
-  const a = est().amb || {};
-  $('#mesaAmb').innerHTML = `<p class="mini">Som contínuo em todos os aparelhos (quem desligou o 🔊 não ouve). Feito no próprio navegador, sem arquivos.</p>
-    <div class="mesa-amb">${Object.keys(ELEM).filter(e => e !== 'Varia').map(e => `<button data-mi="amb" data-v="${e}" class="${a.el === e ? 'on' : ''}" style="--el:${ELEM[e]}">${e}</button>`).join('')}<button data-mi="amb" data-v="" class="${!a.el ? 'on' : ''}">Silêncio</button></div>`;
+const AMB_CAIXA = [['Chuva', '🌧'], ['Goteira', '💧'], ['Fluorescente', '💡'], ['Maquinário', '⚙'], ['Vento', '🌬'], ['Coração', '❤'], ['Sirene', '🚨'], ['Rádio', '📻'], ['Relógio', '🕰'], ['Sussurros', '🗣'], ['Tensão', '🎻']];
+function desenharMesaAmb(forcar) {
+  const c = $('#mesaAmb'); if (!c || !semFoco('#mesaAmb')) return;
+  ligarSons();
+  const a = est().amb || {}, vol = a.vol === undefined ? 85 : int(a.vol);
+  const sons = Object.entries(SONS.idx).filter(([, s]) => s).sort((x, y) => String(x[1].n).localeCompare(String(y[1].n), 'pt'));
+  const assin = JSON.stringify([a.el || '', a.som || '', vol, sons.map(([k, s]) => k + s.n)]);
+  if (!forcar && c.dataset.f === assin) return;
+  c.dataset.f = assin;
+  const on = (k, v) => (a[k] === v && (k === 'som' || !a.som) ? 'on' : '');
+  c.innerHTML = `<p class="mini">Som contínuo em todos os aparelhos (quem desligou o 🔊 não ouve). Os ambientes abaixo são feitos no navegador, sem arquivo.</p>
+    <p class="mesa-k">ELEMENTOS</p>
+    <div class="mesa-amb">${Object.keys(ELEM).filter(e => e !== 'Varia').map(e => `<button data-mi="amb" data-v="${e}" class="${on('el', e)}" style="--el:${ELEM[e]}">${e}</button>`).join('')}</div>
+    <p class="mesa-k">A CAIXA</p>
+    <div class="mesa-amb">${AMB_CAIXA.map(([e, ic]) => `<button data-mi="amb" data-v="${e}" class="${on('el', e)}">${ic} ${e}</button>`).join('')}</div>
+    <div class="mesa-linha amb-vol"><button data-mi="amb" data-v="" class="${!a.el && !a.som ? 'on' : ''}">🔇 Silêncio</button><label>Volume <input type="range" id="ambVol" min="0" max="100" step="5" value="${vol}"></label><output>${vol}%</output></div>
+    <p class="mesa-k">SONS PRÓPRIOS</p>
+    ${sons.length ? `<ul class="amb-sons">${sons.map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>${s.tipo === 'link' ? '🔗' : '🎵'} ${esc(s.n)}${s.tam ? ` <small>${s.tam / 1.37 < 1048576 ? Math.max(1, Math.round(s.tam / 1.37 / 1024)) + ' KB' : (s.tam / 1.37 / 1048576).toFixed(1) + ' MB'}</small>` : ''}</span><button data-mi="amb-som" data-k="${k}" title="Tocar em repetição para todos">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}" title="Tocar uma vez para todos">🔔 Uma vez</button><button data-mi="amb-del" data-k="${k}" class="perigo" aria-label="Apagar">×</button></li>`).join('')}</ul>` : '<p class="mini">Nenhum ainda. Envie um áudio (até 4 MB) ou cole um link direto de mp3/ogg (pode ser um arquivo dentro do próprio repositório, como audio/chuva.mp3).</p>'}
+    <div class="mesa-linha"><label class="amb-arq">⬆ Enviar áudio<input type="file" id="ambArq" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden></label><button data-mi="amb-link">🔗 Link</button><button data-mi="amb-exp" ${sons.length ? '' : 'disabled'}>⬇ Exportar</button><label class="amb-arq">⬆ Importar<input type="file" id="ambImp" accept=".json,application/json" hidden></label></div>`;
+  const vi = $('#ambVol', c);
+  vi.oninput = () => { c.querySelector('.amb-vol output').textContent = vi.value + '%'; };
+  vi.onchange = () => A.definir(['amb'], { ...(est().amb || {}), vol: int(vi.value), ts: Date.now() });
+  $('#ambArq', c).onchange = e => { enviarArquivoSom(e.target.files[0]); e.target.value = ''; };
+  $('#ambImp', c).onchange = e => { importarSons(e.target.files[0]); e.target.value = ''; };
 }
 function desenharMesaRol() {
   if (!semFoco('#mesaRol')) return;
@@ -812,6 +1052,21 @@ function aoClicarMesa(e) {
     if (somOk() && A.Som) A.Som.tom(660, 0, 0.12, 'triangle', 0.08, 990);
   } else if (a === 'tirar') A.definir(['inv', 'pistas', b.dataset.k], null);
   else if (a === 'quadro') { if (window.ACF_QUADRO) window.ACF_QUADRO.abrir(); }
+  else if (a === 'nt-ef') efeitoNoite(b);
+  else if (a === 'int-descansar') {
+    if (!confirm('Tirar de todas as fichas das cobaias as condições do sono (fraco, frustrado…) e zerar os dias sem dormir?')) return;
+    const R = window.ACF_REGRAS; if (!R || !R.entregar) return;
+    Promise.all(cobaias().map(x => R.entregar(x.id, { tirar: ['condSono', 'semDormir'] }))).then(() => A.aviso('Enviado: cada ficha se ajusta quando o jogador estiver com o site aberto.'));
+  }
+  else if (a === 'teste-ini') {
+    const alvos = {}; $$('[data-tst]').forEach(x => { if (x.checked) alvos[x.dataset.tst] = true; });
+    if (!Object.keys(alvos).length) { A.aviso('Escolha ao menos uma cobaia.'); return; }
+    const id = A.Rede.chave();
+    A.gravarSegredo(['_testes', id], int($('#mesaTesteDT').value));
+    A.definir(['pedTeste'], { on: true, id, per: $('#mesaTestePer').value, alvos, sec: $('#mesaTesteSec').checked, txt: ($('#mesaTesteTxt').value || '').trim().slice(0, 120), ts: Date.now() });
+  }
+  else if (a === 'teste-fim') { const pt = est().pedTeste || {}; A.definir(['pedTeste'], { ...pt, on: false }); if (pt.id) setTimeout(() => A.gravarSegredo(['_testes', pt.id], null), 2000); }
+  else if (a === 'nt-desmarca') { if (confirm(`Tirar a marca de ${nomeDe(b.dataset.q)}?`)) A.gravarSegredo(['_marcas', b.dataset.q], null); }
   else if (a === 'int-ini') A.definir(['interludio'], { on: true, id: A.Rede.chave(), tipo: $('#mesaTipoDesc').value, cond: $('#mesaDesc').value, ts: Date.now() });
   else if (a === 'int-fim') { if (confirm('Encerrar o interlúdio?')) A.definir(['interludio'], { ...(est().interludio || {}), on: false }); }
   else if (a === 'rec') {
@@ -825,7 +1080,12 @@ function aoClicarMesa(e) {
     A.definir(['recomp'], { id: A.Rede.chave(), por, msg: ($('#mesaRecMsg').value || '').trim().slice(0, 120), ts: Date.now() });
     A.aviso('Recompensas enviadas.');
     setTimeout(desenharMesaRec, 50);
-  } else if (a === 'amb') { A.definir(['amb'], b.dataset.v ? { el: b.dataset.v, ts: Date.now() } : null); }
+  } else if (a === 'amb') { const v0 = (est().amb || {}).vol; A.definir(['amb'], b.dataset.v ? { el: b.dataset.v, vol: v0 === undefined ? 85 : v0, ts: Date.now() } : (v0 === undefined ? null : { vol: v0, ts: Date.now() })); }
+  else if (a === 'amb-som') { const v0 = (est().amb || {}).vol, k = b.dataset.k; A.definir(['amb'], (est().amb || {}).som === k ? (v0 === undefined ? null : { vol: v0, ts: Date.now() }) : { som: k, vol: v0 === undefined ? 85 : v0, ts: Date.now() }); }
+  else if (a === 'amb-fx') { A.definir(['sfx'], { id: b.dataset.k, ts: Date.now() }); urlDoSom(b.dataset.k).then(src => { if (src && somOk()) { const au = new Audio(src); au.volume = Amb.vol; au.play().catch(() => {}); } }); }
+  else if (a === 'amb-del') { const s = SONS.idx[b.dataset.k] || {}; if (confirm(`Apagar o som "${s.n || ''}"?`)) { if ((est().amb || {}).som === b.dataset.k) A.definir(['amb'], null); A.Rede.set('sons/' + b.dataset.k, null).catch(() => {}); A.Rede.set('sonsIdx/' + b.dataset.k, null).catch(() => {}); } }
+  else if (a === 'amb-link') { const url = (prompt('Link direto do áudio (mp3, ogg…) ou caminho no repositório (ex.: audio/chuva.mp3):') || '').trim(); if (!url) return; const n = (prompt('Nome do som:', url.split('/').pop().replace(/\.[^.]+$/, '')) || '').trim() || 'Som'; guardarSom(n, 'link', url.slice(0, 500)).then(() => A.aviso('Link guardado.'), () => A.aviso('O servidor recusou.')); }
+  else if (a === 'amb-exp') exportarSons();
   else if (a === 'rol') rolagemSecreta();
   else if (a === 'fichas') { FX() && FX().abrir(); }
   else if (a === 'memb-ok') mudarMemb(int(b.dataset.cn), 100);
@@ -853,7 +1113,11 @@ function rolagemSecreta() {
 
 /* ---------- Escudo do Mestre (resumos das regras, separados em tópicos) ----------
    O conteúdo fica em escudo.js (window.ACF_ESCUDO). Busca por palavra e um tópico por vez (ou todos). */
-const ESC = { top: ls.get('acf-escudo-top', 'todos'), busca: '' };
+const ESC = { top: ls.get('acf-escudo-top', 'todos'), busca: '', jog: false };
+// tópicos que os jogadores leem no botão "📖 Regras" (o Mestre liga e desliga no próprio Escudo)
+const PUB_PADRAO = { testes: true, condicoes: true, 'fora-combate': true, furtividade: true };
+const regrasPub = () => { const p = est().regrasPub; return p && typeof p === 'object' ? p : PUB_PADRAO; };
+const modoJog = () => !A.mestre && !A.aux;
 const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 function topicosEscudo() {
   const base = ((window.ACF_ESCUDO || {}).topicos || []).map(t => ({ ...t, cards: t.cards.slice() }));
@@ -861,6 +1125,13 @@ function topicosEscudo() {
   const eq = base.find(t => t.id === 'equipamento');
   if (eq && C.length) eq.cards.push({ titulo: 'Patentes', tipo: 'tabela', fonte: 'OPRPG p. 51', linhas: [['Patente', 'PP', 'Crédito', 'Itens I · II · III · IV']].concat(C.map(x => [x.n, String(x.pp), x.cred, x.lim.join(' · ')])) });
   // regras restritas (ações noturnas etc.): Mestre gerencia; auxiliares leem as liberadas para eles
+  if (modoJog()) {
+    // jogador: só os tópicos liberados + as regras pessoais dele
+    const pub = regrasPub(), lista = base.filter(t => pub[t.id]);
+    const R = window.ACF_REGRAS, pess = R && R.pessoais ? Object.entries(R.pessoais()).filter(([, c]) => c) : [];
+    if (pess.length) lista.unshift({ id: 'minhas', titulo: 'Minhas regras', cards: pess.sort((a, b) => num(a[1].ord) - num(b[1].ord)).map(([, c]) => ({ titulo: c.tit, tipo: 'html', linhas: [c.txt], html: `<h4>${esc(c.tit)}</h4><div class="rr-txt">${R.txtRegra(c.txt)}</div>` })) });
+    return lista;
+  }
   const rr = window.ACF_REGRAS && window.ACF_REGRAS.topicoEscudo();
   if (rr && rr.cards.length) base.push(rr);
   return base;
@@ -882,8 +1153,10 @@ function desenharEscudo() {
     const qtd = q ? (k === 'todos' ? tops.reduce((s, t) => s + t.cards.filter(casa).length, 0) : (tops.find(t => t.id === k) || { cards: [] }).cards.filter(casa).length) : 0;
     return `<button data-esc="top" data-v="${k}" class="${ESC.top === k ? 'on' : ''}${q && !qtd ? ' vazio' : ''}">${esc(n)}${q ? ` <i>${qtd}</i>` : ''}</button>`; }).join('');
   const vis = tops.filter(t => ESC.top === 'todos' || t.id === ESC.top);
+  const pub = regrasPub();
+  const chavePub = t => (A.mestre && !['restritas', 'minhas'].includes(t.id) ? `<label class="esc-pub" title="Aparece no botão 📖 Regras dos jogadores"><input type="checkbox" data-esc-pub="${t.id}" ${pub[t.id] ? 'checked' : ''}> 👁 Jogadores leem</label>` : '');
   const html = vis.map(t => { const cs = t.cards.filter(casa); if (!cs.length) return '';
-    return `<section class="esc-topico" id="esc-${t.id}">${ESC.top === 'todos' ? `<h3>${esc(t.titulo)}</h3>` : ''}<div class="esc-cards">${cs.map(cardEscudo).join('')}</div></section>`; }).join('');
+    return `<section class="esc-topico" id="esc-${t.id}">${ESC.top === 'todos' ? `<h3>${esc(t.titulo)}${chavePub(t)}</h3>` : chavePub(t) ? `<div class="esc-pub-linha">${chavePub(t)}</div>` : ''}<div class="esc-cards">${cs.map(cardEscudo).join('')}</div></section>`; }).join('');
   const corpo = $('.esc-corpo', o);
   corpo.innerHTML = html || `<p class="esc-vazio">Nada encontrado${q ? ` para "${esc(ESC.busca)}"` : ''}.</p>`;
   const on = $('.esc-nav button.on', o); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -901,10 +1174,25 @@ function abrirEscudo(topico) {
       const b = e.target.closest('[data-esc="top"]');
       if (b) { ESC.top = b.dataset.v; ls.set('acf-escudo-top', ESC.top); desenharEscudo(); $('.esc-corpo', o).scrollTop = 0; }
     });
+    o.addEventListener('change', e => {
+      const c = e.target.closest('[data-esc-pub]'); if (!c || !A.mestre) return;
+      const novo = { ...regrasPub(), [c.dataset.escPub]: c.checked };
+      Object.keys(novo).forEach(k => { if (!novo[k]) novo[k] = false; });
+      A.definir(['regrasPub'], novo);
+      setTimeout(desenharEscudo, 30);
+    });
     $('.esc-busca', o).addEventListener('input', e => { ESC.busca = e.target.value; if (ESC.busca && ESC.top !== 'todos') ESC.top = 'todos'; desenharEscudo(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !o.hidden) o.hidden = true; });
   }
   if (topico) ESC.top = topico;
+  const jog = modoJog();
+  if (ESC.jog !== jog || !o.dataset.modo) {
+    ESC.jog = jog; o.dataset.modo = jog ? 'jog' : 'mestre';
+    $('header span', o).textContent = jog ? 'O.R.F.E.U. · CONSULTA DA COBAIA' : 'O.R.F.E.U. · USO DO MESTRE';
+    $('header h2', o).textContent = jog ? 'Regras' : 'Escudo do Mestre';
+    $('.escudo-rodape', o).textContent = jog ? 'Resumos para consulta rápida. Em "Minhas regras" ficam as que só você lê.' : 'Resumos para consulta rápida (Livro de Regras OPRPG v1.3 e Sobrevivendo ao Horror); a regra completa está no livro. "Regras da Caixa" são as regras desta campanha e do site.';
+    if (jog) ESC.top = 'todos';
+  }
   o.hidden = false;
   desenharEscudo();
   if (!matchMedia('(max-width: 700px)').matches) setTimeout(() => $('.esc-busca', o).focus(), 30);
@@ -1256,11 +1544,14 @@ function tudo() {
   contarTurnos();
   verChamado();
   verInterludio();
+  verTeste();
   verRecompensa();
   verAmbiente();
   desenharInvestigacao();
   desenharMesaMestre();
   desenharMesaAux();
+  atualizarBotaoRegras();
+  const oe = $('#escudoMestre'); if (oe && !oe.hidden && oe.dataset.modo !== (modoJog() ? 'jog' : 'mestre')) oe.hidden = true;
 }
 // auxiliares: Ameaças e Membrana (Cena e Escudo é fixo no HTML; NEX e Parede ficam em ferramentas.js)
 function desenharMesaAux() {
@@ -1276,7 +1567,11 @@ document.addEventListener('acf-segredos', () => { if (A.mestre) setTimeout(desen
 document.addEventListener('click', e => { if (e.target.closest('#painel [data-mi]')) aoClicarMesa(e); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = $('#escudoMestre'); if (o && !o.hidden) o.hidden = true; } });
 const bNova = $('#mesaNovaCena'); if (bNova) bNova.addEventListener('click', () => { if (confirm('Começar uma nova cena? Zera os contadores de Morrendo e Enlouquecendo e desconta a munição usada.')) novaCena(); });
-const bEsc = $('#mesaEscudo'); if (bEsc) bEsc.addEventListener('click', abrirEscudo);
+const bEsc = $('#mesaEscudo'); if (bEsc) bEsc.addEventListener('click', () => abrirEscudo());
+// jogador: botão "📖 Regras" (tópicos liberados pelo Mestre + regras pessoais)
+const bReg = $('#btnRegras'); if (bReg) bReg.addEventListener('click', () => abrirEscudo());
+function atualizarBotaoRegras() { const b = $('#btnRegras'); if (b) { const ver = !A.mestre && !A.aux && !!A.meu; if (b.hidden === ver) b.hidden = !ver; } }
+document.addEventListener('acf-regras', () => { const o = $('#escudoMestre'); if (o && !o.hidden) desenharEscudo(); });
 // navegadores só liberam som depois de um toque: tenta de novo o ambiente no primeiro clique
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
