@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012zd';
+const VERSAO_SITE = '20261012ze';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1298,12 +1298,33 @@ function grunhido(txt) {
   }
   return out.join(' ').replace(/(^|[.!?]\s+)([a-z])/g, (m0, a, b) => a + b.toUpperCase());
 }
-// voz: grunhido grave (vogais), estalo seco de quelícera (c, t, k, p…) e chiado (s, f, z, x)
-function vozGrunhido(orig) {
+// ruído filtrado: estalo de pinça, estridulação (o "chiado" de ameaça do escorpião) e patas arranhando
+let RUIDO_BUF = null;
+function rumor(c, t0, dur, f, q, vol, tipo = 'bandpass') {
+  if (!RUIDO_BUF) { RUIDO_BUF = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = RUIDO_BUF.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = RUIDO_BUF; fl.type = tipo; fl.frequency.value = f; fl.Q.value = q;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.004, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(fl); fl.connect(g); g.connect(c.destination); src.start(t0, Math.random() * 0.8); src.stop(t0 + dur + 0.02);
+}
+const pinca = (c, t) => { rumor(c, t, .035, 2600, 1.2, .26, 'highpass'); rumor(c, t + .004, .02, 900, 3, .14); };
+const estridula = (c, t, n = 26, passo = .021) => { for (let i = 0; i < n; i++) rumor(c, t + i * passo * (0.9 + Math.random() * 0.2), .011, 3800 + Math.random() * 1800, 5, .2 + Math.random() * .08); return n * passo; };
+const patas = (c, t, n = 9, dur = .32) => { for (let i = 0; i < n; i++) rumor(c, t + Math.random() * dur, .007, 5500 + Math.random() * 2500, 2, .1); };
+// barulho de escorpião: duas batidas de pinça, patas arranhando e a estridulação; devolve quanto dura
+function somEscorpiao(c, t0, longo) {
+  pinca(c, t0); pinca(c, t0 + .13);
+  if (longo) { patas(c, t0 + .2); const d = estridula(c, t0 + .42); pinca(c, t0 + .5 + d); return .7 + d; }
+  estridula(c, t0 + .24, 12); return .55;
+}
+// voz: grunhido grave (a metade humana), estalo de pinça (c, t, k, p…) e estridulação (s, f, z, x)
+function vozGrunhido(orig, modo) {
+  if (mudo) return;
+  const c = Som.pronto(); if (!c) return;
   const notas = []; let t = 0;
-  const grunhe = () => { const f = 95 + Math.random() * 60; notas.push([f, t, .16, f * 0.75, 'sawtooth', .06]); t += .17; };
-  const estala = () => { notas.push([1900 + Math.random() * 900, t, .022, 1200, 'square', .045]); t += .05; };
-  const chia = () => { notas.push([3200, t, .09, 2600, 'sawtooth', .018]); t += .1; };
+  if (modo) t = somEscorpiao(c, c.currentTime, modo === 'longo');
+  const grunhe = () => { const f = 95 + Math.random() * 60; notas.push([f, t, .18, f * 0.75, 'sawtooth', .09]); t += .19; };
+  const estala = () => { pinca(c, c.currentTime + t); t += .06; };
+  const chia = () => { t += estridula(c, c.currentTime + t, 5, .02) + .02; };
   const DIC = {
     sim: () => { notas.push([120, t, .12, 180, 'sawtooth', .06], [150, t + .16, .12, 230, 'sawtooth', .06]); t += .32; estala(); estala(); },
     nao: () => { notas.push([190, t, .55, 70, 'sawtooth', .07]); t += .6; },
@@ -1331,7 +1352,7 @@ const BZ_OUVIDAS = { primeira: true, ids: new Set() };
 function ouvirBzNovas(msgs) {
   const lista = Object.values(msgs || {}).filter(ehBz);
   if (BZ_OUVIDAS.primeira) { BZ_OUVIDAS.primeira = false; lista.forEach(m => BZ_OUVIDAS.ids.add(idMsg(m))); return; }
-  lista.forEach(m => { const id = idMsg(m); if (BZ_OUVIDAS.ids.has(id)) return; BZ_OUVIDAS.ids.add(id); if (Date.now() - (+m.ts || 0) < 30000) linguaDe(m).voz(desembaralhar(m.t)); });
+  lista.forEach(m => { const id = idMsg(m); if (BZ_OUVIDAS.ids.has(id)) return; BZ_OUVIDAS.ids.add(id); if (Date.now() - (+m.ts || 0) < 30000) linguaDe(m).voz(desembaralhar(m.t), 'curto'); });
 }
 function abrirTraducao(m) {
   const id = idMsg(m), orig = desembaralhar(m.t), L = linguaDe(m);
@@ -1344,7 +1365,7 @@ function abrirTraducao(m) {
     ${!at ? '<p class="bz-aviso">Você não tem ficha ativa.</p>' : !temRit ? '<p class="bz-aviso">Sua ficha ativa não conhece esse ritual.</p>' : ''}
     <div class="bz-botoes">${at && temRit ? '<button data-bz="eu" class="pri">✦ Conjurar e traduzir só para mim</button><button data-bz="todos">✦ Conjurar e traduzir para todos</button>' : ''}<button data-bz="fechar">Fechar</button></div></div>`;
   o.hidden = false;
-  L.voz(orig);
+  L.voz(orig, 'longo');
   $$('[data-bz="eu"], [data-bz="todos"]', o).forEach(b => b.onclick = async () => {
     b.disabled = true;
     const r = await FX.conjurarAtiva('Compreensão Paranormal');
@@ -4056,7 +4077,7 @@ const Chat = {
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
         ${ehBz(m) ? `<div class="msg-txt msg-bz ${linguaDe(m).cls}" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(falaDe(m))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
-    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t)); else abrirTraducao(m); });
+    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t), 'longo'); else abrirTraducao(m); });
     // Mestre: 🗑 pede confirmação no próprio botão (segundo toque em até 3 s apaga)
     $$('.msg-lixo', lista).forEach(b => b.onclick = () => {
       if (!b.classList.contains('confirma')) { b.classList.add('confirma'); b.textContent = 'apagar?'; clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove('confirma'); b.textContent = '🗑'; }, 3000); return; }
