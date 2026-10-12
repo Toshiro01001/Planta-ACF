@@ -3364,4 +3364,19 @@ body.parede-aberta { overflow: hidden; }
 .bau-item b { font: 600 22px var(--display); color: #ffe3a0; } .bau-item small { font: 12px var(--mono); color: #c9b48a; } .bau-item p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; text-align: left; color: #e9dfc6; }
 .bau-botoes button { padding: 10px 18px; border-radius: 8px; border: 1px solid #c9a14a; background: transparent; color: #f3eedd; font: 15px var(--corpo); }
 .bau-botoes button.pri { background: #c9a14a; color: #1a140a; font-weight: 600; }
-.btn-hall { border-color: rgba(236,230,74,.35) !important; }
+.btn-hall { width: 100%; margin-top: 8px; border-color: rgba(236,230,74,.45) !important; color: #f3eedd; }
+
+/* conquista desbloqueada (tela do jogador) */
+.conq-banner { position: fixed; left: 50%; top: calc(var(--topo-h) + 16px); z-index: 3450; display: flex; gap: 14px; align-items: center; width: min(460px, calc(100vw - 32px)); padding: 14px 18px; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #2b2410, #120d19 70%); border: 1px solid #ece64a; color: #f3eedd; box-shadow: 0 0 40px rgba(236,230,74,.35), 0 18px 40px rgba(0,0,0,.6); transform: translate(-50%, -30px); opacity: 0; transition: transform .5s cubic-bezier(.2,1.4,.5,1), opacity .4s; cursor: pointer; }
+.conq-banner.on { transform: translate(-50%, 0); opacity: 1; }
+.conq-ic { flex: 0 0 auto; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; font-size: 28px; background: radial-gradient(circle, rgba(236,230,74,.35), rgba(236,230,74,.05)); border: 1px solid rgba(236,230,74,.6); animation: conqGira 1s ease; }
+@keyframes conqGira { from { transform: scale(.2) rotate(-200deg); } 70% { transform: scale(1.15) rotate(10deg); } to { transform: none; } }
+.conq-banner small { display: block; font: 11px var(--mono); letter-spacing: .25em; color: #ece64a; }
+.conq-banner b { display: block; font: 600 19px var(--display); margin: 2px 0; }
+.conq-banner span:not(.conq-ic) { display: block; font-size: 13px; color: #cfc6dc; }
+.conq-brilho { position: absolute; top: 0; bottom: 0; width: 40%; left: -50%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.18), transparent); animation: conqBrilho 1.6s .4s ease; pointer-events: none; }
+@keyframes conqBrilho { to { left: 120%; } }
+.minhas-lista { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.minhas-lista li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(236,230,74,.35); background: rgba(236,230,74,.05); }
+.minhas-lista li > span { font-size: 26px; line-height: 1; }
+.minhas-lista b { display: block; font: 600 15px var(--display); color: #f3eedd; } .minhas-lista small { display: block; font-size: 12px; color: #cfc6dc; } .minhas-lista em { display: block; font: 11px var(--mono); color: var(--texto-dim); font-style: normal; margin-top: 2px; }

@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012z';
+const VERSAO_SITE = '20261012za';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2983,7 +2983,7 @@ const REST_CATS = [
     nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas'] },
   { id: 'registros', n: 'Registros', d: 'Relatório da missão, diário, noite secreta, marcas da noite, testes pedidos, Balança, total secreto das salas, histórico de NEX (o NEX inicial fica) e desejos da Parede.', on: true,
     nos: ['relatorio', 'desejos', 'nexCalc/ev'], seg: ['_diario', '_noite', '_marcas', '_testes', '_balanca', '_expoRun', '_nex'] },
-  { id: 'hall', n: 'Hall da Caixa e conquistas obtidas', d: 'Episódios, estatísticas, salas superadas e as conquistas que cada cobaia ganhou. A lista de conquistas criadas fica.', on: false, nos: ['hall'], seg: ['_conq/dadas'] },
+  { id: 'hall', n: 'Hall da Caixa e conquistas obtidas', d: 'Episódios, estatísticas, salas superadas e as conquistas que cada cobaia ganhou. A lista de conquistas criadas fica.', on: false, nos: ['hall', 'conqJog'], seg: ['_conq/dadas'] },
   { id: 'regras', n: 'Regras restritas', d: 'Texto das regras e as cópias de cada jogador.', on: false, nos: ['regrasAux', 'regrasJog'], seg: ['_regras', '_regrasHs'] },
   { id: 'arquivo', n: 'Arquivo da O.R.F.E.U.', d: 'Documentos, arquivos, cifras, sigilos e cofres.', on: false, nos: ['arquivos', 'arquivosPriv', 'cofre'], seg: ['_docs', '_arquivos', '_cifras', '_sigilos'], mapa: ['docs', 'cifras'] },
   { id: 'expo', n: 'Salas de Exposição', d: 'Biblioteca, variações e as salas colocadas na planta.', on: false, seg: ['_expo', '_expoMapa', '_expoVar'] },
@@ -2996,7 +2996,7 @@ const REST_CATS = [
   { id: 'funcoes', n: 'Funções e nomes secretos das salas', d: 'As funções das cobaias, quem vê no apagão e os nomes secretos das salas.', on: false, seg: ['_apagao', '_apagaoVe', '*funcoes'], priv: ['salas', 'saidas', 'andares'] },
 ];
 // o que cada aparelho apaga ao ver o carimbo (o Caderno e as fichas ficam)
-const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-'];
+const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-', 'acf-conq-vistas-'];
 function verRestauracao() {
   const r = Store.state.restauracao;
   if (!r || !r.ts) return;

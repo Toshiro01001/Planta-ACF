@@ -61,7 +61,9 @@ function pintarHall() {
   const h = HALL.v || {}, t = totais(h);
   const eps = Object.entries(h.sessoes || {}).filter(([, se]) => se && se.ep).sort((a, b) => num(a[1].ep.ini) - num(b[1].ep.ini));
   const salas = Object.entries(h.salas || {}).filter(([, x]) => x).sort((a, b) => num(a[1].ts) - num(b[1].ts));
-  const abas = [['ep', `Episódios (${eps.length})`], ['cob', 'Cobaias'], ['sal', `Salas (${salas.filter(([, x]) => x.ok).length}/${salas.length})`]].concat(A.mestre ? [['conq', '🏅 Conquistas (só você)']] : []);
+  const minhas = minhasConq();
+  if (!A.mestre && !hallVisivel()) UIH.aba = 'minhas';
+  const abas = (A.mestre || hallVisivel() ? [['ep', `Episódios (${eps.length})`], ['cob', 'Cobaias'], ['sal', `Salas (${salas.filter(([, x]) => x.ok).length}/${salas.length})`]] : []).concat(A.mestre ? [['conq', '🏅 Conquistas (só você)']] : A.meu ? [['minhas', `🏅 Minhas conquistas (${Object.keys(minhas).length})`]] : []);
   const sig = window.ACF_SESSAO && window.ACF_SESSAO.htmlSigilo ? window.ACF_SESSAO.htmlSigilo('mini') : '';
   let corpo = '';
   if (UIH.aba === 'ep') {
@@ -74,6 +76,9 @@ function pintarHall() {
     corpo = `<div class="hall-cobs">${cobaias().map(x => { const v = t[x.id] || {}; return `<article class="hall-cob" style="--cor:${x.cor || '#ece64a'}"><i${x.img ? ` style="background-image:url('${x.img}')"` : ''}></i><h3>${esc(x.nome)}</h3><small>${esc(x.codigo || '')}</small><dl>${linhas.map(([k, n]) => `<div class="${int(v[k]) ? '' : 'zero'}"><dt>${n}</dt><dd>${int(v[k])}</dd></div>`).join('')}</dl></article>`; }).join('')}</div>`;
   } else if (UIH.aba === 'sal') {
     corpo = salas.length ? `<ul class="hall-salas">${salas.map(([id, x]) => `<li style="--el:${ELEM[x.el] || '#8a3fd1'}"><b>${x.ok ? '✓' : '✗'}</b><span>${esc(x.nome)} <small>${esc(x.el || '')} · ${dataBR(x.ts)} · ${Object.keys(x.part || {}).map(nomeDe).map(esc).join(', ')}</small></span>${A.mestre ? `<button data-hl-del="salas/${esc(id)}" class="hall-x" aria-label="Tirar">×</button>` : ''}</li>`).join('')}</ul>` : '<p class="mini">Nenhuma Sala de Exposição encerrada ainda.</p>';
+  } else if (UIH.aba === 'minhas' && A.meu && !A.mestre) {
+    const lst = Object.values(minhas).sort((a, b) => num(a.ts) - num(b.ts)), x = A.SER[A.meu] || {};
+    corpo = `<div class="hall-minhas" style="--cor:${x.cor || '#ece64a'}"><p class="mini">Só você vê as suas. As que faltam continuam em segredo: descubra jogando.</p>${lst.length ? `<ul class="minhas-lista">${lst.map(c => `<li><span>${esc(c.ic || '🏅')}</span><div><b>${esc(c.n)}</b>${c.d ? `<small>${esc(c.d)}</small>` : ''}<em>${dataBR(c.ts)}</em></div></li>`).join('')}</ul>` : '<p class="mini">Nenhuma ainda.</p>'}</div>`;
   } else if (UIH.aba === 'conq' && A.mestre) {
     const defs = (sg()._conq || {}).defs || {}, dadas = (sg()._conq || {}).dadas || {};
     corpo = `<div class="hall-cobs">${cobaias().map(x => { const d = Object.entries(dadas[x.id] || {}).filter(([id]) => defs[id]); return `<article class="hall-cob" style="--cor:${x.cor || '#ece64a'}"><i${x.img ? ` style="background-image:url('${x.img}')"` : ''}></i><h3>${esc(x.nome)}</h3><small>${d.length} de ${Object.keys(defs).length}</small><ul class="conq-lista">${d.map(([id, g]) => `<li title="${esc(defs[id].d || '')}"><span>${esc(defs[id].ic || '🏅')}</span>${esc(defs[id].n)}<small>${g.por === 'mestre' ? 'dada por você' : 'automática'} · ${dataBR(g.ts)}</small></li>`).join('') || '<li class="zero">Nenhuma.</li>'}</ul></article>`; }).join('')}</div>`;
@@ -82,7 +87,7 @@ function pintarHall() {
     <nav class="hall-abas">${abas.map(([k, n]) => `<button data-hl-aba="${k}" class="${UIH.aba === k ? 'on' : ''}">${n}</button>`).join('')}</nav>${corpo}</div>`;
 }
 const bH = $('#btnHall'); if (bH) bH.addEventListener('click', abrirHall);
-function botaoHall() { const b = $('#btnHall'); if (!b) return; const ver = !A.mestre && (!!A.meu || !!A.aux) && hallVisivel(); if (b.hidden === ver) b.hidden = !ver; }
+function botaoHall() { const b = $('#btnHall'); if (!b) return; const ver = !A.mestre && (!!A.meu || !!A.aux) && (hallVisivel() || (!!A.meu && Object.keys(minhasConq()).length > 0)); if (b.hidden === ver) b.hidden = !ver; }
 // sessão em andamento: o Mestre grava as estatísticas parciais no Hall
 async function atualizarSessaoNoHall() {
   const sid = S().sidAtual ? S().sidAtual() : '';
@@ -154,6 +159,25 @@ async function avaliar() {
     if (novas.length && A.alertaMestre) A.alertaMestre('🏅 Conquista' + (novas.length > 1 ? 's' : '') + ': ' + novas.map(([q, id]) => `${nomeDe(q)} · ${D[id].ic || ''} ${D[id].n}`).join('; '));
     if (novas.length) setTimeout(() => desenharBlocoConq(true), 400);
   } finally { CQ.rodando = false; }
+  publicarConq();
+}
+/* ---------- o que cada cobaia já conquistou chega só a ela ----------
+   conqJog/<hash da chave da ficha>: nome, ícone e descrição das conquistas obtidas.
+   Só quem tem a chave da ficha encontra; a lista completa (e como ganhar) fica nos segredos. */
+const PUBC = {};
+async function publicarConq() {
+  if (!A.mestre || !A.segredosProntos) return;
+  const D = defs(), G = dadas();
+  for (const c of cobaias()) {
+    const obj = {};
+    Object.entries(G[c.id] || {}).forEach(([id, g]) => { const d = D[id]; if (d) obj[id] = { n: d.n, ic: d.ic || '🏅', d: d.d || '', ts: num(g.ts) }; });
+    const fichas = (await A.Rede.once('agentes/' + c.id).catch(() => null)) || {};
+    for (const chave of Object.keys(fichas)) {
+      const h = await A.hash('conq:' + chave), js = JSON.stringify(obj);
+      if (PUBC[h] === js) continue;
+      await A.Rede.set('conqJog/' + h, Object.keys(obj).length ? obj : null).then(() => { PUBC[h] = js; }, () => {});
+    }
+  }
 }
 const UIC = { ed: null };
 function desenharBlocoConq(forcar) {
@@ -209,18 +233,18 @@ function editarConq(id) {
     if (!v('n').trim()) { A.aviso('Dê um nome.'); return; }
     const nd = limparDef({ n: v('n').trim(), ic: v('ic').trim(), d: v('d').trim(), regra: { t: v('t'), min: v('min'), esc: v('esc'), el: v('el') } });
     A.gravarSegredo(['_conq', 'defs', id || limparId(nd.n)], nd);
-    o.hidden = true; setTimeout(() => { desenharBlocoConq(true); avaliarLogo(); }, 150);
+    o.hidden = true; setTimeout(() => { desenharBlocoConq(true); avaliarLogo(); publicarConq(); }, 150);
   };
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-cq]'); if (!b || !A.mestre) return;
   const a = b.dataset.cq;
-  if (a === 'dar') { const q = $('#cqQ').value, id = $('#cqD').value; if (!q || !id) return; if ((dadas()[q] || {})[id]) { A.aviso(`${nomeDe(q)} já tem essa.`); return; } A.gravarSegredo(['_conq', 'dadas', q, id], { ts: Date.now(), por: 'mestre', sid: S().sidAtual ? S().sidAtual() : '' }); setTimeout(() => desenharBlocoConq(true), 150); }
-  else if (a === 'tirar') { if (confirm(`Tirar "${(defs()[b.dataset.id] || {}).n}" de ${nomeDe(b.dataset.q)}?`)) { A.gravarSegredo(['_conq', 'dadas', b.dataset.q, b.dataset.id], null); setTimeout(() => desenharBlocoConq(true), 150); } }
+  if (a === 'dar') { const q = $('#cqQ').value, id = $('#cqD').value; if (!q || !id) return; if ((dadas()[q] || {})[id]) { A.aviso(`${nomeDe(q)} já tem essa.`); return; } A.gravarSegredo(['_conq', 'dadas', q, id], { ts: Date.now(), por: 'mestre', sid: S().sidAtual ? S().sidAtual() : '' }); setTimeout(() => { desenharBlocoConq(true); publicarConq(); }, 150); }
+  else if (a === 'tirar') { if (confirm(`Tirar "${(defs()[b.dataset.id] || {}).n}" de ${nomeDe(b.dataset.q)}?`)) { A.gravarSegredo(['_conq', 'dadas', b.dataset.q, b.dataset.id], null); setTimeout(() => { desenharBlocoConq(true); publicarConq(); }, 150); } }
   else if (a === 'reav') { avaliar().then(() => A.aviso('Conquistas verificadas.')); }
   else if (a === 'nova') editarConq(null);
   else if (a === 'editar') editarConq(b.dataset.id);
-  else if (a === 'apagar') { const d = defs()[b.dataset.id]; if (d && confirm(`Apagar a conquista "${d.n}"? Quem já tem perde.`)) { A.gravarSegredo(['_conq', 'defs', b.dataset.id], null); Object.keys(dadas()).forEach(q => { if ((dadas()[q] || {})[b.dataset.id]) A.gravarSegredo(['_conq', 'dadas', q, b.dataset.id], null); }); setTimeout(() => desenharBlocoConq(true), 150); } }
+  else if (a === 'apagar') { const d = defs()[b.dataset.id]; if (d && confirm(`Apagar a conquista "${d.n}"? Quem já tem perde.`)) { A.gravarSegredo(['_conq', 'defs', b.dataset.id], null); Object.keys(dadas()).forEach(q => { if ((dadas()[q] || {})[b.dataset.id]) A.gravarSegredo(['_conq', 'dadas', q, b.dataset.id], null); }); setTimeout(() => { desenharBlocoConq(true); publicarConq(); }, 150); } }
   else if (a === 'exp') exportarConq();
 });
 document.addEventListener('click', e => {
@@ -228,6 +252,48 @@ document.addEventListener('click', e => {
   if (b.dataset.hm === 'abrir') abrirHall(); else if (b.dataset.hm === 'atual') atualizarSessaoNoHall();
 });
 document.addEventListener('acf-hall', () => { if (A.mestre) avaliarLogo(); });
+
+// jogador: ouve as próprias conquistas e mostra as novas na tela
+const CJ = { de: '', off: [], v: {}, fila: [], rodando: false };
+const minhasConq = () => { const out = {}; Object.values(CJ.v).forEach(o => Object.entries(o || {}).forEach(([id, c]) => { if (c && c.n) out[id] = c; })); return out; };
+function ligarConqJog() {
+  const FXA = window.ACF_FICHAS;
+  const chaves = !A.mestre && A.meu && FXA && FXA.minhasChaves ? FXA.minhasChaves() : [];
+  const assin = (A.meu || '') + ':' + chaves.join(',');
+  if (CJ.de === assin) return;
+  CJ.de = assin; CJ.off.forEach(f => { try { f(); } catch (e) {} }); CJ.off = []; CJ.v = {};
+  if (!chaves.length) return;
+  A.garantirLogin().then(async () => {
+    for (const k of chaves) {
+      const h = await A.hash('conq:' + k);
+      if (CJ.de !== assin) return;
+      CJ.off.push(A.Rede.on('conqJog/' + h, v => { CJ.v[h] = v || {}; verNovasConq(); }, () => {}));
+    }
+  }, () => {});
+}
+function verNovasConq() {
+  if (A.mestre || !A.meu) return;
+  const chave = 'acf-conq-vistas-' + A.meu;
+  let vistas = []; try { vistas = JSON.parse(localStorage.getItem(chave) || '[]'); } catch (e) {}
+  const novas = Object.entries(minhasConq()).filter(([id]) => !vistas.includes(id)).sort((a, b) => num(a[1].ts) - num(b[1].ts));
+  if (!novas.length) return;
+  try { localStorage.setItem(chave, JSON.stringify(vistas.concat(novas.map(([id]) => id)).slice(-300))); } catch (e) {}
+  novas.forEach(n => CJ.fila.push(n[1]));
+  proxConq();
+  const o = $('#hallTela'); if (o && !o.hidden) pintarHall();
+}
+function proxConq() {
+  if (CJ.rodando || !CJ.fila.length) return;
+  CJ.rodando = true;
+  const c = CJ.fila.shift();
+  let b = $('#conqBanner');
+  if (!b) { b = document.createElement('div'); b.id = 'conqBanner'; b.className = 'conq-banner'; document.body.appendChild(b); b.addEventListener('click', () => { b.classList.remove('on'); }); }
+  b.innerHTML = `<span class="conq-ic">${esc(c.ic || '🏅')}</span><div><small>CONQUISTA DESBLOQUEADA</small><b>${esc(c.n)}</b>${c.d ? `<span>${esc(c.d)}</span>` : ''}</div><i class="conq-brilho"></i>`;
+  b.hidden = false; b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');
+  if (A.Som && !A.mudo) [659, 880, 1175, 1568].forEach((f, i) => A.Som.tom(f, i * 0.09, 0.22, 'triangle', 0.07));
+  setTimeout(() => { b.classList.remove('on'); setTimeout(() => { b.hidden = true; CJ.rodando = false; proxConq(); }, 600); }, 5200);
+}
+document.addEventListener('acf-ativa', () => setTimeout(ligarConqJog, 300));
 
 /* =========================================================
    BAÚ DE ACHADOS
@@ -315,7 +381,7 @@ function proxBau() {
 let ag = false;
 function tudo() {
   if (ag) return; ag = true;
-  requestAnimationFrame(() => { ag = false; try { botaoHall(); desenharBlocoHall(); desenharBlocoBau(); desenharBlocoConq(); } catch (err) { console.warn('jogo:', err); } });
+  requestAnimationFrame(() => { ag = false; try { botaoHall(); desenharBlocoHall(); desenharBlocoBau(); desenharBlocoConq(); ligarConqJog(); } catch (err) { console.warn('jogo:', err); } });
 }
 A.aoMudar(tudo);
 document.addEventListener('acf-segredos', () => setTimeout(() => { desenharBlocoConq(); pintarLogBau(); }, 50));
@@ -323,5 +389,5 @@ document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 setTimeout(tudo, 600);
 setInterval(() => { if (A.mestre) avaliar(); }, 90000);
 setTimeout(() => { if (A.mestre) avaliar(); }, 8000);
-window.ACF_JOGO = { abrirHall, abrirBau, avaliar };
+window.ACF_JOGO = { abrirHall, abrirBau, avaliar, publicarConq };
 })();
