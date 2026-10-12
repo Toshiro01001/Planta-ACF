@@ -253,7 +253,7 @@ const F = {
   aberto: false, tela: 'lista', abaLista: '',
   offs: [], resumo: {},             // resumo das fichas da lista
   atual: null,                      // { ref, d, editavel, off }
-  aba: 'combate', abaMob: 'status', abertos: new Set(), filtros: {},
+  aba: 'jogo', abaMob: 'jogo', abertos: new Set(), filtros: {},
 };
 const ehMestre = () => A.mestre;
 const quem = () => A.meu || A.aux || null;
@@ -597,7 +597,7 @@ function desenharFicha() {
     : `<span class="fx-nex-exp-ed" style="--nexc:${corNex(nexV)}">${campo('nex', 'n', ' min="0" max="99" step="1"')}<i>%</i></span>`;
   corpo.innerHTML = `<div class="fx-ficha${ed ? '' : ' so-leitura'}" data-mob="${F.abaMob}" style="${estiloAc(d.dono)}">
     ${ed ? '' : `<div class="fx-aviso-leitura"><b>SOMENTE LEITURA</b><span>${ehMestre() ? 'O Mestre acompanha esta ficha ao vivo, mas não pode alterá-la.' : 'Esta ficha é de outra cobaia. Só o dono pode editar.'}</span></div>`}
-    <nav class="fx-abas-mob">${[['status', 'Status'], ['pericias', 'Perícias'], ['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba-mob" data-v="${k}" class="${F.abaMob === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
+    <nav class="fx-abas-mob">${[['jogo', '🎮 Em jogo'], ['status', 'Status'], ['pericias', 'Perícias'], ['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba-mob" data-v="${k}" class="${F.abaMob === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
     <section class="fx-col fx-col-esq">
       <div class="fx-dossie fx-painel">
         <label class="fx-foto"${foto ? ` style="background-image:url('${esc(foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">${esc(at.ref.gm ? 'NPC' : (s.nome || d.dono || ''))}</i></label>
@@ -656,7 +656,7 @@ function desenharFicha() {
       <p class="fx-legenda">Toque no nome para rolar · <b>*</b> só treinada · <b>+</b> sofre penalidade de carga · T, V e E: treinado, veterano e expert</p>
     </section>
     <section class="fx-col fx-col-dir">
-      <nav class="fx-abas">${[['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba" data-v="${k}" class="${F.aba === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
+      <nav class="fx-abas">${[['jogo', '🎮 Em jogo'], ['combate', 'Combate'], ['habilidades', 'Habilidades'], ['rituais', 'Rituais'], ['inventario', 'Inventário'], ['descricao', 'Descrição']].map(([k, n]) => `<button data-acao="aba" data-v="${k}" class="${F.aba === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
       <div class="fx-aba-corpo fx-painel" id="fxAba"></div>
     </section></div>`;
   desenharAba();
@@ -774,7 +774,8 @@ function atualizarDerivados() {
     const tr = Object.entries(d.treino || {}).filter(([, v]) => v);
     const podeT = F.atual && F.atual.editavel;
     const html = (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
-      + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : ''}</i>`).join('')}` : '');
+      + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : ''}</i>`).join('')}` : '')
+      + (d.bonusProx ? `<span class="fx-k">Guardado</span><i class="fx-cond fx-bonus">⚡ ${esc(d.bonusProx.b)} · ${esc(d.bonusProx.n)}${podeT ? ' <button class="fx-x" data-acao="tirar-bp" title="Descartar">×</button>' : ''}</i>` : '');
     if (cx.innerHTML !== html) cx.innerHTML = html;
   }
   put('bloqueio', r.bloqueio); put('esquiva', r.esquiva);
@@ -795,6 +796,9 @@ function atualizarDerivados() {
     $('.fx-barra-fill', b).style.width = `${pc}%`;
     b.classList.toggle('critico', pc > 0 && pc <= 25); b.classList.toggle('zerado', a <= 0);
   });
+  // aba Em jogo: sinais vitais e turno
+  $$('[data-jg]', raiz).forEach(o => { const k = o.dataset.jg, mx = r[o.dataset.jgmax], h = `${atualDe(d, k, mx)}<small>/${mx}</small>`; if (o.innerHTML !== h) o.innerHTML = h; });
+  const tu = turnoAtual(d); $$('[data-turno] button[data-v]', raiz).forEach(b => { if (b.dataset.v !== 'zera') b.classList.toggle('on', !!tu[b.dataset.v]); });
   // inventário
   put('dt', r.dt);
   put('carga', `${+r.carga.toFixed(1)}`); put('cargaMax', r.cargaMax);
@@ -811,11 +815,12 @@ function desenharAba() {
   const ed = F.atual.editavel;
   const aba = F.aba;
   $$('.fx-abas button').forEach(b => b.classList.toggle('on', b.dataset.v === aba));
+  if (aba === 'jogo') el.innerHTML = abaJogo(d, ed);
   if (aba === 'combate') el.innerHTML = abaCombate(d, ed);
   if (aba === 'habilidades') el.innerHTML = abaLista('hab', 'habilidades', d, ed);
   if (aba === 'rituais') el.innerHTML = abaRituais(d, ed);
   if (aba === 'inventario') el.innerHTML = abaInventario(d, ed);
-  if (aba === 'descricao') el.innerHTML = `<div class="fx-desc">${htmlDividas(d)}
+  if (aba === 'descricao') el.innerHTML = `<div class="fx-desc">${htmlRegistro(d)}${htmlDividas(d)}
     <label>Anotações ${area('desc.anot', 4, 'Anotações pessoais do agente...')}</label>
     <label>Aparência ${area('desc.apar', 4)}</label><label>Personalidade ${area('desc.pers', 4)}</label>
     <label>Histórico ${area('desc.hist', 5)}</label><label>Objetivo ${area('desc.obj', 3)}</label></div>`;
@@ -833,36 +838,125 @@ function htmlDividas(d) {
     ${lista.map(([k, x]) => `<article class="${st[k] === 'pago' ? 'pago' : ''}"><header><b>${st[k] === 'pago' ? 'COBRADO' : 'PENDENTE'}</b> · preço ${int(x.n)} · ${new Date(num(x.ts)).toLocaleDateString('pt-BR')}</header><p class="fx-div-d">“${esc(x.d || '')}”</p><p class="fx-div-p">${esc(x.p)}</p></article>`).join('')}</section>`;
 }
 
+// dados de um ataque (arma do inventário ou desarmado), usados no Combate e no Em jogo
+function infoAtaque(d, r, it, desarmado) {
+  const a = it.a || {};
+  const corpo = /corpo/i.test(a.tipo || '') || desarmado;
+  const arremesso = /arremesso/i.test(a.tipo || '');
+  const per = corpo ? 'luta' : 'pontaria';
+  const bAtk = r.bonus(per) + int(a.bAtk);
+  const forV = int(d.atr.for);
+  const extra = `${(corpo || arremesso) && forV ? (forV > 0 ? '+' : '') + forV : ''}${int(a.bDano) ? (int(a.bDano) > 0 ? '+' : '') + int(a.bDano) : ''}`;
+  // "1d6/1d8": duas formas de usar a arma (ex.: uma ou duas mãos); cada uma ganha seu botão
+  const base = String(a.dano || '1d3').trim();
+  const alts = (/^\s*\d*d\d+(\s*\/\s*\d*d\d+)+/i.test(base) ? (() => { const m = /^([\dd\s/]+)(.*)$/i.exec(base); return m[1].split('/').map(x => x.trim() + m[2].trim()); })() : [base]).map(x => ({ x, expr: x + extra }));
+  return { per, bAtk, alts, dano: alts.map(y => y.expr).join(' / '), marg: int(a.margem) || 20, mult: int(a.mult) || 2, a };
+}
+const btnAtaque = (it, inf, y, rot) => `<button class="fx-btn-atk" data-acao="atacar" data-id="${esc(it.id || '')}" data-per="${inf.per}" data-expr="${esc(y.expr)}" data-mult="${inf.mult}" data-margem="${inf.marg}" data-n="${esc(it.n)}${inf.alts.length > 1 ? ' (' + esc(y.x) + ')' : ''}">${rot}</button>`;
+const DESARMADO = { n: 'Ataque desarmado', a: { dano: '1d3', tipo: 'Corpo a Corpo', emp: 'Leve', td: 'Impacto (não letal)', margem: 20, mult: 2 } };
 function abaCombate(d, ed) {
   const r = calc(d);
   const armas = lista(d.itens).filter(it => it.t === 'arma');
   const linhaAtaque = (it, desarmado) => {
-    const a = it.a || {};
-    const corpo = /corpo/i.test(a.tipo || '') || desarmado;
-    const arremesso = /arremesso/i.test(a.tipo || '');
-    const per = corpo ? 'luta' : 'pontaria';
-    const bAtk = r.bonus(per) + int(a.bAtk);
-    const somaFor = corpo || arremesso;
-    const forV = int(d.atr.for);
-    const extra = `${somaFor && forV ? (forV > 0 ? '+' : '') + forV : ''}${int(a.bDano) ? (int(a.bDano) > 0 ? '+' : '') + int(a.bDano) : ''}`;
-    // "1d6/1d8": duas formas de usar a arma (ex.: uma ou duas mãos); cada uma ganha seu botão
-    const base = String(a.dano || '1d3').trim();
-    const alts = /^\s*\d*d\d+(\s*\/\s*\d*d\d+)+/i.test(base) ? (() => { const m = /^([\dd\s/]+)(.*)$/i.exec(base); return m[1].split('/').map(x => x.trim() + m[2].trim()); })() : [base];
-    const dano = alts.map(x => x + extra).join(' / ');
-    const marg = int(a.margem) || 20, mult = int(a.mult) || 2;
+    const inf = infoAtaque(d, r, it, desarmado), a = inf.a;
     const mods = lista(it.mods).map(m => m.n).join(', ');
     const mun = !desarmado && a.mun ? municaoDa(d, it) : null;
     const munTxt = mun ? (mun.falta ? `<span class="fx-mun-falta">Munição <b>sem ${esc(a.mun)}</b></span>` : `<span class="${qtdDe(mun) <= 0 ? 'fx-mun-falta' : ''}">Munição <b>${esc(textoMun(mun))}</b></span>`) : '';
     return `<div class="fx-ataque"><div><b>${esc(it.n)}</b><small>${esc([a.prof, a.tipo, a.emp].filter(Boolean).join(' · '))}${mods ? ' · ' + esc(mods) : ''}</small></div>
-      <div class="fx-ataque-num"><span>Ataque <b>${PER[per][1]}</b> ${bAtk >= 0 ? '+' : ''}${bAtk}</span><span>Dano <b>${esc(dano)}</b>${a.td ? ' ' + esc(a.td) : ''}</span><span>Crítico <b>${marg < 20 ? marg + '/' : ''}x${mult}</b></span>${a.alc ? `<span>Alcance <b>${esc(a.alc)}</b></span>` : ''}${munTxt}</div>
-      <div class="fx-ataque-btns"><button data-acao="atacar" data-id="${esc(it.id || '')}" data-per="${per}">🎲 Ataque</button>${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">🎲 Dano${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}${alts.map((x, i) => `<button data-acao="dano" data-expr="${esc(x + extra)}" data-mult="${mult}" data-n="${esc(it.n)}${alts.length > 1 ? ' (' + esc(x) + ')' : ''}">💥 Crítico${alts.length > 1 ? ' ' + esc(x) : ''}</button>`).join('')}</div></div>`;
+      <div class="fx-ataque-num"><span>Ataque <b>${PER[inf.per][1]}</b> ${inf.bAtk >= 0 ? '+' : ''}${inf.bAtk}</span><span>Dano <b>${esc(inf.dano)}</b>${a.td ? ' ' + esc(a.td) : ''}</span><span>Crítico <b>${inf.marg < 20 ? inf.marg + '/' : ''}x${inf.mult}</b></span>${a.alc ? `<span>Alcance <b>${esc(a.alc)}</b></span>` : ''}${munTxt}</div>
+      <div class="fx-ataque-btns">${inf.alts.map(y => btnAtaque(it, inf, y, `⚔ Atacar${inf.alts.length > 1 ? ' ' + esc(y.x) : ''}`)).join('')}${inf.alts.map(y => `<button data-acao="dano" data-expr="${esc(y.expr)}" data-n="${esc(it.n)}${inf.alts.length > 1 ? ' (' + esc(y.x) + ')' : ''}" title="Só o dano (ex.: ataque que acerta sem teste)">🎲 Só dano${inf.alts.length > 1 ? ' ' + esc(y.x) : ''}</button>`).join('')}</div></div>`;
   };
   return `<div class="fx-combate">
+    ${htmlTurno(d, ed)}
     <div class="fx-rapidos">${['fortitude', 'reflexos', 'vontade', 'iniciativa', 'percepcao'].map(p => `<button data-acao="rolar-per" data-v="${p}"><span>${PER[p][1]}</span><b>${r.bonus(p) >= 0 ? '+' : ''}${r.bonus(p)}</b></button>`).join('')}</div>
     <h4>Ataques</h4>
-    ${linhaAtaque({ n: 'Ataque desarmado', a: { dano: '1d3', tipo: 'Corpo a Corpo', emp: 'Leve', td: 'Impacto (não letal)', margem: 20, mult: 2 } }, true)}
+    ${linhaAtaque(DESARMADO, true)}
     ${armas.map(it => linhaAtaque(it)).join('') || '<p class="fx-vazio-p">Nenhuma arma no inventário. Adicione na aba Inventário.</p>'}
-    <p class="fx-legenda">Corpo a corpo e arremesso somam a Força no dano. Efeitos de melhorias (como o +2 da Alongada) entram nos campos Bônus ataque, Bônus dano e Crítico da arma, no inventário.</p></div>`;
+    <p class="fx-legenda">"Atacar" rola o ataque e já rola o dano: se o d20 escolhido chegar na margem de crítico da arma, o dano sai multiplicado. Quem decide se acertou é o Mestre (Defesa do alvo). Corpo a corpo e arremesso somam a Força no dano.</p></div>`;
+}
+
+/* ---------- TURNO VISUAL: ação padrão, movimento e reação ----------
+   Some sozinho quando o turno muda (perseguição) ou depois de 2 minutos parado. */
+function turnoAtual(d) {
+  const g = d.turno || {};
+  if (g.k !== chaveTurno() || (g.k === 'livre' && Date.now() - num(g.ts) > 120000)) return {};
+  return g;
+}
+function htmlTurno(d, ed) {
+  const tu = turnoAtual(d);
+  return `<div class="fx-turno" data-turno><span>Turno</span>${[['p', 'Padrão'], ['m', 'Movimento'], ['r', 'Reação']].map(([k, n]) => `<button data-acao="turno" data-v="${k}" class="${tu[k] ? 'on' : ''}"${ed ? '' : ' disabled'}>${n}</button>`).join('')}${ed ? '<button class="fx-mini" data-acao="turno" data-v="zera" title="Novo turno">↺</button>' : ''}</div>`;
+}
+function marcarTurno(k, valor = true) {
+  const at = F.atual; if (!at || !at.editavel || !at.d) return;
+  const tu = k === 'zera' ? {} : { ...turnoAtual(at.d), [k]: valor };
+  gravar('turno', { ...tu, k: chaveTurno(), ts: Date.now() }, true);
+  $$('[data-turno] button[data-v]').forEach(b => { if (b.dataset.v !== 'zera') b.classList.toggle('on', !!turnoAtual(at.d)[b.dataset.v]); });
+}
+
+/* ---------- HABILIDADES COM USO: custo em PE e bônus no próximo teste ---------- */
+const USO_PADRAO = { 'saber é poder': { pe: 2, b: '+5', em: 'atr:int' }, perito: { pe: 2, b: '1d6', em: 'treinada' }, 'eclético': { pe: 2, b: '+5', em: 'destreinada' } };
+const EM_USO = [['qualquer', 'qualquer teste'], ['treinada', 'perícia treinada'], ['destreinada', 'perícia sem treino'], ['ataque', 'teste de ataque'], ['atr:agi', 'teste de Agilidade'], ['atr:for', 'teste de Força'], ['atr:int', 'teste de Intelecto'], ['atr:pre', 'teste de Presença'], ['atr:vig', 'teste de Vigor']];
+function usoDe(h) {
+  if (!h) return null;
+  const n = String(h.n || '').toLowerCase().replace(/\s*\(.*\)\s*$/, '').trim();
+  const u = { ...(USO_PADRAO[n] || {}), ...(h.uso || {}) };
+  if (u.off || !u.b || !(int(u.pe) >= 0) || u.pe === undefined || u.pe === '') return null;
+  return { pe: int(u.pe), b: String(u.b).trim(), em: u.em || 'qualquer' };
+}
+const textoEm = em => (EM_USO.find(x => x[0] === em) || EM_USO[0])[1];
+function casaUso(em, d, perId, attr, tipo) {
+  if (!em || em === 'qualquer') return true;
+  const tr = int(((d.per || {})[perId] || {}).t);
+  if (em === 'treinada') return tr > 0;
+  if (em === 'destreinada') return tr === 0;
+  if (em === 'ataque') return tipo === 'ataque' || tipo === 'cac';
+  if (em.startsWith('atr:')) return attr === em.slice(4);
+  return true;
+}
+
+/* ---------- ITENS USÁVEIS ---------- */
+const USO_ITEM_PADRAO = { cicatrizante: { rec: 'pv', x: '2d8+2', gasta: true } };
+function usoItem(it) {
+  if (!it) return null;
+  const u = { ...(USO_ITEM_PADRAO[String(it.n || '').toLowerCase().trim()] || {}), ...(it.uso || {}) };
+  return u.rec && u.x ? u : null;
+}
+
+/* ---------- REGISTRO DA COBAIA (conquistas) ---------- */
+const REG = [['n20', '20 naturais', '🎯', [1, 5, 10]], ['n1', '1 naturais', '💀', [1, 5, 10]], ['rit', 'Rituais conjurados', '✦', [1, 10, 25]], ['pres', 'Presenças resistidas', '👁', [1, 5, 10]], ['int', 'Interlúdios', '🛋️', [1, 5, 15]], ['noites', 'Noites em claro', '🌙', [1, 3, 7]]];
+function somarReg(k, n = 1) { const at = F.atual; if (!at || !at.editavel || at.ref.gm || !at.d) return; gravar('reg.' + k, int((at.d.reg || {})[k]) + n, true); }
+function htmlRegistro(d) {
+  const rg = d.reg || {};
+  const medalha = (v, tiers) => (v >= tiers[2] ? ['ouro', '🥇'] : v >= tiers[1] ? ['prata', '🥈'] : v >= tiers[0] ? ['bronze', '🥉'] : ['', '']);
+  return `<section class="fx-registro"><h4>Registro da cobaia</h4><div class="fx-reg-grade">${REG.map(([k, n, ic, tiers]) => {
+    const v = int(rg[k]), [cl, md] = medalha(v, tiers), prox = tiers.find(x => x > v);
+    return `<div class="fx-reg ${cl}"><span class="fx-reg-ic">${ic}</span><b>${v}</b><small>${n}</small><i>${md}${prox ? ` próx.: ${prox}` : ' completo'}</i></div>`;
+  }).join('')}</div></section>`;
+}
+
+/* ---------- ABA "EM JOGO": tudo o que se usa na mesa, em botões grandes ---------- */
+function abaJogo(d, ed) {
+  const r = calc(d), det = d.regra === 'determinacao';
+  const vit = [['pv', 'PV', 'pvMax'], det ? ['pd', 'PD', 'pdMax'] : ['pe', 'PE', 'peMax']].concat(det ? [] : [['san', 'SAN', 'sanMax']]);
+  const K = det ? 'PD' : 'PE';
+  const armas = lista(d.itens).filter(it => it.t === 'arma');
+  const ataques = [[DESARMADO, true]].concat(armas.map(x => [x, false])).map(([it, des]) => { const inf = infoAtaque(d, r, it, des); return inf.alts.map(y => btnAtaque(it, inf, y, `⚔ ${esc(it.n)}${inf.alts.length > 1 ? ' ' + esc(y.x) : ''} <small>${inf.bAtk >= 0 ? '+' : ''}${inf.bAtk} · ${esc(y.expr)}</small>`)).join(''); }).join('');
+  const fixas = ['iniciativa', 'percepcao', 'fortitude', 'reflexos', 'vontade'];
+  const pers = [...new Set(fixas.concat(PERICIAS.map(p => p[0]).filter(id => int((d.per[id] || {}).t) > 0)))];
+  const habs = lista(d.hab).filter(h => usoDe(h));
+  const rits = lista(d.rit);
+  const itensU = lista(d.itens).filter(it => usoItem(it) && (it.qtd === undefined || it.qtd === '' || int(it.qtd) > 0));
+  const bp = d.bonusProx;
+  return `<div class="fx-jogo">
+    <div class="fx-jg-vits">${vit.map(([k, n, mx]) => `<div class="fx-jg-vit fx-jg-${k}"><b>${n}</b><output data-jg="${k}" data-jgmax="${mx}">${atualDe(d, k, r[mx])}<small>/${r[mx]}</small></output>${ed ? `<span><button data-acao="barra" data-k="${k}" data-v="-1" aria-label="−1 ${n}">−</button><button data-acao="barra" data-k="${k}" data-v="1" aria-label="+1 ${n}">+</button></span>` : ''}</div>`).join('')}</div>
+    ${htmlTurno(d, ed)}
+    ${bp ? `<p class="fx-jg-bp">⚡ Guardado: <b>${esc(bp.b)}</b> no próximo ${esc(textoEm(bp.em))} (${esc(bp.n)})</p>` : ''}
+    <h4>Atacar</h4><div class="fx-jg-btns">${ataques}</div>
+    <h4>Perícias</h4><div class="fx-jg-btns fx-jg-per">${pers.map(id => `<button data-acao="rolar-per" data-v="${id}">${PER[id][1]} <b>${r.bonus(id) >= 0 ? '+' : ''}${r.bonus(id)}</b></button>`).join('')}</div>
+    ${habs.length ? `<h4>Habilidades</h4><div class="fx-jg-btns">${habs.map(h => { const u = usoDe(h); return `<button data-acao="usar-hab" data-id="${h.id}"${ed ? '' : ' disabled'}>⚡ ${esc(h.n)} <small>−${u.pe} ${K} · ${esc(u.b)}</small></button>`; }).join('')}</div>` : ''}
+    ${rits.length ? `<h4>Rituais <small>DT ${r.dt}</small></h4><div class="fx-jg-btns">${rits.map(h => `<button data-acao="conjurar" data-id="${h.id}" data-forma="n" style="--el:${corEl(h.el)}"${ed ? '' : ' disabled'}>✦ ${esc(h.n)} <small>${esc(h.el || '')} · −${CUSTO_RITUAL[int(h.c)] || 1} ${K}</small></button>`).join('')}</div>` : ''}
+    ${itensU.length ? `<h4>Itens</h4><div class="fx-jg-btns">${itensU.map(it => { const u = usoItem(it); return `<button data-acao="usar-item" data-id="${it.id}" data-alvo="eu"${ed ? '' : ' disabled'}>💊 ${esc(it.n)}${int(it.qtd) > 1 ? ` ×${int(it.qtd)}` : ''} <small>+${esc(u.x)} ${esc(u.rec.toUpperCase())}</small></button>`; }).join('')}</div>` : ''}
+    <p class="fx-legenda">Formas avançadas dos rituais e o uso de itens em outra pessoa ficam nas abas Rituais e Inventário.</p></div>`;
 }
 
 // habilidades
@@ -871,9 +965,18 @@ function abaLista(campoD, nomeCat, d, ed) {
   const itens = lista(d[campoD]).filter(h => !filtro || (h.n + ' ' + h.d).toLowerCase().includes(filtro));
   return `<div class="fx-topo-aba"><input class="fx-filtro" data-filtro="${campoD}" placeholder="Filtrar ${nomeCat}" value="${esc(F.filtros[campoD] || '')}">
     ${ed ? `<button class="fx-btn-roxo" data-acao="catalogo" data-v="${campoD}">Adicionar</button><button data-acao="novo" data-v="${campoD}">Nova habilidade</button>` : ''}</div>
-    <div class="fx-itens">${itens.map(h => `<details data-id="${h.id}"><summary><b>${esc(h.n || 'Sem nome')}</b>${h.g ? `<small>${esc(h.g)}</small>` : ''}${h.el ? `<i class="fx-el" style="--el:${corEl(h.el)}">${esc(h.el)}</i>` : ''}</summary>
-      <div class="fx-det">${ed ? `<label>Nome ${campo(`${campoD}.${h.id}.n`)}</label>${area(`${campoD}.${h.id}.d`, 5)}<div class="fx-det-acoes"><button class="fx-btn-perigo" data-acao="remover" data-v="${campoD}" data-id="${h.id}">Remover</button></div>`
-        : `<p class="fx-texto">${esc(h.d)}</p>`}</div></details>`).join('') || `<p class="fx-vazio-p">${filtro ? 'Nada encontrado.' : 'Você ainda não possui habilidades.'}</p>`}</div>`;
+    <div class="fx-itens">${itens.map(h => { const u = campoD === 'hab' ? usoDe(h) : null; return `<details data-id="${h.id}"><summary><b>${esc(h.n || 'Sem nome')}</b>${h.g ? `<small>${esc(h.g)}</small>` : ''}${h.el ? `<i class="fx-el" style="--el:${corEl(h.el)}">${esc(h.el)}</i>` : ''}${u && ed ? `<button class="fx-mini fx-usar" data-acao="usar-hab" data-id="${h.id}" title="Gasta ${u.pe} ${d.regra === 'determinacao' ? 'PD' : 'PE'} e guarda ${esc(u.b)} para o próximo ${esc(textoEm(u.em))}">⚡ usar</button>` : ''}</summary>
+      <div class="fx-det">${ed ? `<label>Nome ${campo(`${campoD}.${h.id}.n`)}</label>${area(`${campoD}.${h.id}.d`, 5)}${campoD === 'hab' ? htmlUsoHab(h) : ''}<div class="fx-det-acoes"><button class="fx-btn-perigo" data-acao="remover" data-v="${campoD}" data-id="${h.id}">Remover</button></div>`
+        : `<p class="fx-texto">${esc(h.d)}</p>`}</div></details>`; }).join('') || `<p class="fx-vazio-p">${filtro ? 'Nada encontrado.' : 'Você ainda não possui habilidades.'}</p>`}</div>`;
+}
+// editor do botão de uso (as que o site já conhece vêm preenchidas)
+function htmlUsoHab(h) {
+  const u = usoDe(h) || {}, base = `hab.${h.id}.uso`;
+  return `<div class="fx-uso"><span>⚡ Botão de uso</span>
+    <label>Custo ${F.atual.d.regra === 'determinacao' ? 'PD' : 'PE'} <input data-c="${base}.pe" type="number" data-n="1" min="0" value="${u.pe === undefined ? '' : u.pe}" placeholder="—"></label>
+    <label>Bônus <input data-c="${base}.b" value="${esc(u.b || '')}" placeholder="+5 ou 1d6"></label>
+    <label>Vale para <select data-c="${base}.em">${EM_USO.map(([k, n]) => `<option value="${k}" ${(u.em || 'qualquer') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+    <small>Gasta o custo e soma o bônus no próximo teste que combinar. Deixe o bônus vazio para não ter botão.</small></div>`;
 }
 
 // formas avançadas descritas no texto do ritual: "Discente (+3 PE)" e "Verdadeiro (+7 PE)"
@@ -921,6 +1024,13 @@ function abaInventario(d, ed) {
     <div class="fx-itens">${its.map(it => itemHTML(it, ed)).join('') || `<p class="fx-vazio-p">${filtro ? 'Nada encontrado.' : 'Inventário vazio.'}</p>`}</div>
     <p class="fx-legenda">Carga: 5 espaços por ponto de Força (Força 0: 2). Patente vem dos pontos de prestígio, a menos que você escolha uma. Cada modificação ou maldição sobe a categoria do item em I.</p>`;
 }
+function htmlUsoItem(it) {
+  const u = usoItem(it) || {}, base = `itens.${it.id}.uso`;
+  return `<div class="fx-uso"><span>💊 Ao usar</span>
+    <label>Recupera <select data-c="${base}.rec"><option value="">nada (sem botão)</option>${[['pv', 'PV'], ['pe', 'PE'], ['san', 'SAN'], ['pd', 'PD']].map(([k, n]) => `<option value="${k}" ${u.rec === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+    <label>Quanto <input data-c="${base}.x" value="${esc(u.x || '')}" placeholder="2d8+2"></label>
+    <label class="fx-check"><input type="checkbox" data-c="${base}.gasta" ${u.gasta ? 'checked' : ''}> gasta 1 unidade</label></div>`;
+}
 function itemHTML(it, ed) {
   const base = `itens.${it.id}`;
   const ce = catEfetiva(it);
@@ -954,8 +1064,9 @@ function itemHTML(it, ed) {
         <p class="fx-legenda fx-l2">${esc(textoMun(it))}. Atacar com a arma ligada a esta munição marca o pacote; a "Nova cena" do Mestre desconta.${it.usou || (restamMun(it) !== null && restamMun(it) < int(durMun(it))) ? ` <button class="fx-mini" data-acao="mun-novo" data-id="${it.id}">Abrir pacote novo</button>` : ''}</p>` : ''}
     </div>
     ${area(base + '.d', 4, 'Descrição')}
+    ${it.t === 'geral' || it.t === 'amaldicoado' || usoItem(it) ? htmlUsoItem(it) : ''}
     ${it.t === 'arma' || it.t === 'protecao' || it.t === 'municao' ? `<div class="fx-mods"><span>Melhorias${mods.length ? ` (+${mods.length} categoria)` : ''}</span>${mods.map(m => `<span class="fx-chip${m.mal ? ' mal' : ''}" title="${esc(m.d || '')}">${esc(m.n)}${m.el ? ` · ${esc(m.el)}` : ''}<button data-acao="rem-mod" data-id="${it.id}" data-m="${m.id}" aria-label="Remover">×</button></span>`).join('')}<button class="fx-btn-roxo fx-mini" data-acao="add-mod" data-id="${it.id}">Adicionar</button></div>` : ''}
-    <div class="fx-det-acoes"><button class="fx-btn-perigo" data-acao="remover" data-v="itens" data-id="${it.id}">Remover</button></div>
+    <div class="fx-det-acoes">${usoItem(it) ? `<button class="fx-btn-roxo" data-acao="usar-item" data-id="${it.id}" data-alvo="eu">💊 Usar em mim</button><button data-acao="usar-item" data-id="${it.id}" data-alvo="outro">Usar em outra pessoa</button>` : ''}<button class="fx-btn-perigo" data-acao="remover" data-v="itens" data-id="${it.id}">Remover</button></div>
     <datalist id="fxProf"><option value="Armas Simples"><option value="Armas Táticas"><option value="Armas Pesadas"></datalist>
     <datalist id="fxTipoArma"><option value="Corpo a Corpo"><option value="Arma de Disparo"><option value="Arma de Fogo"><option value="Arremesso"></datalist>
     <datalist id="fxEmp"><option value="Leve"><option value="Uma Mão"><option value="Duas Mãos"></datalist>
@@ -1159,6 +1270,14 @@ function rolarPericia(id, extra = 0, titulo, tipo = '') {
   const p = PER[id];
   const t = testarPericia(d, id, extra, tipo);
   const nome = titulo || p[1];
+  // bônus guardado por uma habilidade (⚡ usar): entra no primeiro teste que combinar
+  const bp = d.bonusProx;
+  if (bp && F.atual && F.atual.editavel && casaUso(bp.em, d, id, t.attr, tipo)) {
+    const v = /^[+-]?\s*\d+$/.test(String(bp.b).trim()) ? int(String(bp.b).replace(/\s/g, '')) : rolarExpr(bp.b).total;
+    t.total += v; t.bp = { n: bp.n, v };
+    gravar('bonusProx', null, true);
+  }
+  if (minhaFicha() && (t.esc === 20 || t.esc === 1)) somarReg(t.esc === 20 ? 'n20' : 'n1');
   F.ultimaRol = { nome, t, d6: 0 };
   mostrarRolagem(`${d.nome} · ${nome}`, htmlRolagem(F.ultimaRol, d));
   if (minhaFicha()) A.rolagemDaFicha(`${nome}: ${t.total} (${t.dados.length}d20: ${t.dados.join(', ')}${t.desv ? ', menor' : ''}; ${t.bonus >= 0 ? '+' : '−'}${Math.abs(t.bonus)}${t.pen.length ? '; ' + textoPen(t) : ''})`, id === 'iniciativa' ? t.total : undefined, t.dados, t.bonus);
@@ -1171,8 +1290,9 @@ function htmlRolagem(u, d) {
   const fis = ['agi', 'for', 'vig'].includes(t.attr), men = ['int', 'pre'].includes(t.attr);
   const podeEx = F.atual && F.atual.editavel && fis && int(bi.ex) > 0 && !u.usou, podeLe = F.atual && F.atual.editavel && men && int(bi.le) > 0 && !u.usou;
   return `${htmlDados(t)}
-    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)}${t.treino ? ` + <b>${t.treino}</b> (1d6 ${d.treino && d.treino[t.per] === 'le' ? 'leitura' : 'treino'})` : ''}${u.d6 ? ` + <b>${u.d6}</b> (1d6)` : ''}${u.r5 ? ' + <b>5</b> (prato rápido)' : ''} = <span class="fx-total">${t.total + u.d6 + (u.r5 || 0)}</span></p>
+    <p>${t.desv ? 'Menor' : 'Maior'} dado <b>${t.esc}</b> ${t.bonus >= 0 ? '+' : '−'} ${Math.abs(t.bonus)}${t.treino ? ` + <b>${t.treino}</b> (1d6 ${d.treino && d.treino[t.per] === 'le' ? 'leitura' : 'treino'})` : ''}${t.bp ? ` + <b>${t.bp.v}</b> (${esc(t.bp.n)})` : ''}${u.d6 ? ` + <b>${u.d6}</b> (1d6)` : ''}${u.r5 ? ' + <b>5</b> (prato rápido)' : ''} = <span class="fx-total">${t.total + u.d6 + (u.r5 || 0)}</span></p>
     ${t.pen && t.pen.length ? `<p class="fx-legenda">Condições: ${esc(textoPen(t))}</p>` : ''}
+    ${u.dano ? `<div class="fx-rol-dano${u.dano.crit ? ' crit' : ''}"><b>${u.dano.crit ? '💥 CRÍTICO' : 'Dano'}</b> <span class="fx-det-dano">${esc(u.dano.det)}</span> = <span class="fx-total">${u.dano.total}</span></div>` : ''}
     ${F.atual && F.atual.editavel && d.rapido && !u.r5 ? '<p><button class="fx-mini" data-acao="usar-rapido">+5 do prato rápido</button></p>' : ''}
     ${podeEx || podeLe ? `<p><button class="fx-mini" data-acao="usar-d6" data-v="${podeEx ? 'ex' : 'le'}">+1d6 de ${podeEx ? 'exercício' : 'leitura'} (${int(podeEx ? bi.ex : bi.le)} restante${int(podeEx ? bi.ex : bi.le) > 1 ? 's' : ''})</button></p>` : ''}`;
 }
@@ -1354,7 +1474,16 @@ function aoClicar(e) {
       if (!m || m.falta || qtdDe(m) <= 0) { if (!confirm(`Sem ${it.a.mun} no inventário. Atacar mesmo assim?`)) return; }
       else { gastarMun(m); setTimeout(() => { if (F.aba === 'combate') desenharAba(); }, 0); }
     }
-    rolarPericia(b.dataset.per, it ? int((it.a || {}).bAtk) : 0, `Ataque${it ? ' · ' + it.n : ' desarmado'}`, b.dataset.per === 'luta' ? 'cac' : 'ataque');
+    const tA = rolarPericia(b.dataset.per, it ? int((it.a || {}).bAtk) : 0, `Ataque${it ? ' · ' + it.n : ' desarmado'}`, b.dataset.per === 'luta' ? 'cac' : 'ataque');
+    // ataque em um clique: o dano sai junto; crítico se o d20 escolhido chegar na margem
+    if (tA && b.dataset.expr) {
+      const crit = tA.esc >= (int(b.dataset.margem) || 20);
+      const rd = rolarExpr(b.dataset.expr, crit ? int(b.dataset.mult) || 2 : 1);
+      F.ultimaRol.dano = { crit, total: rd.total, det: rd.det };
+      mostrarRolagem(`${at.d.nome} · ${F.ultimaRol.nome}`, htmlRolagem(F.ultimaRol, at.d));
+      if (minhaFicha()) A.rolagemDaFicha(`${crit ? '💥 Crítico' : 'Dano'} (${b.dataset.n || 'ataque'}): ${rd.total} · ${rd.det}`);
+    }
+    if (ed) marcarTurno('p');
     return;
   }
   if (ac === 'dano') { rolarDano(b.dataset.expr, int(b.dataset.mult) || 1, b.dataset.n); return; }
@@ -1378,6 +1507,37 @@ function aoClicar(e) {
     return;
   }
   if (ac === 'zerar-gasto') { gravar('peGasto', null, true); atualizarGasto(); return; }
+  if (ac === 'turno') { if (v === 'zera') marcarTurno('zera'); else marcarTurno(v, !turnoAtual(at.d)[v]); return; }
+  if (ac === 'tirar-bp') { if (confirm('Descartar o bônus guardado? O que foi gasto não volta.')) gravar('bonusProx', null, true); return; }
+  if (ac === 'usar-hab') {
+    e.preventDefault();
+    const d = at.d, h = (d.hab || {})[b.dataset.id], u = usoDe(h); if (!u) return;
+    const det = d.regra === 'determinacao', k = det ? 'pd' : 'pe', K = k.toUpperCase(), r = calc(d), cur = atualDe(d, k, r[k + 'Max']);
+    if (cur < u.pe) { A.aviso(`Você tem ${cur} ${K}; ${h.n} custa ${u.pe}.`); return; }
+    const jaGasto = gastoTurno(d);
+    if (u.pe && jaGasto + u.pe > r.peTurno && !confirm(`Limite de ${K} por turno: você já gastou ${jaGasto} de ${r.peTurno} e ${h.n} custa ${u.pe}. Usar mesmo assim?`)) return;
+    if (d.bonusProx && !confirm(`Você já tem ${d.bonusProx.b} guardado (${d.bonusProx.n}). Trocar por ${h.n}?`)) return;
+    if (u.pe) { gravar(k + '.a', cur - u.pe, true); registrarGasto(d, u.pe); }
+    gravar('bonusProx', { n: String(h.n || '').slice(0, 60), b: u.b, em: u.em }, true);
+    A.aviso(`⚡ ${h.n}: −${u.pe} ${K}. ${u.b} guardado para o próximo ${textoEm(u.em)}.`);
+    if (minhaFicha()) A.rolagemDaFicha(`⚡ usou ${h.n} (−${u.pe} ${K})`);
+    atualizarDerivados(); desenharAba();
+    return;
+  }
+  if (ac === 'usar-item') {
+    const d = at.d, it = (d.itens || {})[b.dataset.id], u = usoItem(it); if (!u) return;
+    const qtd = it.qtd === undefined || it.qtd === '' ? 1 : int(it.qtd);
+    if (qtd <= 0) { A.aviso(`Acabou: ${it.n}.`); return; }
+    const rr = rolarExpr(u.x), r = calc(d), k = u.rec, mx = r[k + 'Max'];
+    const emMim = b.dataset.alvo !== 'outro';
+    if (emMim && mx !== undefined) gravar(k + '.a', Math.min(mx, atualDe(d, k, mx) + rr.total), true);
+    const iid = b.dataset.id;
+    if (u.gasta) { if (qtd - 1 <= 0) gravar('itens.' + iid, null, true); else gravar(`itens.${iid}.qtd`, qtd - 1, true); }
+    mostrarRolagem(`${d.nome} · ${it.n}`, `<p class="fx-det-dano">${esc(rr.det)}</p><p>${emMim ? 'Você recupera' : 'A outra pessoa recupera'} <span class="fx-total">${rr.total}</span> ${esc(k.toUpperCase())}${emMim ? '' : ' (ela soma na própria ficha)'}.</p>${u.gasta ? `<p class="fx-legenda">${qtd - 1 > 0 ? `Restam ${qtd - 1}.` : 'Era o último.'}</p>` : ''}`);
+    if (minhaFicha()) A.rolagemDaFicha(`💊 ${d.nome} usou ${it.n}${emMim ? '' : ' em outra pessoa'}: +${rr.total} ${k.toUpperCase()}`);
+    atualizarDerivados(); desenharAba();
+    return;
+  }
   if (ac === 'mun-novo') {
     const m = (at.d.itens || {})[b.dataset.id]; if (!m) return;
     gravar(`itens.${b.dataset.id}.restam`, null, true); gravar(`itens.${b.dataset.id}.usou`, null, true); desenharAba();
@@ -1448,6 +1608,12 @@ function aoClicar(e) {
     if (cur < custo && !confirm(`Você tem ${cur} ${K} e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
     const jaGasto = gastoTurno(d), limT = calc(d).peTurno;
     if (jaGasto + custo > limT && !confirm(`Limite de ${K} por turno: você já gastou ${jaGasto} de ${limT} neste turno e o ritual custa ${custo}. Conjurar mesmo assim?`)) return;
+    // componentes ritualísticos do elemento (Medo e Varia não usam)
+    const elN = String(h.el || '').toLowerCase().trim();
+    if (elN && !/medo|varia/.test(elN)) {
+      const temComp = lista(d.itens).some(it => (String(it.el || '').toLowerCase() === elN || (/componente/i.test(it.n || '') && String(it.n).toLowerCase().includes(elN))) && (it.qtd === undefined || it.qtd === '' || int(it.qtd) > 0));
+      if (!temComp && !confirm(`Você não tem Componentes Ritualísticos de ${h.el} no inventário, e a regra pede. Conjurar mesmo assim?`)) return;
+    }
     // O Custo do Paranormal (OPRPG p. 121): Ocultismo DT 20 + custo; Medo sempre cobra Sanidade
     const medo = /medo/i.test(h.el || '');
     let perda = 0, perm = 0, teste = null;
@@ -1470,6 +1636,7 @@ function aoClicar(e) {
       } else resumo = 'mente intacta';
     }
     registrarGasto(d, custo);
+    somarReg('rit'); marcarTurno('p');
     atualizarDerivados();
     const nomeF = forma.k === 'n' ? '' : ` (${forma.n.toLowerCase()})`;
     const desc = `conjurou ${h.n}${nomeF} · ${h.el || ''} ${int(h.c) || 1}º círculo · −${custo} ${K}${alq ? ' (alquebrado +1)' : ''} · ${teste ? `Ocultismo ${teste.total} vs DT ${dt}: ${teste.total >= dt ? 'passou' : 'falhou'}, ` : 'Medo: '}${resumo}`;
