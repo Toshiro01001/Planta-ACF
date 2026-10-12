@@ -74,6 +74,10 @@ As funções nunca ficam no código (o repositório é público). O Mestre preen
 - As salas mostram só o CN; tocar numa sala abre um cartão com o nome completo e quem está ali.
 - A lista de cobaias, o ruído e a perseguição ficam numa gaveta que sobe da aba no rodapé.
 - Com mais de 3 fichas na mesma sala, elas se arrumam em fileiras no rodapé da sala (só na tela).
+- O cartão da sala (ou da ficha) ocupa no máximo a metade de baixo do mapa, acima do botão Dados. O × fica preso no canto e acompanha a rolagem do cartão; tocar num ponto vazio do mapa também fecha. As anotações da sala usam um campo mais baixo.
+- A gaveta fechada some de verdade: o "Próximo" do teclado não pula para campos escondidos nela.
+- Pinça fora do mapa (no cartão, na gaveta, no topo) não amplia a página inteira. O topo, a faixa dos andares e o mapa nunca rolam: se o navegador empurrar a página ao abrir ou fechar o teclado, tudo volta para o lugar.
+- No celular, o símbolo do Eco não usa mistura de cor sobre o mapa (no Chrome do Android isso deixava partes da tela em branco até trocar de aplicativo).
 
 Diário, anotações, funções, Balança e a lista do apagão ficam em `segredos`, que só a conta do Mestre lê. As regras do Firebase não mudaram.
 
