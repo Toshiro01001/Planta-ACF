@@ -1,0 +1,182 @@
+{
+ "tipo": "planta-acf-conquistas",
+ "versao": 1,
+ "conquistas": [
+  {
+   "id": "bencao-do-dado",
+   "ic": "🎯",
+   "n": "Bênção do Dado",
+   "d": "Tirou o primeiro 20 natural.",
+   "regra": {
+    "t": "m20",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "tres-vezes-abencoado",
+   "ic": "🌟",
+   "n": "Três Vezes Abençoado",
+   "d": "Três 20 naturais numa mesma sessão.",
+   "regra": {
+    "t": "m20",
+    "min": 3,
+    "esc": "sessao"
+   }
+  },
+  {
+   "id": "azar-de-cobaia",
+   "ic": "💀",
+   "n": "Azar de Cobaia",
+   "d": "Tirou o primeiro 1 natural.",
+   "regra": {
+    "t": "m1",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "perseguido-pelo-azar",
+   "ic": "⚰",
+   "n": "Perseguido pelo Azar",
+   "d": "Três 1 naturais numa mesma sessão.",
+   "regra": {
+    "t": "m1",
+    "min": 3,
+    "esc": "sessao"
+   }
+  },
+  {
+   "id": "ritualista",
+   "ic": "✦",
+   "n": "Ritualista",
+   "d": "Conjurou três rituais numa mesma sessão.",
+   "regra": {
+    "t": "rit",
+    "min": 3,
+    "esc": "sessao"
+   }
+  },
+  {
+   "id": "biblioteca-viva",
+   "ic": "📖",
+   "n": "Biblioteca Viva",
+   "d": "Vinte rituais conjurados na campanha.",
+   "regra": {
+    "t": "rit",
+    "min": 20,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "saco-de-pancadas",
+   "ic": "🩸",
+   "n": "Saco de Pancadas",
+   "d": "Sofreu 30 de dano numa mesma sessão.",
+   "regra": {
+    "t": "dano",
+    "min": 30,
+    "esc": "sessao"
+   }
+  },
+  {
+   "id": "inquebravel",
+   "ic": "🧱",
+   "n": "Inquebrável",
+   "d": "Sofreu 100 de dano na campanha e continua aqui.",
+   "regra": {
+    "t": "dano",
+    "min": 100,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "mente-em-frangalhos",
+   "ic": "🧠",
+   "n": "Mente em Frangalhos",
+   "d": "Perdeu 10 de Sanidade numa mesma sessão.",
+   "regra": {
+    "t": "san",
+    "min": 10,
+    "esc": "sessao"
+   }
+  },
+  {
+   "id": "de-volta-do-abismo",
+   "ic": "⛑",
+   "n": "De Volta do Abismo",
+   "d": "Caiu a 0 PV e voltou com cura.",
+   "regra": {
+    "t": "voltou",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "sobrevivente",
+   "ic": "🚪",
+   "n": "Sobrevivente",
+   "d": "Superou uma Sala de Exposição.",
+   "regra": {
+    "t": "salas",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "veterano-das-salas",
+   "ic": "🏛",
+   "n": "Veterano das Salas",
+   "d": "Superou cinco Salas de Exposição.",
+   "regra": {
+    "t": "salas",
+    "min": 5,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "cobaia-da-sessao",
+   "ic": "🏆",
+   "n": "Cobaia da Sessão",
+   "d": "Foi votada a Cobaia da Sessão.",
+   "regra": {
+    "t": "mvp",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "favorita-da-mesa",
+   "ic": "👑",
+   "n": "Favorita da Mesa",
+   "d": "Foi a Cobaia da Sessão três vezes.",
+   "regra": {
+    "t": "mvp",
+    "min": 3,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "desejo-atendido",
+   "ic": "🕯",
+   "n": "Desejo Atendido",
+   "d": "Fez um desejo na Parede.",
+   "regra": {
+    "t": "des",
+    "min": 1,
+    "esc": "campanha"
+   }
+  },
+  {
+   "id": "momento-marcante",
+   "ic": "✋",
+   "n": "Momento Marcante",
+   "d": "Você dá quando quiser premiar uma cena.",
+   "regra": {
+    "t": "manual",
+    "min": 1,
+    "esc": "campanha"
+   }
+  }
+ ]
+}

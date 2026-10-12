@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012y';
+const VERSAO_SITE = '20261012z';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -1253,7 +1253,34 @@ const ehBz = m => !!m && typeof m.t === 'string' && m.t.startsWith(BZ_MARCA);
 const idMsg = m => `${String(m.a || '').replace(/[.#$\[\]/]/g, '')}_${m.ts}`;
 const BZ = { todos: {}, off: null, meus: (() => { try { return JSON.parse(localStorage.getItem('acf-bz-trad') || '{}'); } catch (e) { return {}; } })() };
 function bzTraduzido(m) { return mestre || !!aux || !!BZ.todos[idMsg(m)] || !!BZ.meus[idMsg(m)]; }
-function bipsSonoros(txt) { String(txt).split(' ').slice(0, 14).forEach((w, i) => Som.tom(/^b/i.test(w) ? 1320 : 760, i * 0.09, 0.06, 'square', 0.05, /^b/i.test(w) ? 1760 : 520)); }
+// voz da C2P0: "bip" sobe curto, "zip" desce arrastado; Sim, Não e Não sei têm melodia própria
+const BZ_MEL = {
+  sim: [[880, 0, .09, 1175], [1175, .11, .09, 1568], [1568, .22, .16, 2093]],                 // sobe alegre
+  nao: [[740, 0, .2, 370, 'sawtooth'], [520, .26, .3, 196, 'sawtooth']],                       // desce duas vezes
+  'nao sei': [[660, 0, .12, 990], [990, .14, .12, 660], [660, .28, .12, 990], [880, .44, .28, 1320, 'triangle']],  // treme e sobe (pergunta)
+};
+function vozBz(orig) {
+  const partes = semAc(orig).match(/[a-z0-9]+/g) || [];
+  const notas = []; let t = 0;
+  const bip = () => { notas.push([1320, t, .055, 1760, 'square']); t += .085; };
+  const zip = () => { notas.push([900, t, .08, 320, 'sawtooth']); t += .1; };
+  for (let i = 0; i < partes.length && t < 4.5; i++) {
+    let p = partes[i];
+    if (p === 'nao' && partes[i + 1] === 'sei') { p = 'nao sei'; i++; }
+    if (BZ_MEL[p]) { BZ_MEL[p].forEach(([f, d, du, ff, tp]) => notas.push([f, t + d, du, ff, tp || 'square'])); t += Math.max(...BZ_MEL[p].map(n => n[1] + n[2])) + .12; continue; }
+    (bipZip(p).toLowerCase().split(' ')).forEach(w => (w.startsWith('b') ? bip() : zip()));
+    t += .08;
+  }
+  notas.forEach(([f, d, du, ff, tp]) => Som.tom(f, d, du, tp, tp === 'sawtooth' ? 0.035 : 0.05, ff));
+}
+function bipsSonoros(txt, orig) { if (orig !== undefined) { vozBz(orig); return; } String(txt).split(' ').slice(0, 14).forEach((w, i) => Som.tom(/^b/i.test(w) ? 1320 : 760, i * 0.09, 0.06, 'square', 0.05, /^b/i.test(w) ? 1760 : 520)); }
+// mensagem nova da C2P0 no chat: todos ouvem a voz dela
+const BZ_OUVIDAS = { primeira: true, ids: new Set() };
+function ouvirBzNovas(msgs) {
+  const lista = Object.values(msgs || {}).filter(ehBz);
+  if (BZ_OUVIDAS.primeira) { BZ_OUVIDAS.primeira = false; lista.forEach(m => BZ_OUVIDAS.ids.add(idMsg(m))); return; }
+  lista.forEach(m => { const id = idMsg(m); if (BZ_OUVIDAS.ids.has(id)) return; BZ_OUVIDAS.ids.add(id); if (Date.now() - (+m.ts || 0) < 30000) vozBz(desembaralhar(m.t)); });
+}
 function abrirTraducao(m) {
   const id = idMsg(m), orig = desembaralhar(m.t);
   let o = $('#bzModal');
@@ -1265,7 +1292,7 @@ function abrirTraducao(m) {
     ${!at ? '<p class="bz-aviso">Você não tem ficha ativa.</p>' : !temRit ? '<p class="bz-aviso">Sua ficha ativa não conhece esse ritual.</p>' : ''}
     <div class="bz-botoes">${at && temRit ? '<button data-bz="eu" class="pri">✦ Conjurar e traduzir só para mim</button><button data-bz="todos">✦ Conjurar e traduzir para todos</button>' : ''}<button data-bz="fechar">Fechar</button></div></div>`;
   o.hidden = false;
-  bipsSonoros(bipZip(orig));
+  bipsSonoros(bipZip(orig), orig);
   $$('[data-bz="eu"], [data-bz="todos"]', o).forEach(b => b.onclick = async () => {
     b.disabled = true;
     const r = await FX.conjurarAtiva('Compreensão Paranormal');
@@ -2929,6 +2956,9 @@ $('#arqBackup').addEventListener('change', async e => {
   Store.gravarTudo();
   if (pacote.privado) ['salas', 'saidas', 'andares'].forEach(k => Priv.gravar([k], pacote.privado[k] || null));
   { const nx = pacote.nexCalc || (pacote.segredos || {})._nex; if (nx) Rede.set('nexCalc', nx).catch(erroGravacao); }
+  // backup feito antes de "Restaurar o site": devolve também chat, relatório e o resto que foi apagado
+  if (pacote.extras && typeof pacote.extras === 'object') Object.entries(pacote.extras).forEach(([cam, v]) => Rede.set(cam, v).catch(erroGravacao));
+  if (pacote.privTokens && typeof pacote.privTokens === 'object') Object.entries(pacote.privTokens).forEach(([id, v]) => Rede.set('privado/tokens/' + id, v).catch(erroGravacao));
   const seg = { ...(pacote.segredos || {}) };
   delete seg._diario;
   if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
@@ -2939,6 +2969,130 @@ $('#arqBackup').addEventListener('change', async e => {
   atualizarTudo();
   aviso('Backup restaurado.');
 });
+
+/* =========================================================
+   RESTAURAR O SITE (apaga o que foi feito nos testes)
+   Antes de apagar, baixa um backup completo. Depois grava mapa/restauracao:
+   cada aparelho, ao ver um carimbo novo, limpa o que guardou localmente.
+   ========================================================= */
+// campos do mapa que são configuração (ficam); o resto é jogo e volta ao zero
+const MAPA_FICA = ['cfg', 'nomes', 'cego', 'loja', 'melhorias', 'regrasPub', 'senhasAndar', 'docs', 'cifras', 'hud', 'momentos', 'trancaAndar', 'trilha'];
+const REST_CATS = [
+  { id: 'mapa', n: 'Mapa e jogo', d: 'Fichas na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança.', on: true },
+  { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões e entregas pendentes.', on: true,
+    nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas'] },
+  { id: 'registros', n: 'Registros', d: 'Relatório da missão, diário, noite secreta, marcas da noite, testes pedidos, Balança, total secreto das salas, histórico de NEX (o NEX inicial fica) e desejos da Parede.', on: true,
+    nos: ['relatorio', 'desejos', 'nexCalc/ev'], seg: ['_diario', '_noite', '_marcas', '_testes', '_balanca', '_expoRun', '_nex'] },
+  { id: 'hall', n: 'Hall da Caixa e conquistas obtidas', d: 'Episódios, estatísticas, salas superadas e as conquistas que cada cobaia ganhou. A lista de conquistas criadas fica.', on: false, nos: ['hall'], seg: ['_conq/dadas'] },
+  { id: 'regras', n: 'Regras restritas', d: 'Texto das regras e as cópias de cada jogador.', on: false, nos: ['regrasAux', 'regrasJog'], seg: ['_regras', '_regrasHs'] },
+  { id: 'arquivo', n: 'Arquivo da O.R.F.E.U.', d: 'Documentos, arquivos, cifras, sigilos e cofres.', on: false, nos: ['arquivos', 'arquivosPriv', 'cofre'], seg: ['_docs', '_arquivos', '_cifras', '_sigilos'], mapa: ['docs', 'cifras'] },
+  { id: 'expo', n: 'Salas de Exposição', d: 'Biblioteca, variações e as salas colocadas na planta.', on: false, seg: ['_expo', '_expoMapa', '_expoVar'] },
+  { id: 'conq', n: 'Conquistas criadas', d: 'A lista de conquistas que você importou ou criou.', on: false, seg: ['_conq'] },
+  { id: 'sons', n: 'Sons próprios', d: 'Áudios e links enviados no Ambiente.', on: false, nos: ['sons', 'sonsIdx'] },
+  { id: 'loja', n: 'Loja do Maurício', d: 'Vendas criadas, melhorias, itens ocultos e imagens.', on: false, nos: ['lojaImg'], seg: ['_lojaOculta', '_melhOculta'], mapa: ['loja', 'melhorias'] },
+  { id: 'quadros', n: 'Quadros', d: 'Quadros da equipe e tudo o que foi desenhado neles.', on: false, nos: ['quadrosMeta', 'quadrosItens'] },
+  { id: 'prep', n: 'Gatilhos, cenas e anotações', d: 'Gatilhos das salas, cenas prontas, anotações das salas e salas sem sinal.', on: false, seg: ['_gatilhos', '_cenas', '_notas', '_semSinal'] },
+  { id: 'senhas', n: 'Senhas', d: 'A pasta Senhas e as senhas dos andares trocadas pelo site.', on: false, nos: ['senhas'], mapa: ['senhasAndar'] },
+  { id: 'funcoes', n: 'Funções e nomes secretos das salas', d: 'As funções das cobaias, quem vê no apagão e os nomes secretos das salas.', on: false, seg: ['_apagao', '_apagaoVe', '*funcoes'], priv: ['salas', 'saidas', 'andares'] },
+];
+// o que cada aparelho apaga ao ver o carimbo (o Caderno e as fichas ficam)
+const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-'];
+function verRestauracao() {
+  const r = Store.state.restauracao;
+  if (!r || !r.ts) return;
+  let visto = 0; try { visto = +localStorage.getItem('acf-rest-visto') || 0; } catch (e) {}
+  if (visto >= r.ts) return;
+  try { localStorage.setItem('acf-rest-visto', String(r.ts)); } catch (e) { return; }
+  const pref = LIMPAR_LOCAL.concat(r.andares ? ['acf-andares'] : []);
+  let n = 0;
+  try { Object.keys(localStorage).forEach(k => { if (pref.some(p => k.startsWith(p))) { localStorage.removeItem(k); n++; } }); } catch (e) {}
+  try { sessionStorage.removeItem('acf-tela-vista'); } catch (e) {}
+  if (n) setTimeout(() => location.reload(), 300);
+}
+Store.aoMudar(verRestauracao);
+async function lerNo(cam) { return Rede.once(cam).catch(() => undefined); }
+async function abrirRestaurar() {
+  if (!mestre) return;
+  let o = $('#restModal');
+  if (!o) { o = el('div', 'rr-modal rest-modal'); o.id = 'restModal'; document.body.appendChild(o); }
+  // fichas no servidor: só para conferir (o Mestre não altera fichas)
+  const ag = await lerNo('agentes') || {};
+  const fichas = Object.entries(ag).map(([q, l]) => [q, Object.values(l || {}).filter(Boolean)]).filter(([, l]) => l.length);
+  o.innerHTML = `<div class="rr-modal-caixa"><h3>🧹 Restaurar o site</h3>
+    <p class="rr-mini">Apaga o que foi feito nos testes. Antes, o site baixa um backup completo: se se arrepender, use "Restaurar backup…". Marque só o que quer zerar.</p>
+    <div class="rest-cats">${REST_CATS.map(c => `<label class="rest-cat${c.on ? '' : ' prep'}"><input type="checkbox" data-rc="${c.id}" ${c.on ? 'checked' : ''}><span><b>${esc(c.n)}</b><small>${esc(c.d)}</small></span></label>`).join('')}</div>
+    <label class="rest-cat"><input type="checkbox" data-rc="aparelhos" checked><span><b>Aparelhos de todos</b><small>Cada celular e computador, ao abrir o site, apaga as visões recebidas, votos, respostas, telas já vistas, avisos e cofres abertos. O Caderno e as fichas ficam.</small></span></label>
+    <label class="rest-cat"><input type="checkbox" data-rc="andares" checked><span><b>Andares liberados nos aparelhos</b><small>Os jogadores digitam a senha dos andares de novo.</small></span></label>
+    <details><summary>Fichas no servidor (${fichas.reduce((t, [, l]) => t + l.length, 0)}): ficam de fora</summary><p class="rr-mini">O Mestre não altera fichas. Para tirar uma ficha de teste, o próprio jogador a apaga no 📋 Fichas.</p><ul class="rest-fichas">${fichas.map(([q, l]) => `<li><b>${esc((SER[q] || {}).nome || q)}</b>: ${l.map(f => esc(((f.d || f).nome) || 'sem nome')).join(', ')}</li>`).join('') || '<li>Nenhuma.</li>'}</ul></details>
+    <label>Para confirmar, digite RESTAURAR <input id="restConf" autocomplete="off" placeholder="RESTAURAR"></label>
+    <div class="rr-botoes"><button data-rb="cancelar">Cancelar</button><button data-rb="ir" class="pri perigo" disabled>🧹 Baixar backup e restaurar</button></div><p class="rr-mini" id="restStatus"></p></div>`;
+  o.hidden = false;
+  const conf = $('#restConf', o), ir = $('[data-rb="ir"]', o);
+  conf.oninput = () => { ir.disabled = conf.value.trim().toUpperCase() !== 'RESTAURAR'; };
+  o.onclick = async e => {
+    if (e.target === o || e.target.closest('[data-rb="cancelar"]')) { o.hidden = true; return; }
+    if (!e.target.closest('[data-rb="ir"]') || ir.disabled) return;
+    ir.disabled = true;
+    const marc = id => { const c = $(`[data-rc="${id}"]`, o); return !!(c && c.checked); };
+    const cats = REST_CATS.filter(c => marc(c.id));
+    const st = t => { const x = $('#restStatus', o); if (x) x.textContent = t; };
+    try {
+      st('Baixando o backup…');
+      await restaurarSite(cats, { aparelhos: marc('aparelhos'), andares: marc('andares') });
+      st('Pronto. O site vai recarregar.');
+      aviso('Site restaurado. O backup foi baixado.');
+      setTimeout(() => location.reload(), 2500);
+    } catch (err) { console.error(err); st('Erro: ' + (err && err.message || err)); ir.disabled = false; }
+  };
+}
+async function restaurarSite(cats, op) {
+  const nos = [...new Set(cats.flatMap(c => c.nos || []))];
+  // 1. backup completo (o mesmo formato do "Baixar backup", com os nós apagados em "extras")
+  const extras = {};
+  for (const n of nos) {
+    if (n === 'chat') { for (const k of ['geral', 'sussurros', 'respostas', 'filhos', 'limpo']) { const v = await lerNo('chat/' + k); if (v != null) extras['chat/' + k] = v; } continue; }
+    if (n === 'sons') { const idx = await lerNo('sonsIdx') || {}; for (const k of Object.keys(idx)) { const v = await lerNo('sons/' + k); if (v != null) extras['sons/' + k] = v; } continue; }
+    const v = await lerNo(n); if (v != null) extras[n] = v;
+  }
+  const privado = { ...Priv.dados }; delete privado.tokens;
+  const nexCalc = await lerNo('nexCalc');
+  const pacote = { tipo: 'planta-acf-backup', versao: 3, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado, privTokens: Store.privTok || {}, nexCalc, extras };
+  baixar(`backup-antes-de-restaurar-${carimbo()}.json`, JSON.stringify(pacote, null, 1), 'application/json');
+  await new Promise(r => setTimeout(r, 600));
+  // 2. nós do servidor
+  for (const n of nos) {
+    if (n === 'chat') await Rede.set('chat', { limpo: Date.now() }).catch(erroGravacao);
+    else await Rede.set(n, null).catch(erroGravacao);
+  }
+  // 3. segredos
+  const segs = [...new Set(cats.flatMap(c => c.seg || []))];
+  segs.forEach(k => {
+    if (k === '*funcoes') { Object.keys(Segredos.dados).filter(x => !x.startsWith('_')).forEach(x => Segredos.gravar([x], null)); return; }
+    Segredos.gravar(k.split('/'), null);
+  });
+  if (segs.includes('_diario')) Diario.sig = '';
+  cats.forEach(c => (c.priv || []).forEach(k => Priv.gravar([k], null)));
+  // 4. mapa
+  const zerarMapa = cats.some(c => c.id === 'mapa');
+  const tirarMapa = cats.flatMap(c => c.mapa || []);
+  if (zerarMapa) {
+    const fica = {};
+    MAPA_FICA.filter(k => !tirarMapa.includes(k)).forEach(k => { if (Store.state[k] !== undefined) fica[k] = Store.state[k]; });
+    Diario.reiniciar = true; Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
+    Store.state = { ...CAMPOS_VAZIOS(), ...fica, tokens: posicoesIniciais() };
+    const cap = capacidadeEstoque(); if (Object.keys(cap).length) Store.state.estoque = cap;
+    Store.gravarTudo();
+    await new Promise(r => setTimeout(r, 400));
+  } else tirarMapa.forEach(k => Store.definir([k], null));
+  // 5. carimbo para os aparelhos
+  if (op.aparelhos) {
+    const ts = Date.now();
+    Store.definir(['restauracao'], { ts, andares: !!op.andares });
+    verRestauracao();
+  }
+  Diario.registrar('sessao', `Site restaurado · ${cats.map(c => c.n).join(', ') || 'só os aparelhos'}`);
+}
+$('#btnRestaurarSite') && $('#btnRestaurarSite').addEventListener('click', abrirRestaurar);
 
 /* =========================================================
    PAINEL RECOLHÍVEL E CELULAR
@@ -3769,7 +3923,7 @@ const Chat = {
     this.carregarEnviados();
     const agora = Date.now();
     this.canais().forEach(c => { this.visto[c] = agora; });
-    this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; this.atualizar(); }, () => {}));
+    this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; ouvirBzNovas(this.msgs.geral); this.atualizar(); }, () => {}));
     this.offs.push(Rede.on('chatTrad', v => { BZ.todos = v || {}; if (this.aberto) this.desenhar(); }, () => {}));
     if (mestre) {
       this.offs.push(Rede.on('chat/sussurros', v => { this.msgs.sus = v || {}; this.atualizar(); }, () => {}));
@@ -3838,7 +3992,7 @@ const Chat = {
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
         ${ehBz(m) ? `<div class="msg-txt msg-bz" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(bipZip(desembaralhar(m.t)))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
     }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
-    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) bipsSonoros(el.textContent); else abrirTraducao(m); });
+    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) bipsSonoros(el.textContent, desembaralhar(m.t)); else abrirTraducao(m); });
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();

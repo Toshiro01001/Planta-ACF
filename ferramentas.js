@@ -936,9 +936,20 @@ function aplicarEntregas() {
       }, () => { ENT['feito' + h + k] = false; });
       return;
     }
-    // cura e afins: só na ficha ativa
+    // cura, baú e afins: só na ficha ativa
     if (!at || !at.ref || at.ref.chave !== chave) return;
     ENT['feito' + h + k] = true;
+    // baú de achados: o jogador abre e o item entra na ficha ativa
+    if (e.item && typeof e.item === 'object' && window.ACF_JOGO) {
+      const fimB = () => Object.keys(ENT.hs).forEach(hh => A.Rede.set(`entregas/${hh}/${k}`, null).catch(() => {}));
+      window.ACF_JOGO.abrirBau(e, async () => {
+        const it = { ...e.item, o: Date.now() }; delete it.ts;
+        const ok = await FXA.aplicarNaAtiva([['itens.' + A.Rede.chave(), it]]);
+        if (ok) fimB(); else ENT['feito' + h + k] = false;
+        return !!ok;
+      });
+      return;
+    }
     const lista = [];
     if (int(e.pv)) lista.push(['pv.a', Math.min(at.r.pvMax, FXA.atualDe(at.d, 'pv', at.r.pvMax) + int(e.pv))]);
     const fim = () => Object.keys(ENT.hs).forEach(hh => A.Rede.set(`entregas/${hh}/${k}`, null).catch(() => {}));

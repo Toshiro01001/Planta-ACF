@@ -458,12 +458,31 @@ document.addEventListener('click', e => {
   else if (a === 'adj' && x) gravarLog(x, { t: 'adj', s: b.dataset.q, n: 'Ajuste do Mestre', r: int(x.rod), suc: int(b.dataset.v), tot: -1 });
   else if (a === 'dec' && x) gravarLog(x, { t: 'adj', s: b.dataset.q, ref: b.dataset.k, n: int(b.dataset.v) ? 'Mestre: passou' : 'Mestre: falhou', r: int(x.rod), suc: int(b.dataset.v), tot: -1 });
   else if (a === 'horda' && x) { const v = int(($('#exHorda') || {}).value); if (v) A.definir(['expo', 'horda'], Math.max(0, int(x.horda) - v)); }
-  else if (a === 'fim' && x) { if (confirm(`Encerrar ${x.sala.nome}?`)) { A.definir(['expo'], { ...x, on: false, fimTs: Date.now() }); UI.previa = false; } }
+  else if (a === 'fim' && x) encerrarSala(x);
   else if (a === 'exp') exportar();
   else if (a === 'nova') abrirEditor(null);
   else if (a === 'editar') abrirEditor(b.dataset.id);
   else if (a === 'apagar') { const s = lib()[b.dataset.id]; if (s && confirm(`Apagar "${s.nome}" da biblioteca?`)) A.gravarSegredo(['_expo', b.dataset.id], null); setTimeout(() => desenharBloco(), 50); }
 });
+
+// encerrar: o Mestre diz se superaram (vai para o Hall da Caixa e para as conquistas)
+function encerrarSala(x) {
+  let o = $('#expoFim');
+  if (!o) { o = document.createElement('div'); o.id = 'expoFim'; o.className = 'rr-modal'; document.body.appendChild(o); }
+  o.innerHTML = `<div class="rr-modal-caixa" id="expoFimCx"><h3>Encerrar: ${esc(x.sala.nome)}</h3><p class="rr-mini">O resultado entra no Hall da Caixa (salas superadas) e nas conquistas de quem participou.</p>
+    <div class="rr-botoes"><button data-ef2="cancelar">Cancelar</button><button data-ef2="nao">Só fechar</button><button data-ef2="x">✗ Não superaram</button><button data-ef2="ok" class="pri">✓ Superaram</button></div></div>`;
+  o.hidden = false;
+  o.onclick = e => {
+    const b = e.target.closest('[data-ef2]');
+    if (e.target === o || (b && b.dataset.ef2 === 'cancelar')) { o.hidden = true; return; }
+    if (!b) return;
+    o.hidden = true;
+    A.definir(['expo'], { ...x, on: false, fimTs: Date.now() }); UI.previa = false;
+    if (b.dataset.ef2 === 'nao') return;
+    const S = window.ACF_SESSAO;
+    A.Rede.set('hall/salas/' + x.id, { nome: String(x.sala.nome || '').slice(0, 80), el: x.sala.el || '', ok: b.dataset.ef2 === 'ok', part: x.part || {}, sid: S && S.sidAtual ? S.sidAtual() : '', ts: Date.now() }).then(() => document.dispatchEvent(new Event('acf-hall')), () => A.aviso('O servidor recusou o registro no Hall.'));
+  };
+}
 
 /* ---------- importar, exportar, editar ---------- */
 const limparId = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'sala';

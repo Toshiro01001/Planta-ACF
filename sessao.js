@@ -85,6 +85,34 @@ async function tocarMusica(som, ini, botao) {
   if (au.readyState >= 1) comecar(); else au.addEventListener('loadedmetadata', comecar, { once: true });
 }
 
+/* ---------- Estilos de abertura ---------- */
+const ESTILOS = [['eco', 'Sigilo do Eco'], ['vhs', 'Fita VHS'], ['dossie', 'Dossiê da O.R.F.E.U.'], ['terminal', 'Terminal'], ['fosforo', 'Fósforo riscado']];
+const nomeEstilo = e => (ESTILOS.find(x => x[0] === e) ? e : 'eco');
+function linhaSessao(x) { return `${x.num ? `SESSÃO ${esc(x.num)}` : ''}${x.num && x.nome ? ' · ' : ''}${esc(String(x.nome || '').toUpperCase())}`; }
+function capaHtml(x, fim) {
+  const tit = esc(x.tit || 'A Caixa de Fósforos'), k = fim ? '<p class="ab-k">FIM DA SESSÃO</p>' : '';
+  const frase = !fim && x.frase ? `<p class="ab-frase">${esc(x.frase)}</p>` : '';
+  const titulos = `<div class="ab-titulos">${k}<h1 data-t="${tit}">${tit}</h1><i class="ab-linha"></i><p class="ab-sessao">${linhaSessao(x)}</p>${frase}</div>`;
+  const d = new Date(num(x.ts) || Date.now());
+  switch (nomeEstilo(x.estilo)) {
+    case 'vhs': {
+      const data = `${['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][d.getMonth()]}. ${String(d.getDate()).padStart(2, '0')} ${d.getFullYear()}`;
+      return `<div class="vhs-capa"><span class="vhs-play">${fim ? '■ STOP' : '▶ PLAY'}</span><span class="vhs-rec">● REC</span><span class="vhs-data">${data}<br>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span><span class="vhs-sp">SP</span><i class="vhs-track"></i>${htmlSigilo('vhs-sig')}${titulos}</div>`;
+    }
+    case 'dossie':
+      return `<div class="dos-pasta"><p class="dos-topo">O.R.F.E.U. · ARQUIVO</p><span class="dos-carimbo">${fim ? 'ARQUIVADO' : 'CONFIDENCIAL'}</span>${k}<h1>${tit}</h1><p class="dos-linha">${fim ? 'ENCERRAMENTO DA SESSÃO' : 'RELATÓRIO DE SESSÃO'}${x.num ? ` Nº ${esc(x.num)}` : ''}</p>${x.nome ? `<p class="dos-assunto">ASSUNTO: <b>${esc(String(x.nome).toUpperCase())}</b></p>` : ''}${!fim && x.frase ? `<p class="dos-frase"><span>${esc(x.frase)}</span><i class="dos-tarja"></i></p>` : ''}</div>`;
+    case 'terminal': {
+      const n = cobaias().length;
+      const linhas = [`> conectando à planta do complexo........ OK`, `> ${fim ? 'encerrando' : 'carregando'} sessão ${esc(x.num || '')}${x.nome ? ': ' + esc(String(x.nome).toUpperCase()) : ''}`, `> cobaias registradas: ${n}`, `> status: ${fim ? 'EM ESPERA' : 'ATIVO'}`];
+      return `<div class="term-capa"><pre class="term-log">${linhas.map((l, i) => `<span style="--i:${i}">${l}</span>`).join('')}</pre>${titulos}</div>`;
+    }
+    case 'fosforo':
+      return `<div class="fos-capa"><div class="fos-fogo"><i class="fos-palito"></i><i class="fos-chama"></i><i class="fos-brasa"></i><i class="fos-fumaca"></i></div>${titulos}</div>`;
+    default:
+      return `<div class="ab-capa">${htmlSigilo('anima')}${titulos}</div>`;
+  }
+}
+
 /* ---------- Tela cheia: abertura e encerramento ---------- */
 const TELA = { id: null, timers: [] };
 function fecharTela() { TELA.timers.forEach(clearTimeout); TELA.timers = []; TELA.id = null; pararMusica(true); const o = $('#abTela'); if (o) { o.classList.add('saindo'); setTimeout(() => { o.hidden = true; o.classList.remove('saindo'); o.innerHTML = ''; }, 900); } }
@@ -92,9 +120,10 @@ function cena(o, html, cls) { $$('.ab-cena.fora', o).forEach(x => { if (!x._tira
 // quem entra atrasado vê o símbolo já no ponto certo do desenho
 function adiantar(el, seg) { if (!el || !(seg > 0) || !el.getAnimations) return; requestAnimationFrame(() => el.getAnimations({ subtree: true }).forEach(a => { try { a.currentTime = (a.currentTime || 0) + seg * 1000; } catch (e) {} })); }
 function agendar(ms, fn) { TELA.timers.push(setTimeout(fn, Math.max(0, ms))); }
-function telaBase(id) {
+function telaBase(id, estilo) {
   let o = $('#abTela');
-  if (!o) { o = document.createElement('div'); o.id = 'abTela'; o.className = 'ab-tela'; document.body.appendChild(o); }
+  if (!o) { o = document.createElement('div'); o.id = 'abTela'; document.body.appendChild(o); }
+  o.className = 'ab-tela estilo-' + nomeEstilo(estilo);
   TELA.timers.forEach(clearTimeout); TELA.timers = []; TELA.id = id;
   const publico = A.mestre && ['abertura', 'encerramento'].some(k => { const x = est()[k]; return x && x.on && (k === 'abertura' ? 'ab' : 'en') + x.id === id; });
   o.innerHTML = '<button class="ab-som" hidden>▶ Toque para ouvir a música</button><button class="ab-x" aria-label="Fechar" title="Fechar só na sua tela">×</button>' + (publico ? '<button class="ab-parar">■ Parar para todos</button>' : '');
@@ -131,13 +160,12 @@ function planoEncerramento(en) {
   return { dur, cs, dest, cards, porD, tCards, total: 7 + porD * dest.length + tCards + (cs.length ? cs.length * 2.4 + 3.2 : 0) + 5 };
 }
 function mostrarAbertura(ab, desde = 0) {
-  const o = telaBase('ab' + ab.id);
+  const o = telaBase('ab' + ab.id, ab.estilo);
   const { cs, T, por } = planoAbertura(ab);
   tocarMusica(ab.som, num(ab.ini) + desde, $('.ab-som', o));
   // 1. sigilo e título (como na capa)
   agendar(0 - desde * 1000, () => {
-    if (desde < T.sig + T.tit) adiantar(cena(o, `<div class="ab-capa">${htmlSigilo('anima')}
-      <div class="ab-titulos"><h1>${esc(ab.tit || 'A Caixa de Fósforos')}</h1><i class="ab-linha"></i><p class="ab-sessao">${ab.num ? `SESSÃO ${esc(ab.num)}` : ''}${ab.num && ab.nome ? ' · ' : ''}${esc(String(ab.nome || '').toUpperCase())}</p>${ab.frase ? `<p class="ab-frase">${esc(ab.frase)}</p>` : ''}</div></div>`, 'ab-cena-capa'), desde);
+    if (desde < T.sig + T.tit) adiantar(cena(o, capaHtml(ab, false), 'ab-cena-capa'), desde);
   });
   let t = T.sig + T.tit;
   // 2. anteriormente
@@ -150,12 +178,12 @@ function mostrarAbertura(ab, desde = 0) {
 }
 function digitar(el, txt, ms) { if (!el) return; const passo = Math.max(12, ms / Math.max(1, txt.length)); let i = 0; const f = () => { el.textContent = txt.slice(0, ++i); if (i < txt.length) TELA.timers.push(setTimeout(f, passo)); }; f(); }
 function mostrarEncerramento(en, desde = 0) {
-  const o = telaBase('en' + en.id);
+  const o = telaBase('en' + en.id, en.estilo);
   const { cs, dest, cards, porD, tCards } = planoEncerramento(en);
   tocarMusica(en.som, num(en.ini) + desde, $('.ab-som', o));
-  agendar(-desde * 1000, () => adiantar(cena(o, `<div class="ab-capa">${htmlSigilo('anima')}<div class="ab-titulos"><p class="ab-k">FIM DA SESSÃO</p><h1>${esc(en.tit || 'A Caixa de Fósforos')}</h1><i class="ab-linha"></i><p class="ab-sessao">${en.num ? `SESSÃO ${esc(en.num)}` : ''}${en.num && en.nome ? ' · ' : ''}${esc(String(en.nome || '').toUpperCase())}</p></div></div>`, 'ab-cena-capa'), desde));
+  agendar(-desde * 1000, () => adiantar(cena(o, capaHtml(en, true), 'ab-cena-capa'), desde));
   let t = 7;
-  dest.forEach(d => { const td = t; const s = A.SER[d.q] || {}; agendar((td - desde) * 1000, () => { $$('.ab-cena', o).forEach(x => x.classList.add('fora')); cena(o, `<p class="ab-k">DESTAQUES</p><div class="ab-cartao ab-pulso" style="--cor:${s.cor || '#ece64a'}"><div class="ab-foto"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></div><div class="ab-txt"><small>${esc(d.t)}</small><b>${esc(s.nome || d.q)}</b><span>${esc(d.v)}</span></div></div>`, 'ab-cred'); }); t += porD; });
+  dest.forEach(d => { const td = t; const s = A.SER[d.q] || {}; agendar((td - desde) * 1000, () => { $$('.ab-cena', o).forEach(x => x.classList.add('fora')); cena(o, `<p class="ab-k">${d.mvp ? '🏆 COBAIA DA SESSÃO' : 'DESTAQUES'}</p><div class="ab-cartao ab-pulso${d.mvp ? ' ab-mvp' : ''}" style="--cor:${s.cor || '#ece64a'}"><div class="ab-foto"${s.img ? ` style="background-image:url('${s.img}')"` : ''}></div><div class="ab-txt"><small>${esc(d.t)}</small><b>${esc(s.nome || d.q)}</b><span>${esc(d.v)}</span></div></div>`, 'ab-cred'); }); t += porD; });
   if (cards.length) { const tc = t; agendar((tc - desde) * 1000, () => { $$('.ab-cena', o).forEach(x => x.classList.add('fora')); cena(o, `<p class="ab-k">RELATÓRIO DAS COBAIAS</p><div class="ab-grade">${cards.map(c => { const s = A.SER[c.q] || {}; return `<div class="ab-mini" style="--cor:${s.cor || '#ece64a'}"><i${s.img ? ` style="background-image:url('${s.img}')"` : ''}></i><b>${esc(s.nome || c.q)}</b>${c.linhas.map(l => `<span>${esc(l)}</span>`).join('')}</div>`; }).join('')}</div>`, 'ab-cena-grade'); }); t += tCards; }
   t = agendarCreditos(o, cs, t, 2.4, desde);
   agendar((t - desde) * 1000, () => { $$('.ab-cena', o).forEach(x => x.classList.add('fora')); cena(o, `<div class="ab-fim">${htmlSigilo('mini')}<p class="ab-frase">${esc(en.frase || 'Continua…')}</p></div>`, 'ab-cena-fim'); });
@@ -237,6 +265,73 @@ function revelarDilema() {
   A.definir(['dilema'], { ...d, on: false, res, resTs: Date.now() });
 }
 
+/* ---------- Cobaia da Sessão (MVP) ----------
+   mapa/mvp { id, on, fim, res, venc, resTs }; votos em mesaResp/<id>/<cobaia que votou> = { v: cobaia votada }.
+   Ninguém vota em si; empate fica para o Mestre desempatar. */
+const MVP = { off: null, de: '', v: {}, mostrado: '' };
+function ouvirMvp(id) {
+  if (MVP.de === id) return;
+  if (MVP.off) MVP.off();
+  MVP.de = id; MVP.v = {};
+  MVP.off = A.Rede.on('mesaResp/' + id, v => { MVP.v = v || {}; if (A.mestre) desenharBloco(true); }, () => {});
+}
+const votosMvp = () => Object.entries(MVP.v || {}).filter(([q, x]) => x && x.v && x.v !== q && (A.SER[x.v] || {}).tipo === 'cobaia');
+function mvpChave() { const m = est().mvp || {}; return [m.on, m.id, votosMvp().length, m.venc || null, !!m.dec]; }
+function htmlMvpMestre() {
+  const m = est().mvp || {};
+  if (m.on) { const vs = votosMvp(); return `<p class="mini">Votação aberta · ${Math.max(0, Math.ceil((num(m.fim) - Date.now()) / 1000))}s · ${vs.length} voto${vs.length === 1 ? '' : 's'} (secreto)</p><button data-ses="mvp-fim">Revelar agora</button>`; }
+  const emp = m.res && !m.dec && m.venc && m.venc.length > 1;
+  return `${m.venc && m.venc.length ? `<p class="mini">Última: <b>${m.venc.map(q => esc(nomeDe(q))).join(' e ')}</b>${emp ? ' (empate: escolha uma ou deixe as duas)' : ''}. Entra sozinha no encerramento.</p>${emp ? `<div class="mesa-linha">${m.venc.map(q => `<button data-ses="mvp-dec" data-q="${q}">🏆 ${esc(nomeDe(q))}</button>`).join('')}</div>` : ''}` : ''}
+    <div class="mesa-linha"><label class="mesa-campo-in">Tempo <input id="sesMvpT" type="number" min="15" max="300" value="60"> s</label><button data-ses="mvp-ini" class="btn-protocolo">🏆 Abrir votação</button></div>`;
+}
+function revelarMvp() {
+  const m = est().mvp; if (!m || !A.mestre) return;
+  const res = {}; votosMvp().forEach(([, x]) => { res[x.v] = (res[x.v] || 0) + 1; });
+  const max = Math.max(0, ...Object.values(res));
+  const venc = max ? Object.keys(res).filter(q => res[q] === max) : [];
+  A.definir(['mvp'], { ...m, on: false, res, venc, resTs: Date.now() });
+}
+function verMvp() {
+  const m = est().mvp;
+  let o = $('#mvpTela');
+  if (!m || !m.id) { if (o) o.hidden = true; return; }
+  if (A.mestre || A.aux || A.meu) ouvirMvp(m.id);
+  if (!o) {
+    o = document.createElement('div'); o.id = 'mvpTela'; o.className = 'dil-tela mvp-tela'; o.hidden = true; document.body.appendChild(o);
+    o.addEventListener('click', e => {
+      const b = e.target.closest('[data-mvp]'); if (!b) return;
+      if (b.dataset.mvp === 'fechar') { o.hidden = true; return; }
+      const mm = est().mvp; if (!mm || !mm.on || Date.now() > num(mm.fim) || b.dataset.mvp === A.meu) return;
+      A.Rede.set(`mesaResp/${mm.id}/${A.meu}`, { v: b.dataset.mvp, ts: Date.now() }).catch(() => {});
+      ls.set('acf-mvp-' + mm.id + '-' + A.meu, b.dataset.mvp); o.dataset.k = ''; pintarMvp();
+    });
+  }
+  // resultado: todos veem por alguns segundos
+  if (m.venc && m.venc.length && m.resTs && MVP.mostrado !== m.id + ':' + m.resTs && Date.now() - num(m.resTs) < 15000) {
+    MVP.mostrado = m.id + ':' + m.resTs; o.dataset.k = '';
+    o.innerHTML = `<div class="dil-caixa mvp-res"><p class="ab-k">🏆 COBAIA DA SESSÃO</p><div class="mvp-venc">${m.venc.map(q => { const s = A.SER[q] || {}; return `<div class="mvp-c" style="--cor:${s.cor || '#ece64a'}"><i${s.img ? ` style="background-image:url('${s.img}')"` : ''}></i><b>${esc(s.nome || q)}</b><span>${int((m.res || {})[q])} voto${int((m.res || {})[q]) === 1 ? '' : 's'}</span></div>`; }).join('')}</div>${m.venc.length > 1 && !m.dec ? '<p class="mini">Empate: o Mestre decide.</p>' : ''}<div class="dil-botoes"><button data-mvp="fechar">Fechar</button></div></div>`;
+    o.hidden = false;
+    if (A.Som && !A.mudo) [523, 659, 784, 1046].forEach((f, i) => A.Som.tom(f, i * 0.12, 0.25, 'triangle', 0.08));
+    setTimeout(() => { if (MVP.mostrado === m.id + ':' + m.resTs) o.hidden = true; }, 12000);
+    return;
+  }
+  if (!m.on || A.mestre || A.aux || !A.meu) return;
+  if (o.dataset.id !== m.id) { o.dataset.id = m.id; o.hidden = false; }
+  pintarMvp();
+}
+function pintarMvp() {
+  const o = $('#mvpTela'), m = est().mvp;
+  if (!o || o.hidden || !m || !m.on || A.mestre || A.aux || !A.meu) return;
+  const meu = ls.get('acf-mvp-' + m.id + '-' + A.meu, ''), resta = Math.max(0, Math.ceil((num(m.fim) - Date.now()) / 1000));
+  const k = JSON.stringify([m.id, meu, !resta]);
+  if (o.dataset.k === k) { const tp = $('.dil-tempo', o); if (tp) tp.textContent = resta ? `${resta}s` : 'tempo esgotado'; return; }
+  o.dataset.k = k;
+  o.innerHTML = `<div class="dil-caixa"><p class="ab-k">🏆 COBAIA DA SESSÃO · <span class="dil-tempo">${resta ? `${resta}s` : 'tempo esgotado'}</span></p><h3>Quem foi a cobaia da sessão?</h3>
+    <div class="mvp-ops">${cobaias().filter(x => x.id !== A.meu).map(x => `<button data-mvp="${x.id}" class="${meu === x.id ? 'on' : ''}" style="--cor:${x.cor || '#ece64a'}" ${resta ? '' : 'disabled'}><i${x.img ? ` style="background-image:url('${x.img}')"` : ''}></i><span>${esc(x.nome)}</span></button>`).join('')}</div>
+    <p class="mini">Voto secreto. Não dá para votar em si. Você pode mudar até o tempo acabar.</p><div class="dil-botoes"><button data-mvp="fechar">Minimizar</button></div></div>`;
+}
+setInterval(() => { const m = est().mvp; if (m && m.on) { pintarMvp(); if (A.mestre) { desenharBloco(true); if (Date.now() > num(m.fim) + 1500) revelarMvp(); } } }, 1000);
+
 /* ---------- Tensão ---------- */
 const TEN = { chamado: undefined };
 const tensao = () => Math.max(0, Math.min(100, int(est().tensao)));
@@ -272,7 +367,7 @@ function holofote(alvo, txt) { if (!A.mestre) return; A.definir(['holofote'], { 
 
 function pararParaTodos() { if (!A.mestre) return; ['abertura', 'encerramento'].forEach(k => { const x = est()[k]; if (x && x.on) A.definir([k], { ...x, on: false }); }); fecharTela(); }
 /* ---------- Bloco do Mestre (aba Mesa → Sessão) ---------- */
-const CFG_PADRAO = { tit: 'A Caixa de Fósforos', num: '3', nome: 'Katábasis', frase: 'Não olhe para trás.', som: '@deadwaltz', yt: '', ini: 0, dur: 75, ant: '', aux: AUX_PADRAO.map(l => l.join(' | ')).join('\n'), mestre: MESTRE_PADRAO, creditos: true };
+const CFG_PADRAO = { estilo: 'eco', tit: 'A Caixa de Fósforos', num: '3', nome: 'Katábasis', frase: 'Não olhe para trás.', som: '@deadwaltz', yt: '', ini: 0, dur: 75, ant: '', aux: AUX_PADRAO.map(l => l.join(' | ')).join('\n'), mestre: MESTRE_PADRAO, creditos: true };
 const cfg = () => ({ ...CFG_PADRAO, ...ls.get('acf-sessao-cfg', {}) });
 function opcoesSom(atual) {
   const L = MESA().sonsLista ? MESA().sonsLista() : { fixos: {}, proprios: {} };
@@ -291,7 +386,7 @@ function desenharBloco(leve) {
     : `<label class="mesa-campo">Pergunta <input id="sesDilQ" maxlength="140" placeholder="Ex.: Abrir a porta vermelha?"></label>
       <label class="mesa-campo">Opções (uma por linha, de 2 a 4) <textarea id="sesDilOps" rows="3" placeholder="Abrir&#10;Deixar fechada"></textarea></label>
       <div class="mesa-linha"><label class="mesa-campo-in">Tempo <input id="sesDilT" type="number" min="10" max="300" value="45"> s</label><label class="chave"><input type="checkbox" id="sesDilSec" checked><span>Voto secreto</span></label><button data-ses="dil-ini" class="btn-protocolo">Lançar dilema</button></div>`;
-  const chave = JSON.stringify([d.on, d.id, votos.length, t, !!(est().abertura && est().abertura.on), !!(est().encerramento && est().encerramento.on), Object.keys((MESA().sonsLista ? MESA().sonsLista().proprios : {}) || {}).length]);
+  const chave = JSON.stringify([mvpChave(), d.on, d.id, votos.length, t, !!(est().abertura && est().abertura.on), !!(est().encerramento && est().encerramento.on), Object.keys((MESA().sonsLista ? MESA().sonsLista().proprios : {}) || {}).length]);
   if (leve && c.dataset.k === chave) return;
   if (leve && c.dataset.k && a && c.contains(a) && a.matches('input, select, textarea')) { const dl = $('#sesDil', c); if (dl) dl.innerHTML = dilHtml; c.dataset.k = chave; return; }
   c.dataset.k = chave;
@@ -302,6 +397,7 @@ function desenharBloco(leve) {
     <p class="mesa-k">HOLOFOTE</p>
     <div class="mesa-linha"><select id="sesHolAlvo">${cobaias().map(x => `<option value="q:${x.id}">${esc(x.nome)}</option>`).join('')}${Array.from({ length: 25 }, (_, i) => (A.andarAtual - 1) * 25 + i + 1).map(cn => `<option value="cn:${cn}">${esc(A.nomeSala ? A.nomeSala(cn) : 'CN ' + cn)}</option>`).join('')}</select></div>
     <div class="mesa-linha"><input id="sesHolTxt" maxlength="120" placeholder="Legenda (opcional)"><button data-ses="hol">🔦 Levar todos até lá</button></div>
+    <p class="mesa-k">COBAIA DA SESSÃO</p><div id="sesMvp">${htmlMvpMestre()}</div>
     <p class="mesa-k">DILEMA</p><div id="sesDil">${dilHtml}</div>`;
   const r = $('#sesTen', c); if (r) r.onchange = () => A.definir(['tensao'], int(r.value));
 }
@@ -313,7 +409,7 @@ function abrirForm(tipo) {
   o.innerHTML = `<div class="rr-modal-caixa"><h3>${ab ? 'Abertura da sessão' : 'Encerramento da sessão'}</h3>
     <div class="ses-grade"><label>Título <input data-c="tit" value="${esc(k.tit)}"></label><label>Nº da sessão <input data-c="num" value="${esc(k.num)}"></label>
     <label>Nome da sessão <input data-c="nome" value="${esc(k.nome)}"></label><label>${ab ? 'Frase' : 'Frase final'} <input data-c="${ab ? 'frase' : 'fraseFim'}" value="${esc(ab ? k.frase : (k.fraseFim || 'Continua…'))}"></label>
-    <label>Música <select data-c="som">${opcoesSom(k.som)}</select></label><label>Link do YouTube <input data-c="yt" value="${esc(k.yt)}" placeholder="só se escolher YouTube"></label>
+    <label>Estilo <select data-c="estilo">${ESTILOS.map(([v, n]) => `<option value="${v}" ${k.estilo === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label>Música <select data-c="som">${opcoesSom(k.som)}</select></label><label>Link do YouTube <input data-c="yt" value="${esc(k.yt)}" placeholder="só se escolher YouTube"></label>
     <label>Começar a música no segundo <input data-c="ini" type="number" min="0" value="${int(k.ini)}"></label><label>Tempo na tela (s) <input data-c="dur" type="number" min="25" max="300" value="${int(k.dur) || 75}"></label></div>
     <p class="rr-mini">${ab ? `Com os créditos (${creditos(k).length} nomes), a abertura dura no mínimo uns ${Math.ceil(planoAbertura({ ...k, dur: 25 }).total)} s; se o tempo pedido for menor, ela se estica.` : 'O tempo se estica se houver muitos destaques e créditos.'}</p>
     ${ab ? `<label>Anteriormente… <small>(vazio = pula)</small> <textarea data-c="ant" rows="4">${esc(k.ant)}</textarea></label><button data-sm="puxar" type="button">↻ Puxar do Relatório</button>` : '<p class="rr-mini">Os destaques e o relatório de cada cobaia vêm do Relatório da missão.</p>'}
@@ -324,27 +420,49 @@ function abrirForm(tipo) {
   const ler = () => { const v = {}; $$('[data-c]', o).forEach(i => { v[i.dataset.c] = i.type === 'checkbox' ? i.checked : i.value; }); ls.set('acf-sessao-cfg', { ...cfg(), ...v }); return { ...cfg(), ...v }; };
   o.onclick = async e => {
     const b = e.target.closest('[data-sm]'); if (!b) return;
-    if (b.dataset.sm === 'puxar') { const r = MESA().agregarRelatorio ? await MESA().agregarRelatorio() : null; if (!r) return; const p = []; if (r.pistas.length) p.push('As cobaias encontraram: ' + r.pistas.slice(-4).join('; ') + '.'); if (r.pres.length) p.push('Encararam ' + [...new Set(r.pres)].slice(0, 3).join(', ') + '.'); Object.entries(r.por).forEach(([q, x]) => { if (x.fim) p.push(`${nomeDe(q)}: ${x.fim}.`); }); $('[data-c="ant"]', o).value = p.join(' ') || 'Nada registrado no Relatório.'; return; }
+    if (b.dataset.sm === 'puxar') { const hs = Object.values((await A.Rede.once('hall/sessoes').catch(() => null)) || {}).filter(h => h && h.fim && h.ep).sort((a, b) => num(b.fim) - num(a.fim))[0]; const r = MESA().agregarRelatorio ? await MESA().agregarRelatorio(hs ? num(hs.ep.ini) : 0, hs ? num(hs.fim) : Infinity) : null; if (!r) return; const p = []; if (r.pistas.length) p.push('As cobaias encontraram: ' + r.pistas.slice(-4).join('; ') + '.'); if (r.pres.length) p.push('Encararam ' + [...new Set(r.pres)].slice(0, 3).join(', ') + '.'); Object.entries(r.por).forEach(([q, x]) => { if (x.fim) p.push(`${nomeDe(q)}: ${x.fim}.`); }); $('[data-c="ant"]', o).value = p.join(' ') || 'Nada registrado no Relatório.'; return; }
     if (!['previa', 'todos'].includes(b.dataset.sm)) return;
     const v = ler();
     const som = v.som === 'yt' ? 'yt:' + v.yt : v.som;
-    const base = { id: A.Rede.chave(), tit: v.tit, num: v.num, nome: v.nome, som, ini: int(v.ini), dur: int(v.dur) || 75, creditos: !!v.creditos, aux: v.aux, mestre: v.mestre, ts: Date.now(), on: true };
+    const base = { id: A.Rede.chave(), estilo: nomeEstilo(v.estilo), tit: v.tit, num: v.num, nome: v.nome, som, ini: int(v.ini), dur: int(v.dur) || 75, creditos: !!v.creditos, aux: v.aux, mestre: v.mestre, ts: Date.now(), on: true };
     let x;
     if (ab) x = { ...base, frase: v.frase, ant: String(v.ant || '').trim().slice(0, 600) };
     else x = { ...base, frase: v.fraseFim || 'Continua…', ...(await statsEncerramento()) };
     o.hidden = true;
     if (b.dataset.sm === 'previa') { ab ? mostrarAbertura(x) : mostrarEncerramento(x); return; }
     A.definir([ab ? 'abertura' : 'encerramento'], x);
+    if (ab) registrarEpisodio(x); else fecharEpisodio(x);
   };
 }
+/* ---------- Hall da Caixa: cada sessão vira um episódio (hall/sessoes/<sid>) ---------- */
+const sidDe = n => 's' + (String(n || '').replace(/[^\w]/g, '').slice(0, 12) || 'x');
+function sidAtual() { const ab = est().abertura; return ab && ab.id ? sidDe(ab.num) : ''; }
+function iniSessao() { const ab = est().abertura; return ab && ab.ts ? num(ab.ts) : 0; }
+function registrarEpisodio(x) {
+  A.Rede.set(`hall/sessoes/${sidDe(x.num)}/ep`, { num: String(x.num || ''), nome: String(x.nome || ''), tit: String(x.tit || ''), frase: String(x.frase || ''), estilo: x.estilo, ini: x.ts }).catch(() => A.aviso('O servidor recusou o registro no Hall.'));
+}
+async function fecharEpisodio(x) {
+  const sid = sidDe(x.num), ini = sidAtual() === sid ? iniSessao() : 0;
+  const r = MESA().agregarRelatorio ? await MESA().agregarRelatorio(ini) : null;
+  const por = {};
+  if (r) Object.entries(r.por).forEach(([q, p]) => { const o = {}; ['dano', 'cura', 'san', 'rit', 'm20', 'm1', 'caiu', 'voltou', 'des'].forEach(k => { if (int(p[k])) o[k] = int(p[k]); }); if (Object.keys(o).length) por[q] = o; });
+  const m = mvpDaSessao();
+  const up = { por, fim: x.ts, ...(m ? { mvp: m.venc } : {}) };
+  if (!ini) up.ep = { num: String(x.num || ''), nome: String(x.nome || ''), tit: String(x.tit || ''), estilo: x.estilo, ini: x.ts };
+  await A.Rede.set(`hall/sessoes/${sid}`, { ...((await A.Rede.once('hall/sessoes/' + sid).catch(() => null)) || {}), ...up }).catch(() => A.aviso('O servidor recusou o registro no Hall.'));
+  document.dispatchEvent(new Event('acf-hall'));
+}
+// resultado da Cobaia da Sessão votado depois da abertura desta sessão
+function mvpDaSessao() { const m = est().mvp; return m && m.venc && m.venc.length && num(m.resTs) >= iniSessao() ? m : null; }
 async function statsEncerramento() {
-  const r = MESA().agregarRelatorio ? await MESA().agregarRelatorio() : null;
-  if (!r) return { cards: [], dest: [] };
+  const r = MESA().agregarRelatorio ? await MESA().agregarRelatorio(iniSessao()) : null;
+  const m = mvpDaSessao(), mvp = m ? m.venc.map(q => ({ t: 'COBAIA DA SESSÃO', q, v: `${int((m.res || {})[q])} voto${int((m.res || {})[q]) === 1 ? '' : 's'} da mesa`, mvp: true })) : [];
+  if (!r) return { cards: [], dest: mvp };
   const ps = Object.entries(r.por);
   const cards = ps.map(([q, p]) => ({ q, linhas: [p.dano ? `−${p.dano} PV` : '', p.cura ? `+${p.cura} PV curados` : '', p.san ? `−${p.san} SAN` : '', p.pe ? `${p.pe} PE gastos` : '', p.rit ? `${p.rit} ritua${p.rit > 1 ? 'is' : 'l'}` : '', p.m20 ? `${p.m20}× 20 natural` : '', p.m1 ? `${p.m1}× 1 natural` : '', p.caiu ? `caiu ${p.caiu}×` : '', p.fim ? p.fim.toUpperCase() : ''].filter(Boolean) })).filter(c => c.linhas.length);
   const top = (campo, t, fmt) => { const m = ps.filter(([, p]) => p[campo] > 0).sort((a, b) => b[1][campo] - a[1][campo])[0]; return m ? { t, q: m[0], v: fmt(m[1][campo]) } : null; };
   const dest = [top('dano', 'MAIS FERIDO', v => `${v} de dano sofrido`), top('san', 'MENTE MAIS ABALADA', v => `${v} de Sanidade perdida`), top('m20', 'MAIS SORTUDO', v => `${v}× 20 natural`), top('m1', 'MAIS AZARADO', v => `${v}× 1 natural`), top('rit', 'MAIS RITUAIS', v => `${v} ritua${v > 1 ? 'is' : 'l'} conjurados`), top('cura', 'MAIS CURADO', v => `${v} PV recuperados`)].filter(Boolean);
-  return { cards, dest };
+  return { cards, dest: mvp.concat(dest) };
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-ses]'); if (!b || !A.mestre) return;
@@ -360,6 +478,9 @@ document.addEventListener('click', e => {
     A.definir(['dilema'], { id: A.Rede.chave(), q: q.slice(0, 140), ops: ops.map(s => s.slice(0, 60)), sec: $('#sesDilSec').checked, fim: Date.now() + t * 1000, on: true, ts: Date.now() });
   }
   else if (a === 'dil-fim') revelarDilema();
+  else if (a === 'mvp-ini') { const t = Math.max(15, Math.min(300, int(($('#sesMvpT') || {}).value) || 60)); A.definir(['mvp'], { id: A.Rede.chave(), on: true, fim: Date.now() + t * 1000, ts: Date.now() }); }
+  else if (a === 'mvp-fim') revelarMvp();
+  else if (a === 'mvp-dec') { const m = est().mvp; if (m) A.definir(['mvp'], { ...m, venc: [b.dataset.q], resTs: Date.now(), dec: true }); }
 });
 // cartão da sala: holofote direto
 A.ganchoSala({
@@ -369,9 +490,9 @@ A.ganchoSala({
 
 /* ---------- Ligações ---------- */
 let ag = false;
-function tudo() { if (ag) return; ag = true; requestAnimationFrame(() => { ag = false; try { verTelas(); verDilema(); pintarTensao(); verHolofote(); desenharBloco(true); } catch (e) { console.warn('sessao:', e); } }); }
+function tudo() { if (ag) return; ag = true; requestAnimationFrame(() => { ag = false; try { verTelas(); verDilema(); verMvp(); pintarTensao(); verHolofote(); desenharBloco(true); } catch (e) { console.warn('sessao:', e); } }); }
 A.aoMudar(tudo);
 document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 setTimeout(tudo, 400);
-window.ACF_SESSAO = { mostrarAbertura, mostrarEncerramento, tensao: mudarTensao, holofote, htmlSigilo };
+window.ACF_SESSAO = { mostrarAbertura, mostrarEncerramento, tensao: mudarTensao, holofote, htmlSigilo, sidAtual, iniSessao, sidDe, ESTILOS };
 })();
