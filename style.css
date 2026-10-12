@@ -2961,7 +2961,6 @@ body.parede-aberta { overflow: hidden; }
 .eco-sig.anima { height: min(46vh, 400px); }
 .eco-sig.mini { height: 120px; }
 .eco-sig .eco-roxo { opacity: .85; }
-.eco-sig.anima .eco-traco path, .eco-sig.anima .eco-roxo path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ecoDesenha 1.1s calc(var(--i) * .8s + .3s) ease-in-out forwards; }
 .eco-sig.anima .eco-roxo { opacity: 0; animation: ecoBrilha 3s 2.2s ease forwards, ecoPulsa 3.2s 5.2s ease-in-out infinite; }
 .eco-sig.anima .eco-lua { opacity: 0; animation: ecoLua 2.4s .2s ease forwards; }
 .eco-sig .eco-gotas > g { transform-box: fill-box; transform-origin: 50% 0; }
@@ -3387,3 +3386,24 @@ body.parede-aberta { overflow: hidden; }
 .msg-topo:hover .msg-lixo, .msg-lixo:focus { opacity: .9; border-color: var(--linha); }
 .msg-lixo.confirma { opacity: 1; color: #fff; background: #b3121b; border-color: #b3121b; font: 11px var(--mono); }
 @media (hover: none) { .msg-lixo { opacity: .7; } }
+
+/* abertura e encerramento: enquanto a tela cheia toca, o resto do site some (o mapa 2.5D pesa na placa
+   de vídeo do celular e fazia partes da abertura não aparecerem) */
+body.tela-cheia .topo, body.tela-cheia .corpo, body.tela-cheia .painel-chat, body.tela-cheia .aba-painel, body.tela-cheia .tensao-veu, body.tela-cheia .hud-retratos { visibility: hidden !important; }
+/* celular: o sigilo e a tela ficam sem os filtros pesados (tinta, desfoque e grão) */
+@media (max-width: 860px), (pointer: coarse) {
+  .eco-sig .eco-traco, .eco-sig .eco-gotas, .eco-sig .eco-roxo { filter: none; }
+  .eco-sig .eco-roxo path { stroke-width: 30px; stroke-opacity: .32; }
+  .ab-tela::after { display: none; }
+  .ab-titulos h1 { text-shadow: 0 0 10px rgba(138,47,196,.7); letter-spacing: .2em; padding-left: .2em; }
+  .ab-sessao { letter-spacing: .28em; padding-left: .28em; }
+  .ab-foto { box-shadow: 0 0 14px color-mix(in srgb, var(--cor, #ece64a) 45%, transparent); }
+  .eco-sig.vhs-sig { filter: none; }
+  .estilo-vhs h1, .estilo-terminal h1, .estilo-fosforo h1 { text-shadow: 0 0 8px rgba(255,255,255,.25) !important; }
+  .fos-chama { box-shadow: 0 0 30px 14px rgba(255,140,0,.35); }
+}
+/* bloco Sessão: campos no tema escuro (no celular apareciam brancos) */
+#mesaSessao select, #mesaSessao textarea, #mesaSessao input:not([type=checkbox]):not([type=range]) { background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 6px 8px; font: 13px var(--corpo); max-width: 100%; }
+#mesaSessao select, #mesaSessao textarea { width: 100%; }
+/* baú: a tampa abre sem cobrir o título */
+.bau-arte { margin-top: 26px; }
