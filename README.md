@@ -79,6 +79,8 @@ Diário, anotações, funções, Balança e a lista do apagão ficam em `segredo
 
 ## Chat, portas e ferramentas de mesa
 
+- **Apagar mensagens (Mestre):** cada mensagem do chat (Geral, Sussurros e Filhos) tem um 🗑 ao lado do horário, só na tela do Mestre. O primeiro toque vira "apagar?" em vermelho; o segundo, em até 3 segundos, apaga para todos. Apagar uma resposta sua num sussurro tira também da caixa do jogador. O "Apagar todo o chat" continua lá para limpar tudo de uma vez.
+
 - **Idioma da C2P0:** tudo o que a C2P0 escreve no chat aparece como bips e zips. Cada letra vira um par de sons (S, N, T… "zip zip"; I, E, R… "zip bip"; A, O, M… "bip zip"; B, D, G… "bip bip"); números viram "bzzt"; "sim", "não" e "não sei" são palavras fixas ("Zip zip zip bip bip zip", "Zip zip bip zip bip zip", "Zip zip zip zip zip"). O texto original vai embaralhado. Mestre e auxiliares leem a tradução embaixo. O jogador toca na mensagem para conjurar Compreensão Paranormal pela ficha ativa (precisa ter o ritual; cobra o custo e o Custo do Paranormal) e escolhe traduzir só para si ou para todos (`chatTrad`).
 
 - **Chat** (botão 💬 no topo, painel próprio): **Geral** (todos), **Sussurro ao Mestre** (só o Mestre lê; a resposta dele chega só para quem mandou) e **Filhos** (Mestre e auxiliares). O Mestre apaga tudo com "Apagar todo o chat". As rolagens dos jogadores entram no Geral ou, se o Mestre desmarcar a opção, só no Sussurro; as dos auxiliares vão para o canal Filhos.
