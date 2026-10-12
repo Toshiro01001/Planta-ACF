@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261012y">
+<link rel="stylesheet" href="style.css?v=20261012z">
 </head>
 <body>
 
@@ -137,6 +137,7 @@
       <button id="btnAbrirLoja" class="btn-fantasma btn-loja">🛒 Loja do Maurício</button>
       <button id="btnArquivo" class="btn-fantasma btn-arquivo">📜 Arquivo da O.R.F.E.U. <span class="n" hidden></span></button>
       <button id="btnRegras" class="btn-fantasma btn-regras" hidden>📖 Regras</button>
+      <button id="btnHall" class="btn-fantasma btn-hall" hidden>🏛 Hall da Caixa</button>
       <button id="btnParede" class="btn-fantasma btn-parede" hidden>🧱 A Parede de Desejos</button>
       <button id="btnMinhaCor" class="btn-fantasma btn-cor" hidden><span class="pinta"></span>🎨 Cor da minha cobaia</button>
       <div id="zonaJogador" class="zona-jogador"></div>
@@ -425,6 +426,9 @@
     </section>
     <section class="bloco mestre-only" id="blocoMesaInv" data-aba="mesa" hidden><h2>Cena de investigação</h2><div id="mesaInv"></div></section>
     <section class="bloco mestre-only" id="blocoMesaTeste" data-aba="mesa" hidden><h2>Pedir teste</h2><div id="mesaTeste"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaBau" data-aba="mesa" hidden><h2>Baú de achados</h2><div id="mesaBau"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaConq" data-aba="mesa" hidden><h2>Conquistas (só você vê)</h2><div id="mesaConq"></div></section>
+    <section class="bloco mestre-only" id="blocoMesaHall" data-aba="mesa" hidden><h2>Hall da Caixa</h2><div id="mesaHall"></div></section>
     <section class="bloco mestre-only" id="blocoMesaExpo" data-aba="mesa" hidden><h2>Salas de Exposição</h2><div id="mesaExpo"></div></section>
     <section class="bloco mestre-only" id="blocoMesaInt" data-aba="mesa" hidden><h2>Interlúdio</h2><div id="mesaInt"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRec" data-aba="mesa" hidden><h2>Fim de missão</h2><div id="mesaRec"></div></section>
@@ -495,6 +499,8 @@
         <button id="btnRestaurar" class="btn-fantasma">Restaurar backup…</button>
         <input type="file" id="arqBackup" accept=".json,application/json" hidden>
       </div>
+      <p class="mini">Restaurar o site apaga o que foi feito nos testes (você escolhe o quê). Antes, baixa um backup completo.</p>
+      <div class="ferramentas"><button id="btnRestaurarSite" class="btn-fantasma perigo">🧹 Restaurar o site…</button></div>
     </section>
   </aside>
 </main>
@@ -678,17 +684,18 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261012y"></script>
-<script src="config.js?v=20261012y"></script>
-<script src="escudo.js?v=20261012y"></script>
-<script src="app.js?v=20261012y"></script>
-<script src="catalogo-op.js?v=20261012y"></script>
-<script src="fichas.js?v=20261012y"></script>
-<script src="quadro.js?v=20261012y"></script>
-<script src="mesa.js?v=20261012y"></script>
-<script src="arquivo.js?v=20261012y"></script>
-<script src="ferramentas.js?v=20261012y"></script>
-<script src="sessao.js?v=20261012y"></script>
-<script src="exposicao.js?v=20261012y"></script>
+<script src="data.js?v=20261012z"></script>
+<script src="config.js?v=20261012z"></script>
+<script src="escudo.js?v=20261012z"></script>
+<script src="app.js?v=20261012z"></script>
+<script src="catalogo-op.js?v=20261012z"></script>
+<script src="fichas.js?v=20261012z"></script>
+<script src="quadro.js?v=20261012z"></script>
+<script src="mesa.js?v=20261012z"></script>
+<script src="arquivo.js?v=20261012z"></script>
+<script src="ferramentas.js?v=20261012z"></script>
+<script src="sessao.js?v=20261012z"></script>
+<script src="exposicao.js?v=20261012z"></script>
+<script src="jogo.js?v=20261012z"></script>
 </body>
 </html>

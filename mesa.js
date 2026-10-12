@@ -626,9 +626,9 @@ function abrirTeste(pt) {
     if (a !== 'rolar' || estadoJanela.feito) return;
     estadoJanela.feito = true;
     const d = FX().ativa().d, tt = FX().testarPericia(d, pt.per);
-    responder(pt.id, { total: tt.total, nat: tt.esc });
+    responder(pt.id, { total: tt.total, nat: tt.esc, dados: tt.dados.slice(0, 4), b: tt.bonus });
     marcar(id);
-    if (!pt.sec) A.rolagemDaFicha(`${per[1]} (pedido do Mestre): ${tt.total} (${tt.dados.length}d20: ${tt.dados.join(', ')}${tt.desv ? ', menor' : ''}; ${tt.bonus >= 0 ? '+' : '−'}${Math.abs(tt.bonus)})`, undefined, tt.dados, tt.bonus);
+    if (!pt.sec && !pt.dest) A.rolagemDaFicha(`${per[1]} (pedido do Mestre): ${tt.total} (${tt.dados.length}d20: ${tt.dados.join(', ')}${tt.desv ? ', menor' : ''}; ${tt.bonus >= 0 ? '+' : '−'}${Math.abs(tt.bonus)})`, undefined, tt.dados, tt.bonus);
     $('[data-mj="rolar"]').disabled = true; $('[data-mj="adiar"]').textContent = 'Fechar'; $('[data-mj="adiar"]').dataset.mj = 'fechar';
     $('#mjRes').innerHTML = `<div class="dados-faces">${tt.dados.map(x => `<span class="face${x === tt.esc ? ' usada' : ''}${x === 20 ? ' crit' : ''}${x === 1 ? ' falha' : ''}">${x}</span>`).join('')}</div><p>${esc(per[1])} <b class="mesa-total">${tt.total}</b>${tt.treino ? ` <small>(com +${tt.treino} do treino)</small>` : ''}. O Mestre já recebeu.</p>`;
   } };
@@ -654,8 +654,69 @@ function desenharMesaTeste() {
     <div class="mesa-alvos">${cobaias().map(x => `<label class="chave"><input type="checkbox" data-tst="${x.id}" checked><span>${esc(x.nome)}</span></label>`).join('')}</div>
     <input id="mesaTesteTxt" maxlength="120" placeholder="Contexto (opcional): ex.: algo se mexe no escuro…">
     <label class="chave"><input type="checkbox" id="mesaTesteSec"><span>Secreto: o resultado não vai para o chat</span></label>
+    <label class="chave"><input type="checkbox" id="mesaTesteDest"><span>🎲 Em destaque: todos veem o dado rolar grande na tela</span></label>
+    <label class="chave"><input type="checkbox" id="mesaTesteVer" checked><span>No destaque, mostrar se passou ou falhou (a DT continua escondida)</span></label>
     <button data-mi="teste-ini" class="btn-protocolo">Pedir teste</button>`;
 }
+
+/* ---------- 4d'. Rolagem em destaque ----------
+   Com "Em destaque", cada resposta ao teste aparece para todos: o d20 gira devagar e para no resultado.
+   O aparelho do Mestre (que sabe a DT) publica só "passou" ou "falhou" em mapa/pedTeste/ver/<cobaia>. */
+const DEST = { id: '', off: null, vistos: null, fila: [], rodando: false };
+function vigiarDestaque() {
+  const pt = est().pedTeste;
+  const id = pt && pt.on && pt.dest ? pt.id : '';
+  if (DEST.id === id) return;
+  if (DEST.off) { DEST.off(); DEST.off = null; }
+  DEST.id = id; DEST.vistos = null; DEST.fila = [];
+  if (!id) return;
+  A.garantirLogin().then(() => {
+    if (DEST.id !== id) return;
+    DEST.off = A.Rede.on('mesaResp/' + id, v => {
+      v = v || {};
+      if (!DEST.vistos) { DEST.vistos = new Set(Object.keys(v).filter(q => Date.now() - num((v[q] || {}).ts) > 8000)); }
+      Object.entries(v).forEach(([q, r]) => {
+        if (!r || DEST.vistos.has(q)) return;
+        DEST.vistos.add(q);
+        if (A.mestre && pt.ver) { const dt = int(((A.segredos || {})._testes || {})[id]); if (dt) A.definir(['pedTeste', 'res', q], int(r.total) >= dt ? 'ok' : 'x'); }
+        DEST.fila.push([q, r]);
+      });
+      proxDestaque();
+    }, () => {});
+  });
+}
+function proxDestaque() {
+  if (DEST.rodando || !DEST.fila.length) return;
+  DEST.rodando = true;
+  const [q, r] = DEST.fila.shift(), pt = est().pedTeste || {}, s = A.SER[q] || {};
+  const per = (((FX() && FX().PER) || {})[pt.per] || [, pt.per])[1];
+  let o = $('#destTela');
+  if (!o) { o = document.createElement('div'); o.id = 'destTela'; o.className = 'dest-tela'; document.body.appendChild(o); o.addEventListener('click', () => { if (o.classList.contains('fim')) fecharDest(); }); }
+  const dados = (Array.isArray(r.dados) ? r.dados : Object.values(r.dados || {})).map(int).filter(Boolean);
+  o.className = 'dest-tela'; o.style.setProperty('--cor', s.cor || '#ece64a');
+  o.innerHTML = `<div class="dest-caixa"><p class="mesa-k">TESTE EM DESTAQUE</p><div class="dest-quem">${s.img ? `<i style="background-image:url('${s.img}')"></i>` : ''}<b>${esc(s.nome || q)}</b><span>${esc(per || '')}</span></div>
+    <div class="dest-d20"><svg viewBox="0 0 100 100"><polygon points="50,4 93,28 93,72 50,96 7,72 7,28" /><polygon class="in" points="50,22 76,66 24,66" /></svg><b class="dest-n">?</b></div>
+    <div class="dest-res"></div></div>`;
+  o.hidden = false;
+  const nEl = $('.dest-n', o), t0 = Date.now(), DUR = 2600;
+  if (A.Som && !A.mudo) for (let i = 0; i < 9; i++) A.Som.tom(300 + Math.random() * 200, i * 0.26 * (1 + i / 12), 0.04, 'triangle', 0.06);
+  const gira = () => {
+    const p = (Date.now() - t0) / DUR;
+    if (p < 1) { nEl.textContent = 1 + Math.floor(Math.random() * 20); setTimeout(gira, 40 + p * p * 260); return; }
+    const nat = int(r.nat);
+    nEl.textContent = nat; o.classList.add(nat === 20 ? 'crit' : nat === 1 ? 'falha' : 'parou');
+    const b = int(r.b), tot = int(r.total);
+    setTimeout(() => {
+      const ver = ((est().pedTeste || {}).res || {})[q];
+      $('.dest-res', o).innerHTML = `${dados.length > 1 ? `<div class="dados-faces">${dados.map(x => `<span class="face${x === nat ? ' usada' : ''}">${x}</span>`).join('')}</div>` : ''}<p>${nat}${b ? ` ${b >= 0 ? '+' : '−'} ${Math.abs(b)}` : ''} = <b>${tot}</b></p>${ver ? `<p class="dest-ver ${ver === 'ok' ? 'ok' : 'x'}">${ver === 'ok' ? 'PASSOU' : 'FALHOU'}</p>` : ''}`;
+      o.classList.add('fim');
+      if (A.Som && !A.mudo) A.Som.tom(nat === 20 ? 1046 : nat === 1 ? 110 : 523, 0, 0.35, 'sine', 0.12, nat === 20 ? 1568 : nat === 1 ? 82 : 523);
+      setTimeout(fecharDest, 5200);
+    }, 900);
+  };
+  gira();
+}
+function fecharDest() { const o = $('#destTela'); if (o) o.hidden = true; DEST.rodando = false; setTimeout(proxDestaque, 300); }
 
 /* ---------- 4c. Fim de missão ---------- */
 function verRecompensa() {
@@ -833,9 +894,17 @@ const Amb = {
     }
   },
 };
+// trilha por andar: quando o Mestre não escolheu um ambiente, toca o do andar
+// (o jogador ouve o andar onde a cobaia dele está; Mestre e auxiliares, o andar que estão vendo)
+function andarDaTrilha() { const tk = A.meu ? ((est().tokens || {})[A.meu] || {}) : {}; return int(tk.a) || A.andarAtual || 1; }
+function trilhaAtual() {
+  const tr = est().trilha; if (!tr || !tr.on) return null;
+  const v = tr['a' + andarDaTrilha()] || '';
+  return v.startsWith('som:') ? v : v.startsWith('el:') ? v.slice(3) : null;
+}
 function verAmbiente() {
   const a = est().amb || {};
-  Amb.tocar(a.som ? 'som:' + a.som : a.el || null, a.vol === undefined ? 0.85 : Math.max(0, Math.min(1, num(a.vol) / 100)));
+  Amb.tocar(a.som ? 'som:' + a.som : a.el || trilhaAtual(), a.vol === undefined ? 0.85 : Math.max(0, Math.min(1, num(a.vol) / 100)));
   // efeito de uma vez (sino, grito…): toca se chegou há pouco
   const fx = est().sfx;
   if (fx && fx.id && fx.ts !== SONS.ultimoFx) { const novo = SONS.ultimoFx !== undefined; SONS.ultimoFx = fx.ts; if (novo && Date.now() - num(fx.ts) < 20000 && somOk()) urlDoSom(fx.id).then(src => { if (src) { const au = new Audio(src); au.volume = Amb.vol; au.play().catch(() => {}); } }); }
@@ -986,12 +1055,17 @@ function desenharMesaRec() {
     ${rc && rc.id ? `<p class="mini">Último envio: ${esc(rc.msg || 'sem título')} · ${new Date(num(rc.ts)).toLocaleString('pt-BR')}</p>` : ''}`;
 }
 const AMB_CAIXA = [['Chuva', '🌧'], ['Goteira', '💧'], ['Fluorescente', '💡'], ['Maquinário', '⚙'], ['Vento', '🌬'], ['Coração', '❤'], ['Sirene', '🚨'], ['Rádio', '📻'], ['Relógio', '🕰'], ['Sussurros', '🗣'], ['Tensão', '🎻']];
+function opcoesTrilha(atual, sons) {
+  const ops = [['', 'Silêncio']].concat(Object.keys(ELEM).filter(e => e !== 'Varia').map(e => ['el:' + e, e])).concat(AMB_CAIXA.map(([e, ic]) => ['el:' + e, ic + ' ' + e]))
+    .concat(Object.entries(SONS_FIXOS).map(([k, x]) => ['som:' + k, '🎻 ' + x.n])).concat((sons || []).map(([k, x]) => ['som:' + k, '🎵 ' + x.n]));
+  return ops.map(([v, n]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
 function desenharMesaAmb(forcar) {
   const c = $('#mesaAmb'); if (!c || !semFoco('#mesaAmb')) return;
   ligarSons();
   const a = est().amb || {}, vol = a.vol === undefined ? 85 : int(a.vol);
   const sons = Object.entries(SONS.idx).filter(([, s]) => s).sort((x, y) => String(x[1].n).localeCompare(String(y[1].n), 'pt'));
-  const assin = JSON.stringify([a.el || '', a.som || '', vol, sons.map(([k, s]) => k + s.n)]);
+  const assin = JSON.stringify([a.el || '', a.som || '', vol, sons.map(([k, s]) => k + s.n), est().trilha || null]);
   if (!forcar && c.dataset.f === assin) return;
   c.dataset.f = assin;
   const on = (k, v) => (a[k] === v && (k === 'som' || !a.som) ? 'on' : '');
@@ -1003,9 +1077,15 @@ function desenharMesaAmb(forcar) {
     <div class="mesa-linha amb-vol"><button data-mi="amb" data-v="" class="${!a.el && !a.som ? 'on' : ''}">🔇 Silêncio</button><label>Volume <input type="range" id="ambVol" min="0" max="100" step="5" value="${vol}"></label><output>${vol}%</output></div>
     <p class="mesa-k">MÚSICAS DO SITE</p>
     <ul class="amb-sons">${Object.entries(SONS_FIXOS).map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>🎻 ${esc(s.n)}</span><button data-mi="amb-som" data-k="${k}">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}">🔔 Uma vez</button><span></span></li>`).join('')}</ul>
+    <p class="mesa-k">TRILHA POR ANDAR</p>
+    <p class="mini">Quando nenhum ambiente acima está tocando, cada um ouve o som do andar: o jogador, o andar onde a cobaia dele está.</p>
+    <label class="chave"><input type="checkbox" id="ambTrilhaOn" ${(est().trilha || {}).on ? 'checked' : ''}><span>Ligar a trilha por andar</span></label>
+    <div class="amb-trilha">${[1, 2, 3, 4, 5].map(n => `<label>${n}º andar <select data-trilha="${n}">${opcoesTrilha((est().trilha || {})['a' + n] || '', sons)}</select></label>`).join('')}</div>
     <p class="mesa-k">SONS PRÓPRIOS</p>
     ${sons.length ? `<ul class="amb-sons">${sons.map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>${s.tipo === 'link' ? '🔗' : '🎵'} ${esc(s.n)}${s.tam ? ` <small>${s.tam / 1.37 < 1048576 ? Math.max(1, Math.round(s.tam / 1.37 / 1024)) + ' KB' : (s.tam / 1.37 / 1048576).toFixed(1) + ' MB'}</small>` : ''}</span><button data-mi="amb-som" data-k="${k}" title="Tocar em repetição para todos">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}" title="Tocar uma vez para todos">🔔 Uma vez</button><button data-mi="amb-del" data-k="${k}" class="perigo" aria-label="Apagar">×</button></li>`).join('')}</ul>` : '<p class="mini">Nenhum ainda. Envie um áudio (até 4 MB) ou cole um link direto de mp3/ogg (pode ser um arquivo dentro do próprio repositório, como audio/chuva.mp3).</p>'}
     <div class="mesa-linha"><label class="amb-arq">⬆ Enviar áudio<input type="file" id="ambArq" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden></label><button data-mi="amb-link">🔗 Link</button><button data-mi="amb-exp" ${sons.length ? '' : 'disabled'}>⬇ Exportar</button><label class="amb-arq">⬆ Importar<input type="file" id="ambImp" accept=".json,application/json" hidden></label></div>`;
+  const tro = $('#ambTrilhaOn', c); if (tro) tro.onchange = () => A.definir(['trilha', 'on'], tro.checked || null);
+  $$('[data-trilha]', c).forEach(sel => sel.onchange = () => A.definir(['trilha', 'a' + sel.dataset.trilha], sel.value || null));
   const vi = $('#ambVol', c);
   vi.oninput = () => { c.querySelector('.amb-vol output').textContent = vi.value + '%'; };
   vi.onchange = () => A.definir(['amb'], { ...(est().amb || {}), vol: int(vi.value), ts: Date.now() });
@@ -1068,7 +1148,8 @@ function aoClicarMesa(e) {
     if (!Object.keys(alvos).length) { A.aviso('Escolha ao menos uma cobaia.'); return; }
     const id = A.Rede.chave();
     A.gravarSegredo(['_testes', id], int($('#mesaTesteDT').value));
-    A.definir(['pedTeste'], { on: true, id, per: $('#mesaTestePer').value, alvos, sec: $('#mesaTesteSec').checked, txt: ($('#mesaTesteTxt').value || '').trim().slice(0, 120), ts: Date.now() });
+    const dest = $('#mesaTesteDest').checked;
+    A.definir(['pedTeste'], { on: true, id, per: $('#mesaTestePer').value, alvos, sec: dest ? false : $('#mesaTesteSec').checked, dest, ver: dest && $('#mesaTesteVer').checked, txt: ($('#mesaTesteTxt').value || '').trim().slice(0, 120), ts: Date.now() });
   }
   else if (a === 'teste-fim') { const pt = est().pedTeste || {}; A.definir(['pedTeste'], { ...pt, on: false }); if (pt.id) setTimeout(() => A.gravarSegredo(['_testes', pt.id], null), 2000); }
   else if (a === 'nt-desmarca') { if (confirm(`Tirar a marca de ${nomeDe(b.dataset.q)}?`)) A.gravarSegredo(['_marcas', b.dataset.q], null); }
@@ -1474,11 +1555,12 @@ function desenharMesaRel() {
 }
 const ROT_REL = { dano: 'sofreu dano', cura: 'recuperou PV', san: 'perdeu Sanidade', pd: 'perdeu Determinação', pe: 'gastou PE', caiu: 'caiu (morrendo)', enl: 'começou a enlouquecer', pista: 'Pista', presenca: 'Presença Perturbadora', interludio: 'Interlúdio', recomp: 'Fim de missão', ritual: 'conjurou', membrana: 'Membrana rompida', m20: 'tirou 20 natural', m1: 'tirou 1 natural', mobito: 'ÓBITO', minsano: 'INSANIDADE', cena: 'Nova cena', nex: 'NEX', desejo: 'desejou à Parede', cofre: 'abriu o cofre' };
 // números do relatório por cobaia (usado no Encerramento e no "Anteriormente" da abertura)
-async function agregarRelatorio() {
+// desde/ate: só os eventos de um trecho (uma sessão); "voltou" = caiu e depois recebeu cura
+async function agregarRelatorio(desde = 0, ate = Infinity) {
   const dados = await A.Rede.once('relatorio').catch(() => null) || {};
-  const evs = Object.values(dados.ev || {}).sort((a, b) => num(a.ts) - num(b.ts));
-  const por = {};
-  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: 0, m20: 0, m1: 0, caiu: 0, enl: 0, nex: 0, des: 0, fim: '' }; });
+  const evs = Object.values(dados.ev || {}).filter(e => e && num(e.ts) >= desde && num(e.ts) <= ate).sort((a, b) => num(a.ts) - num(b.ts));
+  const por = {}, caido = {};
+  cobaias().forEach(x => { por[x.id] = { dano: 0, cura: 0, san: 0, pd: 0, pe: 0, rit: 0, m20: 0, m1: 0, caiu: 0, enl: 0, nex: 0, des: 0, voltou: 0, fim: '' }; });
   const pistas = [], pres = [];
   let cenas = 0;
   evs.forEach(e => {
@@ -1486,7 +1568,8 @@ async function agregarRelatorio() {
     if (p) {
       if (['dano', 'cura', 'san', 'pd', 'pe', 'nex'].includes(e.t)) p[e.t] += int(e.v);
       if (e.t === 'ritual') p.rit++; if (e.t === 'm20') p.m20++; if (e.t === 'm1') p.m1++;
-      if (e.t === 'caiu') p.caiu++; if (e.t === 'enl') p.enl++; if (e.t === 'desejo') p.des++;
+      if (e.t === 'caiu') { p.caiu++; caido[e.q] = true; } if (e.t === 'enl') p.enl++; if (e.t === 'desejo') p.des++;
+      if (e.t === 'cura' && caido[e.q]) { p.voltou++; caido[e.q] = false; }
       if (e.t === 'mobito') p.fim = 'óbito'; if (e.t === 'minsano' && !p.fim) p.fim = 'insano';
     }
     if (e.t === 'pista') pistas.push(e.x); if (e.t === 'presenca') pres.push(e.x); if (e.t === 'cena') cenas++;
@@ -1570,6 +1653,7 @@ function tudo() {
   verChamado();
   verInterludio();
   verTeste();
+  vigiarDestaque();
   verRecompensa();
   verAmbiente();
   desenharInvestigacao();
@@ -1583,6 +1667,8 @@ function desenharMesaAux() {
   if (A.mestre || !A.aux) { if (!A.mestre && !A.aux && ameaOff) { ameaOff(); ameaOff = null; } return; }
   desenharMesaAmea(); desenharMesaMemb();
 }
+// a trilha acompanha a troca de andar (que não passa pelo estado do mapa)
+setInterval(() => { try { if ((est().trilha || {}).on) verAmbiente(); } catch (e) {} }, 1500);
 let agendado = false;
 function agendar() { if (agendado) return; agendado = true; requestAnimationFrame(() => { agendado = false; try { tudo(); } catch (e) { console.warn('mesa:', e); } }); }
 A.aoMudar(agendar);
@@ -1601,5 +1687,5 @@ document.addEventListener('acf-regras', () => { const o = $('#escudoMestre'); if
 document.addEventListener('pointerdown', () => { if (!Amb.el) setTimeout(verAmbiente, 50); }, { passive: true });
 setTimeout(agendar, 700);
 setInterval(pintarMembrana, 1200);
-window.ACF_MESA = { agregarRelatorio, urlDoSom, sonsLista: () => ({ fixos: SONS_FIXOS, proprios: SONS.idx }), ligarSons, abrirEscudo, desenharEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
+window.ACF_MESA = { ambAtual: () => Amb.el, agregarRelatorio, ELEM_AMB: () => [Object.keys(ELEM).filter(e => e !== 'Varia'), AMB_CAIXA], urlDoSom, sonsLista: () => ({ fixos: SONS_FIXOS, proprios: SONS.idx }), ligarSons, abrirEscudo, desenharEscudo, desenharHud, novaCena, danoDeterminacao, momento, mostrarMomento, membDe, temMedidor, abrirRelatorio, registrarRel };
 })();
