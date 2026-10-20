@@ -97,7 +97,8 @@ function aoMudarNexCalc() {
   [...NXC.vistos].forEach(k => { if (!ev[k]) { NXC.vistos.delete(k); if (A.mestre) A.Rede.set('relatorio/ev/n' + k, null).catch(() => {}); } });
 }
 const baseDe = id => { const b = (nexSg().base || {})[id]; return typeof b === 'number' ? b : (NEX_INICIAL[id] !== undefined ? NEX_INICIAL[id] : 0); };
-const eventosNex = () => Object.entries(nexSg().ev || {}).map(([k, e]) => ({ k, ...e })).filter(e => e && e.s).sort((a, b) => num(a.ts) - num(b.ts));
+// "chave" = id do registro no servidor; "k" = qual gatilho foi usado (criatura, sala…, ajuste)
+const eventosNex = () => Object.entries(nexSg().ev || {}).filter(([, e]) => e && e.s).map(([chave, e]) => ({ ...e, chave })).sort((a, b) => num(a.ts) - num(b.ts));
 const somaAte = (id, ate = Infinity) => baseDe(id) + eventosNex().filter(e => e.s === id && num(e.ts) <= ate).reduce((t, e) => t + int(e.d), 0);
 const nexAtual = id => limitar(somaAte(id));
 const ultimoEv = id => eventosNex().filter(e => e.s === id).pop() || null;
@@ -170,7 +171,7 @@ function importarEventos(novos, origem) {
 const antigosNesteNavegador = () => { let l = []; try { l = JSON.parse(localStorage.getItem(CHAVE_CALC_ANTIGA) || '[]'); } catch (e) {} const ev = nexSg().ev || {}; return Object.keys(eventosDaCalcAntiga(l)).filter(k => !ev[k]).length; };
 function exportarNex() {
   // mesmo formato da calculadora antiga (dá para importar lá também)
-  const lista = eventosNex().map(e => ({ eid: e.k, char: codCurto(e.s), key: e.k === 'ajuste' ? 'ajuste' : e.k, label: e.l, delta: int(e.d), ts: num(e.ts) }));
+  const lista = eventosNex().map(e => ({ eid: e.chave, char: codCurto(e.s), key: e.k || 'ajuste', label: e.l, delta: int(e.d), ts: num(e.ts) }));
   baixar(`caixa-de-fosforos-nex-${new Date().toISOString().slice(0, 10)}.json`, lista);
 }
 
@@ -317,11 +318,12 @@ function desenharNex(forcar) {
       return `<article class="nx-card" style="--nex:${corNex(n)}"><div class="nx-card-cab"><span>FHP · ${esc(codCurto(x.id))}</span><b>${esc(x.nome)}</b></div>
         <div class="nx-leitura"><span class="nx-num">${n}</span><span class="nx-pct">%</span><span class="nx-rot">NEX</span></div>
         <div class="nx-barra"><i style="width:${n}%"></i>${marcos().map(m => `<em style="left:${m.v}%" title="Marco ${m.v}%" class="${n >= m.v ? 'ok' : ''}"></em>`).join('')}</div><div class="nx-marcas"><span>0%</span><span>${(pm => (pm ? `próximo marco: ${pm.v}%` : 'todos os marcos'))(proxMarco(n))}</span><span>99%</span></div>
-        <details class="nx-aumento" data-id="${x.id}" ${aberto ? 'open' : ''}><summary>Aumento de NEX</summary>
+        <div class="nx-passo" role="group" aria-label="Mudar o NEX de ${esc(x.nome)}"><button data-nx="passo" data-id="${x.id}" data-d="-5" aria-label="Tirar 5">−5</button><button data-nx="passo" data-id="${x.id}" data-d="-1" aria-label="Tirar 1">−1</button><button data-nx="passo" data-id="${x.id}" data-d="1" aria-label="Somar 1">+1</button><button data-nx="passo" data-id="${x.id}" data-d="5" aria-label="Somar 5">+5</button><button data-nx="definir" data-id="${x.id}" title="Definir o valor exato">= …</button></div>
+        <details class="nx-aumento" data-id="${x.id}" ${aberto ? 'open' : ''}><summary>Gatilhos e ajuste com motivo</summary>
           <div class="nx-gatilhos">${GATILHOS.map(g => `<button data-nx="gat" data-id="${x.id}" data-g="${g.k}"><span>${esc(g.l)}</span><b>+${g.d}</b></button>`).join('')}</div>
           <div class="nx-ajuste"><input type="number" step="1" data-aj="${x.id}" placeholder="±" aria-label="Valor do ajuste"><input data-ajm="${x.id}" maxlength="60" placeholder="Motivo do ajuste"><button data-nx="ajuste" data-id="${x.id}">Aplicar</button></div>
         </details>
-        ${u ? `<button class="nx-desfazer" data-nx="rev" data-k="${esc(u.k)}">↩ desfazer último (${esc(u.l)} ${int(u.d) > 0 ? '+' : ''}${int(u.d)})</button>` : ''}</article>`; }).join('')}</div>`;
+        ${u ? `<button class="nx-desfazer" data-nx="rev" data-k="${esc(u.chave)}">↩ desfazer último (${esc(u.l)} ${int(u.d) > 0 ? '+' : ''}${int(u.d)})</button>` : ''}</article>`; }).join('')}</div>`;
   } else if (N.aba === 'hist') {
     let lista = eventosNex();
     if (N.filtro !== 'todos') lista = lista.filter(e => e.s === N.filtro);
@@ -329,7 +331,7 @@ function desenharNex(forcar) {
     html = `<div class="nx-filtros">${[['todos', 'Todos']].concat(cobaias().map(x => [x.id, `${codCurto(x.id)} ${x.nome}`])).map(([k, n]) => `<button data-nx="filtro" data-v="${k}" class="${N.filtro === k ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>
       <div class="nx-linha">${lista.length ? lista.map(e => { const r = limitar(somaAte(e.s, num(e.ts))), q = dataHora(e.ts);
         return `<div class="nx-reg" style="--nex:${corNex(r)}"><div class="nx-quando"><b>${q.data}</b>${q.hora}</div><div class="nx-oque"><div class="nx-alvo">FHP · ${esc(codCurto(e.s))} ${esc(nomeDe(e.s))}</div><div class="nx-causa">${esc(e.l)}</div></div>
-          <div class="nx-delta"><div class="nx-mais">${int(e.d) > 0 ? '+' : ''}${int(e.d)}</div><div class="nx-res">NEX → ${r}%</div></div><button class="nx-rev" data-nx="rev" data-k="${esc(e.k)}">reverter</button></div>`; }).join('')
+          <div class="nx-delta"><div class="nx-mais">${int(e.d) > 0 ? '+' : ''}${int(e.d)}</div><div class="nx-res">NEX → ${r}%</div></div><button class="nx-rev" data-nx="rev" data-k="${esc(e.chave)}">reverter</button></div>`; }).join('')
         : '<p class="nx-vazio">Nenhum aumento registrado ainda. A Caixa de Fósforos ainda dorme.</p>'}</div>`;
   } else {
     const ant = antigosNesteNavegador();
@@ -356,10 +358,24 @@ function aoClicarNex(e) {
   else if (a === 'aba') { N.aba = b.dataset.v; desenharNex(true); }
   else if (a === 'filtro') { N.filtro = b.dataset.v; desenharNex(true); }
   else if (a === 'gat') { const g = GATILHOS.find(x => x.k === b.dataset.g); if (g) { aplicarNex(b.dataset.id, g); desenharNex(true); } }
+  else if (a === 'passo') {
+    // +1/+5/−1/−5: só o que cabe entre 0% e 99% vira registro
+    const id = b.dataset.id, cur = nexAtual(id), d = limitar(cur + int(b.dataset.d)) - cur;
+    if (!d) { A.aviso(cur >= TETO ? 'Já está no máximo (99%).' : 'Já está em 0%.'); return; }
+    aplicarNex(id, null, { l: d > 0 ? 'Ajuste manual (aumento)' : 'Ajuste manual (redução)', d }); desenharNex(true);
+  }
+  else if (a === 'definir') {
+    const id = b.dataset.id, cur = nexAtual(id);
+    const v = prompt(`Novo NEX de ${nomeDe(id)} (0 a 99). Hoje: ${cur}%`, String(cur)); if (v === null) return;
+    const alvo = limitar(int(v)), d = alvo - cur; if (!d) return;
+    aplicarNex(id, null, { l: `Ajuste: definido em ${alvo}%`, d }); desenharNex(true);
+  }
   else if (a === 'ajuste') {
     const id = b.dataset.id, v = int($(`[data-aj="${id}"]`, o).value), m = ($(`[data-ajm="${id}"]`, o).value || '').trim();
     if (!v) { A.aviso('Digite quanto somar ou tirar (ex.: 2 ou -1).'); return; }
-    aplicarNex(id, null, { l: m ? `Ajuste: ${m}`.slice(0, 80) : 'Ajuste manual', d: Math.max(-99, Math.min(99, v)) }); desenharNex(true);
+    const cur = nexAtual(id), d = limitar(cur + Math.max(-99, Math.min(99, v))) - cur;
+    if (!d) { A.aviso(cur >= TETO ? 'Já está no máximo (99%).' : 'Já está em 0%.'); return; }
+    aplicarNex(id, null, { l: m ? `Ajuste: ${m}`.slice(0, 80) : 'Ajuste manual', d }); desenharNex(true);
   }
   else if (a === 'rev') { const ev = (nexSg().ev || {})[b.dataset.k]; if (ev && confirm(`Reverter "${ev.l}" de ${nomeDe(ev.s)}?`)) { reverterNex(b.dataset.k); desenharNex(true); } }
   else if (a === 'exportar') exportarNex();

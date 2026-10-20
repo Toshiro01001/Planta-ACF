@@ -3587,3 +3587,166 @@ body.em-persg .sah-faixas { top: 40px; }
 .sah-bonus input{width:52px}
 .sah-bonus small{opacity:.7}
 #sahMsort:empty{display:none}
+/* Calculadora de NEX · passos rápidos */
+.nx-passo { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 4px; margin: 8px 0 2px; }
+.nx-passo button { background: transparent; border: 1px solid var(--nx-linha); border-radius: 6px; color: #f0e9b8; padding: 6px 0; font: 600 13px var(--mono); cursor: pointer; min-height: 34px; }
+.nx-passo button:hover { border-color: var(--nex); color: var(--nex); }
+.nx-passo button[data-nx="definir"] { padding: 6px 10px; font-weight: 400; }
+
+/* =========================================================
+   HUD LIMPO (padrão para todos; "Visual clássico" no ⚙ do painel desliga)
+   ========================================================= */
+/* barra do painel: busca, recolher/abrir, aparência */
+.painel-barra { position: relative; display: flex; gap: 6px; align-items: center; margin: 0 0 14px; }
+.painel-barra.so-botoes .painel-busca { display: none; }
+.painel-barra.so-botoes { justify-content: flex-end; margin-bottom: 6px; }
+.painel-busca { flex: 1; min-width: 0; background: #0f0c16; border: 1px solid var(--linha); border-radius: 6px; color: var(--texto); padding: 7px 10px; font: 13px var(--mono); }
+.painel-busca:focus { outline: none; border-color: var(--roxo); }
+.pb-btn { flex: none; width: 32px; height: 32px; border-radius: 6px; background: transparent; border: 1px solid var(--linha); color: var(--texto-dim); font-size: 15px; display: grid; place-items: center; padding: 0; }
+.pb-btn:hover, .pb-btn[aria-expanded="true"] { border-color: var(--roxo); color: var(--roxo-claro); }
+.pb-menu { position: absolute; right: 0; top: 38px; z-index: 30; width: min(280px, 86vw); background: #15111f; border: 1px solid var(--roxo); border-radius: 8px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.6); display: grid; gap: 6px; }
+.pb-menu[hidden] { display: none; }
+.pb-menu b { font: 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--texto-dim); }
+.painel.buscando section.bloco.fora-da-aba:not([hidden]):not(.fora-busca) { display: block !important; }
+.painel .bloco.fora-busca { display: none !important; }
+.painel.buscando .bloco.achou h2 { color: #fff; }
+.bloco-fav { cursor: pointer; color: var(--texto-dim); margin-right: 8px; font-size: 14px; letter-spacing: 0; opacity: .45; transition: opacity .15s; }
+.bloco h2:hover .bloco-fav, .bloco-fav:focus-visible { opacity: 1; }
+.bloco.fav .bloco-fav { color: #f5c542; opacity: 1; }
+.bloco h2.dobra { justify-content: flex-start; }
+.bloco h2.dobra::after { margin-left: auto; }
+
+/* títulos e espaçamento do painel mais leves */
+body.hud-limpo .painel { padding: 14px 14px 40px; }
+body.hud-limpo .bloco h2 { font-size: 13px; letter-spacing: .08em; margin-bottom: 10px; color: #b9a6f0; }
+body.hud-limpo .bloco + .bloco, body.hud-limpo.mestre .painel .bloco + .bloco { margin-top: 0; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.06); }
+body.hud-limpo .bloco { padding-bottom: 12px; }
+body.hud-limpo .bloco.fechado { padding-bottom: 0; }
+body.hud-limpo .bloco.fechado h2 { margin-bottom: 12px; }
+
+/* jogador: atalhos da cobaia em grade de 2 colunas, menores */
+body.hud-limpo #blocoMinha { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+body.hud-limpo #blocoMinha[hidden] { display: none; }
+body.hud-limpo #blocoMinha > h2, body.hud-limpo #blocoMinha > #minhaFicha, body.hud-limpo #blocoMinha > #zonaJogador { grid-column: 1 / -1; }
+body.hud-limpo #blocoMinha > button { margin: 0; width: 100%; padding: 8px 6px; font-size: 13px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+body.hud-limpo #blocoMinha > button[hidden] { display: none; }
+body.hud-limpo #blocoMinha.fechado > :not(h2) { display: none !important; }
+
+/* topo: botões mais discretos; no celular só os ícones */
+body.hud-limpo .topo-dir { gap: 6px; }
+body.hud-limpo .topo-dir .btn-fantasma { border-color: transparent; background: rgba(255,255,255,.03); }
+body.hud-limpo .topo-dir .btn-fantasma:hover { border-color: var(--linha); }
+body.hud-limpo #btnMestre { border-color: var(--roxo); background: rgba(139,92,246,.12); }
+body.hud-limpo .sync { font-size: 11px; padding: 3px 8px; }
+@media (max-width: 1180px) { body.hud-limpo .topo-dir .btn-pilha .rot { display: none; } body.hud-limpo .topo-dir .btn-pilha { padding: 7px 10px; } }
+@media (max-width: 860px) {
+  body.hud-limpo .topo-dir .btn-pilha { flex-direction: row; min-width: 40px; padding: 6px 8px; }
+  body.hud-limpo .topo-dir .btn-pilha .ic { font-size: 18px; }
+  body.hud-limpo .sync { font-size: 0; padding: 0; width: 10px; height: 10px; border-radius: 50%; border: 0; background: var(--texto-dim); }
+  body.hud-limpo .sync.vivo { background: var(--ok); }
+  body.hud-limpo .sync.vivo::before { content: none; }
+  body.hud-limpo .sync.erro { background: var(--perigo); }
+  body.hud-limpo #btnMestre { max-width: 120px; padding: 6px 8px; font-size: 13px; line-height: 1.15; }
+  body.hud-limpo #btnMestre .perfil-nome { display: inline-block; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+}
+
+/* andares menores */
+body.hud-limpo .andar-btn { width: 50px; height: 50px; font-size: 17px; }
+body.hud-limpo .elevador { gap: 8px; padding: 12px 0; }
+body.hud-limpo .lista-andares { gap: 8px; }
+body.hud-limpo .andar-legenda span { font-size: 20px; }
+body.hud-limpo .andar-legenda small { font-size: 11px; }
+@media (max-width: 860px) {
+  body.hud-limpo .andar-btn { width: 40px; height: 40px; font-size: 15px; }
+  body.hud-limpo .andar-btn .cadeado { width: 18px; height: 18px; font-size: 10px; right: -5px; bottom: -5px; }
+  body.hud-limpo .eco-simbolo { height: 46px; }
+  body.hud-limpo .andar-legenda { top: 8px; left: 12px; }
+  body.hud-limpo .andar-legenda span { font-size: 16px; }
+}
+
+/* câmera: + − ◎ (◉) e ⋯ ; o resto aparece no ⋯ */
+.camera .cam-mais { font-size: 18px; line-height: 1; }
+body:not(.hud-limpo) .camera .cam-mais { display: none; }
+body.hud-limpo .camera { display: flex; flex-direction: column-reverse; flex-wrap: wrap-reverse; gap: 6px; align-items: flex-end; max-height: 240px; }
+body.hud-limpo .camera button { width: 38px; height: 38px; padding: 0; border-radius: 50%; background: rgba(14,11,20,.78); border-color: rgba(255,255,255,.1); font-size: 14px; backdrop-filter: blur(4px); }
+body.hud-limpo .camera button[data-cam="iso"], body.hud-limpo .camera button[data-cam="topo"] { font-size: 10px; letter-spacing: .04em; }
+body.hud-limpo .camera button[hidden] { display: none; }
+body.hud-limpo .camera:not(.aberta) .cam-extra { display: none; }
+body.hud-limpo .camera.aberta .cam-mais { background: var(--roxo-escuro); border-color: var(--roxo); }
+@media (max-width: 860px) {
+  body.hud-limpo .camera { right: 10px; bottom: 74px; max-height: 210px; }
+  body.hud-limpo .camera button { width: 40px; height: 40px; }
+}
+
+/* dados: botão redondo no celular, discreto no computador */
+body.hud-limpo .btn-dados { border-color: rgba(139,92,246,.6); padding: 7px 12px; font-size: 14px; }
+@media (max-width: 860px) {
+  body.hud-limpo .btn-dados { width: 46px; height: 46px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 20px; bottom: 74px; }
+  body.hud-limpo .btn-dados .rot { display: none; }
+}
+.dica.dica-off { display: none; }
+body.hud-limpo .dica { font-size: 11px; opacity: .8; transition: opacity 1s; }
+
+/* retratos: cartões compactos (foto com anel na cor da cobaia, nome e PV); a mancha de sangue só aparece morrendo */
+body.hud-limpo .hud-retratos { gap: 6px; }
+body.hud-limpo .hud-card { gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; background: rgba(12,9,16,.72); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(4px); }
+body.hud-limpo .hud-card:not(.morrendo) .hud-mancha { display: none; }
+body.hud-limpo .hud-retrato { width: 46px; height: 46px; }
+body.hud-limpo .hud-foto { inset: 0; box-shadow: 0 0 0 2px var(--cor); }
+body.hud-limpo .hud-card.morrendo .hud-mancha { inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); }
+body.hud-limpo .hud-txt { margin: 0; line-height: 1.1; gap: 1px; }
+body.hud-limpo .hud-nome { font: 600 12px var(--mono); letter-spacing: .08em; text-shadow: none; color: #eee; }
+body.hud-limpo .hud-pv { font: 700 15px var(--mono); text-shadow: none; color: #fff; }
+body.hud-limpo .hud-pv i { color: #ff7a85; }
+body.hud-limpo .hud-pe { left: auto; right: -6px; bottom: -4px; font: 700 11px var(--mono); min-width: 20px; padding: 0 4px; text-shadow: none; }
+body.hud-limpo .hud-estado { top: auto; bottom: -6px; left: 50%; transform: translateX(-50%); font-size: 8px; }
+body.hud-limpo .hud-retratos.muitos .hud-retrato { width: 36px; height: 36px; }
+body.hud-limpo .hud-retratos.muitos .hud-foto { inset: 0; }
+body.hud-limpo .hud-retratos.muitos .hud-nome { font-size: 11px; }
+body.hud-limpo .hud-retratos.muitos .hud-pv { font-size: 13px; }
+body.hud-limpo .hud-retratos.muitos .hud-pe { font-size: 10px; min-width: 18px; }
+body.hud-limpo .hud-retratos.muitos .hud-estado { top: auto; }
+body.hud-limpo .hud-recolher { margin-left: 14px; }
+@media (max-width: 860px) {
+  body.hud-limpo .hud-retratos { left: 8px; }
+  body.hud-limpo .hud-retratos.muitos { gap: 4px; }
+  body.hud-limpo .hud-retratos.muitos .hud-card { flex-direction: column; padding: 3px 3px 4px; border-radius: 10px; gap: 2px; min-width: 50px; }
+  body.hud-limpo .hud-retratos.muitos .hud-retrato { width: 32px; height: 32px; }
+  body.hud-limpo .hud-retratos.muitos .hud-nome { font-size: 9px; letter-spacing: .02em; max-width: 54px; overflow: hidden; text-overflow: ellipsis; }
+  body.hud-limpo .hud-retratos.muitos .hud-pv { font-size: 11px; }
+  body.hud-limpo .hud-retratos.muitos .hud-txt { text-align: center; }
+}
+/* ajustes do HUD limpo */
+body.hud-limpo #blocoMinha .btn-cor .pinta { width: 16px; height: 16px; min-width: 16px; }
+body.hud-limpo .camera { max-height: none; flex-wrap: nowrap; }
+body.hud-limpo .camera.aberta { flex-wrap: wrap-reverse; max-height: 230px; }
+@media (min-width: 861px) {
+  /* Mestre: coluna estreita só com foto e PV (o nome aparece ao passar o mouse) */
+  body.hud-limpo .hud-retratos.muitos .hud-nome { display: none; }
+  body.hud-limpo .hud-retratos.muitos .hud-card { padding: 3px 9px 3px 3px; gap: 6px; }
+}
+@media (max-width: 860px) {
+  body.hud-limpo #btnMestre { white-space: nowrap; }
+  body.hud-limpo #btnMestre .perfil-seta { display: none; }
+  body.hud-limpo .topo-dir .btn-pilha .rot { display: none; }
+  body.hud-limpo .hud-retratos.muitos .hud-txt { margin: 0; }
+  body.hud-limpo .hud-retratos.muitos .hud-nome { text-shadow: none; }
+}
+.pb-linha { display: flex; gap: 6px; }
+.pb-linha .btn-fantasma { flex: 1; padding: 6px 8px; font-size: 13px; }
+@media (max-width: 380px) { body.hud-limpo #btnAjuda { display: none; } }
+@media (max-width: 440px) {
+  /* telas estreitas: o som (e, abaixo de 380 px, a ajuda) vai para o ⚙ do painel */
+  body.hud-limpo #btnSom { display: none; }
+  body.hud-limpo .topo { padding: 0 8px; }
+  body.hud-limpo .topo-dir { gap: 4px; }
+  body.hud-limpo .topo-dir .btn-pilha { min-width: 36px; padding: 6px; }
+  body.hud-limpo #btnMestre { max-width: 104px; }
+}
+@media (max-width: 860px) {
+  /* retrato do jogador no celular: estreito, para a faixa da investigação caber ao lado */
+  body.hud-limpo .hud-retratos:not(.muitos) .hud-retrato { width: 40px; height: 40px; }
+  body.hud-limpo .hud-retratos:not(.muitos) .hud-card { padding: 3px 8px 3px 3px; gap: 6px; }
+  body.hud-limpo .hud-retratos:not(.muitos) .hud-nome { font-size: 10px; letter-spacing: .04em; max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
+  body.hud-limpo .hud-retratos:not(.muitos) .hud-pv { font-size: 13px; }
+}

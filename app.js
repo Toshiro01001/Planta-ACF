@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261020a';
+const VERSAO_SITE = '20261020b';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2394,7 +2394,10 @@ let aux = null;   // robô do Mestre Auxiliar neste navegador
 function atualizarBotaoPerfil() {
   document.dispatchEvent(new Event('acf-perfil'));
   const b = $('#btnMestre');
-  b.textContent = mestre ? 'Mestre ✓ · trocar' : meu ? `${SER[meu].nome} · trocar` : aux ? `${SER[aux].nome} (auxiliar) · trocar` : 'Entrar';
+  const nomeP = mestre ? 'Mestre' : meu ? SER[meu].nome : aux ? `${SER[aux].nome} (auxiliar)` : '';
+  b.dataset.nome = nomeP;
+  b.innerHTML = nomeP ? `<span class="perfil-nome">${esc(nomeP)}</span><span class="perfil-seta" aria-hidden="true"> ▾</span>` : 'Entrar';
+  b.title = nomeP ? 'Trocar de perfil' : 'Entrar';
   b.classList.toggle('ativo', mestre || !!meu || !!aux);
   document.body.classList.toggle('auxiliar', !!aux && !mestre);
   $('#blocoCobaias').hidden = !!aux && !mestre;
@@ -2500,7 +2503,7 @@ function abrirLoginMestre() {
 
 function trocarPerfil() {
   if (meu || aux || mestre) {
-    const quem = ($('#btnMestre').textContent || '').split('·')[0].replace('✓', '').trim() || 'o perfil atual';
+    const quem = $('#btnMestre').dataset.nome || 'o perfil atual';
     if (!confirm(`Trocar de perfil?\n\nVocê deixa de estar como ${quem} e escolhe de novo quem é.`)) return;
   }
   if (Presenca.quem) { Rede.set('presenca/' + Presenca.id, null).catch(() => {}); Presenca.quem = ''; clearInterval(Presenca.timer); }
