@@ -1,0 +1,1359 @@
+{
+ "formato": "acf-bestiario",
+ "versao": 1,
+ "fonte": "Ordem Paranormal: Sobrevivendo ao Horror (Jambô, 2024), cap. 3",
+ "aviso": "Uso pessoal do Mestre. Não publicar no GitHub.",
+ "criaturas": [
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Sepultado",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 126-127",
+   "el": "Morte",
+   "vd": 20,
+   "porte": "Criatura de Morte · Grande",
+   "pres": {
+    "dt": 15,
+    "dano": "2d4",
+    "nex": 25
+   },
+   "def": 16,
+   "pvMax": 50,
+   "desl": "9m (6 q), escalada 9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 3
+   },
+   "sentidos": "Percepção às cegas",
+   "per": "Percepção O, Iniciativa O, Fortitude 3O+5, Reflexos O, Vontade O, Furtividade O+10",
+   "resist": "Balístico, corte, impacto e perfuração 5, Morte 10",
+   "imun": "",
+   "vuln": "Energia",
+   "ataques": {
+    "a1": {
+     "n": "Dedos ósseos (corpo a corpo x3, corte)",
+     "dados": 3,
+     "bonus": 5,
+     "dano": "1d6+5",
+     "crit": "x2"
+    }
+   },
+   "hab": "Membros longos. Embora o Sepultado seja Médio, seus braços e pernas se esticam e lhe dão alcance natural de 3m.\n\nParte do cenário. Na forma de caixão, o Sepultado se confunde com a mobília em lugares adequados (cemitérios, mausoléus, galerias mortuárias). Nessas condições recebe +10 em Furtividade e é muito difícil distingui-lo de um objeto comum. Um ser treinado em Ocultismo que esteja procurando ameaças ativamente pode fazer um teste de Ocultismo (DT 20) como reação para sentir que há uma criatura paranormal escondida por perto.",
+   "acoes": "Padrão · Agredir. Dedos ósseos x3 (corpo a corpo): teste 3O+5, dano 1d6+5 de corte cada.\n\nLivre · Agarrão. Se acertar um ataque de dedos ósseos, pode tentar agarrar o alvo (teste 3O+5).\n\nPadrão · Bater desesperado. O Sepultado golpeia o interior da tampa num ritmo descompassado, como alguém preso tentando sair. O som é ouvido por qualquer ser a até 90m. Todas as pessoas e animais a até 9m ficam atordoados por 1 rodada (Vontade DT 14 reduz para abalado por 1 rodada). Quem passar no teste fica imune a esta habilidade até o fim da cena.\n\nCompleta · Tragar. Se estiver agarrando um ser Médio ou menor, puxa-o para dentro do caixão e o fecha lá. Preso, o ser fica agarrado e imóvel e vive a sensação de ser enterrado vivo. Ao ser tragado e no início de cada turno em que estiver dentro do Sepultado, a vítima sofre 2d4 de dano mental (Vontade DT 14 reduz à metade). A única forma de libertar quem foi tragado é destruir o Sepultado. Ele só consegue tragar um ser por vez.",
+   "enigma": "",
+   "notas": "PV 50 (Machucado 25). Sarcófago ou caixão amaldiçoado pela espiral, nascido de quem foi enterrado vivo; dele saem membros ósseos retorcidos de vários corpos fundidos. Fica imóvel como móvel de cemitério ou mausoléu, atrai vítimas com batidas desesperadas por dentro da tampa e as agarra para tragá-las. Às vezes as batidas são quase inaudíveis (armadilha para ladrões de túmulos), às vezes ensurdecedoras quando ele se arrasta atrás de alguém."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Mescla",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 128-129",
+   "el": "Sangue",
+   "vd": 60,
+   "porte": "Criatura de Sangue (também Medo) · Grande",
+   "pres": {
+    "dt": 20,
+    "dano": "3d6",
+    "nex": 35
+   },
+   "def": 21,
+   "pvMax": 100,
+   "desl": "12m (8 q), escalada 12m (8 q), voo 9m (6 q)",
+   "atr": {
+    "agi": 3,
+    "for": 3,
+    "int": 1,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão no escuro",
+   "per": "Percepção O+5, Iniciativa 3O+10, Fortitude 2O+5, Reflexos 3O+10, Vontade O+5, Acrobacia 3O+10, Atletismo 3O+10, Furtividade 3O+8",
+   "resist": "Balístico, corte, perfuração 10, Sangue 20",
+   "imun": "Químico",
+   "vuln": "Morte, fogo e frio",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "2d6+5",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Cuspe ácido (distância, curto, Sangue)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "3d12",
+     "crit": "x2"
+    },
+    "a3": {
+     "n": "Ferrão de Incubar ovos (só agarrando)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "",
+     "crit": "x2"
+    }
+   },
+   "hab": "Fluidos repugnantes. Os fluidos do corpo da Mescla são corrosivos e nauseantes. Sempre que um ser causa dano corpo a corpo ou em alcance curto à criatura, ou sempre que sofre dano de Sangue causado por ela, fica enjoado por 1 rodada (Fortitude DT 20 evita).\n\nPercepção multifacetada. A Mescla não pode ser flanqueada nem surpreendida.",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x2 (corpo a corpo), teste 3O+10, dano 2d6+5 de corte cada; cuspe ácido (distância, alcance curto): teste 3O+10, dano 3d12 de Sangue.\n\nLivre · Vomitar ácido. Quando acerta um ser com os dois ataques de garra na mesma ação agredir, a Mescla vomita uma massa de substância cáustica sobre ele: a vítima sofre 1d12 de dano de Sangue.\n\nReação · Agarrão. Se acertar os dois ataques de garra num mesmo ser na mesma ação agredir, pode tentar agarrar o alvo (teste 3O+12).\n\nCompleta · Camuflagem sobrenatural. Se nenhuma pessoa a estiver vendo, a Mescla se mistura ao ambiente: fica imóvel e muda de cor, ficando sob camuflagem total e recebendo +10 em Furtividade.\n\nCompleta · Incubar ovos. Se estiver agarrando um ser, perfura-o com um ferrão fino como agulha escondido na língua (teste de ataque 3O+10). Se acertar, o ferrão incuba 1d4 ovos (Fortitude DT 5 +5 por ovo evita a incubação). O alvo incubado sofre uma versão modificada da doença Sangue Quente (OPRPG p. 291), que ganha um Estágio IV: ao chegar nele, uma nova Mescla nasce do corpo da vítima e a mata de dentro para fora.\n\nCompleta · Investida insectoide. Se estiver num ponto acima de um ser em alcance médio, a Mescla salta em direção a ele e cai num espaço adjacente. Conta como investida, mas ela pode fazer os dois ataques de garra (ambos com o bônus da investida) contra o alvo.",
+   "enigma": "",
+   "notas": "PV 100 (Machucado 50). Antiga pessoa que se entregou de propósito a uma rotina de viver e comer com insetos, vermes e parasitas e virou uma fusão de humano e inseto, cheia de larvas, carrapatos e sanguessugas e com um fedor que provoca desmaios e vômitos. Há relatos de formas voadoras (asas de mosca) e alongadas (centopeia). Quer proliferar e consumir: embosca camuflada, salta de cima sobre a presa, agarra e implanta ovos."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Espectro Inesquecido (exemplo, Marcado NEX 55%)",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 130-133",
+   "el": "Energia",
+   "vd": 220,
+   "porte": "Criatura de Energia (também Conhecimento, Morte e Medo) · Grande",
+   "pres": {
+    "dt": 35,
+    "dano": "6d8",
+    "nex": 75
+   },
+   "def": 27,
+   "pvMax": 340,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 2,
+    "int": 1,
+    "pre": 1,
+    "vig": 3
+   },
+   "sentidos": "Percepção às cegas, visão no escuro",
+   "per": "Percepção 3O+15, Iniciativa 3O+5, Fortitude 3O+5, Reflexos 3O+15, Vontade 4O+15, Atletismo 1O+5, Ciências 3O+10, Furtividade 2O+5, Intimidação 3O+5, Intuição 3O+10, Investigação 3O+10, Medicina 3O+10, Percepção 3O+10. Pontos de esforço: 66.",
+   "resist": "Balístico, corte, impacto, perfuração, Conhecimento e Morte 15, Energia 25",
+   "imun": "",
+   "vuln": "Conhecimento",
+   "ataques": {
+    "a1": {
+     "n": "Lâmina espectral (corpo a corpo, Energia)",
+     "dados": 2,
+     "bonus": 10,
+     "dano": "1d4+31",
+     "crit": "19/x2"
+    },
+    "a2": {
+     "n": "Pistola sinalizadora espectral (distância, curto, Energia)",
+     "dados": 3,
+     "bonus": 15,
+     "dano": "2d6+32",
+     "crit": "x2"
+    }
+   },
+   "hab": "Pontos de esforço. Diferente de outras criaturas, o espectro tem 66 PE (os mesmos do Marcado). Não tem Sanidade.\n\nBalística avançada. Mantém a proficiência do Marcado com armas táticas de fogo e +2 nas rolagens de dano com elas (já somado ao ataque à distância).",
+   "acoes": "Padrão · Agredir. Ataques listados: lâmina espectral (corpo a corpo), teste 2O+10, crítico 19, dano 1d4+31 de Energia; pistola sinalizadora espectral (distância, alcance curto): teste 3O+15, dano 2d6+32 de Energia.\n\nLivre · Conhecimento aplicado. Ao fazer um teste de perícia (exceto Luta e Pontaria), pode gastar 2 PE para trocar o atributo-base da perícia por Intelecto.\n\nLivre · Eclético. Ao fazer um teste de perícia, pode gastar 2 PE para receber os benefícios de treinado nela, ou 4 PE para os de veterano.\n\nLivre · Investigação científica. Uma vez por cena de investigação, pode procurar pistas com Ciências no lugar da perícia que seria usada para aquela pista.\n\nLivre · Na trilha certa. Sempre que passa num teste para procurar pistas, pode gastar 1 PE para receber +O no próximo teste. Custos e bônus se acumulam (passando num segundo teste, paga 2 PE para ter +2O no seguinte, e assim por diante).\n\nLivre · Pensamento ágil. Uma vez por rodada, numa cena de investigação, pode gastar 2 PE para fazer uma ação adicional de procurar pistas.\n\nLivre · Perito. Perito em Ciências e Medicina: ao testar uma delas, pode gastar 2 PE para somar +1d6 ao resultado, 3 PE para +1d8 ou 4 PE para +1d10.\n\nPadrão · Equipe de trauma. Gasta 2 PE para remover uma condição negativa (exceto morrendo) de um aliado adjacente.\n\nPadrão · Paramédico. Gasta 2 PE para curar 2d10 PV, ou 3 PE para curar 3d10 PV, de si mesmo ou de um aliado adjacente.\n\nCompleta · Aterrorizar. O espectro vibra, geme ou urra e lembra a todos de que é o eco de uma morte terrível. Pessoas e animais em alcance curto sofrem 2d8 de dano mental (Vontade DT 15 reduz à metade). (Valores impressos na ficha de exemplo; pela regra geral, seriam os da linha do VD na Tabela 3.1.)",
+   "enigma": "Cada espectro nasce da morte de um Marcado, então as circunstâncias são sempre imprevisíveis: ele pode surgir, por exemplo, num flashback de uma história fora de ordem cronológica, ou ao revisitar um lugar de Membrana fragilizada onde o personagem de um jogador morreu numa missão anterior. Por isso, algumas habilidades e as condições para dissipar cada espectro são únicas, ligadas à personalidade, às escolhas e às ações do personagem em vida, mas distorcidas pelas Entidades do Outro Lado.",
+   "notas": "PV 340 (Machucado 170). Eco distorcido e translúcido de um Marcado que morreu num passado em que poderia ter sobrevivido; existe e não existe ao mesmo tempo até que seu passado seja descoberto por um Marcado que tenha a mesma Marca. Não é alma nem fantasma, só uma lembrança deformada pelo Outro Lado. Não tem ficha fixa: esta é a ficha de exemplo do livro.\n\nCOMO CRIAR UM ESPECTRO (aplicar à ficha do Marcado): Tipo e VD: vira criatura de Energia (o ícone do elemento não saiu no texto da regra; o cabeçalho da ficha é Energia), VD = 4 x NEX; tamanho igual ao do Marcado. Presença Perturbadora: DT e dano mental pela Tabela 3.1; seres com NEX 20 pontos acima do NEX original do Marcado são imunes. Sentidos: +5 em Iniciativa e Percepção, percepção às cegas e visão no escuro. Defesa: bônus pela Tabela 3.1 e +O+5 em Fortitude, Reflexos e Vontade. PV: PV do Marcado multiplicados pela coluna PV; resistência a balístico, corte, impacto, perfuração, Conhecimento e Morte igual à coluna Defesa/Res., resistência a Energia igual a esse valor +10, vulnerabilidade a Conhecimento. Atributos: iguais aos do Marcado. Perícias: iguais às do Marcado, mas Furtividade sobe um grau (treinado para veterano etc.); se já for expert, recebe +5 nela. Deslocamento: igual. PE e Sanidade: tem PE iguais aos do Marcado e não tem Sanidade. Habilidades, ações e ataques: mantém todos; efeitos baseados em NEX usam o NEX original; DTs de habilidades usam a Tabela 3.1; ataques recebem +O+5 no teste e um bônus de dano (coluna Dano extra) que pode ir num só ataque ou, a critério do Mestre, ser dividido entre ataques da mesma ação; tudo vira manifestação espectral com as mesmas estatísticas, mas causando dano de Energia. Todo espectro ganha Aterrorizar (completa: pessoas e animais em alcance curto sofrem o dano mental da Tabela 3.1, Vontade com a DT da tabela reduz à metade).\n\nTABELA 3.1 (VD · DT de hab. · Dano mental · Defesa/Res. · PV · Dano extra): 20-40 · 15 · 2d8 · +2 · x2 · +5 | 60-100 · 20 · 3d8 · +5 · x3 · +10 | 120-160 · 25 · 4d8 · +10 · x4 · +20 | 180-300 · 35 · 6d8 · +15 · x5 · +30 | 320-400 · 40 · 8d8 · +20 · x6 · +40.\n\nMARCADO BASE DO EXEMPLO (NEX 55%): Pessoa · Média. Percepção 2O, Iniciativa 2O. Defesa 12; Fortitude 2O, Reflexos 2O+10, Vontade 3O+10. PV 68 (Machucado 34), PE 66, Sanidade 56. Deslocamento 9m. AGI 2, FOR 1, INT 3, PRE 3, VIG 2. Perícias: Atletismo O+5, Ciências 3O+10, Fortitude 2O+5, Intimidação 3O+5, Intuição 3O+10, Luta 1O+5, Medicina 3O+10, Percepção 3O+10, Pontaria 2O+10. Balística avançada (proficiência com armas táticas de fogo e +2 no dano com armas de fogo). Agredir: faca (corpo a corpo) teste O+5, crítico 19, dano 1d4+1 corte; pistola sinalizadora (distância, curto) teste 2O+10, dano 2d6+2 fogo. Mesmas ações livres e padrão listadas nesta ficha (Conhecimento aplicado, Eclético, Investigação científica, Na trilha certa, Pensamento ágil, Perito, Equipe de trauma, Paramédico)."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Uivar",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 134-135",
+   "el": "Energia",
+   "vd": 100,
+   "porte": "Criatura de Energia (também Medo) · Média",
+   "pres": {
+    "dt": 20,
+    "dano": "4d6",
+    "nex": 45
+   },
+   "def": 20,
+   "pvMax": 100,
+   "desl": "voo 12m (8 q)",
+   "atr": {
+    "agi": 3,
+    "for": 0,
+    "int": 3,
+    "pre": 3,
+    "vig": 1
+   },
+   "sentidos": "Percepção às cegas",
+   "per": "Percepção 3O+10, Iniciativa 3O+10, Fortitude O+5, Reflexos 3O+10, Vontade 3O+10",
+   "resist": "",
+   "imun": "Dano",
+   "vuln": "",
+   "ataques": {},
+   "hab": "Alterações climáticas. O Uivar altera o clima o tempo todo num raio de 90m em volta de si: a área fica sob frio extremo, neblina, neve e vento forte (OPRPG p. 290).\n\nVibrações térmicas. O Uivar é invisível (regra de invisibilidade, SaH p. 125) e incorpóreo, e não faz ruído mais alto que o assobio do vento gelado, que às vezes lembra gritos de horror e às vezes giz arranhando uma lousa. Quem consegue vê-lo enxerga dentro dele uma silhueta de tamanho Médio, vazia, distorcida, curvada e gélida.\n\nRegra de invisibilidade (SaH p. 125). Um ser invisível não pode ser percebido pela visão: tem camuflagem total, +15 em Furtividade contra ouvir, e seres que não conseguem vê-lo ficam desprevenidos contra seus ataques. Além disso, recebe +2D em ataques contra alvos que não estejam cegos (alvos cegos, em vez disso, sofrem −5 na Defesa).",
+   "acoes": "Movimento · Granizo perfurante. O Uivar começa a gerar granizo. Se usar Congelar na mesma rodada, além dos efeitos normais, todos os seres sem cobertura na área sofrem 2d8 de dano de perfuração (Reflexos DT 20 reduz à metade). Coberturas frágeis, como tendas e toldos, são destruídas com facilidade pelo granizo.\n\nPadrão · Congelar. Ondas de frio absorvem o calor num raio de 90m em volta da criatura. Todo ser na área sofre 2d8 de dano de frio (Fortitude DT 20 reduz à metade). O cenário também muda: nuvens cobrem o céu (de dia, a luz fica como penumbra; de noite, como escuridão), gelo cobre os objetos (a critério do Mestre, testes de manipular itens sofrem −O) e surgem granizo, chuva e vendaval (OPRPG p. 290). Essas mudanças duram até o fim da cena ou até o fim da missão, a critério do Mestre.\n\nPadrão · Beijo gélido. O Uivar encosta sua forma vazia num ser em alcance corpo a corpo e suga o calor dele: a vítima sofre 6d6 de dano de Energia e fica lenta (Fortitude DT 20 reduz à metade). Quem for reduzido a 0 PV por este efeito, ou já estiver com 0 PV ao sofrê-lo, vira uma estátua de gelo deformada: fica petrificado até a camada de gelo sobrenatural ser destruída (20 PV, RD 20/fogo). Petrificado assim, não recupera PV, mas também não está morrendo; porém qualquer dano que não seja de fogo causado ao gelo também fere quem está dentro, deixando-o morrendo. Ao transformar um ser em estátua, o Uivar recupera 20 PV. Destruir uma estátua criada por ele faz o Uivar perder 10 PV; mas, se o ser congelado também morrer, quem o matou sofre 6d6 de dano mental (Vontade DT 20 reduz à metade).",
+   "enigma": "",
+   "notas": "PV 100 (Machucado 50). FOR aparece como \"-\" na ficha (sem valor; registrado como 0). Presença invisível e incorpórea que traz uma nevasca até a lugares tropicais, absorve o calor e a essência das pessoas e as deixa como esculturas de gelo; só é notada pelos flocos que desviam dela, pelo uivo de muitas vozes e por cliques e clarões espectrais no meio da neblina. Alguns pesquisadores a tratam como anomalia climática paranormal, algo a sobreviver e não a combater. Age cobrindo a área com Congelar e granizo e usa o Beijo gélido para congelar vítimas e se curar; destruir estátuas a enfraquece, mas matar quem está preso cobra dano mental."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Derretido",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 136-137",
+   "el": "Sangue",
+   "vd": 80,
+   "porte": "Criatura de Sangue (também Energia) · Enorme",
+   "pres": {
+    "dt": 20,
+    "dano": "4d6",
+    "nex": 40
+   },
+   "def": 23,
+   "pvMax": 140,
+   "desl": "9m (6 q), escalada 9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 4,
+    "int": 0,
+    "pre": 1,
+    "vig": 4
+   },
+   "sentidos": "Percepção às cegas",
+   "per": "Percepção O+5, Iniciativa O+5, Fortitude 4O+10, Reflexos O+5, Vontade O+5, Enganação O, Furtividade O",
+   "resist": "Sangue 20",
+   "imun": "Balístico, corte, impacto e perfuração",
+   "vuln": "Morte, fogo e químico",
+   "ataques": {},
+   "hab": "Amorfo. Massa de Sangue e pedaços viscosos, quase sem consistência e muito maleável. Apesar do tamanho, não é contida por obstáculos físicos e passa por qualquer fresta por onde passaria água (por baixo da porta, pelo encanamento, por frestas de janela etc.). Enquanto está se espremendo para atravessar um obstáculo, fica lento.\n\nLiberdade de espaço. Desde que continue ligado por um fio mínimo da própria gosma, o Derretido ignora as regras de espaço ocupado e pode entrar em quadrados ocupados por outras criaturas. Outras criaturas também podem atravessar os espaços que ele ocupa, mas esses espaços contam como terreno difícil.\n\nMatéria nociva. Todo ser que entre ou comece o turno na área ocupada pelo Derretido sofre 6d6 de dano de Sangue e fica lento e enjoado por 1 rodada (Fortitude DT 20 reduz o dano à metade e evita a condição lento). Cada criatura só é afetada uma vez por rodada. A critério do Mestre, ele também pode danificar objetos para abrir caminho.",
+   "acoes": "Padrão · Arrastar repulsivo. O Derretido envolve objetos e seres com sua massa. Até o início do seu próximo turno, sempre que se mover, arrasta consigo os seres e objetos em sua área que escolher (Atletismo DT 20 evita ser arrastado). Quem é arrastado assim sofre 4d6 de dano de Sangue e fica caído.\n\nPadrão · Rastro corrosivo. Começa a soltar muco corrosivo. Até o início do seu próximo turno, sempre que se move, deixa um rastro de ácido no espaço percorrido; essa área vira terreno difícil. Quem entra ou começa o turno no rastro sofre 1d6 de dano de ácido (cada criatura no máximo uma vez por rodada).\n\nPadrão · Simular corpo. Molda o corpo para ter a silhueta de uma pessoa, animal ou objeto. Em local iluminado é fácil distingui-lo, mas em penumbra ou escuridão ele pode usar isto para se esconder ou se disfarçar, recebendo +10 em Furtividade para se esconder e em Enganação para disfarce.\n\nCompleta · Consumir. Consome um ser que esteja na sua área ocupada, inconsciente e com 0 PV (mesmo que não esteja morrendo): recupera 20 PV e dissolve a vítima por completo, incorporando-a.\n\nCompleta · Deslizar nojento. Se não estiver se espremendo num espaço apertado, desliza como uma lesma-do-mar, desviando de obstáculos, e percorre o triplo do seu deslocamento normal.",
+   "enigma": "",
+   "notas": "PV 140 (Machucado 70). Massa gelatinosa avermelhada de carne, veias, órgãos e restos cozinhando num ácido vivo; às vezes assume por um tempo a silhueta de pessoas ou animais que absorveu. Deixa um rastro de carne derretida e gosma púrpura ácida, viaja por frestas, canos e encanamentos e surge de surpresa (inclusive em banheiros). Não tem empatia: só absorve, derrete e cresce, arrastando vítimas para dentro de si e consumindo quem cai."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Melancolia",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 138-141",
+   "el": "Conhecimento",
+   "vd": 140,
+   "porte": "Criatura de Conhecimento (também Sangue, Morte e Medo) · Minúscula",
+   "pres": {
+    "dt": 25,
+    "dano": "4d8",
+    "nex": 50
+   },
+   "def": 29,
+   "pvMax": 200,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 4,
+    "for": 0,
+    "int": 4,
+    "pre": 3,
+    "vig": 1
+   },
+   "sentidos": "Visão no escuro",
+   "per": "Percepção 3O+5, Iniciativa O+5, Fortitude 3O+5, Reflexos 4O+5, Vontade 3O+5, Furtividade 4O+5",
+   "resist": "",
+   "imun": "Dano",
+   "vuln": "",
+   "ataques": {},
+   "hab": "Parasita invisível. A Melancolia é invisível (regra de invisibilidade, SaH p. 125) e incorpórea, e consegue subir numa pessoa sem que ela perceba. O único jeito de não virar vítima é passar num teste de Vontade (DT 25) no momento em que ela tenta infectar. Se a vítima passar, o parasita vai atrás de outro ser e a vítima nem percebe que foi alvo.\n\nParasitose melancólica. A infecção segue as regras de doenças (OPRPG p. 291): contaminação por contato, teste de Vontade (DT 25).\nEstágio I (Medo): o infectado vive inseguro e fica abalado, mesmo que seja imune a efeitos de medo.\nEstágio II (Sangue): instabilidade emocional e ideias irracionais, em geral de autoflagelo emocional, tomam os pensamentos; fica alquebrado e frustrado, mesmo que seja imune a efeitos mentais.\nEstágio III (Morte): o desapego à própria vida arrasa o que resta da mente; fica esmorecido, mesmo que seja imune a efeitos mentais.\nEstágio IV (Conhecimento): a mente se abre para a própria insignificância diante do universo; todas as ações da vítima passam a ter como único objetivo tirar a própria vida.\nA cada estágio, o parasita fica mais visível para a vítima (mas não tangível), cresce e a DT do teste de Vontade sobe: Estágio I, parasita Minúsculo, DT 25; Estágio II, Pequeno, DT 30; Estágio III, Médio, DT 35; Estágio IV, Grande, DT 40.\nSe a vítima conseguir se recuperar da infecção, o parasita a abandona e procura outra vítima, mas ela ainda leva um dia para descer cada estágio (do IV ao III, ao II, ao I, curando-se por completo ao fim do quarto dia).\n\nParasitas poderosos. Um parasita que já consumiu outros seres é maior e mais forte: use como DT do Estágio I a DT correspondente ao tamanho atual do parasita, até o máximo de Grande (DT 40).\n\nRegra de invisibilidade (SaH p. 125). Um ser invisível não pode ser percebido pela visão: tem camuflagem total, +15 em Furtividade contra ouvir, e seres que não conseguem vê-lo ficam desprevenidos contra seus ataques. Além disso, recebe +2D em ataques contra alvos que não estejam cegos (alvos cegos, em vez disso, sofrem −5 na Defesa).",
+   "acoes": "",
+   "enigma": "Para aceitar ajuda, a vítima precisa primeiro perceber o parasita. Isso pode ocorrer como evento narrativo ou por um quase sucesso no teste de Vontade para resistir (em geral, falhar por 5 ou menos basta para notar que há algo paranormal acontecendo). Pessoas que convivem com a vítima também podem notar que algo está errado, com um teste de Intuição, Medicina, Ocultismo ou Profissão (psicólogo) contra a DT atual de resistência ao parasita. Mas, ao contrário de transtornos de humor, a Melancolia só é afetada por efeitos paranormais: a vítima pode receber apoio por meio de pequenos rituais (Ocultismo contra a mesma DT atual). Cada ajuda bem-sucedida reduz em 5 a DT do teste contra a entidade; o Mestre decide com que frequência narrativa esse apoio pode acontecer. Se a DT chegar a 0, a Melancolia perde a invisibilidade, a incorporeidade e a imunidade a dano e fica vulnerável a todos os tipos de dano (exceto paranormais); então tenta fugir ou infectar outro ser.",
+   "notas": "PV 200 (Machucado 100). FOR aparece como \"-\" na ficha (sem valor; registrado como 0). Parasita paranormal invisível que se agarra às costas da vítima e consome seus sentimentos: apatia crescente, perda de interesse, isolamento, até o rosto travar numa careta exagerada de tristeza (como um sorriso de palhaço invertido) e surgirem marcas parecidas com tatuagens pelas costas, ombros e braços, que se espalham quanto mais ele consome. Usa o hospedeiro como veículo para chegar à próxima vítima. Não é combatida de frente: a solução passa pelo Enigma de Medo."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Quibungo",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 142-143",
+   "el": "Sangue",
+   "vd": 160,
+   "porte": "Criatura de Sangue · Grande",
+   "pres": {
+    "dt": 25,
+    "dano": "4d8",
+    "nex": 55
+   },
+   "def": 34,
+   "pvMax": 320,
+   "desl": "15m (10 q), escalada 15m (10 q), natação 15m (10 q)",
+   "atr": {
+    "agi": 4,
+    "for": 4,
+    "int": 1,
+    "pre": 3,
+    "vig": 4
+   },
+   "sentidos": "Faro, visão no escuro",
+   "per": "Percepção 3O+10, Iniciativa 4O+10, Fortitude 4O+10, Reflexos 4O+10, Vontade 2O+5, Atletismo 4O+10, Furtividade 4O+10, Sobrevivência 2O+10",
+   "resist": "Balístico, impacto, perfuração e Sangue 20",
+   "imun": "",
+   "vuln": "Morte",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x4, corte)",
+     "dados": 4,
+     "bonus": 20,
+     "dano": "2d6+10",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Mordida (corpo a corpo, perfuração)",
+     "dados": 4,
+     "bonus": 20,
+     "dano": "3d12+10",
+     "crit": "x2"
+    }
+   },
+   "hab": "Besta da mata. Em mata fechada, o Quibungo recebe +10 em Furtividade e camuflagem total contra seres a mais de 9m.\n\nRegeneração acelerada. Predador capaz de se recuperar de quase qualquer ferimento: tem Cura Acelerada 10/Morte.",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x4 (corpo a corpo), teste 4O+20, dano 2d6+10 de corte cada; mordida (corpo a corpo), teste 4O+20, dano 3d12+10 de perfuração.\n\nReação · Agarrão. Se acertar um ataque de garras, pode tentar agarrar o alvo (teste 4O+22).\n\nLivre · Dilacerar. Uma vez por rodada, se acertar dois ataques de garra no mesmo alvo, causa mais 1d12+10 de dano de perfuração.\n\nReação · Instintos bestiais. Uma vez por rodada, esquiva-se por completo de um ataque à distância ou de um efeito em área, sem sofrer nenhum dano.\n\nCompleta · Bocarra torturadora. Coloca um ser que esteja agarrando na bocarra das costas. O ser continua agarrado, tem cobertura contra efeitos vindos de fora do Quibungo (e vice-versa) e sofre 1d12+10 de dano de Sangue no início de cada turno do Quibungo. Ele escapa vencendo um teste de agarrar ou de Acrobacia contra o Quibungo, ou causando pelo menos 25 de dano a ele; nesse caso, o Quibungo o solta e ele cai num espaço adjacente desocupado à frente da criatura. Só um ser engolido por vez. Se a vítima chegar a 0 PV na bocarra, não fica inconsciente nem morrendo, mas só consegue gritar e sofrer até o Quibungo gastar uma ação completa para engoli-la e matá-la; ao fazer isso, ele recupera 25 PV. Outros seres podem libertar a vítima vencendo um teste de agarrar contra o Quibungo; quem falhar sofre 1d12+10 de dano de perfuração dos dentes. Libertada com 0 PV, a vítima fica inconsciente e morrendo normalmente. No início de cada turno do Quibungo em que ele mantiver um ser com 0 PV na bocarra, todos que presenciarem a cena sofrem 4d8 de dano mental (Vontade DT 25 reduz à metade).\n\nCompleta · Investida brutal. Percorre o dobro do deslocamento até o alvo, mesmo sem ser em linha reta. Conta como investida (+1D nos ataques e −5 na Defesa até o próximo turno). No fim da investida, faz dois ataques de garras.",
+   "enigma": "",
+   "notas": "PV 320 (Machucado 160). Lenda nascida no oeste da África e difundida no Nordeste brasileiro como bicho-papão de crianças, distorcida pelo Sangue: fera de mais de 3m, peluda e com carne vermelha exposta, quatro braços, boca frontal cheia de mandíbulas e uma enorme bocarra que se abre nas costas para engolir gente viva. As vítimas podem ser digeridas por horas, dias ou semanas; o zumbido que anuncia sua chegada são os gritos delas lá dentro. Caça em matas, devorando sem lógica e deixando corpos vomitados, membros arrancados e sobreviventes arrasados."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Profundo",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 144-147",
+   "el": "Energia",
+   "vd": 200,
+   "porte": "Criatura de Energia (também Sangue) · Enorme",
+   "pres": {
+    "dt": 30,
+    "dano": "6d6",
+    "nex": 65
+   },
+   "def": 34,
+   "pvMax": 380,
+   "desl": "6m (4 q), natação 15m (10 q)",
+   "atr": {
+    "agi": 4,
+    "for": 4,
+    "int": 2,
+    "pre": 2,
+    "vig": 2
+   },
+   "sentidos": "Percepção às cegas, visão no escuro",
+   "per": "Percepção 2O+10, Iniciativa 4O+15, Fortitude 2O+10, Reflexos 4O+15, Vontade 2O+10, Furtividade 4O+10",
+   "resist": "Balístico, corte, impacto, perfuração, Energia e Sangue 20",
+   "imun": "",
+   "vuln": "Morte e fogo",
+   "ataques": {
+    "a1": {
+     "n": "Mordida (corpo a corpo, perfuração)",
+     "dados": 4,
+     "bonus": 25,
+     "dano": "4d10+20",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Tentáculos (corpo a corpo x6, impacto; máx. 2 no mesmo ser por ação)",
+     "dados": 4,
+     "bonus": 25,
+     "dano": "2d10+10",
+     "crit": "x2"
+    }
+   },
+   "hab": "Camuflagem submersa. Submerso, o Profundo tem camuflagem contra seres a 1,5m e camuflagem total contra seres a mais de 1,5m, e recebe +10 em Furtividade.\n\nRegeneração acelerada. As luzes vermelhas que percorrem seu corpo o alimentam com Energia: tem Cura Acelerada 20/Morte e fogo.",
+   "acoes": "Padrão · Agredir. Ataques listados: mordida (corpo a corpo), teste 4O+25, dano 4d10+20 de perfuração; tentáculos x6 (corpo a corpo), teste 4O+25, dano 2d10+10 de impacto cada. Não pode fazer mais de dois ataques de tentáculos contra o mesmo ser na mesma ação agredir.\n\nReação · Agarrão. Ao acertar um ser com um ataque de tentáculos, pode fazer a manobra agarrar contra ele (teste 4O+30). Tem incontáveis tentáculos: só mantém um ser agarrado assim por vez, mas não perde ataques de tentáculos por isso.\n\nLivre · Mastigar. Uma vez por rodada, se acertar dois ataques de tentáculo num mesmo ser na mesma rodada, faz um ataque adicional de mordida.\n\nCompleta · Engolir. Se começar o turno agarrando um ser com os tentáculos, faz um teste de agarrar contra ele (teste 4O+30). Se vencer, engole o ser; se perder, o ser se solta do tentáculo. O engolido fica preso num sistema digestivo vermelho cheio de ácido paranormal e fileiras de dentes: continua agarrado, fica cego, tem cobertura total contra efeitos vindos de fora (e vice-versa) e sofre 2d10 de dano de Sangue e 2d10 de dano de perfuração no início de cada turno do Profundo. Escapa vencendo um teste de agarrar ou de Acrobacia contra o Profundo ou causando pelo menos 30 de dano a ele; então é regurgitado e fica caído num espaço adjacente desocupado à frente da criatura. Só um ser engolido por vez. Quem está do lado de fora pode ajudar atacando o mesmo ponto por fora: exige uma ação de movimento e um teste de Percepção (DT 25) para achar o ponto certo.\n\nCompleta · Onda energética. Solta uma onda invisível de Energia que enlouquece todos os sistemas eletrônicos num raio de 90m: dispositivos, veículos e aparelhos reagem de forma caótica a critério do Mestre (desligam, piscam, entram em curto, até explodem). Quem estiver portando o item pode evitar o efeito nele com um teste de Vontade (DT 25).",
+   "enigma": "",
+   "notas": "PV 380 (Machucado 190). Habitante das profundezas oceânicas que mergulhadores confundem com uma lula rara de corpo alongado (Magnapinna): corpo humanoide de uns 2m, pele verde translúcida e gelatinosa, rosto vazio, cabeça de lula e tentáculos finíssimos de até 8m, com um sistema nervoso que brilha em vermelho e se intensifica antes do ataque, quando o corpo se abre em incontáveis dentinhos. As vítimas descrevem gritos fantasmas, silhuetas translúcidas e, por último, a luz vermelha. Agarra com os tentáculos, engole e derrete os corpos em segundos; embaralha eletrônicos (equipamentos de mergulho) com a onda de Energia."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Memento Mori",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 148-149",
+   "el": "Morte",
+   "vd": 260,
+   "porte": "Criatura de Morte (também Conhecimento e Medo) · Média",
+   "pres": {
+    "dt": 35,
+    "dano": "8d6",
+    "nex": 80
+   },
+   "def": 44,
+   "pvMax": 650,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 1,
+    "int": 3,
+    "pre": 3,
+    "vig": 3
+   },
+   "sentidos": "Visão no escuro",
+   "per": "Percepção 4O+20, Iniciativa 2O+15, Fortitude 4O+20, Reflexos 2O+15, Vontade 4O+20, Furtividade 2O+30",
+   "resist": "Balístico, corte, impacto, perfuração e Morte 20",
+   "imun": "",
+   "vuln": "Energia",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte)",
+     "dados": 5,
+     "bonus": 30,
+     "dano": "4d10+30",
+     "crit": "x2"
+    }
+   },
+   "hab": "A Ampulheta da Morte. O Memento Mori já chega à Realidade com um alvo (em geral uma pessoa), cujo tempo de vida restante passa a ser contado pela areia que escorre na Ampulheta da Morte. Nas mãos de uma pessoa, a Ampulheta é um item amaldiçoado de Morte indestrutível, que precisa ser empunhado com uma mão para ser usado e ocupa 1 espaço. O portador pode gastar uma ação padrão, 2 PE e 2 pontos de Sanidade para descobrir o nome do ser ligado à areia que está caindo e quanto tempo de vida ele ainda tem, numa estimativa, nunca um valor exato.\n\nIninterrupto. O Memento Mori não corre e só pode usar uma de suas ações por rodada para se deslocar. Em compensação, nenhuma condição ou efeito (paranormal ou não) que reduza ou impeça seu deslocamento o afeta: coberto por uma rede de pesca, por exemplo, em um instante está de pé e livre, andando na direção do alvo.\n\nInevitável fim. Quando chega a 0 PV, não morre: desfaz-se em cinzas e sombras até o fim da cena e pode reaparecer depois para continuar perseguindo o alvo.\n\nRegra de invisibilidade (SaH p. 125). Um ser invisível não pode ser percebido pela visão: tem camuflagem total, +15 em Furtividade contra ouvir, e seres que não conseguem vê-lo ficam desprevenidos contra seus ataques. Além disso, recebe +2D em ataques contra alvos que não estejam cegos (alvos cegos, em vez disso, sofrem −5 na Defesa).",
+   "acoes": "Padrão · Agredir. Garras x2 (corpo a corpo): teste 5O+30, dano 4d10+30 de corte cada.\n\nMovimento · Visagem. Até três vezes por cena, teletransporta-se para qualquer espaço desocupado em alcance extremo. Em vez disso, pode gastar um uso para ficar invisível até fazer uma ação que não seja se mover.\n\nPadrão · Encarar o abismo. Encara um ser em alcance curto e o obriga a ver o vazio da morte em seu olhar: a vítima sofre 4d10+30 de dano de Morte e revela suas memórias e pensamentos ao Memento Mori (Vontade DT 35 reduz à metade e evita a revelação). Costuma usar isto para encontrar a ampulheta quando a perde.\n\nPadrão · Revelar a ampulheta. Mostra a ampulheta tirando-a das vestes. Todas as pessoas a até 36m que possam vê-la enxergam nas areias, por instantes, presságios de incontáveis mortes, das mais trágicas às mais banais, e sofrem 8d6 de dano mental (Vontade DT 35 reduz à metade).\n\nCompleta · Atrair a ampulheta. Se estiver em alcance curto da ampulheta, mesmo sem vê-la, sente sua presença e a teletransporta para as próprias mãos.",
+   "enigma": "Lendas em pergaminhos antigos, esquecidos no fundo de grandes bibliotecas, falam de enganar a morte. Quem vira alvo do Memento Mori não tem como escapar dele, mas pode distraí-lo e ganhar tempo: sem a ampulheta, ele para de perseguir o alvo e passa a perseguir o item amaldiçoado até recuperá-lo. Há também mitos sobre um ritual capaz de destruir a ampulheta, matando o Memento Mori de vez e libertando o alvo, mas não existe informação útil sobre ele, até onde se sabe.",
+   "notas": "PV 650 (Machucado 325). Humanoide encapuzado com crânio de pássaro apodrecido, Lodo preto escorrendo dos olhos, capa que parece penas de ave morta e mãos de três dedos em luvas de couro preto segurando uma ampulheta cheia de cinzas, decorada com crânios. Lenda antiga, talvez nascida do pavor dos médicos da peste do século XIV, que de tanto ser contada se tornou real. Poucos o enxergam; ele caminha devagar e sem parar até o alvo marcado, e fugir não adianta. Recuperar ou tirar dele a ampulheta é a chave do confronto."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Rascunho",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 150-151",
+   "el": "Conhecimento",
+   "vd": 300,
+   "porte": "Criatura de Conhecimento (também Energia) · Média",
+   "pres": {
+    "dt": 35,
+    "dano": "7d8",
+    "nex": 90
+   },
+   "def": 48,
+   "pvMax": 750,
+   "desl": "15m (10 q)",
+   "atr": {
+    "agi": 2,
+    "for": 2,
+    "int": 5,
+    "pre": 5,
+    "vig": 2
+   },
+   "sentidos": "Percepção às cegas, visão no escuro",
+   "per": "Percepção 5O+25, Iniciativa 3O+15, Fortitude 4O+20, Reflexos 3O+15, Vontade 5O+25",
+   "resist": "Balístico, corte, impacto, perfuração, Conhecimento e Energia 20",
+   "imun": "",
+   "vuln": "Sangue",
+   "ataques": {},
+   "hab": "Ele não existe. O Rascunho não está lá quando alguém procura por ele: enquanto qualquer outro ser estiver olhando diretamente para ele (mesmo pelo reflexo de um espelho, por exemplo), é invisível (regra de invisibilidade, SaH p. 125), inaudível e incorpóreo, e sempre passa em testes de Furtividade. Quando ninguém o observa diretamente, perde essas três características. Lutar contra ele sem poder olhá-lo diretamente impõe as mesmas penalidades de estar cego.\n\nVulnerabilidade à luz. Não consegue permanecer em lugares com fontes de luz capazes de iluminá-lo por inteiro. Nessa situação, sofre −10 na Defesa, perde suas resistências a dano e faz de tudo para fugir.\n\nRegra de invisibilidade (SaH p. 125). Um ser invisível não pode ser percebido pela visão: tem camuflagem total, +15 em Furtividade contra ouvir, e seres que não conseguem vê-lo ficam desprevenidos contra seus ataques. Além disso, recebe +2D em ataques contra alvos que não estejam cegos (alvos cegos, em vez disso, sofrem −5 na Defesa).",
+   "acoes": "Movimento · Possuir objeto. Se não estiver sendo observado, uma vez por rodada usa sua telecinesia macabra para arremessar um objeto contra um ser em alcance médio: o alvo sofre 4d6 de dano de impacto (Reflexos DT 35 reduz à metade). O dano dobra se o objeto for muito pesado (motocicleta, geladeira…).\n\nPadrão · Aterrorizar. Usa sua manifestação instável para perturbar as vítimas (parado no canto do quarto, piscando na borda da visão, provocando calafrios na nuca, mexendo com eletrônicos). Todos os seres que escolher a até 9m sofrem 7d8 de dano mental (Vontade DT 35 reduz à metade).\n\nCompleta · Piscar. Até três vezes por cena, teletransporta-se para um espaço desocupado em alcance extremo, mesmo sem linha de visão. Se surgir adjacente a outro ser, pode usar Aterrorizar como ação livre contra esse ser.",
+   "enigma": "",
+   "notas": "PV 750 (Machucado 375). O erro de Deus: a ideia abortada de algo que nunca existiu, uma memória apagada que cresceu como tumor na mente e virou contornos negros instáveis, como rabiscos de um esboço abandonado. Costuma ser confundido com sintoma de transtorno psicológico ou viagem alucinógena. Nunca pode ser visto de frente; aproxima-se pelo canto do olho, pela sombra que se mexeu, pela silhueta parada no quarto. Ataca quando não é observado e foge da luz forte, que é a principal arma contra ele."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Medusa",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 152-153",
+   "el": "Conhecimento",
+   "vd": 320,
+   "porte": "Criatura de Conhecimento (também Morte) · Grande",
+   "pres": {
+    "dt": 40,
+    "dano": "9d6",
+    "nex": 95
+   },
+   "def": 50,
+   "pvMax": 380,
+   "desl": "12m (8 q), escalada 12m (8 q), natação 12m (8 q)",
+   "atr": {
+    "agi": 4,
+    "for": 3,
+    "int": 4,
+    "pre": 5,
+    "vig": 3
+   },
+   "sentidos": "Faro, visão no escuro",
+   "per": "Percepção 5O+25, Iniciativa 4O+20, Fortitude 4O+20, Reflexos 4O+20, Vontade 5O+25. Expert em todas as perícias: as não listadas valem 4O+20.",
+   "resist": "Corte, impacto, perfuração e Morte 20",
+   "imun": "Conhecimento",
+   "vuln": "Sangue",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte; veneno)",
+     "dados": 5,
+     "bonus": 35,
+     "dano": "8d8+20",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Cauda (corpo a corpo, impacto)",
+     "dados": 5,
+     "bonus": 35,
+     "dano": "8d8+40",
+     "crit": "x2"
+    },
+    "a3": {
+     "n": "Jato venenoso (distância, longo, Morte; veneno)",
+     "dados": 5,
+     "bonus": 35,
+     "dano": "8d12",
+     "crit": "x2"
+    }
+   },
+   "hab": "Camuflagem sombria. Em penumbra ou escuridão, a Medusa recebe camuflagem e +10 em Furtividade.\n\nConhecimento de eras. Carrega o ideal helênico de perfeição: é expert em todas as perícias (as que não aparecem na ficha valem 4O+20). Também consegue conversar normalmente com pessoas.\n\nOlhar petrificante. Quem olhar diretamente nos olhos da Medusa faz um teste de Reflexos (DT 40). Se falhar, não desvia o olhar a tempo e fica petrificado. A petrificação é temporal, não física: o corpo não vira pedra, só parece paralisado. Se atacado, é ferido normalmente, mas o ferimento não mostra passagem de tempo (o sangue não escorre, por exemplo). A única forma conhecida de salvar alguém assim é matar a Medusa que o petrificou. Lutar contra ela sem olhá-la diretamente impõe as mesmas penalidades de estar cego.\n\nRecuperação acelerada. Como nos mitos, é muito difícil de derrotar: tem Cura Acelerada 20, mas essa cura não recupera dano de acertos críticos nem de golpes de corte desferidos especificamente contra seu pescoço (Defesa 60).\n\nVeneno mortal. Quem for atingido pelas garras ou pelo jato venenoso fica envenenado. No início de cada um de seus turnos, a vítima faz Fortitude (DT 40): se falhar, sofre 4d10 de dano de Morte; se passar, cura-se do veneno.",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x2 (corpo a corpo), teste 5O+35, dano 8d8+20 de corte cada; cauda (corpo a corpo), teste 5O+35, dano 8d8+40 de impacto; jato venenoso (distância, alcance longo), teste 5O+35, dano 8d12 de Morte.\n\nReação · Agarrão. Se acertar um ataque de cauda, pode tentar agarrar o alvo (teste 5O+37).\n\nLivre · Dilacerar. Se acertar os dois ataques de garra, rasga o alvo com violência e causa mais 8d8 de dano de corte.\n\nPadrão · Sussurrar maléfico. Sabe exatamente que palavras dizer para perturbar a mente e corromper a alma: um ser em alcance médio sofre 6d10 de dano mental (Vontade DT 40 reduz à metade).\n\nPadrão · Sugestões irresistíveis. Sibila palavras que tentam a mente a contemplar a beleza que ela oferece: um ser em alcance médio faz Vontade (DT 40); se falhar, não consegue deixar de olhar para a Medusa até o início do seu próximo turno.\n\nCompleta · Rastejar imparável. Avança rastejando com rapidez assustadora: percorre até o dobro do deslocamento, ignorando terreno difícil. Se terminar adjacente a um ser, pode atacá-lo com as garras ou a cauda como ação livre.",
+   "enigma": "",
+   "notas": "PV 380 (Machucado 190). Versão do Outro Lado do mito grego: corpo feminino e serpentino, escuro como sombra, esquelético, só com os olhos penetrantes visíveis, sussurrando convites para uma última contemplação. Quer ser admirada pelos olhares da Realidade e coleciona vítimas paralisadas no tempo, conscientes e obrigadas a fitá-la para sempre. É territorial e vive num covil de ruínas, um templo à própria adoração formado pelos corpos de quem não resistiu. Combinação de sugestão para forçar o olhar e olhar petrificante; os jogadores precisam lutar sem encará-la e mirar no pescoço ou buscar críticos."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Amigo Imaginário",
+   "grupo": "Criaturas paranormais",
+   "fonte": "SaH p. 154-157",
+   "el": "Morte",
+   "vd": 360,
+   "porte": "Criatura de Morte e Sangue · Grande",
+   "pres": {
+    "dt": 40,
+    "dano": "8d8",
+    "nex": 0
+   },
+   "def": 56,
+   "pvMax": 1000,
+   "desl": "12m (8 q); em Frenesi de Sangue ganha escalada 15m (10 q)",
+   "atr": {
+    "agi": 5,
+    "for": 5,
+    "int": 3,
+    "pre": 5,
+    "vig": 4
+   },
+   "sentidos": "Percepção às cegas (alcance extremo)",
+   "per": "Percepção 5O+30, Iniciativa 5O+30, Fortitude 4O+20 (5D+30 em Frenesi de Sangue), Reflexos 5O+30, Vontade 5O+30, Furtividade 5O+30 (5O+50 se estiver em um quadro)",
+   "resist": "Balístico, corte, impacto e perfuração 20",
+   "imun": "Morte, Sangue",
+   "vuln": "Energia",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte)",
+     "dados": 5,
+     "bonus": 40,
+     "dano": "4d10+10",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Tentáculos (distância, médio, impacto)",
+     "dados": 5,
+     "bonus": 40,
+     "dano": "4d10+20",
+     "crit": "x2"
+    }
+   },
+   "hab": "Quadros. A presença do Amigo Imaginário nasce de interações entre pessoas e sete quadros influenciados pelo Medo. Essas interações, chamadas de \"Entrar no Quadro\", são tentativas de entender ou se relacionar com a arte da pintura; costumam ser intencionais, mas podem acontecer sem querer. Sempre que alguém observa uma das pinturas por algum tempo, faz um teste de Vontade (DT 40). Se falhar, vive experiências mentais profundas e perturbadoras (reviver memórias, enfrentar traumas, ilusões ligadas ao quadro ou efeitos parecidos que o Mestre achar adequados). Ao \"Entrar no Quadro\", a pessoa sofre 8d8 de dano mental (Vontade DT 40 evita). Cada vez que alguém \"Entra no Quadro\", a Membrana da região se deteriora, permitindo que o Medo seja alimentado pelo imaginário da população local.\n\nO Sino. Quando o Amigo Imaginário aparece, todas as pessoas em alcance extremo que possam ouvi-lo escutam um sino cada vez mais alto vindo de dentro da criatura, como gritos ritmados. Cada pessoa afetada fica pasma por 1 rodada (Vontade DT 40 evita, e quem passar não pode mais ser afetado por esta habilidade até o fim da cena). Quem falhou e também já \"Entrou em um Quadro\" fica impedido de se afastar do Amigo Imaginário até o fim da cena. O sino se repete no início de cada turno da criatura.\n\nFrenesi de Sangue. Ao ficar machucado, o Amigo Imaginário é tomado por fúria sanguinária e fica mais ágil e violento, com estas mudanças: Vigor passa a 5; Fortitude passa a 5D+30; ganha deslocamento de escalada 15m (10 q); passa a ter duas ações padrão e duas ações de movimento; o som de \"O Sino\" fica distorcido, provocando formigamento interno, fome, abstinência e vontade de morder algo: em vez de ficar pasma, quem falhar no teste gasta suas ações para alcançar o ser vivo mais próximo e tentar mordê-lo com força, ou morde a si mesmo, a critério do Mestre. Quem já tinha passado contra a versão anterior do Sino precisa testar de novo contra esta. O sino continua se repetindo no início de cada turno da criatura, mas quem passar contra este efeito fica imune a ele até o fim da cena.",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x2 (corpo a corpo), teste 5O+40, dano 4d10+10 de corte cada; tentáculos (distância, alcance médio), teste 5O+40, dano 4d10+20 de impacto.\n\nReação · Agarrão. Se acertar um ataque de tentáculos, pode tentar agarrar o alvo (teste 5O+42). A criatura agarrada assim pode ser libertada se o tentáculo for destruído (Defesa 30, PV 50, imune a Morte e Sangue, vulnerável a Energia). Se o tentáculo for destruído, o Amigo Imaginário perde 50 PV.\n\nCompleta · Derreter. Puxa um alvo agarrado até o rosto e despeja nele sua tinta corrosiva: a vítima sofre 4d10+10 de dano de Morte e 4d10+10 de dano de Sangue (Fortitude DT 40 reduz à metade).\n\nCompleta · Dissolver. Puxa um alvo agarrado e o envolve com outros tentáculos para consumi-lo: a vítima sofre 4d10+20 de dano químico (Fortitude DT 40 reduz à metade) e o Amigo Imaginário recupera PV igual ao dano causado.",
+   "enigma": "",
+   "notas": "PV 1.000 (Machucado 500, quando entra em Frenesi de Sangue). Presença Perturbadora sem NEX de imunidade indicado. Criatura da ilha de Tipora, obra de arte perfeita nascida da obsessão de um artista e do delírio coletivo de uma pequena comunidade isolada, potencializados por um composto impossível de Sangue e Morte ligado ao Sino de Tenebris. Ser encapuzado de mais de 2,5m, alongado e curvado, com manto marrom de material estranho, tentáculos e braços podres de dedos ossudos, e uma cascata incessante de Tinta vermelho-ocre jorrando do rosto; tudo ao redor parece derreter. Alimenta-se do medo de quem teve os segredos manipulados. A manifestação original foi contida após o \"Incidente da Ilha\" (massacre na igrejinha), mas cada vez que os sobreviventes recontam a história ela fica mais forte; o sino anuncia a volta."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Bêbado local",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 158",
+   "el": "Realidade",
+   "vd": 10,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 12,
+   "pvMax": 6,
+   "desl": "6m (4 q)",
+   "atr": {
+    "agi": 1,
+    "for": 1,
+    "int": 0,
+    "pre": 0,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção O+5, Iniciativa O, Fortitude O+5, Reflexos O, Vontade −2O, Diplomacia O+5",
+   "resist": "Químico 1",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Soco (corpo a corpo, impacto)",
+     "dados": 1,
+     "bonus": 0,
+     "dano": "1d3+1",
+     "crit": "x2"
+    }
+   },
+   "hab": "Causos e histórias. Conhece muitas histórias, antigas e atuais, da região. Um personagem recebe +5 em testes de Investigação para interrogá-lo, desde que a DT da informação seja 20 ou menos.\n\nEspião involuntário. Pode ser usado como espião por um NPC interessado em informações locais. Sempre que um personagem interage com ele, faz um teste de Intuição ou Vontade (DT 15). Se falhar, deixa escapar alguma informação relevante; cada informação revelada dá ao Mestre um bônus de +5 para gastar ao longo da missão aumentando a DT de um teste ligado à investigação (o uso dessa informação contra os personagens).\n\nInvisibilidade social. É fácil não notá-lo, seja porque ele se esforça para passar despercebido, seja porque é fácil para pessoas socialmente privilegiadas ignorá-lo. Se ele não estiver fazendo nada chamativo, os outros precisam passar em Percepção (DT 15) para perceber sua presença.",
+   "acoes": "Padrão · Agredir. Soco (corpo a corpo): teste O, dano 1d3+1 de impacto.",
+   "enigma": "",
+   "notas": "PV 6 (Machucado 3). Figura conhecida do bairro, simpática e tagarela, que vive de bico, de vender miudezas ou da caridade alheia e circula de bar em bar atrás da próxima dose; em cidades pequenas costuma fazer parte do folclore local. Nem sempre tem boa fama, mas é ótima fonte de fofoca para agentes de fora, ou um espião eficiente para quem quer vigiar forasteiros."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Burocrata",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 158-159",
+   "el": "Realidade",
+   "vd": 10,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 11,
+   "pvMax": 6,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 1,
+    "int": 2,
+    "pre": 2,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção 2O+5, Iniciativa −2O, Fortitude O, Reflexos O, Vontade 2O+5, Diplomacia 2O+5, Profissão (burocrata) 2O+10",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Soco (corpo a corpo, impacto)",
+     "dados": 1,
+     "bonus": 0,
+     "dano": "1d3+1",
+     "crit": "x2"
+    }
+   },
+   "hab": "Atendimento protocolar. A atitude inicial do burocrata com desconhecidos é sempre indiferente. Enquanto a atitude dele com uma pessoa for indiferente (ou pior), ela sofre −5 em testes baseados em Intelecto e Presença contra ele.\n\nBurocracia frustrante. Um labirinto de regras sem sentido frustra até o agente mais experiente: sempre que um personagem falha num teste baseado em Intelecto ou Presença contra o burocrata, perde 1 ponto de Sanidade.\n\nMorosidade. Se o burocrata estiver numa cena em que o tempo é importante (como uma investigação urgente), cada personagem faz um teste de Diplomacia (DT 15) ao encontrá-lo pela primeira vez. Se falhar, perde uma rodada preso em alguma discussão ou procedimento.\n\nPreencha o formulário. Seja qual for a função, o burocrata pode ter informações importantes, desde que se preencha o formulário certo. Interrogá-lo exige uma perícia específica definida pelo Mestre conforme a área dele (por exemplo, Artes para a recepcionista de uma galeria, Crime para um funcionário de tribunal, Religião para o secretário de uma igreja). Testes de interrogatório com a perícia errada falham automaticamente. Os personagens podem tentar adivinhar a perícia certa ou conversar com ele para descobri-la.",
+   "acoes": "Padrão · Agredir. Soco (corpo a corpo): teste O, dano 1d3+1 de impacto.",
+   "enigma": "",
+   "notas": "PV 6 (Machucado 3). Funcionário de órgão público ou empresa privada encarregado de zelar por trâmites, normas e papelada. Não é perigoso em combate, mas vira obstáculo sério quando os agentes estão contra o relógio: trava a cena, drena Sanidade e só libera a informação pela via correta."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Fazendeiro isolado",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 159",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 16,
+   "pvMax": 16,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 2,
+    "int": 1,
+    "pre": 2,
+    "vig": 2
+   },
+   "sentidos": "",
+   "per": "Percepção 2O+5, Iniciativa O, Fortitude 2O+5, Reflexos O, Vontade 2O+5, Profissão (fazendeiro) 2O+5",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Pancada (corpo a corpo, impacto)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "1d3+5",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Peixeira (corpo a corpo, corte)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "1d8+5",
+     "crit": "19/x2"
+    },
+    "a3": {
+     "n": "Espingarda (distância, curto, balístico)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "4d6",
+     "crit": "x3"
+    }
+   },
+   "hab": "De sol a sol. Não fica inconsciente por ter os pontos de vida reduzidos a 0.\n\nHistórias de pescador. Fonte inesgotável de causos da região, pode ajudar os personagens se estiver disposto. Se eles compartilharem a investigação com ele, o fazendeiro pode, a critério do Mestre, fazer um teste de revisar o caso (OPRPG p. 93) usando Profissão (fazendeiro). Se passar, fornece uma pista, explicada pela vivência no mato ou por histórias dos antepassados.\n\nResiliência do campo. Pode usar Profissão (fazendeiro) no lugar de perícias baseadas em Força ou Presença.",
+   "acoes": "Padrão · Agredir. Ataques listados: pancada (corpo a corpo), teste 2O+5, dano 1d3+5 de impacto; peixeira (corpo a corpo), teste 2O+5, crítico 19, dano 1d8+5 de corte; espingarda (à distância, alcance curto), teste 2O+5, crítico x3, dano 4d6 balístico.\n\nMovimento · Atiçar os cães. Manda seus cães de guarda avançarem sobre um alvo em alcance curto; os animais cercam o alvo esperando a melhor hora de atacar. O próximo ataque que o fazendeiro acertar causa +1d8 de dano de perfuração e deixa o alvo caído (Luta DT 15 evita a condição).",
+   "enigma": "",
+   "notas": "PV 16 (Machucado 8). Gente do campo que vive longe de vizinhos e da cidade, acostumada a resolver tudo sozinha e com a família; desconfiada e pouco receptiva com estranhos. Pode ser obstáculo armado (espingarda, peixeira, cães) ou aliado valioso se for convencido a ajudar, graças ao conhecimento da região."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Investigador",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 159-160",
+   "el": "Realidade",
+   "vd": 40,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 18,
+   "pvMax": 68,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 1,
+    "int": 2,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "",
+   "per": "Percepção 2O+5, Iniciativa 2O+5, Fortitude O, Reflexos 2O+5, Vontade O+5, Crime 2O+5, Diplomacia 1O+5, Furtividade 2O+5, Intuição 1O+5, Investigação 2O+5",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Soco (corpo a corpo, impacto)",
+     "dados": 2,
+     "bonus": 10,
+     "dano": "1d3+1",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Revólver (distância, curto, balístico)",
+     "dados": 2,
+     "bonus": 10,
+     "dano": "2d6+6",
+     "crit": "19/x3"
+    }
+   },
+   "hab": "Fonte de informações. Um investigador amigável (atitude amistosa ou prestativa) é uma fonte valiosa: uma vez por interlúdio, se puderem consultá-lo, os personagens recebem +5 numa única ação de revisar caso. Por mais amigável que seja, ele tem suas próprias obrigações; o Mestre decide se qualquer investigador conhecido está disponível.",
+   "acoes": "Padrão · Agredir. Ataques listados: soco (corpo a corpo), teste 2O+10, dano 1d3+1 de impacto; revólver (à distância, alcance curto), teste 2O+10, crítico 19/x3, dano 2d6+6 balístico.\n\nMovimento · Olhar do investigador. Faz um teste de Investigação (DT 15) para notar alguma fraqueza num ser em alcance médio. Se passar, seus ataques contra esse ser causam +1d6 de dano até o fim da cena.",
+   "enigma": "",
+   "notas": "PV 68 (Machucado 34). Agente da lei ou profissional de investigação de campo: escrivão ou agente da polícia civil, investigador de seguradora ou de grande empresa, detetive particular. Pode trabalhar a favor ou contra os agentes da Ordem; como aliado, rende bônus de investigação, e como adversário é atirador perigoso que estuda o alvo antes de atacar."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Médico",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 160",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 13,
+   "pvMax": 14,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 1,
+    "int": 2,
+    "pre": 2,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção 2O+5, Iniciativa O, Fortitude O+5, Reflexos O, Vontade 2O+5, Ciências 2O+5, Medicina 3O+5",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Bisturi (corpo a corpo, corte)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "1d4+1",
+     "crit": "18/x2"
+    }
+   },
+   "hab": "Conhecimento anatômico. Quem for atingido por um ataque de bisturi do médico fica atordoado por 1 rodada e sangrando (Fortitude DT 15 evita). Cada pessoa só pode ser atordoada por esta habilidade uma vez por cena.",
+   "acoes": "Padrão · Agredir. Bisturi (corpo a corpo): teste 2O+5, crítico 18, dano 1d4+1 de corte.\n\nPadrão · Tratar ferimentos. Cura 2d10+2 PV de si mesmo ou de um ser adjacente. Só pode usar uma vez por dia em cada ser.",
+   "enigma": "",
+   "notas": "PV 14 (Machucado 7). Profissional treinado para socorrer, que pode salvar um grupo de sobreviventes ou uma equipe em campo. Nas mãos de alguém criminoso ou tomado pelo paranormal, o mesmo conhecimento serve para causar dor ou matar com precisão."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Religioso",
+   "grupo": "Ameaças da Realidade",
+   "fonte": "SaH p. 160-161",
+   "el": "Realidade",
+   "vd": 40,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 15,
+   "pvMax": 32,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 1,
+    "for": 1,
+    "int": 2,
+    "pre": 3,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção 3O+5, Iniciativa O+5, Fortitude O, Reflexos O, Vontade 3O+5, Diplomacia 3O+5, Intuição 3O+5, Religião 3O+5",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Pancada (corpo a corpo, impacto)",
+     "dados": 1,
+     "bonus": 5,
+     "dano": "1d3+1",
+     "crit": "x2"
+    }
+   },
+   "hab": "Fé inabalável. O único poder sobrenatural em que acredita é o que vem da própria devoção: recebe +10 em testes de Vontade contra efeitos paranormais (inclusive rituais).\n\nPotência da voz. Com acesso a um microfone ou outro amplificador de voz, o alcance de suas habilidades aumenta em um passo e a DT para resistir a elas aumenta em +5.\n\nSeguidores. Está sempre acompanhado de 1d4+1 devotos fiéis (use a ficha de iniciados, OPRPG p. 286), dispostos a tudo para protegê-lo.",
+   "acoes": "Padrão · Agredir. Pancada (corpo a corpo): teste +5 (o livro imprime um símbolo de ação no lugar do dado; ver dúvidas), dano 1d3+1 de impacto.\n\nPadrão · Voz guia. Figura de orientação e conselho: uma pessoa em alcance curto que possa ouvi-lo recebe +O (símbolo impresso trocado; ver dúvidas) no próximo teste de perícia, desde que feito até o fim da próxima rodada.\n\nPadrão · Voz acusadora. Escolhe uma pessoa em alcance curto e a humilha esfregando na cara dela falhas, erros e culpas: a vítima sofre 3d6 de dano mental e fica alquebrada (Vontade DT 15 reduz à metade e evita a condição).\n\nReação · Sacrifício sagrado. Uma vez por rodada, quando sofre dano, troca de lugar com um seguidor adjacente, que sofre o dano no lugar dele.",
+   "enigma": "",
+   "notas": "PV 32 (Machucado 16). Líder religioso de qualquer fé, muito carismático e adorado pelos fiéis. Alguns usam isso para cuidar da congregação; outros manipulam os seguidores em busca de dinheiro, influência ou até de acesso a poder paranormal. Em combate, fica protegido atrás dos devotos, apoia aliados com a voz e humilha inimigos."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Predador sofisticado",
+   "grupo": "Serial killers",
+   "fonte": "SaH p. 161",
+   "el": "Realidade",
+   "vd": 60,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 21,
+   "pvMax": 60,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 2,
+    "int": 2,
+    "pre": 3,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção 3O+10, Iniciativa 2O+5, Fortitude O+5, Reflexos 2O+10, Vontade 3O+10, Diplomacia 3O+10, Enganação 3O+10, Intimidação 3O+10",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Navalha (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d8+13",
+     "crit": "19/x3"
+    },
+    "a2": {
+     "n": "Machado (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "2d8+13",
+     "crit": "x3"
+    },
+    "a3": {
+     "n": "Pistola silenciada (distância x2, curto, balístico)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d12+13",
+     "crit": "x3"
+    }
+   },
+   "hab": "Escondido em plena vista. Caça melhor em lugares movimentados, como shoppings e metrôs. Nesses ambientes, pode usar Enganação no lugar de Furtividade e não sofre penalidade nem redução de deslocamento por fazer ações chamativas enquanto está furtivo.\n\nRecursos abundantes. O dinheiro abre portas: pode entrar em lugares onde normalmente não entraria, acessar documentos e aparelhos que não teria, e cometer crimes menores (como agredir alguém num bar) sem ser punido pela Justiça. Para crimes mais graves, a critério do Mestre, pode arranjar um bode expiatório que assuma a culpa.\n\nSorriso sedutor. Manipula e atrai vítimas com carisma e artigos de luxo. Quem não sabe que ele é um assassino fica desprevenido contra ele e sofre −1D em testes contra ele. Não depende só de atração romântica: ele pode, por exemplo, levar um acionista a um quarto de hotel prometendo informações valiosas.",
+   "acoes": "Padrão · Agredir. Ataques listados: navalha x2 (corpo a corpo), teste 3O+10, crítico 19/x3, dano 1d8+13 de corte cada; machado x2 (corpo a corpo), teste 3O+10, crítico x3, dano 2d8+13 de corte cada; pistola silenciada x2 (à distância, alcance curto), teste 3O+10, crítico x3, dano 1d12+13 balístico cada.\n\nLivre · Ataque furtivo. Uma vez por rodada, causa +3d6 de dano com um ataque corpo a corpo, ou à distância em alcance curto, contra alvo desprevenido ou que esteja flanqueando.\n\nPadrão · Guarda-costas. Vive cercado de gente que manipulou ou comprou. Uma vez por cena, chama 1d4+1 capangas (OPRPG p. 284), que entram em cena no início da próxima rodada.",
+   "enigma": "",
+   "notas": "PV 60 (Machucado 30). Serial killer que sobe na vida social: mora e trabalha no alto de arranha-céus, olha o mundo de cima e subestima rivais e vítimas. Prefere mortes limpas e discretas (mas é brutal quando pode) e usa o status para que as vítimas fiquem dadas como desaparecidas por muito tempo. Serial killers em geral matam em série com algum padrão (perfil da vítima ou método), por motivos que vão do patológico ao paranormal, e são metódicos e preparados para escapar da lei."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Caçador de gente",
+   "grupo": "Serial killers",
+   "fonte": "SaH p. 162",
+   "el": "Realidade",
+   "vd": 80,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 23,
+   "pvMax": 80,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 3,
+    "int": 1,
+    "pre": 1,
+    "vig": 3
+   },
+   "sentidos": "Faro (só para humanos)",
+   "per": "Percepção O+5, Iniciativa 2O+10, Fortitude 3O+10, Reflexos 2O+10, Vontade O+5, Atletismo 3O+10, Sobrevivência O+10",
+   "resist": "Dano 10/paranormal enquanto machucado",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Pancada (corpo a corpo x2, impacto)",
+     "dados": 3,
+     "bonus": 15,
+     "dano": "1d4+15",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Machado (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 15,
+     "dano": "2d8+15",
+     "crit": "x3"
+    },
+    "a3": {
+     "n": "Motosserra (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 15,
+     "dano": "3d6+15",
+     "crit": "x4"
+    }
+   },
+   "hab": "Abrutalhado. Capaz de feitos físicos assustadores, muitas vezes tidos como sobrenaturais. Pode usar itens de duas mãos com uma só e usar objetos feitos para criaturas Grandes sem penalidade. Enquanto está machucado, tem resistência a dano 10/paranormal.\n\nÁrea de caça. Mesmo grandalhão e bruto, sabe ser furtivo no lugar isolado onde se esconde e caça. Defina a área de caça como um raio de 1km em volta da morada dele: ali, recebe +O em testes de perícia.\n\nFaro para humanos. Acostumado a caçar pessoas, recebe +2O em testes de Sobrevivência envolvendo pessoas e percebe a presença de humanos pelo cheiro, como se tivesse faro.",
+   "acoes": "Padrão · Agredir. Ataques listados: pancada x2 (corpo a corpo), teste 3O+15, dano 1d4+15 de impacto cada; machado x2 (corpo a corpo), teste 3O+15, crítico x3, dano 2d8+15 de corte cada; motosserra x2 (corpo a corpo), teste 3O+15, crítico x4, dano 3d6+15 de corte cada.\n\nLivre · Ataque furtivo. Uma vez por rodada, causa +4d6 de dano com um ataque corpo a corpo, ou à distância em alcance curto, contra alvo desprevenido ou que esteja flanqueando.\n\nMovimento · Imparável. Nunca para de caçar: anula qualquer efeito que esteja reduzindo seu deslocamento. Outras consequências desse efeito continuam valendo.\n\nPadrão · Assustar. Faz algo apavorante (grita, gargalha, faz a motosserra roncar…): todas as pessoas e animais em alcance curto que possam vê-lo ou ouvi-lo sofrem 4d6 de dano mental (Vontade DT 20 reduz à metade).\n\nPadrão · Fatalidade. Faz um único ataque de pancada. Se acertar, além do dano, o alvo sofre um ferimento debilitante (SaH p. 105). Cada ser só pode ser afetado por isto uma vez por cena.",
+   "enigma": "",
+   "notas": "PV 80 (Machucado 40). Assassino que já não consegue viver em sociedade: brutal, grotesco, movido por uma sede de sangue incontrolável e tido como monstro, por isso se isola em casas de campo ou prédios abandonados. Joga em casa: espera as vítimas no próprio território, fareja-as, assusta e golpeia com força sobre-humana."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Artista da morte",
+   "grupo": "Serial killers",
+   "fonte": "SaH p. 162-163",
+   "el": "Realidade",
+   "vd": 140,
+   "porte": "Pessoa · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 27,
+   "pvMax": 150,
+   "desl": "9m (6 q)",
+   "atr": {
+    "agi": 3,
+    "for": 1,
+    "int": 3,
+    "pre": 3,
+    "vig": 1
+   },
+   "sentidos": "",
+   "per": "Percepção 3O+15, Iniciativa 3O+15, Fortitude O+5, Reflexos 3O+15, Vontade 3O+15, Artes 3O+15, Enganação 3O+15, Furtividade 3O+15",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Bisturi (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 15,
+     "dano": "1d4+17",
+     "crit": "19/x4"
+    }
+   },
+   "hab": "Matar é uma arte. Trata a matança como expressão artística estudada com carinho. Pode usar Artes no lugar de qualquer outra perícia em testes que envolvam mentes e corpos humanos (por exemplo, Artes em vez de Medicina para uma necropsia, ou em vez de Diplomacia para persuadir). Se tiver algumas horas para analisar uma cena de crime ou uma vítima, pode trocar testes de Investigação por Artes com bônus de +O. Essa técnica, mesmo vindo de assassinos em série, é cobiçada por departamentos de investigação, que muitas vezes usam artistas da morte presos como consultores para capturar outros.\n\nCenas imprevisíveis. A cena de crime de um artista da morte nunca é fácil de analisar. Se ele quis que parecesse acidente ou morte sem ligação com ele, todos os testes para obter pistas na cena têm DT +5. Se ele quis deixar sua marca, a cena perturba a mente: quem a vê fica enjoado e, se não sair dela imediatamente, sofre 4d8 de dano mental (Vontade DT 25 reduz à metade e evita a condição).",
+   "acoes": "Padrão · Agredir. Bisturi x2 (corpo a corpo): teste 3O+15, crítico 19/x4, dano 1d4+17 de corte cada.\n\nLivre · Ataque furtivo. Uma vez por rodada, causa +7d6 de dano com um ataque corpo a corpo, ou à distância em alcance curto, contra alvo desprevenido ou que esteja flanqueando.\n\nPadrão · Discurso artístico. Dirige-se a todos que possam ouvi-lo em alcance curto e justifica sua arte mortal com argumentos expressionistas, frases racionais e niilismo, fazendo mentes fracas acharem algum sentido ou beleza no que ele diz. As pessoas afetadas sofrem 4d8 de dano mental e ficam alquebradas e frustradas (Vontade DT 25 reduz à metade e evita a condição frustrado). Cada pessoa só pode ser afetada uma vez por cena.",
+   "enigma": "",
+   "notas": "PV 150 (Machucado 75). Assassino para quem a morte é uma arte técnica e meticulosa, a ser vivida com atenção por ele, pela vítima e pelo público que verá a obra nos jornais. Não é combatente: costuma ter profissão comum, precisa de tempo e do lugar certo, porque até a cena do crime tem de ser perfeita. Em confronto, aproveita a surpresa (ataque furtivo enorme) e desestabiliza os agentes com o discurso."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Ariranha",
+   "grupo": "Animais",
+   "fonte": "SaH p. 163",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Animal · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 16,
+   "pvMax": 32,
+   "desl": "12m (8 q), natação 9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 1,
+    "int": 0,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa 2O+5, Fortitude O, Reflexos 2O+5, Vontade O",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Mordida (corpo a corpo, corte)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "2d4+2",
+     "crit": "x2"
+    }
+   },
+   "hab": "Evasão. Quando sofre um ataque que permite teste de Reflexos para reduzir o dano à metade, não sofre dano nenhum se passar.\n\nTáticas familiares. Recebe +2 em testes de ataque e rolagens de dano para cada outra ariranha que esteja atacando o mesmo oponente na mesma rodada.",
+   "acoes": "Padrão · Agredir. Mordida (corpo a corpo): teste 2O+5, dano 2d4+2 de corte.",
+   "enigma": "",
+   "notas": "PV 32 (Machucado 16). Animal do Pantanal e de trechos do Rio Amazonas, brincalhão mas predador corajoso e hábil. Vive em grupos familiares que se defendem entre si e conseguem derrubar oponentes muito maiores: use em bando. Os animais deste capítulo podem aparecer fora da região de origem como pets exóticos, bichos de circo ou laboratório, ou como parte de rituais de cultistas."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Cavalo",
+   "grupo": "Animais",
+   "fonte": "SaH p. 163",
+   "el": "Realidade",
+   "vd": 10,
+   "porte": "Animal · Grande",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 13,
+   "pvMax": 12,
+   "desl": "15m (10 q)",
+   "atr": {
+    "agi": 1,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa O+5, Fortitude 2O, Reflexos O+5, Vontade O",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Cascos (corpo a corpo, impacto)",
+     "dados": 1,
+     "bonus": 5,
+     "dano": "2d4+3",
+     "crit": "x2"
+    }
+   },
+   "hab": "Montaria. Um personagem treinado em Adestramento pode usar o cavalo como montaria. Ele conta como um aliado que aumenta o deslocamento do personagem para 15 e dá uma ação extra por rodada (só para se deslocar).",
+   "acoes": "Padrão · Agredir. Cascos (corpo a corpo): teste O+5, dano 2d4+3 de impacto.",
+   "enigma": "",
+   "notas": "PV 12 (Machucado 6). Ainda muito usado: na cidade, pela polícia montada e em esporte e lazer; no campo, para transporte e tração. Em geral é pacato, mas dá coices fortes com os cascos."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Enxame de Tocandiras",
+   "grupo": "Animais",
+   "fonte": "SaH p. 164",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Animal (enxame) · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 16,
+   "pvMax": 22,
+   "desl": "6m (4 q), escalar 6m (4 q)",
+   "atr": {
+    "agi": 1,
+    "for": 0,
+    "int": 0,
+    "pre": 1,
+    "vig": 0
+   },
+   "sentidos": "Visão na penumbra",
+   "per": "Percepção O+5, Iniciativa O+5, Fortitude −2O, Reflexos O+5, Vontade O",
+   "resist": "Metade do dano de ataques com armas",
+   "imun": "Manobras de combate e efeitos que afetam só uma criatura e não causam dano",
+   "vuln": "Efeitos de área (+50% de dano)",
+   "ataques": {},
+   "hab": "Enxame. Aglomeração de criaturas que agem juntas. Pode entrar no espaço ocupado por um ser. No fim do seu turno, causa automaticamente 4d4 de dano de perfuração a todo ser no seu espaço. É imune a manobras de combate e a efeitos que afetam apenas uma criatura e não causam dano, e sofre só metade do dano de ataques com armas; por outro lado, sofre 50% a mais de dano de efeitos de área.\n\nDor debilitante. Quem sofrer dano do enxame sofre −O em todos os testes por causa da dor intensa (Fortitude DT 20 evita). A penalidade só sai com a ação de interlúdio dormir ou com uma dose de antídoto.\n\nPor dentro das roupas. Quem sai do espaço do enxame leva algumas formigas dentro da roupa e continua sofrendo metade do dano de Enxame (2d4) até gastar uma ação de movimento para se livrar delas.",
+   "acoes": "Fim do turno · Enxame. 4d4 de dano de perfuração automático em cada ser no espaço do enxame (2d4 por turno em quem saiu com formigas na roupa, até gastar uma ação de movimento para tirá-las).",
+   "enigma": "",
+   "notas": "PV 22 (Machucado 11). Tocandira, ou formiga-bala: inseto pequeno típico da Amazônia (e de outras partes da América do Sul), famoso pela picada de dor intensa e incapacitante. O perigo é a dor que derruba os testes, não o dano em si; efeitos de área funcionam melhor que armas."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Gorila",
+   "grupo": "Animais",
+   "fonte": "SaH p. 164",
+   "el": "Realidade",
+   "vd": 40,
+   "porte": "Animal · Grande",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 19,
+   "pvMax": 70,
+   "desl": "9m (6 q), escalar 9m (6 q)",
+   "atr": {
+    "agi": 2,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 3
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa 2O+5, Fortitude 2O+5, Reflexos O+5, Vontade O, Atletismo 3O+5",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Pancada (corpo a corpo x2, impacto)",
+     "dados": 2,
+     "bonus": 10,
+     "dano": "1d6+3",
+     "crit": "x2"
+    },
+    "a2": {
+     "n": "Mordida (corpo a corpo, corte)",
+     "dados": 2,
+     "bonus": 10,
+     "dano": "1d6+4",
+     "crit": "x2"
+    }
+   },
+   "hab": "",
+   "acoes": "Padrão · Agredir. Ataques listados: pancada x2 (corpo a corpo), teste 2O+10, dano 1d6+3 de impacto cada; mordida (corpo a corpo), teste 2O+10, dano 1d6+4 de corte.\n\nLivre · Morder. Se acertar os dois ataques de pancada num mesmo ser na mesma rodada, ataca esse ser com a mordida.",
+   "enigma": "",
+   "notas": "PV 70 (Machucado 35). O livro não traz texto descritivo para o gorila. Escala tão bem quanto anda; golpeia com os dois braços e, se acertar os dois no mesmo ser, emenda uma mordida. Como os outros animais do capítulo, pode surgir fora do habitat como pet exótico, animal de circo ou laboratório, ou parte de um ritual."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Leão",
+   "grupo": "Animais",
+   "fonte": "SaH p. 164-165",
+   "el": "Realidade",
+   "vd": 60,
+   "porte": "Animal · Grande",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 18,
+   "pvMax": 80,
+   "desl": "15m (10 q)",
+   "atr": {
+    "agi": 3,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+10, Iniciativa 3O+10, Fortitude 2O+5, Reflexos 3O+10, Vontade 2O+5, Atletismo 3O+10, Furtividade 3O+8",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d6+4",
+     "crit": "19/x2"
+    },
+    "a2": {
+     "n": "Mordida (corpo a corpo, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d8+4",
+     "crit": "x2"
+    }
+   },
+   "hab": "",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x2 (corpo a corpo), teste 3O+10, crítico 19, dano 1d6+4 de corte cada; mordida (corpo a corpo), teste 3O+10, dano 1d8+4 de corte.\n\nLivre · Agarrão. Se acertar um ataque de mordida num ser Médio ou menor, pode tentar agarrar o alvo (teste 3O+12).\n\nCompleta · Bote. Faz uma investida e ataca com a mordida e as garras. Os três ataques recebem o bônus de +O da investida, mas têm de ser feitos contra o mesmo alvo.",
+   "enigma": "",
+   "notas": "PV 80 (Machucado 40). O \"rei das selvas\", um dos maiores predadores das savanas africanas. Já foi comum em circos no Brasil e ainda aparece em santuários de animais selvagens ou em coleções (geralmente ilegais) de animais exóticos. Abre a luta com o bote e tenta agarrar com a mordida."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Lobo",
+   "grupo": "Animais",
+   "fonte": "SaH p. 165",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Animal · Médio",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 15,
+   "pvMax": 18,
+   "desl": "12m (8 q)",
+   "atr": {
+    "agi": 3,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa O+5, Fortitude 2O+5, Reflexos 2O+5, Vontade 2O, Sobrevivência 2O+10",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Mordida (corpo a corpo, corte)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "1d6+4",
+     "crit": "x2"
+    }
+   },
+   "hab": "Táticas de alcateia. Quando flanqueia um inimigo, recebe +O no teste de ataque e causa +1d6 de dano com a mordida (além do bônus normal de flanquear, totalizando +2O no ataque e +1d6 no dano).",
+   "acoes": "Padrão · Agredir. Mordida (corpo a corpo): teste 2O+5, dano 1d6+4 de corte.\n\nLivre · Derrubar. Se acertar um ataque de mordida num ser Médio ou menor, pode fazer a manobra derrubar (teste 2O+5).",
+   "enigma": "",
+   "notas": "PV 18 (Machucado 9). O livro não traz texto descritivo para o lobo. Rende mais em grupo: flanqueia para ganhar +O e +1d6 na mordida, e derruba quem morde."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Touro",
+   "grupo": "Animais",
+   "fonte": "SaH p. 165",
+   "el": "Realidade",
+   "vd": 20,
+   "porte": "Animal · Grande",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 15,
+   "pvMax": 38,
+   "desl": "12m (8 q)",
+   "atr": {
+    "agi": 1,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 2
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa O, Fortitude 2O+5, Reflexos O, Vontade O",
+   "resist": "",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Chifres (corpo a corpo, perfuração)",
+     "dados": 2,
+     "bonus": 5,
+     "dano": "2d6+6",
+     "crit": "x2"
+    }
+   },
+   "hab": "",
+   "acoes": "Padrão · Agredir. Chifres (corpo a corpo): teste 2O+5, dano 2d6+6 de perfuração.\n\nCompleta · Atropelamento. Percorre até o dobro do deslocamento em linha reta, podendo passar pelo espaço de quaisquer seres menores que ele. Os seres nessa linha sofrem 2d6+6 de dano de impacto e ficam caídos (Reflexos DT 15 reduz à metade e evita a condição). Recarga (movimento): depois de usar, precisa gastar uma ação de movimento antes de poder usar de novo.",
+   "enigma": "",
+   "notas": "PV 38 (Machucado 19). O livro não traz texto descritivo para o touro. Alterna chifradas e atropelamentos em linha reta; depois de atropelar, gasta uma ação de movimento para recarregar."
+  },
+  {
+   "v": 1,
+   "tipo": "ameaca",
+   "nome": "Urso Pardo",
+   "grupo": "Animais",
+   "fonte": "SaH p. 165",
+   "el": "Realidade",
+   "vd": 60,
+   "porte": "Animal · Grande",
+   "pres": {
+    "dt": 0,
+    "dano": "",
+    "nex": 0
+   },
+   "def": 19,
+   "pvMax": 90,
+   "desl": "12m (8 q)",
+   "atr": {
+    "agi": 1,
+    "for": 3,
+    "int": 0,
+    "pre": 1,
+    "vig": 3
+   },
+   "sentidos": "Faro, visão na penumbra",
+   "per": "Percepção O+5, Iniciativa O+5, Fortitude 3O+10, Reflexos 2O+5, Vontade 2O, Atletismo 3O+10",
+   "resist": "Balístico, corte, impacto e perfuração 2",
+   "imun": "",
+   "vuln": "",
+   "ataques": {
+    "a1": {
+     "n": "Garras (corpo a corpo x2, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d6+4",
+     "crit": "19/x2"
+    },
+    "a2": {
+     "n": "Mordida (corpo a corpo, corte)",
+     "dados": 3,
+     "bonus": 10,
+     "dano": "1d8+4",
+     "crit": "x2"
+    }
+   },
+   "hab": "",
+   "acoes": "Padrão · Agredir. Ataques listados: garras x2 (corpo a corpo), teste 3O+10, crítico 19, dano 1d6+4 de corte cada; mordida (corpo a corpo), teste 3O+10, dano 1d8+4 de corte.\n\nLivre · Agarrão. Se acertar um ataque de mordida num ser Médio ou menor, pode tentar agarrar o alvo (teste 3O+12).",
+   "enigma": "",
+   "notas": "PV 90 (Machucado 45). Um dos ursos mais perigosos, predador imponente e poderoso. Tem resistência 2 a dano balístico, corte, impacto e perfuração, garras com crítico 19 e mordida que agarra."
+  }
+ ],
+ "duvidas": [
+  "Críticos: o livro não informa margem nem multiplicador de crítico na maioria dos ataques (todas as criaturas paranormais, exceto a lâmina do Espectro, e vários ataques de pessoas e animais). Nesses casos o campo crit ficou \"x2\" (padrão 20/x2). Onde o livro diz só \"crítico 19\" ou \"crítico 18\", gravei \"19/x2\" e \"18/x2\", porque o site lê o número depois do \"x\" como multiplicador.",
+  "Agredir com várias armas: o livro lista sob a mesma ação agredir ataques diferentes (ex.: Quibungo garras x4 e mordida; Medusa garras x2, cauda e jato; Predador sofisticado navalha x2, machado x2 e pistola x2) sem dizer se são opções ou se todos são feitos juntos. Transcrevi como \"ataques listados\", sem decidir.",
+  "Sepultado: o cabeçalho diz CRIATURA · GRANDE, mas a habilidade Membros Longos diz \"Embora o Sepultado seja Médio\". Mantive Grande no porte e o texto da habilidade como está.",
+  "Uivar e Melancolia: Força impressa como \"-\" (sem valor); gravado como 0 em atr.for. Ambos têm \"IMUNIDADES Dano\" impresso assim, sem especificar; transcrito literalmente (o Enigma da Melancolia confirma que ela perde a \"imunidade a dano\" ao ser revelada).",
+  "Uivar, Beijo gélido: \"sofre 6d6 de Energia e fica lenta (Fortitude DT 20 reduz à metade)\". O livro não diz se o teste também evita a condição lenta.",
+  "Espectro Inesquecido: o texto da regra diz \"O Marcado se torna uma criatura de , com VD...\" (o ícone do elemento não aparece nem na imagem); o cabeçalho da ficha de exemplo é ENERGIA, então usei Energia. A regra de PV fala em \"Defesa / Resistências\" de forma truncada.",
+  "Espectro Inesquecido, ficha de exemplo diverge da própria regra: tamanho Grande (o Marcado é Médio e a regra manda manter o tamanho); atributos AGI 2, FOR 2, INT 1, PRE 1, VIG 3 (o Marcado tem AGI 2, FOR 1, INT 3, PRE 3, VIG 2 e a regra manda manter iguais); Iniciativa 3O+5 (pela regra seria 2O+5); Aterrorizar com 2d8 e DT 15 (linha VD 20-40) em vez de 6d8 e DT 35 (linha do VD 220); aparece Investigação 3O+10 que o Marcado não tem, somem Luta e Pontaria, e Percepção aparece duas vezes (3O+15 nos sentidos e 3O+10 nas perícias). Transcrevi a ficha exatamente como impressa e anotei a regra completa nas notas.",
+  "Espectro Inesquecido: criei uma ficha só (o exemplo VD 220), com a regra de criação, a Tabela 3.1 e as estatísticas do Marcado-base nas notas. O livro não traz outras fichas prontas de espectro.",
+  "Amigo Imaginário: o cabeçalho traz dois elementos principais (MORTE · SANGUE); usei el \"Morte\" e porte \"Criatura de Morte e Sangue\". A Presença Perturbadora não tem NEX de imunidade (nex 0). No Frenesi de Sangue, a Fortitude impressa é \"5D+30\" (provavelmente 5O+30, com o símbolo trocado). O Frenesi é uma lista de alterações, não uma ficha própria, então ficou na mesma ficha (habilidade), sem criar uma segunda.",
+  "Religioso: no ataque Pancada (\"Teste ❖+5\") e na Voz guia (\"recebe +❖\") o livro imprime o símbolo de ação no lugar do dado. Gravei o ataque como 1 dado +5 e a Voz guia como +O. Confirmar.",
+  "Lobo: o livro escreve \"visão na pesnumbra\"; gravado como visão na penumbra.",
+  "Cavalo, Montaria: \"aumenta seu deslocamento para 15\", sem unidade (presumivelmente 15m). Transcrito como está.",
+  "Selos de elemento secundário (Medo, Sangue, Energia, Conhecimento, Morte) aparecem antes de \"Criatura\" em várias fichas (Mescla, Uivar, Derretido, Espectro, Melancolia, Profundo, Memento Mori, Rascunho, Medusa). O campo el só aceita um valor; usei o elemento do cabeçalho e registrei os demais no porte como \"(também ...)\".",
+  "Melancolia (estágios I a IV da infecção) e Mescla não têm fichas próprias por estágio ou forma no livro, então não foram desdobradas. Nenhuma criatura do capítulo tem variação com ficha própria separada.",
+  "Gorila, Lobo e Touro não têm texto descritivo no livro (só a ficha). Medusa não tem linha de Perícias (só a regra de expert, 4O+20 para as não listadas).",
+  "Valores de Machucado (metade dos PV, como impresso) não têm campo no modelo; foram para o início de notas. Os quadrados de deslocamento (\"| 6 q\") também foram mantidos em desl."
+ ]
+}

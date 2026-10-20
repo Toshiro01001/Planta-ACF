@@ -82,7 +82,7 @@ const ORIGENS = [
   ['Psicólogo', 'intuicao,profissao', 'Terapia'], ['Repórter Investigativo', 'atualidades,investigacao', 'Encontrar a Verdade'],
 ];
 const CUSTO_RITUAL = { 1: 1, 2: 3, 3: 6, 4: 10 };
-const ELEM_COR = { conhecimento: '#d9a514', energia: '#8a3fd1', morte: '#7c7c7c', sangue: '#c2272f', medo: '#e9e4f2', varia: '#5fa8a0' };
+const ELEM_COR = { conhecimento: '#d9a514', energia: '#8a3fd1', morte: '#7c7c7c', sangue: '#c2272f', medo: '#e9e4f2', varia: '#5fa8a0', realidade: '#6f8aa3' };
 // cor de destaque da ficha: a cor da cobaia (cores muito escuras viram cinza claro)
 function acento(cor) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(cor || '').trim());
@@ -473,6 +473,27 @@ function limparImportado(v, prof = 0) {
   return typeof v === 'boolean' ? v : null;
 }
 // importa um ou vários arquivos (.json de uma ficha, ou um pacote com várias) para a aba aberta
+// janela do bestiário: lista as criaturas por grupo; devolve as marcadas
+function escolherDoBestiario(b) {
+  return new Promise(ok => {
+    const m = $('#fxModal'); m.hidden = false; F.cat = null;
+    const grupos = [...new Set(b.criaturas.map(c => c.grupo || 'Outras'))];
+    m.innerHTML = `<div class="fx-modal-caixa fx-bestiario"><div class="fx-modal-topo"><h3>Bestiário${b.fonte ? ' · ' + esc(String(b.fonte).split(' (')[0]) : ''}</h3><button class="fx-fechar" data-b="nao" aria-label="Fechar">×</button></div>
+      <p class="fx-legenda">Marque as ameaças que viram ficha agora. Dá para importar o mesmo arquivo de novo depois para pegar outras.</p>
+      <input class="fx-busca" data-b="busca" placeholder="Procurar pelo nome…">
+      <div class="fx-best-lista">${grupos.map(g => `<section><h4>${esc(g)} <button class="fx-mini" data-b="grupo" data-g="${esc(g)}">marcar todos</button></h4>${b.criaturas.map((c, i) => (c.grupo || 'Outras') === g ? `<label class="fx-check fx-best-item"><input type="checkbox" data-i="${i}"> <b>${esc(c.nome || 'Sem nome')}</b> <small>${esc([c.el && c.el !== 'Realidade' ? c.el : '', c.vd ? 'VD ' + c.vd : '', c.fonte || ''].filter(Boolean).join(' · '))}</small></label>` : '').join('')}</section>`).join('')}</div>
+      <div class="fx-det-acoes"><button class="fx-btn-roxo" data-b="sim">Criar as fichas marcadas</button><button data-b="nao">Cancelar</button></div></div>`;
+    const fim = r => { m.hidden = true; m.innerHTML = ''; m.removeEventListener('click', clique); ok(r); };
+    const clique = e => {
+      const x = e.target.closest('[data-b]'); if (!x) return;
+      if (x.dataset.b === 'nao') fim([]);
+      if (x.dataset.b === 'sim') fim($$('[data-i]', m).filter(i => i.checked).map(i => b.criaturas[int(i.dataset.i)]));
+      if (x.dataset.b === 'grupo') { const sec = x.closest('section'); const cx = $$('[data-i]', sec); const todos = cx.every(i => i.checked); cx.forEach(i => { i.checked = !todos; }); }
+    };
+    m.addEventListener('click', clique);
+    $('[data-b="busca"]', m).addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); $$('.fx-best-item', m).forEach(l => { l.hidden = q && !l.textContent.toLowerCase().includes(q); }); });
+  });
+}
 async function importarFichas(lista) {
   const arquivos = [...(lista || [])]; if (!arquivos.length) return;
   const naAux = F.abaLista === 'aux' && (ehMestre() || ehAux());
@@ -480,11 +501,20 @@ async function importarFichas(lista) {
   const dono = naAux ? 'aux' : gm ? 'mestre' : quem();
   if (!dono) { A.aviso('Escolha sua cobaia antes de importar uma ficha.'); return; }
   const fichas = [];
-  let ruins = 0;
+  let ruins = 0, doBestiario = false;
   for (const f of arquivos) {
     if (f.size > 4000000) { ruins++; continue; }
     let dado;
     try { dado = JSON.parse(await f.text()); } catch (e) { ruins++; continue; }
+    // bestiário (arquivo fora do GitHub, ex.: Sobrevivendo ao Horror): o Mestre escolhe quais criaturas viram ficha
+    if (dado && dado.formato === 'acf-bestiario' && Array.isArray(dado.criaturas)) {
+      if (!ehMestre() && !ehAux()) { ruins++; continue; }
+      const escolhidas = await escolherDoBestiario(dado);
+      escolhidas.forEach(bruta => { const d = normalizar({ ...limparImportado(bruta), dono, criado: Date.now() }); d.dono = dono; d.criado = Date.now() + fichas.length; fichas.push(d); });
+      if (!escolhidas.length) return;
+      doBestiario = true;
+      continue;
+    }
     const brutas = dado && dado.formato === 'acf-fichas' && Array.isArray(dado.fichas) ? dado.fichas : [dado && dado.formato === 'acf-ficha' ? dado.ficha : dado];
     brutas.forEach(bruta => {
       if (!bruta || typeof bruta !== 'object' || !('nome' in bruta || 'atr' in bruta)) { ruins++; return; }
@@ -497,7 +527,7 @@ async function importarFichas(lista) {
   if (!fichas.length) { A.aviso(ruins > 1 ? 'Nenhum desses arquivos é uma ficha válida.' : 'Esse arquivo não é uma ficha válida.'); return; }
   const onde = naAux ? ' em "Ameaças e Filhos" (o Mestre e os auxiliares veem)' : gm ? ' nas suas fichas de Mestre' : '';
   const pergunta = fichas.length === 1 ? `Criar uma ficha nova com "${fichas[0].nome || 'Sem nome'}"${onde}?` : `Importar ${fichas.length} fichas${onde}?\n\n${fichas.slice(0, 12).map(d => '• ' + (d.nome || 'Sem nome')).join('\n')}${fichas.length > 12 ? `\n… e mais ${fichas.length - 12}` : ''}`;
-  if (!confirm(pergunta)) return;
+  if (!doBestiario && !confirm(pergunta)) return;
   let ok = 0, ultima = null;
   for (const d of fichas) {
     const ref = naAux ? { aux: true, dono: 'aux', chave: novaChave() } : { gm, dono, chave: novaChave() };
@@ -670,14 +700,16 @@ function desenharAmeaca() {
   const corpo = $('#fxCorpo'); const topo = corpo.scrollTop;
   const ataques = lista(d.ataques);
   const pres = d.pres || {};
-  corpo.innerHTML = `<div class="fx-ficha fx-ameaca" style="--ac:${corEl(d.el)};--ac-txt:${luz(corEl(d.el)) > 0.5 ? '#16130c' : '#fff'}">
+  const mobA = F.abaMobA || 'status';
+  corpo.innerHTML = `<div class="fx-ficha fx-ameaca" data-mob="${mobA}" style="--ac:${corEl(d.el)};--ac-txt:${luz(corEl(d.el)) > 0.5 ? '#16130c' : '#fff'}">
+    <nav class="fx-abas-mob">${[['status', d.filho !== undefined ? 'Filho' : 'Ameaça'], ['pericias', 'Perícias e defesas'], ['combate', 'Ataques e ações']].map(([k, n]) => `<button data-acao="aba-mob" data-v="${k}" class="${mobA === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
     <section class="fx-col fx-col-esq">
       <div class="fx-dossie fx-painel">
         <label class="fx-foto"${d.foto ? ` style="background-image:url('${esc(d.foto)}')"` : ''}>${ed ? '<input type="file" accept="image/*" data-acao-arq="foto" hidden><span>trocar foto</span>' : ''}<i class="fx-foto-tag">${d.filho !== undefined ? 'FILHO' : 'AMEAÇA'}</i></label>
         <div class="fx-dossie-campos">
-          <label class="fx-nome"><span>Ameaça</span>${campo('nome')}</label>
+          <label class="fx-nome"><span>Ameaça</span>${campo('nome')}</label>${d.fonte ? `<small class="fx-k fx-fonte">${esc(d.grupo ? d.grupo + ' · ' : '')}${esc(d.fonte)}</small>` : ''}
           <div class="fx-dossie-grade">
-            <label>Elemento <select data-c="el"${RO()}>${['Sangue', 'Morte', 'Conhecimento', 'Energia', 'Medo', 'Varia'].map(e => `<option ${d.el === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
+            <label>Elemento <select data-c="el"${RO()}>${['Sangue', 'Morte', 'Conhecimento', 'Energia', 'Medo', 'Varia', 'Realidade'].map(e => `<option ${d.el === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
             <label class="fx-origem">Tipo e tamanho ${campo('porte')}</label>
             <label>Deslocamento ${campo('desl')}</label>
             <label>Sentidos ${campo('sentidos')}</label>
@@ -687,11 +719,11 @@ function desenharAmeaca() {
         <div class="fx-nex"><label class="fx-nex-grande">VD ${campo('vd', 'n', ' min="0"')}</label></div>
       </div>
       <div class="fx-faixa">
-        <div class="fx-painel fx-p-pres"><h4 class="fx-ph"><i>01</i>Presença Perturbadora</h4>
+        ${int(pres.dt) || ed ? `<div class="fx-painel fx-p-pres"><h4 class="fx-ph"><i>01</i>Presença Perturbadora</h4>
           <div class="fx-pres-grade"><label>DT ${campo('pres.dt', 'n')}</label><label>Dano mental ${campo('pres.dano')}</label><label>Imune a partir de NEX ${campo('pres.nex', 'n')}</label></div>
           <p class="fx-legenda">Quem enxerga a criatura faz Vontade: falhou, sofre o dano mental; passou, sofre metade. Com mais de uma criatura, use a de VD mais alto, +1d6 por criatura a mais.</p>
-          <button class="fx-btn-roxo" data-acao="presenca">Chamar o teste dos jogadores</button>
-        </div>
+          ${int(pres.dt) ? '<button class="fx-btn-roxo" data-acao="presenca">Chamar o teste dos jogadores</button>' : '<p class="fx-legenda">Sem Presença Perturbadora (DT 0): gente comum, animais e ameaças da Realidade.</p>'}
+        </div>` : ''}
         <div class="fx-painel fx-p-vit"><h4 class="fx-ph"><i>02</i>Vida e defesa</h4>
           <div class="fx-barras">${['pv'].map(k => `<div class="fx-barra fx-barra-v" data-barra="pv" data-max="pvMax">
             <div class="fx-barra-cab"><span class="fx-barra-tit">Vida <i>PV</i></span><span class="fx-barra-txt"><input data-c="pv.a" type="number" data-n="1" class="fx-barra-at"${RO()}><i>/</i>${campo('pvMax', 'n', ' class="fx-pvmax"')}</span></div>
@@ -1096,6 +1128,8 @@ function abaDe(tipo, x) {
     if (g.startsWith('poderes de ')) return g.slice(11);
     if (TRILHA_CLASSE[g]) return TRILHA_CLASSE[g];
     if (g === 'origens') return 'origens';
+    if (g === 'sobrevivente') return 'sobrevivente';
+    if (g === 'poderes gerais') return 'gerais';
     if (ELEMENTOS.some(e => e.toLowerCase() === g)) return 'paranormal';
     return 'homebrew';
   }
@@ -1103,7 +1137,7 @@ function abaDe(tipo, x) {
   return x.t || 'geral';
 }
 function abasDe(tipo) {
-  if (tipo === 'hab') return [['combatente', 'Combatente'], ['especialista', 'Especialista'], ['ocultista', 'Ocultista'], ['origens', 'Origens'], ['paranormal', 'Poderes Paranormais'], ['homebrew', 'Homebrew']];
+  if (tipo === 'hab') return [['combatente', 'Combatente'], ['especialista', 'Especialista'], ['ocultista', 'Ocultista'], ['sobrevivente', 'Sobrevivente'], ['gerais', 'Poderes Gerais'], ['origens', 'Origens'], ['paranormal', 'Poderes Paranormais'], ['homebrew', 'Homebrew']];
   if (tipo === 'rit') return [['todos', 'Todos'], ...ELEMENTOS.map(e => [e.toLowerCase(), e])];
   if (tipo === 'itens') return [['arma', 'Armas'], ['municao', 'Munições'], ['protecao', 'Proteções'], ['geral', 'Geral'], ['amaldicoado', 'Itens Amaldiçoados']];
   return [];
@@ -1135,7 +1169,7 @@ function abrirCatalogo(tipo, itemId) {
   let tab = ultimo.tab;
   if (!tab) {
     const d = F.atual && F.atual.d;
-    tab = tipo === 'hab' ? (['combatente', 'especialista', 'ocultista'].includes(d && d.classe) ? d.classe : 'combatente') : tipo === 'rit' ? 'todos' : 'arma';
+    tab = tipo === 'hab' ? (['combatente', 'especialista', 'ocultista', 'sobrevivente'].includes(d && d.classe) ? d.classe : 'combatente') : tipo === 'rit' ? 'todos' : 'arma';
   }
   F.cat = { tipo, itemId, seg: 'cat', tab, chip: ultimo.chip, busca: '', fonte: '', sub: tipo === 'mods' ? 'melhorias' : '', minhas: null };
   desenharCatalogo();
@@ -1219,6 +1253,7 @@ function desenharCatalogo() {
   const busca = $('#fxBusca');
   busca.oninput = () => { c.busca = busca.value; const pos = busca.selectionStart; desenharCatalogo(); const nb = $('#fxBusca'); nb.focus(); nb.setSelectionRange(pos, pos); };
   const fo = $('#fxFonte'); if (fo) fo.onchange = () => { c.fonte = fo.value; desenharCatalogo(); };
+  const abaOn = $('#fxModal .fx-cat-abas button.on'); if (abaOn && abaOn.scrollIntoView) { const nav = abaOn.parentElement; nav.scrollLeft = Math.max(0, abaOn.offsetLeft - (nav.clientWidth - abaOn.offsetWidth) / 2); }
 }
 function adicionarDoCatalogo(i, minha) {
   const c = F.cat; const id = A.Rede.chave();
@@ -1258,10 +1293,12 @@ function mostrarRolagem(titulo, html) {
 }
 const minhaFicha = () => F.atual && F.atual.editavel && !F.atual.ref.gm;
 // teste de perícia de uma ficha qualquer, já com as condições (sem mostrar nada)
-function testarPericia(d, id, extra = 0, tipo = '') {
+// dadosExtra: +O / −O de quem pediu o teste (ex.: ações de perseguição e furtividade do SaH)
+function testarPericia(d, id, extra = 0, tipo = '', dadosExtra = 0) {
   const r = calc(d);
   const attr = atrDaPericia(d, id);
   const pen = penalidadesDados(d, id, attr, tipo);
+  if (dadosExtra) pen.push({ n: dadosExtra, fonte: 'da ação' });
   const extraDados = pen.reduce((s, x) => s + x.n, 0);
   const t = rolarTeste(int(d.atr[attr]), r.bonus(id) + extra, extraDados);
   t.pen = pen; t.attr = attr; t.per = id;
@@ -1473,6 +1510,11 @@ function aoClicar(e) {
   }
   if (!at || !at.d) return;
   if (ac === 'aba') { F.aba = v; desenharAba(); return; }
+  if (ac === 'aba-mob' && $('.fx-ficha.fx-ameaca')) {
+    F.abaMobA = v; $('.fx-ficha').dataset.mob = v;
+    $$('.fx-abas-mob button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
+    return;
+  }
   if (ac === 'aba-mob') {
     F.abaMob = v; $('.fx-ficha').dataset.mob = v;
     $$('.fx-abas-mob button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
