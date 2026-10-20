@@ -3436,3 +3436,154 @@ body.tela-cheia .topo, body.tela-cheia .corpo, body.tela-cheia .painel-chat, bod
   .eco-simbolo { mix-blend-mode: normal; }
 }
 @media (pointer: coarse) { .eco-simbolo { mix-blend-mode: normal; } }
+
+/* =========================================================
+   CELULAR: correções da varredura completa (20261012zj)
+   ========================================================= */
+/* botões sem estilo próprio no painel (ex.: "Revelar agora", "consultar a pedra") seguem o tema escuro;
+   :where() deixa a especificidade zerada, então qualquer estilo que o botão já tenha continua valendo */
+:where(#painel) button:where(:not([class])) {
+  background: #1b1526; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px;
+  padding: 6px 10px; font: 13px var(--corpo); cursor: pointer;
+}
+:where(#painel) button:where(:not([class])):hover { border-color: var(--roxo); }
+/* campo de arquivo (ex.: imagem da visão) com cara de botão */
+input[type=file] { max-width: 100%; font: 13px var(--corpo); color: inherit; }
+input[type=file]::file-selector-button { border: 1px solid currentColor; border-radius: 6px; padding: 8px 12px; margin-right: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+/* tela de senha do andar: nada do mapa por cima do terminal */
+.palco-area:has(> #bloqueio:not([hidden])) > :is(.btn-dados, .btn-desfazer, .painel-dados, .camera, .hud-retratos, .hud-mostrar, .cartao, .relogio, .faixa-inv, .andar-legenda, .dica) { display: none !important; }
+.bloqueio { overflow-y: auto; z-index: 8; }
+/* alertas do Mestre: "Fechar todos" e lista com rolagem própria */
+.alertas-mestre { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; }
+.alertas-mestre:not(:empty) { pointer-events: auto; }
+.alertas-todos { justify-self: end; pointer-events: auto; border: 1px solid var(--linha); background: rgba(12,9,18,.94); color: var(--texto); border-radius: 999px; padding: 8px 14px; font: 12px var(--mono); letter-spacing: .06em; cursor: pointer; }
+/* abas que rolam de lado: degradê na borda onde há mais coisa */
+.rola-dir { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.rola-esq { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px); mask-image: linear-gradient(to right, transparent, #000 40px); }
+.rola-dir.rola-esq { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
+/* Sala de Exposição minimizada não fica por baixo do cartão aberto */
+body:has(#cartao:not([hidden])) .expo-chip { display: none; }
+
+@media (max-width: 860px) {
+  /* faixas do topo empilhadas; a fileira dos andares e o símbolo do Eco descem o tanto que elas ocupam */
+  .faixa-persg, .faixa-protocolo, .faixa-apagao { height: 28px; line-height: 16px; padding: 6px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; letter-spacing: .06em; }
+  body.com-faixas .corpo { grid-template-rows: calc(64px + var(--faixas-h, 0px)) 1fr; }
+  body.com-faixas .elevador { padding-top: var(--faixas-h, 0px); }
+  body.com-faixas .eco-simbolo { top: calc(var(--topo-h) + 4px + var(--faixas-h, 0px)); }
+  /* gaveta aberta: o símbolo do Eco não fica por cima do × dela */
+  body:has(#painel.aberto) .eco-simbolo { visibility: hidden; }
+  body.em-persg .andar-legenda, body.em-persg .relogio { top: 14px; }
+  body.em-persg .relogio { top: 10px; }
+  /* Holofote: abaixo da fileira dos andares, sem bloquear o toque */
+  .hol-banner { top: calc(var(--topo-h) + 72px + var(--faixas-h, 0px)); pointer-events: none; padding: 8px 14px; }
+  .hol-banner b { font-size: 14px; }
+  /* Sala de Exposição minimizada: acima do botão Dados, longe da câmera */
+  .expo-chip { left: 10px; right: auto; bottom: 214px; max-width: calc(100vw - 20px); }
+  /* Investigação: canto direito, fora do retrato do jogador */
+  .faixa-inv, body.em-persg .faixa-inv { left: auto; right: 8px; transform: none; top: 56px; max-width: calc(100% - 130px); padding: 6px 10px; }
+  /* Hall da Caixa: o topo com o × acompanha a rolagem */
+  .hall-caixa { padding-top: 0; }
+  .hall-caixa > header { position: sticky; top: 0; z-index: 4; margin: 0 -18px 4px; padding: 14px 18px 6px; background: #150f1d; border-bottom: 1px solid #2a1f38; }
+  .hall-caixa h2 { font-size: 22px; margin-bottom: 4px; }
+  .hall-fechar { width: 44px; height: 44px; flex: none; }
+  /* Quadro: todas as ferramentas à vista, em duas linhas */
+  .qd-ferramentas { flex-wrap: wrap; justify-content: center; overflow-x: visible; }
+  .qd-ferramentas button { width: 40px; height: 40px; }
+  .qd-opcoes { bottom: calc(112px + env(safe-area-inset-bottom)); }
+  .qd-ajuda { display: none; }
+  .qd-fechar { min-width: 40px; min-height: 40px; }
+  /* alvos de toque maiores */
+  #btnFecharChat, .dados-topo .fechar, .fx-fechar, .escudo .fechar, [data-esc="fechar"] { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+  #btnAjuda { min-width: 34px; }
+  .hud-recolher { width: 36px; height: 30px; margin-left: 20px; font-size: 16px; }
+  .setup-linha { grid-template-columns: 24px 24px minmax(0, 1fr) 56px 36px 48px 14px; }
+  .setup-linha input.ck { width: 22px; height: 22px; margin: 0; }
+  .setup-linha .ini, .setup-linha .lim { min-height: 32px; }
+  .setup-linha .dado-mini { min-width: 34px; min-height: 32px; }
+}
+@media (max-width: 400px) {
+  /* nome do andar mais discreto para não cobrir a primeira fileira de salas */
+  .andar-legenda { top: 8px; left: 10px; }
+  .andar-legenda span { font-size: 16px; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
+  .andar-legenda small { display: none; }
+}
+/* computador: com faixas no topo, o corpo do site desce o tanto delas (antes a faixa cobria as abas do Mestre) */
+@media (min-width: 861px) {
+  body.com-faixas .corpo { margin-top: var(--faixas-h, 0px); height: calc(100% - var(--topo-h) - var(--faixas-h, 0px)); }
+  body.com-faixas.em-persg .andar-legenda { top: 14px; }
+  body.com-faixas.em-persg .relogio { top: 14px; }
+  body.com-faixas.em-persg .cartao { top: 82px; }
+  body.com-faixas.em-persg .faixa-inv { top: 10px; }
+}
+
+/* =========================================================
+   SOBREVIVENDO AO HORROR (sah.js): perseguição, furtividade, medo
+   ========================================================= */
+.sah-faixas { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 7; display: grid; gap: 6px; width: max-content; max-width: calc(100% - 24px); pointer-events: none; }
+.sah-faixas[hidden] { display: none; }
+.palco-area:has(#faixaInv) .sah-faixas { top: 54px; }
+body.em-persg .sah-faixas { top: 40px; }
+.sah-faixa { pointer-events: auto; background: rgba(10,8,12,.93); border: 1px solid #7a2a32; border-radius: 10px; padding: 7px 12px; color: #f1e6ea; box-shadow: 0 8px 24px rgba(0,0,0,.5); cursor: pointer; max-width: 100%; }
+.sah-furt { border-color: #2f7d72; }
+.sah-faixa .inv-k { color: #ff8a93; } .sah-furt .inv-k { color: #7fd8c8; }
+.sah-btn { border: 1px solid #b3121b; background: #b3121b; color: #fff; border-radius: 7px; padding: 5px 10px; font: 600 13px var(--corpo); cursor: pointer; min-height: 32px; }
+.sah-furt .sah-btn { background: #2f7d72; border-color: #2f7d72; }
+.sah-ev { margin: 6px 0 2px; font-size: 13px; line-height: 1.45; color: #ffd98a; }
+.sah-lista { display: none; list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; max-height: 38vh; overflow-y: auto; }
+.sah-faixa.aberta .sah-lista { display: grid; gap: 3px; }
+.sah-lista li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 2px 0; }
+.sah-lista li.eu { color: #fff; font-weight: 600; }
+.sah-lista li.visto { color: #ff7b85; }
+.sah-lista small { color: #b9a9b0; font-size: 11px; }
+.sah-pips { display: inline-flex; gap: 6px; }
+.sah-pips span { display: inline-flex; gap: 2px; }
+.sah-pips i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid currentColor; display: inline-block; }
+.sah-pips .ok { color: #59c49a; } .sah-pips .ruim { color: #ff6b75; }
+.sah-pips i.on { background: currentColor; }
+.sah-olhos { letter-spacing: -2px; font-size: 12px; }
+.sah-grade { display: grid; gap: 6px; }
+.sah-part { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0 10px; }
+.sah-part-l { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.sah-part-l select { background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 3px; font-size: 12px; }
+.sah-tab { display: grid; gap: 6px; margin: 8px 0; }
+.sah-tab-l { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--linha); border-radius: 8px; }
+.sah-tab-l.visto { border-color: #b3121b; }
+.sah-tab-l small { color: var(--texto-dim); }
+.sah-ctl { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.sah-ctl button { min-width: 36px; }
+.sah-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 6px 0; }
+.sah-tabela th, .sah-tabela td { border: 1px solid var(--linha); padding: 4px 6px; text-align: left; vertical-align: top; }
+.sah-tabela th { background: #1b1526; }
+.sah-janela .mesa-caixa { border-top-color: #b3121b; }
+.sah-janela.sah-furt-j .mesa-caixa { border-top-color: #2f7d72; }
+.sah-janela.sah-furt-j .mesa-botoes button.pri { background: #2f7d72; border-color: #2f7d72; }
+.sah-ev-op { margin: 8px 0; }
+@media (max-width: 860px) {
+  .sah-faixas { top: 64px; width: calc(100% - 16px); max-width: none; }
+  .palco-area:has(#faixaInv) .sah-faixas { top: 108px; }
+  body.em-persg .sah-faixas { top: 94px; }
+  .sah-faixa { padding: 6px 10px; }
+  .sah-faixa .inv-linha { font-size: 13px; }
+  .sah-btn { min-height: 38px; }
+  .sah-ctl button { min-height: 38px; }
+}
+/* bestiário (importar criaturas do Sobrevivendo ao Horror) */
+.fx-bestiario { max-width: 620px; }
+.fx-best-lista { max-height: 55vh; overflow-y: auto; display: grid; gap: 10px; margin: 8px 0; }
+.fx-best-lista h4 { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin: 6px 0; font: 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ac, #c9a14a); }
+.fx-best-item { display: flex; gap: 8px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.06); min-height: 36px; }
+.fx-best-item[hidden] { display: none; }
+.fx-best-item small { color: var(--texto-dim, #a99); font-size: 11.5px; }
+.fx-busca { width: 100%; background: #0d0a13; color: var(--texto); border: 1px solid var(--linha); border-radius: 6px; padding: 8px; font: 14px var(--corpo); }
+.fx-fonte { display: block; margin: -2px 0 4px; opacity: .8; }
+.fx-bestiario > :not(.fx-modal-topo) { margin-left: 14px; margin-right: 14px; }
+.fx-bestiario > .fx-det-acoes { margin-bottom: 14px; }
+.fx-bestiario .fx-best-lista { flex: 1; min-height: 0; max-height: none; }
+@media (min-width: 861px) { .fx-bestiario .fx-best-lista { max-height: 55vh; } }
+/* SaH · sorteios com bônus */
+.sah-sort-bts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.sah-sort-b{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.sah-bonus{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.sah-bonus input{width:52px}
+.sah-bonus small{opacity:.7}
+#sahMsort:empty{display:none}

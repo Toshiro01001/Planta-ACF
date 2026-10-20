@@ -6,7 +6,7 @@
 (() => {
 'use strict';
 // muda a cada atualização do site: força o navegador a buscar as imagens novas
-const VERSAO_SITE = '20261012zi';
+const VERSAO_SITE = '20261020a';
 
 /* ---------- Medidas da planta (em quadradinhos) ---------- */
 const T  = 40;   // pixels por quadradinho
@@ -2499,6 +2499,10 @@ function abrirLoginMestre() {
 }
 
 function trocarPerfil() {
+  if (meu || aux || mestre) {
+    const quem = ($('#btnMestre').textContent || '').split('·')[0].replace('✓', '').trim() || 'o perfil atual';
+    if (!confirm(`Trocar de perfil?\n\nVocê deixa de estar como ${quem} e escolhe de novo quem é.`)) return;
+  }
   if (Presenca.quem) { Rede.set('presenca/' + Presenca.id, null).catch(() => {}); Presenca.quem = ''; clearInterval(Presenca.timer); }
   meu = null; aux = null;
   salvarPerfil('');
@@ -3395,6 +3399,48 @@ function atualizarBotaoMinha() {
     const dy = e.clientY - y0; y0 = null;
     if (dy < -20 || Math.abs(dy) < 8) $('#painel').classList.add('aberto');
   });
+})();
+
+// a tela "Protocolo iniciado" some sozinha em 7 s; um toque fecha antes
+$('#telaProtocolo').addEventListener('click', e => { e.currentTarget.hidden = true; });
+
+// faixas do topo (Perseguição, Protocolo, Apagão): uma embaixo da outra e, no celular, a fileira dos andares desce junto
+(() => {
+  const ids = ['#faixaPersg', '#faixaProtocolo', '#faixaApagao'];
+  const arrumar = () => {
+    const vis = ids.map(i => $(i)).filter(f => f && !f.hidden);
+    vis.forEach((f, i) => { f.style.top = `calc(var(--topo-h) + ${i * 28}px)`; });
+    ids.map(i => $(i)).filter(f => f && f.hidden).forEach(f => { f.style.top = ''; });
+    document.body.classList.toggle('com-faixas', vis.length > 0);
+    document.body.style.setProperty('--faixas-h', vis.length * 28 + 'px');
+  };
+  const mo = new MutationObserver(arrumar);
+  ids.forEach(i => { const f = $(i); if (f) mo.observe(f, { attributes: true, attributeFilter: ['hidden'] }); });
+  arrumar();
+})();
+
+// diálogos (Ajuda, Loja…) sempre abrem no começo, mesmo com o foco no botão do fim
+(() => {
+  const P = window.HTMLDialogElement && HTMLDialogElement.prototype; if (!P || !P.showModal) return;
+  const orig = P.showModal;
+  P.showModal = function () {
+    const r = orig.apply(this, arguments), d = this;
+    const topo = () => { d.scrollTop = 0; $$('*', d).forEach(x => { if (x.scrollTop) x.scrollTop = 0; }); };
+    topo(); requestAnimationFrame(topo); setTimeout(topo, 120);
+    return r;
+  };
+})();
+
+// abas e barras que rolam de lado: um degradê na borda avisa que tem mais coisa escondida
+(() => {
+  const SEL = '.fx-abas-mob, .fx-nav, .arq-abas, .esc-nav, .qd-ferramentas, .qd-opcoes, .hall-abas, .abas-mestre, .nx-abas, .chat-abas';
+  const marcar = e => {
+    const max = e.scrollWidth - e.clientWidth;
+    e.classList.toggle('rola-dir', max > 4 && e.scrollLeft < max - 4);
+    e.classList.toggle('rola-esq', max > 4 && e.scrollLeft > 4);
+  };
+  document.addEventListener('scroll', ev => { const e = ev.target; if (e && e.matches && e.matches(SEL)) marcar(e); }, { capture: true, passive: true });
+  setInterval(() => $$(SEL).forEach(e => { if (e.offsetParent) marcar(e); }), 700);
 })();
 
 // celular: o corpo do site nunca rola. Se o navegador empurrar alguma dessas caixas sozinho
@@ -4456,12 +4502,37 @@ $$('#abasMestre button[data-aba]').forEach(b => b.addEventListener('click', () =
 /* =========================================================
    ALERTAS DO MESTRE (gatilhos e avisos importantes)
    ========================================================= */
+// "Fulano entrou em X" de várias cobaias ao mesmo tempo vira um aviso só; com 2 ou mais, aparece "Fechar todos"
+const nomesAlerta = () => SERES.map(x => x.nome).filter(Boolean).sort((a, b) => b.length - a.length);
+function juntarNomes(l) { return l.length < 2 ? l[0] : l.length === 2 ? l.join(' e ') : `${l.slice(0, -1).join(', ')} e ${l[l.length - 1]}`; }
+function arrumarAlertas() {
+  const c = $('#alertasMestre'); if (!c) return;
+  const ls = $$('.alerta-mestre', c);
+  let todos = $('.alertas-todos', c);
+  if (ls.length >= 2) {
+    if (!todos) { todos = el('button', 'alertas-todos'); todos.onclick = () => { c.innerHTML = ''; }; c.appendChild(todos); }
+    todos.textContent = `Fechar todos (${ls.length})`;
+  } else if (todos) todos.remove();
+}
 function alertaMestre(txt) {
+  const c = $('#alertasMestre'); if (!c) return;
+  let pre = '', nome = '', resto = '';
+  for (const n of nomesAlerta()) { const i = txt.indexOf(n + ' entrou'); if (i >= 0 && i <= 4) { pre = txt.slice(0, i); nome = n; resto = txt.slice(i + n.length + 7); break; } }
+  const chave = nome ? pre + '|' + resto : '';
+  const ja = chave && $$('.alerta-mestre', c).find(x => x.dataset.k === chave && Date.now() - +x.dataset.t < 20000);
+  if (ja) {
+    const l = JSON.parse(ja.dataset.nomes || '[]'); if (!l.includes(nome)) l.push(nome);
+    ja.dataset.nomes = JSON.stringify(l);
+    $('span', ja).textContent = `${pre}${juntarNomes(l)} ${l.length > 1 ? 'entraram' : 'entrou'}${resto}`;
+    return;
+  }
   const d = el('div', 'alerta-mestre');
   d.innerHTML = `<span>${esc(txt)}</span><button aria-label="Fechar">×</button>`;
-  $('button', d).onclick = () => d.remove();
-  $('#alertasMestre').prepend(d);
-  setTimeout(() => d.remove(), 25000);
+  if (chave) { d.dataset.k = chave; d.dataset.t = Date.now(); d.dataset.nomes = JSON.stringify([nome]); }
+  $('button', d).onclick = () => { d.remove(); arrumarAlertas(); };
+  c.prepend(d);
+  arrumarAlertas();
+  setTimeout(() => { d.remove(); arrumarAlertas(); }, 25000);
   Som.tom(740, 0, 0.18, 'square', 0.1); Som.tom(988, 0.2, 0.25, 'square', 0.1);
 }
 

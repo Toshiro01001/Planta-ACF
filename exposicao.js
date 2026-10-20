@@ -562,7 +562,7 @@ function tudo() {
   });
 }
 A.aoMudar(tudo);
-document.addEventListener('acf-segredos', () => setTimeout(() => desenharBloco(), 30));
+document.addEventListener('acf-segredos', () => setTimeout(() => { try { vigiarEntradas(); } catch (e) {} desenharBloco(); }, 30));
 document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 document.addEventListener('acf-ativa', () => setTimeout(tudo, 60));
 setTimeout(tudo, 500);
