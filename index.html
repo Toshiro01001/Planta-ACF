@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261020a">
+<link rel="stylesheet" href="style.css?v=20261020b">
 </head>
 <body>
 
@@ -31,12 +31,12 @@
     <span id="sync" class="sync" title="Estado da conexão">modo local</span>
     <button id="btnSom" class="btn-fantasma btn-icone" title="Ligar ou desligar os sons neste aparelho" aria-label="Som">🔊</button>
     <button id="btnAjuda" class="btn-fantasma btn-icone" title="Ajuda rápida" aria-label="Ajuda">?</button>
-    <button id="btnFichas" class="btn-fantasma btn-fichas btn-pilha" hidden aria-label="Fichas de agente" title="Fichas de agente (F)"><span class="ic">📋</span> Fichas</button>
-    <button id="btnQuadro" class="btn-fantasma btn-pilha" hidden aria-label="Quadro da equipe" title="Quadro da equipe (B)"><span class="ic">🖍</span> Quadro</button>
-    <button id="btnChat" class="btn-fantasma btn-chat btn-pilha" hidden aria-label="Abrir o chat"><span class="ic">💬</span> Chat<span id="chatBadge" class="chat-badge" hidden>0</span></button>
+    <button id="btnFichas" class="btn-fantasma btn-fichas btn-pilha" hidden aria-label="Fichas de agente" title="Fichas de agente (F)"><span class="ic">📋</span><span class="rot"> Fichas</span></button>
+    <button id="btnQuadro" class="btn-fantasma btn-pilha" hidden aria-label="Quadro da equipe" title="Quadro da equipe (B)"><span class="ic">🖍</span><span class="rot"> Quadro</span></button>
+    <button id="btnChat" class="btn-fantasma btn-chat btn-pilha" hidden aria-label="Abrir o chat"><span class="ic">💬</span><span class="rot"> Chat</span><span id="chatBadge" class="chat-badge" hidden>0</span></button>
     <button id="btnMestre" class="btn-fantasma">Entrar</button>
     <button id="btnRecolher" class="btn-fantasma so-desktop" title="Esconder ou mostrar o painel lateral">Painel ⟩</button>
-    <button id="btnPainel" class="btn-fantasma btn-painel btn-pilha so-celular" aria-label="Abrir painel"><span class="ic">☰</span> Painel</button>
+    <button id="btnPainel" class="btn-fantasma btn-painel btn-pilha so-celular" aria-label="Abrir painel"><span class="ic">☰</span><span class="rot"> Painel</span></button>
   </div>
 </header>
 
@@ -100,7 +100,7 @@
     <div id="cartao" class="cartao" hidden></div>
 
     <!-- Dados -->
-    <button id="btnDados" class="btn-dados" title="Rolar dados">🎲 Dados</button>
+    <button id="btnDados" class="btn-dados" title="Rolar dados" aria-label="Rolar dados"><span class="ic">🎲</span><span class="rot"> Dados</span></button>
     <button id="btnDesfazer" class="btn-desfazer" title="Desfazer o último movimento (Ctrl+Z)" hidden>↶ Desfazer</button>
     <div id="painelDados" class="painel-dados" hidden>
       <div class="dados-topo"><h3 id="dadosTitulo">Rolar dados</h3><button id="btnFecharDados" class="fechar" aria-label="Fechar">×</button></div>
@@ -688,20 +688,21 @@
   </form>
 </dialog>
 
-<script src="data.js?v=20261020a"></script>
-<script src="config.js?v=20261020a"></script>
-<script src="escudo.js?v=20261020a"></script>
-<script src="app.js?v=20261020a"></script>
-<script src="catalogo-op.js?v=20261020a"></script>
-<script src="fichas.js?v=20261020a"></script>
-<script src="quadro.js?v=20261020a"></script>
-<script src="mesa.js?v=20261020a"></script>
-<script src="sah-dados.js?v=20261020a"></script>
-<script src="sah.js?v=20261020a"></script>
-<script src="arquivo.js?v=20261020a"></script>
-<script src="ferramentas.js?v=20261020a"></script>
-<script src="sessao.js?v=20261020a"></script>
-<script src="exposicao.js?v=20261020a"></script>
-<script src="jogo.js?v=20261020a"></script>
+<script src="data.js?v=20261020b"></script>
+<script src="config.js?v=20261020b"></script>
+<script src="escudo.js?v=20261020b"></script>
+<script src="app.js?v=20261020b"></script>
+<script src="catalogo-op.js?v=20261020b"></script>
+<script src="fichas.js?v=20261020b"></script>
+<script src="quadro.js?v=20261020b"></script>
+<script src="mesa.js?v=20261020b"></script>
+<script src="sah-dados.js?v=20261020b"></script>
+<script src="sah.js?v=20261020b"></script>
+<script src="limpo.js?v=20261020b"></script>
+<script src="arquivo.js?v=20261020b"></script>
+<script src="ferramentas.js?v=20261020b"></script>
+<script src="sessao.js?v=20261020b"></script>
+<script src="exposicao.js?v=20261020b"></script>
+<script src="jogo.js?v=20261020b"></script>
 </body>
 </html>
