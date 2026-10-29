@@ -237,15 +237,32 @@ Quadro compartilhado, ao vivo, para jogadores, auxiliares e Mestre: caneta, marc
 
 Nomes, elementos, subtítulos e elevadores desses andares não ficam no código. O Mestre importa o arquivo `salas-secretas.json` (botão "Importar salas" no painel) ou edita no cartão de cada sala. Os jogadores só recebem o nome de uma sala quando ela é revelada. Nunca envie esse arquivo ao GitHub.
 
-## Salas em 3D ("Entrar na sala")
+## Salas em 3D ("Entrar na sala" e "Andar inteiro")
 
-Cada sala pode ter uma cena 3D de verdade (Three.js), aberta pelo botão **🧊 Entrar na sala (3D)** no cartão da sala.
+Cada sala pode ter uma cena 3D de verdade (Three.js), aberta pelos botões **🧊 Entrar na sala (3D)** e **🏢 Andar inteiro (3D)** no cartão da sala.
 
 - **Onde fica o conteúdo:** o código (`sala3d.js`) é só o motor e uma biblioteca de objetos genéricos (cadeira, mesa, rack, maca…). O que existe em cada sala vem do arquivo `salas-3d.json`, que fica **fora do GitHub** (nunca envie). O Mestre importa pelo botão "Importar cenas 3D (.json)" no cartão de qualquer sala; as cenas vão para `segredos/_3d`.
-- **Quem vê:** o Mestre vê todas as cenas importadas. Quando uma sala está revelada aos jogadores, a tela do Mestre publica a cena em `mapa/m3d/cNN`, e jogadores e auxiliares passam a ver o botão. Escondeu a sala, a cena sai do mapa público na hora. O 1º andar começa revelado, então as cenas dele aparecem logo depois da importação (o Mestre precisa estar com o site aberto).
-- **Na tela 3D:** "Por fora" mostra a sala como casa de bonecas (as paredes da frente somem); "Por dentro" põe a câmera dentro da sala para olhar em volta; "De cima" é a planta vista do teto; "🔦 Luz" acende uma luz de serviço nas salas escuras. Arrastar gira (ou olha em volta), pinça ou roda do mouse aproximam, Esc ou ✕ fecham.
-- **Desempenho:** o Three.js (cdnjs, versão r128) só é baixado na primeira vez que alguém abre uma sala. No celular as sombras ficam desligadas e a resolução é menor; o resto é igual.
-- **Formato do arquivo:** `{"tipo":"planta-acf-3d","salas":{"c4":{piso,parede,teto,amb,nevoa,itens:[{t:"cadeira_dentista",x,z,r}, …]}}}`. Medidas em metros, a sala tem 10 × 10 × 3,2; x vai de −5 (oeste) a 5 (leste), z de −5 (norte, a parede do fundo) a 5. Para outro andar, basta acrescentar as salas (c26, c27…) no mesmo arquivo e importar de novo.
+- **Quem vê:**
+  - Mestre: todas as cenas importadas, em qualquer sala.
+  - Auxiliares: as salas reveladas.
+  - Jogador: **só a sala onde está a ficha da cobaia dele.** Nas outras salas o cartão diz "Leve sua cobaia até esta sala". Se a ficha sai da sala com a vista aberta, a vista fecha; na vista do andar inteiro, ela acompanha a ficha para a sala nova.
+  - Quando uma sala é revelada, a tela do Mestre publica a cena em `mapa/m3d/cNN`; escondeu a sala, a cena sai do mapa público na hora (o Mestre precisa estar com o site aberto).
+- **Andar inteiro:** as 25 salas ligadas pelos corredores (1 quadradinho da planta = 2 m). Cada corredor tem a porta no estado público da planta: fechada (botão vermelho), abrindo (botão piscando), trancada (🔒), com teclado (🔢), escombros, carne ou aberta. Porta que não está aberta barra a passagem; o Mestre atravessa portas, como um fantasma, para conferir as salas. O jogador vê só a própria sala; o resto do andar é um bloco escuro.
+- **Na tela 3D:** "Fora" mostra como casa de bonecas; "Dentro" põe você dentro para andar; "Cima" é a vista do teto; "Luz" acende uma luz de serviço; "Andar/Sala" troca entre a sala e o andar levando junto a sua posição; "Som" liga e desliga o som ambiente. Na vista do andar, clicar numa sala leva até ela.
+- **Andar com o teclado:** WASD ou setas; Shift corre; arrastar o mouse olha em volta. Apertar W/A/S/D na vista de fora já entra andando. Com a vista aberta, nenhuma tecla chega ao mapa (o "A" não dispara o apagão, por exemplo). Esc fecha.
+- **Andar no celular:** no modo "Dentro" aparece um círculo (joystick) no canto: o polegar anda, e perto da borda corre; arrastar a tela olha em volta.
+- **Colisão:** ninguém atravessa paredes nem móveis (mesas, macas, racks…); tapetes, ralos, cabos e o que fica na parede ou no teto não atrapalham.
+- **Som ambiente:** cada cena pode ter o campo `som` (ex.: `["fluor", ["freezer", 0.6]]`). O som é gerado na hora pelo navegador, sem arquivos. Efeitos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio. Na vista do andar, as salas vizinhas soam mais baixo conforme a distância. Respeita o botão de som do site.
+- **Desempenho:** o Three.js (cdnjs, versão r128) só é baixado na primeira vez que alguém abre uma sala. No andar inteiro só os móveis da sala onde você está (e das vizinhas com porta aberta) ficam carregados, e as luzes são um conjunto fixo que copia as mais próximas. No celular não há sombras e a resolução é menor.
+- **Formato do arquivo:** `{"tipo":"planta-acf-3d","salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r}, …]}}}`. Medidas em metros, a sala tem 10 × 10 × 3,2; x vai de −5 (oeste) a 5 (leste), z de −5 (norte) a 5. Os vãos para os corredores ficam em x = 3,2 nas paredes norte e sul e em z = −3,2 nas paredes oeste e leste: deixe esses trechos livres de móveis. Para outro andar, acrescente as salas (c26, c27…) no mesmo arquivo e importe de novo.
+
+## Névoa de guerra e molduras das fichas (`nevoa.js`)
+
+- **Névoa:** o Mestre liga ou desliga por andar no cartão de qualquer sala ("🌫 Névoa de guerra"). Com ela ligada, cada jogador vê claras só as salas por onde a cobaia dele já passou e a sala onde ela está; as outras ficam escuras, sem nome, e as fichas dentro delas somem da tela dele (o cartão da sala também não diz quem está lá).
+- **Visitas:** a tela do Mestre anota em `mapa/visitas/<ficha>/cNN`; o aparelho do jogador também guarda as próprias visitas. "Limpar névoa" faz todos esquecerem as visitas daquele andar.
+- **Quem vê tudo:** Mestre e auxiliares. A tela da mesa (`?tv`) e quem entra sem cobaia veem a soma das visitas de todas as cobaias.
+- **Limite:** é um véu na tela. As posições continuam no mapa público do Firebase.
+- **Molduras:** as fichas ganham um aro na cor de cada uma, com fio dourado e brilho. Liga e desliga em ⚙ Aparência ("Molduras nas fichas"), só neste aparelho. Os Filhos mantêm a borda tracejada.
 
 ## Perfis
 
