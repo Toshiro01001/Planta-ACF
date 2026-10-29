@@ -5655,6 +5655,8 @@ window.ACF = {
   // sala (CN) onde está a ficha; null fora do mapa
   salaDe(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a) return null; const p = salaEm(tk.a, tk.x, tk.y); return p ? cnDe(tk.a, p) : null; },
   salaVisivel: cn => salaVisivel(Math.ceil(cn / 25), cn),
+  // revelada aos jogadores (vale para o Mestre também: é o que ele já liberou)
+  salaRevelada: cn => salaRevelada(Math.ceil(cn / 25), cn),
   nomeSala(cn) { const a = Math.ceil(cn / 25); const vis = salaVisivel(a, cn); const n = vis ? infoSala(a, cn)[0] : ''; return vis ? `CN ${pad2(cn)}${n ? ' · ' + n : ''}` : 'Sala desconhecida'; },
   get segredos() { return mestre ? Segredos.dados : {}; },
   get segredosProntos() { return mestre && Segredos.pronto; },
