@@ -237,6 +237,16 @@ Quadro compartilhado, ao vivo, para jogadores, auxiliares e Mestre: caneta, marc
 
 Nomes, elementos, subtítulos e elevadores desses andares não ficam no código. O Mestre importa o arquivo `salas-secretas.json` (botão "Importar salas" no painel) ou edita no cartão de cada sala. Os jogadores só recebem o nome de uma sala quando ela é revelada. Nunca envie esse arquivo ao GitHub.
 
+## Salas em 3D ("Entrar na sala")
+
+Cada sala pode ter uma cena 3D de verdade (Three.js), aberta pelo botão **🧊 Entrar na sala (3D)** no cartão da sala.
+
+- **Onde fica o conteúdo:** o código (`sala3d.js`) é só o motor e uma biblioteca de objetos genéricos (cadeira, mesa, rack, maca…). O que existe em cada sala vem do arquivo `salas-3d.json`, que fica **fora do GitHub** (nunca envie). O Mestre importa pelo botão "Importar cenas 3D (.json)" no cartão de qualquer sala; as cenas vão para `segredos/_3d`.
+- **Quem vê:** o Mestre vê todas as cenas importadas. Quando uma sala está revelada aos jogadores, a tela do Mestre publica a cena em `mapa/m3d/cNN`, e jogadores e auxiliares passam a ver o botão. Escondeu a sala, a cena sai do mapa público na hora. O 1º andar começa revelado, então as cenas dele aparecem logo depois da importação (o Mestre precisa estar com o site aberto).
+- **Na tela 3D:** "Por fora" mostra a sala como casa de bonecas (as paredes da frente somem); "Por dentro" põe a câmera dentro da sala para olhar em volta; "De cima" é a planta vista do teto; "🔦 Luz" acende uma luz de serviço nas salas escuras. Arrastar gira (ou olha em volta), pinça ou roda do mouse aproximam, Esc ou ✕ fecham.
+- **Desempenho:** o Three.js (cdnjs, versão r128) só é baixado na primeira vez que alguém abre uma sala. No celular as sombras ficam desligadas e a resolução é menor; o resto é igual.
+- **Formato do arquivo:** `{"tipo":"planta-acf-3d","salas":{"c4":{piso,parede,teto,amb,nevoa,itens:[{t:"cadeira_dentista",x,z,r}, …]}}}`. Medidas em metros, a sala tem 10 × 10 × 3,2; x vai de −5 (oeste) a 5 (leste), z de −5 (norte, a parede do fundo) a 5. Para outro andar, basta acrescentar as salas (c26, c27…) no mesmo arquivo e importar de novo.
+
 ## Perfis
 
 Ao abrir o site, a pessoa escolhe **Jogador**, **Mestre Auxiliar** ou **Mestre**. O Mestre Auxiliar entra com a senha dos auxiliares (com Firebase, é a senha da conta `auxiliares@caixa-acf.com`), escolhe o próprio robô e move os Filhos e o seu robô; ele não vê as cobaias, só os sons das salas, até o Mestre revelar. O jogador escolhe a própria cobaia e só consegue arrastar essa ficha. O Mestre entra com senha e move tudo. A escolha fica salva no navegador; o botão no topo ("trocar") volta para a tela de escolha.
