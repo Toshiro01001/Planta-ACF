@@ -8,7 +8,7 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 |---|---|
 | `index.html` | O esqueleto da página |
 | `style.css` | A aparência (roxo e preto) |
-| `app.js` | O motor: desenha a planta, gira a câmera, arrasta as fichas, sincroniza |
+| `app.js` | O motor: desenha a planta, gira a câmera, arrasta os tokens, sincroniza |
 | `data.js` | Nomes das salas, elementos e lista de seres. **É aqui que se edita o conteúdo** |
 | `config.js` | Senhas (em hash) e a conexão com o Firebase |
 | `fichas.js` | Fichas de agente de Ordem Paranormal (botão 📋 Fichas) |
@@ -25,6 +25,8 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `sah.js` | Ferramentas de *Sobrevivendo ao Horror* na Mesa: perseguição, furtividade, medo em jogo e sorteios |
 | `sah-dados.js` | Tabelas do *Sobrevivendo ao Horror* usadas por `sah.js` (eventos de investigação, efeitos de medo, ferimentos, desastres) |
 | `limpo.js` | HUD limpo: câmera compacta, dica só nas primeiras visitas, busca, recolher/abrir e favoritos no painel, aparência (limpo ou clássico) |
+| `sala3d.js`, `objetos3d.js`, `tokens3d.js` | A vista 3D (ver "Duas maneiras de jogar") |
+| `nevoa.js` | Névoa de guerra e molduras dos tokens |
 | `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
 
 ## Publicar no GitHub Pages
@@ -237,32 +239,83 @@ Quadro compartilhado, ao vivo, para jogadores, auxiliares e Mestre: caneta, marc
 
 Nomes, elementos, subtítulos e elevadores desses andares não ficam no código. O Mestre importa o arquivo `salas-secretas.json` (botão "Importar salas" no painel) ou edita no cartão de cada sala. Os jogadores só recebem o nome de uma sala quando ela é revelada. Nunca envie esse arquivo ao GitHub.
 
-## Salas em 3D ("Entrar na sala" e "Andar inteiro")
+## Duas maneiras de jogar: 2.5D e 3D
 
-Cada sala pode ter uma cena 3D de verdade (Three.js), aberta pelos botões **🧊 Entrar na sala (3D)** e **🏢 Andar inteiro (3D)** no cartão da sala.
+**Termos usados no site:** *ficha* é a informação do personagem (vida, sanidade, nível, rituais…). *Token* é a peça que representa o personagem no mapa 2.5D e a miniatura no 3D. A vista 3D mostra só os tokens, nunca as fichas.
 
-- **Onde fica o conteúdo:** o código (`sala3d.js`) é só o motor e uma biblioteca de objetos genéricos (cadeira, mesa, rack, maca…). O que existe em cada sala vem do arquivo `salas-3d.json`, que fica **fora do GitHub** (nunca envie). O Mestre importa pelo botão "Importar cenas 3D (.json)" no cartão de qualquer sala; as cenas vão para `segredos/_3d`.
-- **Quem vê:**
-  - Mestre: todas as cenas importadas, em qualquer sala.
-  - Auxiliares: as salas reveladas.
-  - Jogador: **só a sala onde está a ficha da cobaia dele.** Nas outras salas o cartão diz "Leve sua cobaia até esta sala". Se a ficha sai da sala com a vista aberta, a vista fecha; na vista do andar inteiro, ela acompanha a ficha para a sala nova.
-  - Quando uma sala é revelada, a tela do Mestre publica a cena em `mapa/m3d/cNN`; escondeu a sala, a cena sai do mapa público na hora (o Mestre precisa estar com o site aberto).
-- **Andar inteiro:** as 25 salas ligadas pelos corredores (1 quadradinho da planta = 2 m). Cada corredor tem a porta no estado público da planta: fechada (botão vermelho), abrindo (botão piscando), trancada (🔒), com teclado (🔢), escombros, carne ou aberta. Porta que não está aberta barra a passagem; o Mestre atravessa portas, como um fantasma, para conferir as salas. O jogador vê só a própria sala; o resto do andar é um bloco escuro.
-- **Na tela 3D:** "Fora" mostra como casa de bonecas; "Dentro" põe você dentro para andar; "Cima" é a vista do teto; "Luz" acende uma luz de serviço; "Andar/Sala" troca entre a sala e o andar levando junto a sua posição; "Som" liga e desliga o som ambiente. Na vista do andar, clicar numa sala leva até ela.
-- **Andar com o teclado:** WASD ou setas; Shift corre; arrastar o mouse olha em volta. Apertar W/A/S/D na vista de fora já entra andando. Com a vista aberta, nenhuma tecla chega ao mapa (o "A" não dispara o apagão, por exemplo). Esc fecha.
-- **Andar no celular:** no modo "Dentro" aparece um círculo (joystick) no canto: o polegar anda, e perto da borda corre; arrastar a tela olha em volta.
-- **Colisão:** ninguém atravessa paredes nem móveis (mesas, macas, racks…); tapetes, ralos, cabos e o que fica na parede ou no teto não atrapalham.
-- **Som ambiente:** cada cena pode ter o campo `som` (ex.: `["fluor", ["freezer", 0.6]]`). O som é gerado na hora pelo navegador, sem arquivos. Efeitos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio. Na vista do andar, as salas vizinhas soam mais baixo conforme a distância. Respeita o botão de som do site.
-- **Desempenho:** o Three.js (cdnjs, versão r128) só é baixado na primeira vez que alguém abre uma sala. No andar inteiro só os móveis da sala onde você está (e das vizinhas com porta aberta) ficam carregados, e as luzes são um conjunto fixo que copia as mais próximas. No celular não há sombras e a resolução é menor.
-- **Formato do arquivo:** `{"tipo":"planta-acf-3d","salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r}, …]}}}`. Medidas em metros, a sala tem 10 × 10 × 3,2; x vai de −5 (oeste) a 5 (leste), z de −5 (norte) a 5. Os vãos para os corredores ficam em x = 3,2 nas paredes norte e sul e em z = −3,2 nas paredes oeste e leste: deixe esses trechos livres de móveis. Para outro andar, acrescente as salas (c26, c27…) no mesmo arquivo e importe de novo.
+A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owlbear) é a mesma partida vista de outro jeito: quem anda no 3D move o token de verdade, e todos veem a mudança nas duas vistas.
 
-## Névoa de guerra e molduras das fichas (`nevoa.js`)
+### Como abrir
 
-- **Névoa:** o Mestre liga ou desliga por andar no cartão de qualquer sala ("🌫 Névoa de guerra"). Com ela ligada, cada jogador vê claras só as salas por onde a cobaia dele já passou e a sala onde ela está; as outras ficam escuras, sem nome, e as fichas dentro delas somem da tela dele (o cartão da sala também não diz quem está lá).
-- **Visitas:** a tela do Mestre anota em `mapa/visitas/<ficha>/cNN`; o aparelho do jogador também guarda as próprias visitas. "Limpar névoa" faz todos esquecerem as visitas daquele andar.
+- No cartão da sala: **🧊 Ver a sala em 3D** e **🏢 Andar inteiro (3D)**.
+- **Jogador:** só abre a sala onde está o token da cobaia dele. Se o token muda de andar, a vista reabre no andar novo.
+- **Mestre e auxiliares:** abrem qualquer sala e qualquer andar.
+
+### Arquivos
+
+| Arquivo | Para que serve |
+|---|---|
+| `sala3d.js` | Motor: monta o andar, corredores, portas, luzes, câmera, HUD e liga tudo às regras do mapa |
+| `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
+| `tokens3d.js` | Miniaturas: as sete cobaias, os robôs S.T.A.F.F., NPCs e as formas dos Filhos |
+| `salas-3d.json` | O que existe em cada uma das 125 salas. **Fica fora do GitHub.** O Mestre importa pelo cartão de qualquer sala |
+| `modelos/` (opcional) | Modelos 3D em `.glb` que substituem as miniaturas desenhadas por código |
+
+### Regras do mapa valem no 3D
+
+- **Distância:** o 3D usa a mesma conta do 2.5D (sala de 50 m² = 7,07 m de lado; corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa.
+- **Corredores:** 14 m de comprimento e estreitos (cabem duas pessoas lado a lado, três não). Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
+- **Portas:** cada corredor tem a porta no estado público da planta (fechada, abrindo, trancada, com teclado, escombros, carne ou aberta). Porta fechada barra o corredor. Ao lado do vão, dentro da sala, fica o painel com o botão vermelho. Tecla **E** (ou toque no botão) aperta o botão quando a regra deixa; com teclado, pede o código. Só o Mestre fecha portas.
+- **Decibelímetro:** o mesmo medidor do 2.5D aparece no canto da tela 3D, com o nível do token que você controla.
+
+### Controles do Mestre (botão 🎛 no topo da vista)
+
+- **Luzes:** cada sala e cada corredor aceita normal, fraca, piscando, vermelha ou apagada (`mapa/luz`). Apagão zera tudo; protocolo deixa tudo vermelho e pulsando.
+- **Portas:** o Mestre abre e fecha pelo próprio 3D: clique na porta ou no botão vermelho ao lado (ou tecla E perto dela). Trancas e escombros continuam sendo mudados no mapa 2.5D.
+- **Versão da sala (5º andar):** neutra, Rei, Mãe ou Consagrado, conforme a cena.
+- **Controlar token:** o Mestre escolhe qualquer token e anda com WASD (as regras continuam valendo) ou usa a câmera fantasma, que atravessa paredes.
+- **Formas dos Filhos:** cada Filho escolhe uma forma (esguio, colosso, rastejante, retalhos, mecânico, sombra, luz, enxame, estática, olhos). O arquivo traz uma PROPOSTA; o Mestre troca quando quiser (`mapa/formas`).
+
+### Esconderijos
+
+Móveis marcados como esconderijo (embaixo da cama, dentro do armário, atrás do balcão…) mostram "E · Esconder". O token fica escondido: some da tela de todos, menos do dono e do Mestre, nas duas vistas. Andar de novo tira do esconderijo. **Limite:** é ocultação visual; a posição continua no Firebase.
+
+### Na tela 3D
+
+- **Fora:** casa de bonecas (as paredes do lado da câmera somem). **Dentro:** primeira pessoa. **Cima:** vista do teto. **Andar/Sala:** alterna a sala e o andar inteiro. **Lanterna (L)**, **Som**.
+- **Teclado:** WASD ou setas; Shift corre; E interage; L lanterna; Esc fecha. Clique no chão anda até o ponto. Com a vista aberta, nenhuma tecla chega ao mapa.
+- **Celular:** joystick no canto no modo Dentro; arrastar a tela olha em volta.
+- **Qualidade:** ⚙ → Alta (sombras, brilho, anti-serrilhado) ou Leve. Fica salva no aparelho. Celular começa em Leve.
+
+### Desempenho
+
+O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só os móveis da sala atual (e vizinhas, para o Mestre) ficam carregados; as luzes são um conjunto fixo (6 no celular, 10 no computador) que copia as mais próximas.
+
+### Formato do `salas-3d.json`
+
+`{"tipo":"planta-acf-3d","versao":2,"salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r,esc,v}]}},"formas":{"f04":"colosso"}}`
+
+- Medidas em metros. A sala vai de −3,5 a 3,5 em x (oeste → leste) e em z (norte → sul); pé-direito 3 m.
+- Os vãos das portas ficam no meio de cada parede (1,8 m de largura). Deixe esses trechos livres.
+- `esc`: nome do esconderijo. `v`: versão da sala onde o item aparece (`neutro`, `rei`, `mae`, `consagrado`).
+- Som gerado pelo navegador, sem arquivos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio, geiger, grilos, vento, mar, alarme_baixo, respiracao, coro.
+
+### Modelos 3D próprios (opcional)
+
+Para trocar uma miniatura por um modelo feito em outra ferramenta, crie a pasta `modelos/` com:
+
+- `modelos/modelos.json`: `{"faca":{"arquivo":"faca.glb","altura":1.6,"rot":0}}` (a chave é o id do token);
+- `modelos/faca.glb`: o modelo. Se tiver animações chamadas `idle` e `walk`, o site usa as duas.
+
+Sem a pasta, o site usa as miniaturas desenhadas por código. **Atenção:** o que estiver em `modelos/` fica público no GitHub.
+
+## Névoa de guerra e molduras dos tokens (`nevoa.js`)
+
+- **Névoa:** o Mestre liga ou desliga por andar no cartão de qualquer sala ("🌫 Névoa de guerra"). Com ela ligada, cada jogador vê claras só as salas por onde a cobaia dele já passou e a sala onde ela está; as outras ficam escuras, sem nome, e os tokens dentro delas somem da tela dele (o cartão da sala também não diz quem está lá).
+- **Visitas:** a tela do Mestre anota em `mapa/visitas/<token>/cNN`; o aparelho do jogador também guarda as próprias visitas. "Limpar névoa" faz todos esquecerem as visitas daquele andar.
 - **Quem vê tudo:** Mestre e auxiliares. A tela da mesa (`?tv`) e quem entra sem cobaia veem a soma das visitas de todas as cobaias.
 - **Limite:** é um véu na tela. As posições continuam no mapa público do Firebase.
-- **Molduras:** as fichas ganham um aro na cor de cada uma, com fio dourado e brilho. Liga e desliga em ⚙ Aparência ("Molduras nas fichas"), só neste aparelho. Os Filhos mantêm a borda tracejada.
+- **Molduras:** os tokens ganham um aro na cor de cada um, com fio dourado e brilho. Liga e desliga em ⚙ Aparência ("Molduras nos tokens"), só neste aparelho. Os Filhos mantêm a borda tracejada.
 
 ## Perfis
 
