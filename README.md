@@ -25,7 +25,7 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `sah.js` | Ferramentas de *Sobrevivendo ao Horror* na Mesa: perseguição, furtividade, medo em jogo e sorteios |
 | `sah-dados.js` | Tabelas do *Sobrevivendo ao Horror* usadas por `sah.js` (eventos de investigação, efeitos de medo, ferimentos, desastres) |
 | `limpo.js` | HUD limpo: câmera compacta, dica só nas primeiras visitas, busca, recolher/abrir e favoritos no painel, aparência (limpo ou clássico) |
-| `sala3d.js`, `objetos3d.js`, `tokens3d.js` | A vista 3D (ver "Duas maneiras de jogar") |
+| `sala3d.js`, `objetos3d.js`, `detalhes3d.js`, `tokens3d.js` | A vista 3D (ver "Duas maneiras de jogar") |
 | `nevoa.js` | Névoa de guerra e molduras dos tokens |
 | `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
 
@@ -257,6 +257,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 |---|---|
 | `sala3d.js` | Motor: monta o andar, corredores, portas, luzes, câmera, HUD e liga tudo às regras do mapa |
 | `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
+| `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
 | `tokens3d.js` | Miniaturas: as sete cobaias, os robôs S.T.A.F.F., NPCs e as formas dos Filhos |
 | `salas-3d.json` | O que existe em cada uma das 125 salas. **Fica fora do GitHub.** O Mestre importa pelo cartão de qualquer sala |
 | `modelos/` (opcional) | Modelos 3D em `.glb` que substituem as miniaturas desenhadas por código |
@@ -306,6 +307,7 @@ O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só o
 - Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. Sem `lado`, a cena é tratada como do formato antigo (7,07 m) e espalhada sozinha na sala de 10 m: o que está encostado na parede continua encostado.
 - Os vãos das portas ficam no meio de cada parede (2,4 m de largura). Deixe esses trechos livres.
 - `uso`: `loja` (Maurício), `agua` ou `comida` (despensa).
+- `imagens`: imagens embutidas na cena (`{"mae":"data:image/jpeg;base64,…"}`), usadas por quadros com `img:"mae"`. Como ficam dentro do arquivo de cenas, não vão para o GitHub.
 - `esc`: nome do esconderijo. `v`: versão da sala onde o item aparece (`neutro`, `rei`, `mae`, `consagrado`).
 - Som gerado pelo navegador, sem arquivos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio, geiger, grilos, vento, mar, alarme_baixo, respiracao, coro.
 

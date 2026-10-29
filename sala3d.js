@@ -209,10 +209,12 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto']);
+  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'faiscas', 'livro_aberto', 'escorpiao']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
-  const naVersao = (it, ver) => { if (!it.v) return true; const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
+  const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
+ const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
   function montarItens(F, cena, pai, ver) {
+    F.imagens = cena.imagens || {};
     const lado = cena.lado || 7.071;
     (cena.itens || []).map(it => lado === SALA_M ? it : NS().ajustarItem(it, lado, SALA_M, ALT)).forEach((it, i) => {
       if (it.t === 'porta' || !naVersao(it, ver)) return;   // no 3D novo, as portas de verdade são as dos corredores
@@ -433,7 +435,14 @@
         P.anim.push((dt, t) => { const k = 1 + Math.max(0, Math.sin(t * 5.2)) * .04 + Math.max(0, Math.sin(t * 5.2 - 1.2)) * .02; pw.scale.set(k, 1, 1 + (k - 1) * .4); });
         return;
       }
-      Fp.bx(g, .09, CORR_H - .16, W - .08, metalP, 0, 0, 0);
+      // porta de aço dupla, rebitada, com puxadores dos dois lados
+      const aco = Fp.m('#5a5e62', { tex: 'porta_aco', r: .6, me: .45 }), puxa = Fp.m('#a8aeb4', { me: .8, r: .3 }), escuro = Fp.m('#1a1a1a', { me: .5 });
+      [-1, 1].forEach(s => {
+        Fp.bx(g, .09, CORR_H - .16, W / 2 - .06, aco, 0, 0, s * (W / 4 - .01));
+        [-1, 1].forEach(lx => Fp.bx(g, .04, .5, .035, puxa, lx * .07, .95, s * .13));
+        [.35, CORR_H - .65].forEach(yy => Fp.bx(g, .12, .22, .06, escuro, 0, yy, s * (W / 2 - .07)));
+      });
+      Fp.bx(g, .1, CORR_H - .16, .02, escuro, 0, 0, 0);
       Fp.bx(g, .1, .12, W - .08, Fp.m('#d4a017', { r: .7 }), 0, .25, 0);
       if (e === 't' || e === 'tk') [-1, 1].forEach(s => {
         const tx = Fp.textoTex(e === 'tk' ? '🔢\nTECLADO' : '🔒\nTRANCADA', { w: 256, h: 192, cor: '#ffd36b', fundo: '#1a1408' });
@@ -451,6 +460,13 @@
       b.traverse(o => { if (o.isMesh) o.userData.porta = v.ci; });
       const P = portas[CS.findIndex(c => c.ci === v.ci)]; if (P) P.botoes.push(b);
       interativos.push({ tipo: 'porta', ci: v.ci, pos: b.position.clone().setY(1.1), p: s.p });
+      // lâmpadas de alerta dos dois lados do vão (mudam de cor com a porta, como o botão)
+      if (F.P.lampada_alerta) [-1, 1].forEach(k => {
+        const l = F.P.lampada_alerta({ y: 1.95, sem: v.ci * 3 + k }), al = v.centro + k * (CORR_W / 2 + .2);
+        if (lado === 'n') l.position.set(al, 0, s.z0 + .1); if (lado === 's') l.position.set(al, 0, s.z1 - .1);
+        if (lado === 'w') l.position.set(s.x0 + .1, 0, al); if (lado === 'e') l.position.set(s.x1 - .1, 0, al);
+        l.rotation.y = ladoInfo[lado][0]; raiz.add(l); if (P) P.botoes.push(l);
+      });
     }));
     const COR_BOTAO = { f: '#ff2020', p: '#ff2020', a: '#20ff60', t: '#ffb020', tk: '#ffb020', d: '#ffb020', c: '#ffb020' };
     function atualizarPortas() {
@@ -619,7 +635,7 @@
       livre3D, atualizarPortas, recarregar, estadoPorta,
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
-        tStream -= dt; if (tStream <= 0) { tStream = .3; streaming(x, z, modo); }
+        tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
         carregadas.forEach(c => { for (let i = 0; i < c.anim.length; i++) c.anim[i](dt, t); });
         portas.forEach(P => { if (P) for (let i = 0; i < P.anim.length; i++) P.anim[i](dt, t); });
         for (let i = 0; i < ctx.animMundo.length; i++) ctx.animMundo[i](dt, t);
@@ -1027,7 +1043,7 @@
     if (!op.manter && !podeAbrir(cn)) { a.aviso(a.meu ? 'Para ver esta sala em 3D, o token da sua cobaia precisa estar nela.' : 'Esta sala não está liberada para você.'); return; }
     Som.preparar();   // precisa ser no clique (o celular só libera o som assim)
     const d = criarJanela();
-    const manter = op.manter && V ? { cam: { ...V.cam }, lanterna: V.lanterna, ctrl: V.ctrlMestre } : null;
+    const manter = op.manter && V ? { cam: { ...V.cam }, lanterna: V.lanterna, ctrl: V.ctrlMestre, a: V.a } : null;
     if (V) fechar(true);
     d.hidden = false; document.body.classList.add('s3d-aberta');
     const msg = $('#s3dMsg'); msg.hidden = false; msg.textContent = 'Montando o andar…';
@@ -1078,7 +1094,12 @@
     if (ctrlJog) { const tk = meuTk(); [est.px, est.pz] = planta3D(a, tk.x, tk.y); }
     else { [est.px, est.pz] = [cx, cz + 1.5]; }
     est.ax = op.largo ? 0 : est.px; est.az = op.largo ? 0 : est.pz;
-    if (op.manter) Object.assign(est, op.manter.cam);
+    if (op.manter) {
+      // mesmo andar: volta exatamente onde estava; outro andar: mantém só o jeito de olhar (a posição é a da sala nova)
+      const c0 = { ...op.manter.cam };
+      if (op.manter.a !== a) ['px', 'pz', 'ax', 'az'].forEach(k => delete c0[k]);
+      Object.assign(est, c0);
+    }
 
     // lanterna (luz que sai da câmera ou do token); no computador, faz sombra
     const lanterna = new T.SpotLight('#fff1d8', 0, 16, .48, .55, 1.4); lanterna.castShadow = alta; lanterna.shadow.mapSize.set(1024, 1024); lanterna.shadow.bias = -.0006; lanterna.shadow.camera.near = .1;
@@ -1251,7 +1272,8 @@
     const quadro = agora => {
       if (!V || !V.rodando) return;
       V.raf = requestAnimationFrame(quadro);
-      const dt = Math.min(.05, (agora - t0) / 1000); t0 = agora; tt += dt;
+      if (!(agora > 0)) agora = performance.now();
+      const dt = Math.max(0, Math.min(.05, (agora - t0) / 1000)) || 0; t0 = agora; tt += dt;
       const andou = mover(dt); if (!andou) talvezFechar();
       // token controlado: se o Mestre (ou o mapa 2D) o mover, a câmera vai junto
       if (V.ctrl && !V.movendo && !V.escondido) {
@@ -1485,6 +1507,9 @@
     get aberta() { return !!V; },
     get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe() } : null; },
     _livre: (x, z) => !!(V && V.mundo.livre3D(x, z)),
+    _centro: p => V && V.mundo.centro(p),
+    _cam: o => V && Object.assign(V.cam, o),
+    _v: () => V && { raf: V.raf, rodando: V.rodando, n: V.mundo.carregadas.size },
     _mapa: { planta3D: (a, x, y) => (prepararMapa(), planta3D(a, x, y)), plantaDe3D: (a, x, z) => (prepararMapa(), plantaDe3D(a, x, z)) },
     Som
   };
