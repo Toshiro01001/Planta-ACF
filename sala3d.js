@@ -2,8 +2,9 @@
    - Duas formas de jogar: o mapa 2.5D de sempre e esta vista 3D. As duas mostram o MESMO estado:
      andar no 3D move o token de verdade, com as MESMAS regras do arraste no mapa (paredes, portas
      fechadas, vez e limite de metros da perseguição). Nada de correr infinito numa fuga.
-   - Escala igual à da planta: sala de 50 m² (7,07 m de lado) e corredor de 14 m. No 3D o corredor
-     é estreito (1,6 m: duas pessoas lado a lado, três não cabem).
+   - Escala do 3D: sala de 10 m de lado (mais espaço para andar e se esconder) e corredor de 14 m de
+     comprido e 2,4 m de largura (duas pessoas lado a lado). As REGRAS (metros de fuga, custo do
+     movimento) continuam sendo as da planta: o 3D só converte a posição.
    - O código é só o MOTOR. O que existe em cada sala (a "cena") vem do arquivo salas-3d.json, que o
      Mestre importa pelo cartão de qualquer sala e que fica nos segredos (nunca no GitHub). Quando o
      Mestre revela uma sala, a tela dele publica a cena em mapa/m3d/cNN.
@@ -116,20 +117,21 @@
   }));
 
   /* ================= escala: planta (quadradinhos) <-> 3D (metros) ================= */
-  // Sala: 7,07 m de lado (1,414 m por quadradinho). Corredor: 14 m (7 m por quadradinho ao longo dele).
+  // Sala do 3D: 10 m de lado (2 m por quadradinho). Corredor: 14 m (7 m por quadradinho ao longo dele).
   // Na largura, o corredor do 3D é mais estreito que o desenho: a posição é comprimida (KC).
-  const ALT = 3.0, CORR_W = 1.6, CORR_H = 2.45, VAO_H = 2.1, ESP = .2, RAIO = .22;
+  const SALA_M = 10, ALT = 3.2, CORR_W = 2.4, CORR_H = 2.7, VAO_H = 2.2, ESP = .2, RAIO = .22;
   let MAPA = null;
   function prepararMapa() {
     if (MAPA) return MAPA;
     const g = ACF().geo, segs = [];
     let u = 0, pos = 0;
     const add = (len, s) => { segs.push({ u0: u, u1: u + len, x0: pos, s }); u += len; pos += len * s; };
-    add(g.M, g.M_POR_UNID);
-    for (let c = 0; c < 5; c++) { add(g.R, g.M_POR_UNID); if (c < 4) add(g.G, g.M_CORREDOR); }
-    add(g.M, g.M_POR_UNID);
+    const mS = SALA_M / g.R;
+    add(g.M, mS);
+    for (let c = 0; c < 5; c++) { add(g.R, mS); if (c < 4) add(g.G, g.M_CORREDOR); }
+    add(g.M, mS);
     const meio = pos / 2; segs.forEach(s => { s.x0 -= meio; s.x1 = s.x0 + (s.u1 - s.u0) * s.s; });
-    MAPA = { segs, total: pos, g, KC: CORR_W / (g.CW * g.M_POR_UNID), SALA: g.R * g.M_POR_UNID };
+    MAPA = { segs, total: pos, g, KC: Math.min(1, CORR_W / (g.CW * mS)), SALA: SALA_M };
     return MAPA;
   }
   function eixo3D(u) { const S = MAPA.segs; for (const s of S) if (u <= s.u1) return s.x0 + (Math.max(u, s.u0) - s.u0) * s.s; const l = S[S.length - 1]; return l.x1 + (u - l.u1) * l.s; }
@@ -207,18 +209,19 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda']);
+  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v) return true; const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
   function montarItens(F, cena, pai, ver) {
-    (cena.itens || []).forEach((it, i) => {
+    const lado = cena.lado || 7.071;
+    (cena.itens || []).map(it => lado === SALA_M ? it : NS().ajustarItem(it, lado, SALA_M, ALT)).forEach((it, i) => {
       if (it.t === 'porta' || !naVersao(it, ver)) return;   // no 3D novo, as portas de verdade são as dos corredores
       const fab = F.P[it.t]; if (!fab) return;
       let o; try { o = fab({ sem: i + 1, ...it }); } catch (e) { console.warn('3D:', it.t, e); return; }
       o.position.set(it.x || 0, it.h0 || 0, it.z || 0);
       o.rotation.y = (it.r || 0) * Math.PI / 180;
       if (it.s) o.scale.setScalar(it.s);
-      o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null;
+      o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null; o.userData.uso = it.uso || null;
       pai.add(o);
     });
   }
@@ -494,12 +497,14 @@
       const esconde = [];
       g.children.forEach(o => { if (o.userData.esc) { const w = new T.Vector3(); o.getWorldPosition(w); esconde.push({ tipo: 'esconderijo', cn: s.cn, p, i: o.userData.i, nome: o.userData.esc, pos: w, obj: o }); } });
       esconde.forEach(e => interativos.push(e));
+      // coisas de usar: o Maurício (loja), o bebedouro e a geladeira (despensa)
+      g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w }); } });
       carregadas.set(p, { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver });
     }
     function descarregar(p) {
       const c = carregadas.get(p); if (!c) return;
       raiz.remove(c.g); c.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
-      for (let i = interativos.length - 1; i >= 0; i--) if (interativos[i].tipo === 'esconderijo' && interativos[i].p === p) interativos.splice(i, 1);
+      for (let i = interativos.length - 1; i >= 0; i--) if ((interativos[i].tipo === 'esconderijo' || interativos[i].tipo === 'uso') && interativos[i].p === p) interativos.splice(i, 1);
       carregadas.delete(p);
     }
     const vizinhas = p => CS.filter(c => !c.saida && (c.p1 === p || c.p2 === p)).map(c => [c.p1 === p ? c.p2 : c.p1, c.ci]);
@@ -947,6 +952,7 @@
   const TECLAS = { w: 'f', arrowup: 'f', s: 't', arrowdown: 't', a: 'e', arrowleft: 'e', d: 'd', arrowright: 'd' };
   window.addEventListener('keydown', e => {
     const d = $('#s3d'); if (!V || !d || d.hidden) return;
+    if (document.querySelector('dialog[open]')) return;   // a loja (ou outra janela) está aberta por cima do 3D
     if (e.target && e.target.matches && e.target.matches('input, textarea, select')) { if (e.key === 'Escape') e.target.blur(); return; }
     const k = (e.key || '').toLowerCase();
     e.stopImmediatePropagation();
@@ -1232,6 +1238,7 @@
       mundo.interativos.forEach(it => { const d = Math.hypot(it.pos.x - est.px, it.pos.z - est.pz); if (d < bd) { bd = d; melhor = it; } });
       if (!melhor) return null;
       if (melhor.tipo === 'esconderijo') return V.ctrl ? { ...melhor, txt: `✋ Esconder-se (${melhor.nome})` } : null;
+      if (melhor.tipo === 'uso') return { ...melhor, txt: { loja: '🃏 Falar com o Maurício (loja)', agua: '💧 Pegar água (despensa)', comida: '🥫 Pegar comida (despensa)' }[melhor.uso] || '✋ Usar' };
       const e = mundo.estadoPorta(melhor.ci);
       const txt = quem === 'mestre' ? (e === 'a' ? '🚪 Fechar a porta' : '🚪 Abrir a porta') : e === 'a' ? null : e === 'tk' ? '🔢 Digitar o código' : e === 'f' ? '🔴 Apertar o botão da porta' : null;
       return txt ? { ...melhor, txt } : null;
@@ -1397,6 +1404,7 @@
     const pr = V.pertoDe(); if (!pr) { toast('Nada por perto para usar.'); return; }
     if (pr.tipo === 'sair') V.sairEsconderijo();
     else if (pr.tipo === 'esconderijo') V.usarEsconderijo(pr);
+    else if (pr.tipo === 'uso') { const A = ACF(); if (pr.uso === 'loja') A.abrirLoja && A.abrirLoja(); else A.pegarEstoque && A.pegarEstoque(pr.uso); }
     else if (pr.tipo === 'porta') V.usarPorta(pr.ci);
   }
 

@@ -113,6 +113,99 @@
     return { g, alt: op.alt || 1.72, anim, partes: { corpo, cab, bracos, pernas } };
   }
 
+  /* ---------- Mostarda: escorpião de sangue meio humano ---------- */
+  function escorpiao(F) {
+    const T = F.T, { G, bx, cy, sf, m } = F;
+    const g = G(), bicho = G(); g.add(bicho);
+    const casca = m('#4a0407', { unico: true, r: .16, me: .18, e: '#1a0002', ei: .5 });
+    const junta = m('#2a0306', { r: .35, me: .1 });
+    const veia = m('#ff2a1a', { unico: true, e: '#c80a00', ei: 1.1 });
+    const UP = new T.Vector3(0, 1, 0);
+    // cilindro de p1 até p2 (patas e garras)
+    const osso = (pai, a, b, r1, r2, mat = casca) => {
+      const p1 = new T.Vector3(...a), p2 = new T.Vector3(...b), d = p2.clone().sub(p1), L = d.length();
+      const me = new T.Mesh(F.guardar(new T.CylinderGeometry(r2, r1, L, 8)), mat);
+      me.position.copy(p1).add(d.multiplyScalar(.5)); me.quaternion.setFromUnitVectors(UP, p2.clone().sub(p1).normalize()); pai.add(me);
+      sf(pai, r1 * 1.15, junta, ...a, 8); return me;
+    };
+    // corpo do escorpião: prossoma na frente, sete placas do abdome para trás
+    const prossoma = sf(bicho, .32, casca, 0, .5, .12, 18); prossoma.scale.set(1.05, .5, 1.1);
+    const placas = [];
+    for (let i = 0; i < 7; i++) {
+      const w = .36 - i * .025, z = -.2 - i * .17;
+      const pl = sf(bicho, w, casca, 0, .48 + Math.sin(i * .5) * .02, z, 16); pl.scale.set(1, .42, .55); placas.push(pl);
+      const v = bx(bicho, w * 1.2, .012, .02, veia, 0, .48 + w * .4, z + .04); v.rotation.x = -.2;
+    }
+    // oito patas (quatro de cada lado)
+    const patas = [];
+    [-1, 1].forEach(sx => [.12, -.12, -.36, -.6].forEach((z, i) => {
+      const p = G(); p.position.set(sx * .26, .5, z); bicho.add(p);
+      const ab = .12 + i * .07;
+      const joelho = [sx * .42, .16, (1.5 - i) * .07], pe = [sx * (.78 + ab * .5), -.5, (1.5 - i) * .16];
+      osso(p, [0, 0, 0], joelho, .06, .05);
+      osso(p, joelho, pe, .05, .014);
+      patas.push({ p, sx, i });
+    }));
+    // cauda: seis segmentos encadeados, curvando por cima das costas; ferrão na ponta
+    const cauda = []; let pai = G(); pai.position.set(0, .5, -1.3); pai.rotation.x = -1.0; bicho.add(pai); cauda.push(pai);
+    for (let i = 0; i < 6; i++) {
+      const L = .3 - i * .018, r = .15 - i * .013;
+      const seg = sf(pai, r, casca, 0, L * .5, 0, 12); seg.scale.set(1, 1.3, 1);
+      bx(pai, r * 1.4, .012, .02, veia, 0, L * .5, r * .9);
+      const prox = G(); prox.position.set(0, L, 0); prox.rotation.x = .47; pai.add(prox); cauda.push(prox); pai = prox;
+    }
+    const ferrao = G(); pai.add(ferrao); ferrao.rotation.x = .5;
+    const bulbo = sf(ferrao, .13, casca, 0, .12, 0, 14); bulbo.scale.set(1, 1.35, 1);
+    const ponta = new T.Mesh(F.guardar(new T.ConeGeometry(.045, .28, 8)), m('#1a0204', { r: .2, me: .4 })); ponta.position.set(0, .34, .06); ponta.rotation.x = .5; ferrao.add(ponta);
+    // gotas de sangue caindo do ferrão
+    const gotas = [0, 1, 2].map(i => { const gt = sf(g, .025, m('#9a0008', { unico: true, r: .15, e: '#3a0000', ei: .5 }), 0, 0, 0, 8); gt.scale.set(1, 1.6, 1); return { gt, f: i / 3 }; });
+    const poca = new T.Mesh(F.guardar(new T.CircleGeometry(.5, 20)), m('#3a0003', { unico: true, r: .1, op: .85 })); poca.rotation.x = -Math.PI / 2; poca.position.set(0, .02, -.3); poca.scale.set(1.3, 1, 1); g.add(poca);
+    // o homem: o humano de sempre, só do quadril para cima, saindo da frente do escorpião
+    const h = humano(F, { alt: 1.82, pele: '#c9a07a', camisaTex: panoTex(F, '#c8b593', 'sangue', 17), calca: '#2c2a26', sapato: '#1a1a1a', maos: '#1e1e1e',
+      rosto: { bandagem: '#cdb48a', iris: '#2a2a2a', sem: 7 }, cabelo: { tipo: 'nenhum' },
+      extras: ({ F, corpo, bracos, mt }) => {
+        bx(corpo, .42, .5, .3, mt('#1d1f22', { r: .7 }), 0, 1.0, 0);
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) bx(corpo, .1, .1, .06, mt('#26292d'), -.13 + i * .13, 1.05 + j * .14, .16);
+        bx(corpo, .38, .06, .02, m('#ffffff', { unico: true, mapa: F.textoTex('SWAT', { w: 256, h: 48, cor: '#d8d8d8', fundo: '#1d1f22', tam: 34 }) }), 0, 1.38, .155);
+        // cintura virando carapaça
+        const cinta = cy(corpo, .2, .26, .2, casca, 0, .8, 0, 16); cinta.scale.z = .75;
+        bracos.forEach(b => { b.children[1].material = m('#ffffff', { unico: true, mapa: panoTex(F, '#cdb48a', 'bandagem', 11), r: .9 }); b.children[2].visible = false; });
+      } });
+    h.partes.pernas.forEach(p => { p.visible = false; });
+    const homem = G(); homem.add(h.g); homem.position.set(0, -.28, .3); bicho.add(homem);
+    // pinças no lugar das mãos
+    const pincas = h.partes.bracos.map((b, k) => {
+      const pz = G(); pz.position.set(0, -.68, 0); pz.scale.setScalar(1.45); b.add(pz);
+      const palma = sf(pz, .1, casca, 0, -.1, 0, 12); palma.scale.set(1, 1.5, .8);
+      const fixo = new T.Mesh(F.guardar(new T.ConeGeometry(.05, .26, 8)), casca); fixo.position.set(.035, -.32, 0); fixo.rotation.z = Math.PI + .12; pz.add(fixo);
+      const mov = G(); mov.position.set(-.04, -.2, 0); pz.add(mov);
+      const dedo = new T.Mesh(F.guardar(new T.ConeGeometry(.04, .24, 8)), casca); dedo.position.set(0, -.12, 0); dedo.rotation.z = Math.PI; mov.add(dedo);
+      return mov;
+    });
+    h.partes.bracos.forEach((b, k) => { b.rotation.x = -.5; b.rotation.z = (k ? 1 : -1) * .35; });
+    let fase = 0;
+    const anim = (dt, t, andando) => {
+      h.anim(dt, t, false);
+      h.partes.bracos.forEach((b, k) => { b.rotation.x = -.5 + Math.sin(t * 1.3 + k) * .12; b.rotation.z = (k ? 1 : -1) * (.35 + Math.sin(t * .9 + k * 2) * .06); });
+      if (andando) fase += dt * 9;
+      patas.forEach(({ p, sx, i }) => {
+        const f = fase + i * 1.4 + (sx > 0 ? Math.PI : 0);
+        p.rotation.y = andando ? Math.sin(f) * .28 : p.rotation.y * .9;
+        p.rotation.z = andando ? Math.max(0, Math.cos(f)) * .18 * sx : p.rotation.z * .9;
+      });
+      bicho.position.y = andando ? Math.abs(Math.sin(fase * 2)) * .02 : 0;
+      // a cauda balança devagar e às vezes dá o bote
+      const bote = Math.max(0, Math.sin(t * .7) - .92) * 9;
+      cauda.forEach((c, i) => { if (i) c.rotation.x = .47 + Math.sin(t * 1.4 + i * .5) * .05 - bote * .12; c.rotation.y = Math.sin(t * .8 + i * .3) * .08; });
+      pincas.forEach((pm, k) => { pm.rotation.z = -.15 - Math.max(0, Math.sin(t * 2.2 + k * 1.7)) * .5; });
+      placas.forEach((pl, i) => { pl.scale.y = .42 + Math.sin(t * 2 - i * .6) * .02; });
+      // gotas: caem do ferrão até o chão e recomeçam
+      ferrao.updateWorldMatrix(true, false); const ptW = ponta.getWorldPosition(new T.Vector3()); g.worldToLocal(ptW);
+      gotas.forEach(o => { const q = (t * .6 + o.f) % 1; o.gt.position.set(ptW.x, Math.max(.03, ptW.y * (1 - q * q)), ptW.z + .05); o.gt.visible = q < .97; });
+    };
+    return { g, alt: 2.05, anim, raioBase: .62 };
+  }
+
   /* ---------- as sete cobaias (a partir das imagens de referência) ---------- */
   const COBAIAS = {
     // Faca: coque, camiseta clara, calça cargo verde-oliva, cinto de bolsas, tênis vermelho-marrom,
@@ -148,17 +241,10 @@
         const arma = G(); arma.position.set(0, -.68, .05); bracos[1].add(arma); bx(arma, .04, .1, .05, m('#3a2416'), 0, -.05, 0); bx(arma, .035, .04, .38, m('#5a4a3a', { me: .7, r: .4 }), 0, .02, .16); cy(arma, .028, .028, .07, m('#4a3a2a', { me: .7 }), 0, .0, .04, 10).rotation.x = Math.PI / 2;
         bracos[1].rotation.x = -.3;
       } }),
-    // Mostarda: cabeça enfaixada, colete tático preto (SWAT), camisa bege, antebraços enfaixados, luvas e uma maleta
-    mostarda: F => humano(F, { alt: 1.82, pele: '#c9a07a', camisa: '#c8b593', calca: '#2c2a26', sapato: '#1a1a1a', maos: '#1e1e1e',
-      rosto: { bandagem: '#cdb48a', iris: '#2a2a2a', sem: 7 }, cabelo: { tipo: 'nenhum' },
-      extras: ({ F, corpo, bracos, mt }) => {
-        const { bx, G, m } = F;
-        const colete = bx(corpo, .42, .5, .3, mt('#1d1f22', { r: .7 }), 0, 1.0, 0);
-        for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) bx(corpo, .1, .1, .06, mt('#26292d'), -.13 + i * .13, 1.05 + j * .14, .16);
-        bx(corpo, .38, .06, .02, m('#ffffff', { unico: true, mapa: F.textoTex('SWAT', { w: 256, h: 48, cor: '#d8d8d8', fundo: '#1d1f22', tam: 34 }) }), 0, 1.38, .155);
-        bracos.forEach(b => { const t = panoTex(F, '#cdb48a', 'bandagem', 11); b.children[1].material = m('#ffffff', { unico: true, mapa: t, r: .9 }); });
-        const mala = G(); mala.position.set(0, -.75, .05); bracos[1].add(mala); bx(mala, .3, .22, .08, mt('#1a1a1a', { r: .5 }), 0, -.1, 0);
-      } }),
+    // Mostarda: o amálgama. Da cintura para cima, o homem de sempre (cabeça enfaixada, colete SWAT, camisa
+    // manchada); da cintura para baixo, um escorpião de sangue: carapaça vermelha molhada, oito patas,
+    // pinças no lugar das mãos e a cauda arqueada sobre a cabeça, pingando
+    mostarda: F => escorpiao(F),
     // Papelão: alto, cabeça enfaixada cinza com olhos amarelos, sobretudo longo e rasgado, fivelas douradas,
     // mãos enfaixadas em garra e botas pretas
     papelao: F => humano(F, { alt: 1.92, pele: '#8a8a82', camisa: '#4a4a48', calca: '#2a2a2c', sapato: '#141414', manga: '#545658', maos: '#8a877a',
@@ -363,7 +449,7 @@
     }
     // base redonda na cor do token (como a base de uma miniatura)
     const base = new T.Group();
-    const R = s.tipo === 'filho' ? .55 : .32;
+    const R = t.raioBase || (s.tipo === 'filho' ? .55 : .32);
     const disco = new T.Mesh(F.guardar(new T.CylinderGeometry(R, R + .02, .035, 32)), F.m('#141218', { r: .4, me: .3 }));
     disco.position.y = .0175; base.add(disco);
     const aro = new T.Mesh(F.guardar(new T.TorusGeometry(R + .005, .018, 8, 40)), F.m('#ffffff', { unico: true, e: s.contorno || s.cor || '#888', ei: .9 }));

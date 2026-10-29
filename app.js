@@ -5785,5 +5785,7 @@ window.ACF = {
   get protocolo() { return !!(Store.state.ruido || {}).p; },
   geo: { M, R, G, CW, W, H, CORREDORES, retSala, retSaida: a => retSaida(saidaDoAndar(a)), saidaDoAndar, salaEm, corredorEm: (x, y) => corredorEm(x, y), M_POR_UNID, M_CORREDOR },
   rotulo: tk => rotuloBase(tk),
+  abrirLoja: () => abrirLoja(),
+  pegarEstoque: k => pegarEstoque(k),
 };
 })();
