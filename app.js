@@ -1456,14 +1456,16 @@ function desenharCartaoSalaPublico() {
   const [nome, elm] = vis ? infoSala(a, cn) : ['', '?'];
   const mostraEl = vis && !!(Store.state.rev || {})['a' + a] && elm !== '?' && elm !== 'N';
   const el2 = ELEMENTOS[mostraEl ? elm : '?'] || ELEMENTOS['?'];
-  const aqui = Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
+  // névoa de guerra (nevoa.js): sala ainda não vista não entrega quem está lá dentro
+  const naNevoa = !!(window.Nevoa && Nevoa.escondida(cn));
+  const aqui = naNevoa ? [] : Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
     SER[tk.s] && tk.a === a && salaEm(tk.a, tk.x, tk.y) === p && visivelPara(tk)).map(([, tk]) => rotuloBase(tk));
   c.style.setProperty('--cor', el2.cor);
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
       <h3>${vis ? 'CN ' + pad2(cn) : 'Sala desconhecida'}</h3><span class="cod">${vis ? (nome || 'sem nome registrado') : 'ainda não mapeada'}</span></div></div>
     ${mostraEl ? `<p>Elemento: ${el2.nome}</p>` : ''}
-    <p><strong>Aqui:</strong> ${aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>
+    <p><strong>Aqui:</strong> ${naNevoa ? 'não dá para ver (névoa)' : aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>
     ${vis && Arquivos.daSala(cn).length ? `<p><strong>Arquivos encontrados:</strong></p><div class="acoes">${Arquivos.daSala(cn).map(([fid, t]) => `<button data-abrir="${fid}">📄 ${esc(t)}</button>`).join('')}</div>` : ''}
     ${vis ? htmlGanchosSala(cn, true) : ''}`;
   c.hidden = false;
