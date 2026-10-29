@@ -312,7 +312,22 @@
         const g = G(); const w = o.w || .9, h = o.h || 1.1, y = o.y ?? 1.2, r = rng(o.sem || 21);
         const [c, x] = tela(256, Math.round(256 * h / w)); const grd = x.createRadialGradient(128, c.height * .45, 10, 128, c.height / 2, 200); grd.addColorStop(0, o.c1 || '#d98c6a'); grd.addColorStop(1, o.c2 || '#3a0d12'); x.fillStyle = grd; x.fillRect(0, 0, 256, c.height);
         for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(${90 + r() * 120},${10 + r() * 30},${20 + r() * 30},${r() * .25})`; x.beginPath(); x.ellipse(r() * 256, r() * c.height, 4 + r() * 22, 2 + r() * 10, r() * 3, 0, 7); x.fill(); }
-        if (o.figura) { x.fillStyle = 'rgba(30,0,4,.55)'; x.beginPath(); x.ellipse(128, c.height * .35, 26, 32, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(128, c.height * .72, 60, 80, 0, 0, 7); x.fill(); }
+        if (o.figura && !o.img) { x.fillStyle = 'rgba(30,0,4,.55)'; x.beginPath(); x.ellipse(128, c.height * .35, 26, 32, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(128, c.height * .72, 60, 80, 0, 0, 7); x.fill(); }
+        // imagem própria (ex.: o retrato da Mãe), embutida no arquivo de cenas em "imagens"
+        const src = o.img && (fab.imagens || {})[o.img];
+        if (src) {
+          const ouro = m('#8a6a2a', { me: .75, r: .35 }), escuro = m('#3a2a10', { me: .5, r: .5 }), mol = .09;
+          bx(g, w + mol * 2 + .04, h + mol * 2 + .04, .04, escuro, 0, y - mol - .02, -.01);
+          [[0, h + mol / 2, w + mol * 2, mol], [0, -mol / 2, w + mol * 2, mol]].forEach(([xx, yy, ww, hh]) => bx(g, ww, hh, .08, ouro, xx, y + yy - hh / 2, .02));
+          [-1, 1].forEach(s2 => bx(g, mol, h, .08, ouro, s2 * (w / 2 + mol / 2), y, .02));
+          const tela2 = m('#ffffff', { unico: true, r: .6 }); const ld = new Image();
+          ld.onload = () => { const t = new T.Texture(ld); t.encoding = T.sRGBEncoding; t.needsUpdate = true; guardar(t); tela2.map = t; tela2.needsUpdate = true; };
+          ld.src = src;
+          pl(g, w, h, tela2, 0, y + h / 2, .03);
+          if (o.luz !== false) { const lp = G(); lp.position.set(0, y + h + mol + .05, .12); g.add(lp); cy(lp, .025, .025, w * .55, ouro, 0, 0, 0, 8).rotation.z = Math.PI / 2; luz(g, '#ffd8a8', .35, 2.2, 0, y + h + .02, .35); }
+          if (o.txt) { const pm = m('#ffffff', { unico: true, mapa: textoTex(o.txt, { w: 256, h: 48, cor: '#2b2b2b', fundo: '#c9a24b', tam: 26 }) }); pl(g, .34, .065, pm, 0, y - mol - .1, .03); }
+          return g;
+        }
         bx(g, w + .1, h + .1, .05, m('#6d4c1f', { me: .4, r: .4 }), 0, y - .05);
         pl(g, w, h, m('#ffffff', { unico: true, mapa: texCanvas(c), r: .7 }), 0, y + h / 2, .03);
         if (o.txt) { const pm = m('#ffffff', { unico: true, mapa: textoTex(o.txt, { w: 256, h: 48, cor: '#2b2b2b', fundo: '#c9a24b', tam: 26 }) }); pl(g, .34, .065, pm, 0, y - .12, .03); }
@@ -455,6 +470,15 @@
 
     /* ---------- texturas novas (geradas na hora) ---------- */
     function textura(tipo, cor, rep) {
+      // texturas registradas por extensão: ACF3D.texturas[nome] = (ctx2d, tamanho, rng, cor) => desenha
+      const EXTRA = (window.ACF3D || {}).texturas || {};
+      if (EXTRA[tipo]) {
+        const k = 'x' + tipo + cor + (rep || '');
+        if (cacheT.has(k)) return cacheT.get(k);
+        const [c, x] = tela(512, 512); x.fillStyle = cor; x.fillRect(0, 0, 512, 512);
+        EXTRA[tipo](x, 512, rng(tipo.length * 97 + cor.length * 13), cor);
+        const t = texCanvas(c, rep || [1, 1]); cacheT.set(k, t); return t;
+      }
       const NOVAS = ['papel_parede', 'carpete_umido', 'forro', 'marmore', 'areia', 'grama', 'carne', 'osso', 'tijolo', 'estrelas', 'nomes', 'veludo', 'terra', 'agua', 'vagao', 'ceu_noite', 'ceu_nublado', 'ceu_branco', 'asfalto'];
       if (!NOVAS.includes(tipo)) return texturaBase(tipo, cor, rep);
       const k = tipo + cor + (rep || '');
@@ -1117,7 +1141,10 @@
       elevador(o) { const g = G(), ferro = m('#4a4f55', { me: .7, r: .4, tex: 'metal' }); bx(g, 1.6, 2.3, .15, ferro); [-1, 1].forEach(s => bx(g, .75, 2.1, .05, m('#6d747b', { me: .7, r: .35 }), s * .39, .05, .1)); bx(g, .4, .15, .05, m('#ffffff', { e: '#ffb000', ei: 1 }), 0, 2.2, .1); return g; },
     });
 
-    return { P, m, textura, bx, cy, sf, pl, luz, textoTex, G, metal, texCanvas, guardar, figura, cores };
+    const fab = { P, m, textura, bx, cy, sf, pl, luz, textoTex, G, metal, texCanvas, guardar, figura, cores, ALT, anim, rng, tela, T, imagens: {} };
+    // extensões (detalhes3d.js): mais objetos na mesma fábrica
+    ((window.ACF3D || {}).extensoes || []).forEach(f => { try { f(fab); } catch (e) { console.warn('3D extensão:', e); } });
+    return fab;
   }
   // caixas de colisão de um objeto da cena: peças grandes e "compostas" (anel de colunas, vagão,
   // fileira de mesas) viram uma caixa por peça, para não bloquear a sala inteira com uma caixa só
