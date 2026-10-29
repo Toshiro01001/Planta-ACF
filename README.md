@@ -263,8 +263,9 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 
 ### Regras do mapa valem no 3D
 
-- **Distância:** o 3D usa a mesma conta do 2.5D (sala de 50 m² = 7,07 m de lado; corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa.
-- **Corredores:** 14 m de comprimento e estreitos (cabem duas pessoas lado a lado, três não). Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
+- **Tamanho no 3D:** a sala tem 10 m de lado e 3,2 m de pé-direito; o corredor tem 14 m de comprimento e 2,4 m de largura.
+- **Distância:** as regras continuam sendo as da planta (sala de 50 m², corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa. Como a sala do 3D é maior que a da regra, dentro dela o passo no 3D "rende" menos metros de regra que parece.
+- **Corredores:** 2,4 m de largura, para duas pessoas andarem lado a lado. Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
 - **Portas:** cada corredor tem a porta no estado público da planta (fechada, abrindo, trancada, com teclado, escombros, carne ou aberta). Porta fechada barra o corredor. Ao lado do vão, dentro da sala, fica o painel com o botão vermelho. Tecla **E** (ou toque no botão) aperta o botão quando a regra deixa; com teclado, pede o código. Só o Mestre fecha portas.
 - **Decibelímetro:** o mesmo medidor do 2.5D aparece no canto da tela 3D, com o nível do token que você controla.
 
@@ -275,6 +276,13 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 - **Versão da sala (5º andar):** neutra, Rei, Mãe ou Consagrado, conforme a cena.
 - **Controlar token:** o Mestre escolhe qualquer token e anda com WASD (as regras continuam valendo) ou usa a câmera fantasma, que atravessa paredes.
 - **Formas dos Filhos:** cada Filho escolhe uma forma (esguio, colosso, rastejante, retalhos, mecânico, sombra, luz, enxame, estática, olhos). O arquivo traz uma PROPOSTA; o Mestre troca quando quiser (`mapa/formas`).
+
+### Zona Neutra no 3D
+
+Toda Zona Neutra (sala 25 de cada andar) tem beliches, camas, armários, mural, geladeira, bebedouro e a banca do Maurício (o palhaço de mola na caixa "PROJ Maurício", com armas, lanternas, latas e máscaras de gás, e a placa "COMPRE OU TROQUE!"). Cada andar mantém o próprio jeito (bunker, alojamento, guarita, vagão, quarto branco).
+
+- Perto da banca: **E · Falar com o Maurício** abre a Loja do Maurício (as mesmas regras de loja aberta/fechada).
+- Perto da geladeira ou do bebedouro: **E** pega 1 comida ou 1 água da despensa (mesma regra do botão "Pegar 1").
 
 ### Esconderijos
 
@@ -295,8 +303,9 @@ O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só o
 
 `{"tipo":"planta-acf-3d","versao":2,"salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r,esc,v}]}},"formas":{"f04":"colosso"}}`
 
-- Medidas em metros. A sala vai de −3,5 a 3,5 em x (oeste → leste) e em z (norte → sul); pé-direito 3 m.
-- Os vãos das portas ficam no meio de cada parede (1,8 m de largura). Deixe esses trechos livres.
+- Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. Sem `lado`, a cena é tratada como do formato antigo (7,07 m) e espalhada sozinha na sala de 10 m: o que está encostado na parede continua encostado.
+- Os vãos das portas ficam no meio de cada parede (2,4 m de largura). Deixe esses trechos livres.
+- `uso`: `loja` (Maurício), `agua` ou `comida` (despensa).
 - `esc`: nome do esconderijo. `v`: versão da sala onde o item aparece (`neutro`, `rei`, `mae`, `consagrado`).
 - Som gerado pelo navegador, sem arquivos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio, geiger, grilos, vento, mar, alarme_baixo, respiracao, coro.
 
