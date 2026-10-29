@@ -111,6 +111,8 @@ function visivelPara(tk) {
   if (!tk || !SER[tk.s]) return false;
   const v = V();
   if (v.mestre) return true;
+  // escondido num esconderijo (vista 3D): só quem se escondeu (e o Mestre) enxerga
+  if (tk.esq && tk.s !== v.meu) return false;
   const tipo = SER[tk.s].tipo;
   if (v.aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
@@ -496,10 +498,10 @@ function recusaLocal(caminho, valor) {
   // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
   if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f\d+-\d+$/.test(caminho[1])) return '';
   if (aux && atual && !valor && SER[atual.s] && SER[atual.s].tipo === 'filho') return atual.h ? '' : 'Este Filho já foi revelado aos jogadores: só o Mestre tira do mapa.';
-  if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar fichas do mapa.';
-  if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover essa ficha.';
+  if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar tokens do mapa.';
+  if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover esse token.';
   const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
-  if (!igual('s') || !igual('a') || !igual('h') || !igual('vf')) return 'Só o Mestre pode mudar o andar ou a ocultação de uma ficha.';
+  if (!igual('s') || !igual('a') || !igual('h') || !igual('vf')) return 'Só o Mestre pode mudar o andar ou a ocultação de um token.';
   return '';
 }
 
@@ -1079,6 +1081,7 @@ function desenharFichas() {
     $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
     f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
+    f.classList.toggle('escondida', !!tk.esq);
     f.classList.toggle('minha', !mestre && podeMover(tk));
     f.classList.toggle('vista-filhos', mestre && !!tk.vf);
     f.classList.toggle('selecionada', selecionado === id);
@@ -1099,7 +1102,7 @@ function ligarArraste(f) {
     esconderDica();
     const id = f.dataset.id;
     const tk = Store.state.tokens[id];
-    if (espiar) { selecionar(id); aviso('Volte à visão do Mestre para mover fichas.'); return; }
+    if (espiar) { selecionar(id); aviso('Volte à visão do Mestre para mover tokens.'); return; }
     if (mestre && e.shiftKey) { alternarGrupo(id); return; }
     if (!podeMover(tk)) { selecionar(id); return; }
     const motivo = bloqueioPerseguicao(id, tk);
@@ -1160,6 +1163,7 @@ function ligarArraste(f) {
       tk.m = +Math.min(lim, usado + custo).toFixed(2);
     }
     arrastando.andou = true;
+    if (tk.esq) delete tk.esq;   // sair andando tira do esconderijo
     tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2);
     f.style.left = px(tk.x); f.style.top = px(tk.y);
     previaPasso(tk, lim);
@@ -1433,7 +1437,7 @@ function desenharCartaoSala() {
   const marcar = sim => {
     const lista = naSala();
     lista.forEach(([id, tk]) => Store.definir(['tokens', id], { ...tk, vf: sim }));
-    aviso(lista.length ? `${lista.length} ficha(s) ${sim ? 'reveladas aos' : 'escondidas dos'} Filhos.` : 'Nenhuma cobaia ou NPC nesta sala.');
+    aviso(lista.length ? `${lista.length} token(s) ${sim ? 'revelados aos' : 'escondidos dos'} Filhos.` : 'Nenhuma cobaia ou NPC nesta sala.');
   };
   $('[data-acao="vfsim"]', c).onclick = () => marcar(true);
   $('[data-acao="trazcob"]', c).onclick = () => {
@@ -2898,7 +2902,7 @@ function desfazer() {
   if (!prox) { aviso('Nada para desfazer.'); return; }
   const { it, tk, pilha } = prox;
   const pz = participante(it.id);
-  if (pz && vezAtual() !== it.id && !(mestre && movLivre)) { aviso('Na perseguição, só dá para desfazer na vez dessa ficha.'); return; }
+  if (pz && vezAtual() !== it.id && !(mestre && movLivre)) { aviso('Na perseguição, só dá para desfazer na vez desse token.'); return; }
   pilha.pop();
   if (mestre) Diario.ignorar[it.id] = Date.now();
   Store.definir(['tokens', it.id], { ...tk, a: it.antes.a, x: it.antes.x, y: it.antes.y, m: it.antes.m || 0 });
@@ -3035,7 +3039,7 @@ $('#arqBackup').addEventListener('change', async e => {
   try { pacote = JSON.parse(await arq.text()); } catch (err) { alert('Este arquivo não é um backup válido.'); return; }
   if (!pacote || pacote.tipo !== 'planta-acf-backup' || !pacote.mapa || typeof pacote.mapa.tokens !== 'object') { alert('Este arquivo não é um backup da Planta da Caixa.'); return; }
   const qtd = Object.keys(pacote.mapa.tokens || {}).length;
-  if (!confirm(`Restaurar o backup salvo em ${dataCurta(pacote.salvoEm)} às ${hora(pacote.salvoEm)}?\n\n${qtd} fichas, salas, ruído, dia, perseguição, funções e anotações voltam a esse ponto. Todos os jogadores verão o mapa mudar. O diário atual é mantido.`)) return;
+  if (!confirm(`Restaurar o backup salvo em ${dataCurta(pacote.salvoEm)} às ${hora(pacote.salvoEm)}?\n\n${qtd} tokens, salas, ruído, dia, perseguição, funções e anotações voltam a esse ponto. Todos os jogadores verão o mapa mudar. O diário atual é mantido.`)) return;
   const m = pacote.mapa;
   Diario.reiniciar = true;
   Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
@@ -3065,7 +3069,7 @@ $('#arqBackup').addEventListener('change', async e => {
 // campos do mapa que são configuração (ficam); o resto é jogo e volta ao zero
 const MAPA_FICA = ['cfg', 'nomes', 'cego', 'loja', 'melhorias', 'regrasPub', 'senhasAndar', 'docs', 'cifras', 'hud', 'momentos', 'trancaAndar', 'trilha'];
 const REST_CATS = [
-  { id: 'mapa', n: 'Mapa e jogo', d: 'Fichas na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança.', on: true },
+  { id: 'mapa', n: 'Mapa e jogo', d: 'Tokens na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança.', on: true },
   { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0 e do Mostarda, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões e entregas pendentes.', on: true,
     nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas'] },
   { id: 'registros', n: 'Registros', d: 'Relatório da missão, diário, noite secreta, marcas da noite, testes pedidos, Balança, total secreto das salas, histórico de NEX (o NEX inicial fica) e desejos da Parede.', on: true,
@@ -3292,7 +3296,7 @@ async function publicarApagao(ligar) {
 }
 $('#btnApagao').addEventListener('click', async () => {
   if (apagaoAtivo()) { await publicarApagao(false); return; }
-  if (confirm('Ligar o apagão? Os jogadores passam a enxergar só a própria ficha até você desligar.')) await publicarApagao(true);
+  if (confirm('Ligar o apagão? Os jogadores passam a enxergar só o próprio token até você desligar.')) await publicarApagao(true);
 });
 
 /* =========================================================
@@ -4619,7 +4623,7 @@ function desenharGrupo() {
   $$('.ficha').forEach(f => f.classList.toggle('no-grupo', grupo.has(f.dataset.id)));
   const info = $('#grupoInfo');
   info.hidden = !grupo.size;
-  info.textContent = grupo.size ? `${grupo.size} ficha${grupo.size > 1 ? 's' : ''} no grupo: ${[...grupo].map(nomeDoId).join(', ')} · Esc limpa` : '';
+  info.textContent = grupo.size ? `${grupo.size} token${grupo.size > 1 ? 's' : ''} no grupo: ${[...grupo].map(nomeDoId).join(', ')} · Esc limpa` : '';
 }
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && grupo.size && !e.target.matches('input, textarea, select')) { grupo.clear(); desenharGrupo(); } });
 function grupoInicio(id) {
@@ -5646,6 +5650,100 @@ function rolagemAux() {
   else { const r = F.rolarExpr(ex); html = `${esc(r.det)} = <b>${r.total}</b>`; }
   $('#rolAuxRes').innerHTML = html + ` <small>${hora(Date.now()).slice(0, 5)}</small>`;
 }
+
+/* =========================================================
+   PONTE PARA A VISTA 3D (sala3d.js)
+   O 3D move o token pelas MESMAS regras do arraste no mapa: paredes e portas
+   (andavel/caminhoLivre), vez e limite de metros da perseguição (custoMetros).
+   ========================================================= */
+const mov3d = {};
+function moverToken3D(id, x, y, fim) {
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk || !SER[tk.s]) return { ok: false, motivo: 'Token fora do mapa.' };
+  if (espiar) return { ok: false, motivo: 'Volte à visão do Mestre para mover tokens.' };
+  if (!podeMover(tk)) return { ok: false, motivo: meu ? 'Você só pode mover o token da sua cobaia.' : 'Você não pode mover esse token.' };
+  const motivo = bloqueioPerseguicao(id, tk);
+  if (motivo) return { ok: false, motivo, persg: true };
+  const atual = { x: tk.x, y: tk.y };
+  let alvo = { x: clamp(x, 0.3, W - 0.3), y: clamp(y, 0.3, H - 0.3) };
+  if (Math.hypot(alvo.x - atual.x, alvo.y - atual.y) < 0.004 && !fim) return { ok: true, x: tk.x, y: tk.y, m: tk.m || 0, lim: limiteDe(id) };
+  if (andavel(tk.a, atual.x, atual.y) && !caminhoLivre(tk.a, atual, alvo)) return { ok: false, motivo: 'parede', parede: true };
+  const lim = limiteDe(id);
+  let m = tk.m || 0, esgotou = false;
+  if (lim) {
+    if (m >= lim - 0.001) return { ok: false, motivo: `Deslocamento esgotado (${lim} m).`, esgotou: true, lim, m };
+    let custo = custoMetros(atual, alvo);
+    if (m + custo > lim) {
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 18; i++) {
+        const mid = (lo + hi) / 2, q = { x: atual.x + (alvo.x - atual.x) * mid, y: atual.y + (alvo.y - atual.y) * mid };
+        if (m + custoMetros(atual, q) <= lim) lo = mid; else hi = mid;
+      }
+      alvo = { x: atual.x + (alvo.x - atual.x) * lo, y: atual.y + (alvo.y - atual.y) * lo };
+      custo = lim - m; esgotou = true;
+    }
+    m = Math.min(lim, m + custo);
+  }
+  const s = mov3d[id] || (mov3d[id] = { antes: { a: tk.a, x: tk.x, y: tk.y, m: tk.m || 0 }, ultimo: 0 });
+  const novo = { ...tk, x: +alvo.x.toFixed(2), y: +alvo.y.toFixed(2) };
+  if (lim) novo.m = +m.toFixed(2);
+  if (novo.esq && Math.hypot(novo.x - tk.x, novo.y - tk.y) > 0.05) delete novo.esq;   // só sai do esconderijo quem anda de verdade
+  const agora = performance.now();
+  if (fim || agora - s.ultimo > 140) { s.ultimo = agora; Store.definir(['tokens', id], novo); }
+  else Store.state.tokens[id] = novo;   // o próximo envio leva a posição mais nova
+  if (fim) { delete mov3d[id]; if (!mestre && (novo.x !== s.antes.x || novo.y !== s.antes.y)) empilharLocal(id, s.antes); }
+  return { ok: true, x: novo.x, y: novo.y, m: novo.m || 0, lim, esgotou };
+}
+// esconderijo (armário, embaixo da cama…): chave = "cNN:i" do objeto; null sai
+function esconderToken(id, chave) {
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk || !podeMover(tk)) return false;
+  const novo = { ...tk };
+  if (chave) novo.esq = String(chave).slice(0, 24); else delete novo.esq;
+  Store.definir(['tokens', id], novo);
+  return true;
+}
+// botão vermelho / Mestre abre e fecha a porta do corredor ci do andar a
+function porta3D(a, ci, acao, codigo) {
+  const pub = portaDe(a, ci), k = CORREDORES[ci];
+  if (!k) return 'Porta inexistente.';
+  if (!mestre && !aux) {
+    const tk = meu && (Store.state.tokens || {})[meu];
+    if (!tk) return 'Só quem tem um token no mapa pode apertar o botão.';
+    const p = salaEm(tk.a, tk.x, tk.y);
+    if (tk.a !== a || !(p === k.p1 || p === k.p2 || corredorEm(tk.x, tk.y) === ci)) return 'Chegue até uma das salas ligadas por este corredor para apertar o botão.';
+  }
+  if (acao === 'codigo') { if (pub !== 'tk') return 'Esta porta não tem teclado.'; digitarCodigo(a, ci, codigo); return ''; }
+  if (acao === 'fechar') { if (!mestre) return 'Só o Mestre fecha portas.'; fecharPorta(a, ci); return ''; }
+  if (pub) return pub === 'a' ? 'A porta já está aberta.' : apertada(pub) ? 'O botão já foi apertado.' : 'Essa porta não responde ao botão.';
+  abrirPorta(a, ci);
+  return '';
+}
+// decibelímetro: nível de ruído da sala (ou do corredor) onde está o token
+function ruidoDe(id) {
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk) return null;
+  const grupos = gruposDeSala();
+  if (isentos.has(id)) return { n: 0, nome: 'Zona Neutra · isenta', db: 0, isento: true, qtd: 0 };
+  let achou = null;
+  grupos.forEach(gr => { if (gr.ids.includes(id)) achou = gr; });
+  if (!achou) {
+    // não é cobaia: mede a sala onde ele está
+    const p = salaEm(tk.a, tk.x, tk.y);
+    grupos.forEach(gr => { if (p && gr.a === tk.a && gr.p === p) achou = gr; });
+    if (!achou) return { n: 0, nome: NIVEIS[0].nome, db: 0, qtd: 0 };
+  }
+  const n = nivelDe(achou.ids.length + (achou.extra || 0));
+  return { n, nome: NIVEIS[n].nome, db: NIVEIS[n].db, qtd: achou.ids.length, porta: !!achou.extra };
+}
+function ruidoPior() {
+  if (!mestre) return null;
+  let pior = null;
+  gruposDeSala().forEach(gr => { if (!pior || gr.ids.length + (gr.extra || 0) > pior.ids.length + (pior.extra || 0)) pior = gr; });
+  if (!pior) return { n: 0, nome: NIVEIS[0].nome, db: 0, onde: 'Nenhuma cobaia no mapa' };
+  const n = nivelDe(pior.ids.length + (pior.extra || 0));
+  return { n, nome: NIVEIS[n].nome, db: NIVEIS[n].db, onde: nomeGrupo(pior) };
+}
 window.ACF = {
   Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som, COND, publicarVitais, enviarChat, condicoesVisiveis,
   get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), definir: (c, v) => Store.definir(c, v),
@@ -5677,5 +5775,15 @@ window.ACF = {
   focarSala(cn) { const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1); if (!podeVer(a) || !POS[p]) return false; irParaAndar(a); const s = retSala(p); focar(s.x + s.w / 2, s.y + s.h / 2); if (salaVisivel(a, cn)) selecionarSala(cn); return true; },
   focarToken(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a || !podeVer(tk.a)) return false; irParaAndar(tk.a); focar(tk.x, tk.y); return true; },
   get andarAtual() { return andarAtual; },
+  // vista 3D
+  podeMover, visivelPara, moverToken3D, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
+  andavel: (a, x, y) => andavel(a, x, y),
+  limiteDe: id => limiteDe(id),
+  participa: id => !!participante(id),
+  portaDe: (a, ci) => portaDe(a, ci),
+  get apagao() { return apagaoAtivo(); },
+  get protocolo() { return !!(Store.state.ruido || {}).p; },
+  geo: { M, R, G, CW, W, H, CORREDORES, retSala, retSaida: a => retSaida(saidaDoAndar(a)), saidaDoAndar, salaEm, corredorEm: (x, y) => corredorEm(x, y), M_POR_UNID, M_CORREDOR },
+  rotulo: tk => rotuloBase(tk),
 };
 })();

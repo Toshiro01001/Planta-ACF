@@ -1,4 +1,4 @@
-/* nevoa.js · Névoa de guerra (estilo Owlbear) e molduras das fichas (estilo Token Stamp)
+/* nevoa.js · Névoa de guerra (estilo Owlbear) e molduras dos tokens (estilo Token Stamp)
 
    NÉVOA DE GUERRA
    - O Mestre liga ou desliga por andar, no cartão de qualquer sala daquele andar.
@@ -37,7 +37,7 @@
     if ($('[data-moldura]', m)) return;
     const l = document.createElement('label');
     l.className = 'chave';
-    l.innerHTML = '<input type="checkbox" data-moldura><span>Molduras nas fichas (aro na cor de cada ficha)</span>';
+    l.innerHTML = '<input type="checkbox" data-moldura><span>Molduras nos tokens (aro na cor de cada token)</span>';
     const linha = $('.pb-linha', m);
     linha ? m.insertBefore(l, linha) : m.appendChild(l);
     const i = $('input', l);
