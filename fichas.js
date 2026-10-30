@@ -1579,7 +1579,7 @@ function aoClicar(e) {
     if (u.pe) { gravar(k + '.a', cur - u.pe, true); registrarGasto(d, u.pe); }
     gravar('bonusProx', { n: String(h.n || '').slice(0, 60), b: u.b, em: u.em }, true);
     A.aviso(`⚡ ${h.n}: −${u.pe} ${K}. ${u.b} guardado para o próximo ${textoEm(u.em)}.`);
-    if (minhaFicha()) A.rolagemDaFicha(`⚡ usou ${h.n} (−${u.pe} ${K})`);
+    if (minhaFicha()) { A.rolagemDaFicha(`⚡ usou ${h.n} (−${u.pe} ${K})`); if (A.efeitoToken && A.meu) A.efeitoToken(A.meu, { t: 'hab', n: h.n, el: h.el || '' }); }
     atualizarDerivados(); desenharAba();
     return;
   }
@@ -1851,6 +1851,13 @@ window.ACF_FICHAS = {
     return tem + 1 > max ? { cat: ROM[int(x.cat)], tem, max, pat: r.patente.n } : null;
   },
   consumoMissao,
+  // fichas de "Ameaças e Filhos" ligadas a um Filho do mapa (o 3D mostra as habilidades de quem está no Controle)
+  fichasDoFilho(serId, cb) {
+    if (!(ehMestre() || ehAux())) { cb([]); return () => {}; }
+    return A.Rede.on('agentesAux', v => cb(Object.entries(v || {}).filter(([, d]) => d && d.tipo === 'ameaca' && d.filho === serId).map(([chave, d]) => ({ chave, d: normalizar(d) }))), () => cb([]));
+  },
+  // abre a ficha de um Filho/ameaça dos auxiliares
+  abrirAux: chave => { abrir(); abrirFicha({ aux: true, dono: 'aux', chave }); },
   abrirAtiva: () => { if (F.ativaRef) { abrir(); abrirFicha(F.ativaRef); } else abrir(); },
   religar: () => { F.ativaId = undefined; ligarAtiva(); },
 };
