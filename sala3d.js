@@ -29,6 +29,38 @@
   }));
   const ACF = () => window.ACF;
   const NS = () => window.ACF3D;
+  // objeto de cena "campo_infinito": a figura flutuante (triângulo invertido) com o campo em volta.
+  // O que ele faz com quem chega perto fica em Campos (mover): quanto mais perto, mais devagar; perto demais, preso.
+  (window.ACF3D = window.ACF3D || {}).extensoes = window.ACF3D.extensoes || [];
+  window.ACF3D.extensoes.push(F => {
+    const { P, m, G, T, guardar, anim, luz } = F;
+    P.campo_infinito = o => {
+      const g = G(), alto = o.y || 1.75, tam = o.tam || 1.5, fig = G(); fig.position.y = alto; g.add(fig);
+      const tri = (lado, furo) => { const sh = new T.Shape(), h = lado * Math.sqrt(3) / 2; sh.moveTo(-lado / 2, h / 3); sh.lineTo(lado / 2, h / 3); sh.lineTo(0, -2 * h / 3); sh.closePath();
+        if (furo) { const f = new T.Path(), l2 = furo, h2 = l2 * Math.sqrt(3) / 2; f.moveTo(-l2 / 2, h2 / 3); f.lineTo(0, -2 * h2 / 3); f.lineTo(l2 / 2, h2 / 3); f.closePath(); sh.holes.push(f); } return sh; };
+      const moldura = new T.Mesh(guardar(new T.ExtrudeGeometry(tri(tam, tam * .72), { depth: .12, bevelEnabled: true, bevelSize: .02, bevelThickness: .02, bevelSegments: 2 })), m('#0a0a0b', { r: .35, me: .4 }));
+      moldura.position.z = -.06; fig.add(moldura);
+      const branco = m('#ffffff', { unico: true, e: '#ffffff', ei: 1.6, r: .2 });
+      const miolo = new T.Mesh(guardar(new T.ShapeGeometry(tri(tam * .38))), branco); miolo.position.z = .07; fig.add(miolo);
+      const miolo2 = miolo.clone(); miolo2.rotation.y = Math.PI; miolo2.position.z = -.07; fig.add(miolo2);
+      const fundo = new T.Mesh(guardar(new T.ShapeGeometry(tri(tam * .72))), m('#1a1a1c', { r: .9, lado: 2 })); fig.add(fundo);
+      // anéis listrados (a espiral do mural) girando em volta da figura
+      const aneis = [];
+      for (let i = 0; i < 4; i++) { const a = new T.Mesh(guardar(new T.TorusGeometry(tam * (.75 + i * .22), .012, 6, 64)), m(i % 2 ? '#f2f2f2' : '#101010', { unico: true, op: .55 - i * .1, e: i % 2 ? '#ffffff' : '#000000', ei: .4 })); a.position.y = alto; g.add(a); aneis.push(a); }
+      // ondas no chão: marcam onde o ar fica "grosso"
+      const ondas = [];
+      for (let i = 0; i < 3; i++) { const r = new T.Mesh(guardar(new T.RingGeometry(1, 1.04, 64)), m('#ffffff', { unico: true, op: .0, lado: 2 })); r.rotation.x = -Math.PI / 2; r.position.y = .015; g.add(r); ondas.push(r); }
+      luz(g, '#f4f6ff', o.i || 1.4, o.d || 8, 0, alto, 0, false);
+      const ext = o.ext || 7;
+      anim.push((dt, t) => {
+        fig.rotation.y = t * .22; fig.position.y = alto + Math.sin(t * .9) * .06;
+        aneis.forEach((a, i) => { a.rotation.x = t * (.15 + i * .07) * (i % 2 ? -1 : 1); a.rotation.y = t * (.11 + i * .05); });
+        branco.emissiveIntensity = 1.3 + Math.sin(t * 2.2) * .5;
+        ondas.forEach((r, i) => { const k = ((t * .18 + i / 3) % 1); r.scale.setScalar(.4 + k * ext); r.material.opacity = .22 * (1 - k); });
+      });
+      return g;
+    };
+  });
   // 'jogo' (terceira pessoa) e 'dentro' (primeira pessoa): você está DENTRO do mundo (teto, névoa, paredes inteiras)
   const imersivo = m => m === 'dentro' || m === 'jogo';
   const $ = (s, r = document) => r.querySelector(s);
@@ -251,7 +283,7 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao', 'item_chao', 'documento_sala',
+  const SEM_COLISAO = new Set(['campo_infinito', 'tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao', 'item_chao', 'documento_sala',
     'a2_aneis_chao', 'a2_arandela', 'a2_camera_canto', 'a2_defletor', 'a2_documento', 'a2_estandarte', 'a2_evaporador', 'a2_facho', 'a2_faixa_zebrada', 'a2_fila_chao', 'a2_gelo', 'a2_lampada_cultivo', 'a2_metronomo', 'a2_panelas', 'a2_ralo_cabelo', 'a2_regua_altura', 'a2_retalhos', 'a3_bilhete', 'a3_carne_costurada', 'a3_chao', 'a3_eclusa', 'a3_lampada_respira', 'a3_manual_corte', 'a3_poco_teto', 'a3_sob_agua', 'a3_telas', 'a3_trilhos_parede', 'a3_veias', 'a3_vento', 'a4_arandela', 'a4_calcada', 'a4_calendario', 'a4_capacete_riscado', 'a4_carne_parede', 'a4_fachada', 'a4_fenda_portal', 'a4_fita_chao', 'a4_fratura', 'a4_lampiao', 'a4_lustre', 'a4_luz', 'a4_placa_museu', 'a4_poco_espiral', 'a4_porta_nome', 'a4_seteira_vista', 'a5_brinquedos', 'a5_coroa', 'a5_costura', 'a5_cupula', 'a5_facho', 'a5_feixe', 'a5_gotas_paradas', 'a5_olhos_fenda', 'a5_parede_nomes', 'a5_pertences', 'a5_projecao', 'a5_queimado', 'a5_tunel', 'a5_valvula', 'a5_veias', 'a5_vista']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
@@ -266,7 +298,7 @@
     let escs = 0;
     Object.entries(LADOS).forEach(([lado, [sx, sz, rot]]) => {
       for (let u = -H + 1.6; u <= H - 1.6; u += 2.3) {
-        if (porta(lado, u) || r() < .38) continue;
+        if (porta(lado, u) || r() < .62) continue;
         const k = r(), tipo = k < .26 ? 'armario_metal' : k < .48 ? 'estante' : k < .66 ? 'arquivo' : k < .84 ? 'caixote' : 'pilha';
         const prof = { armario_metal: .32, estante: .3, arquivo: .36, caixote: .85, pilha: .7 }[tipo];
         const x = sx ? sx * (H - prof) : u, z = sz ? sz * (H - prof) : u;
@@ -309,8 +341,95 @@
       o.rotation.y = (it.r || 0) * Math.PI / 180;
       if (it.s) o.scale.setScalar(it.s);
       o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null; o.userData.uso = it.uso || null;
+      if (it.t === 'campo_infinito') o.userData.campo = { r0: it.r0 || 1.3, r1: it.r1 || 2.6, ext: it.ext || 7, per: it.per || 'vontade', dt: it.dt || 20 };
       pai.add(o);
     });
+    if (sala && lado < SALA_M * .8) { try { encherComMobilia(F, pai, itens, sala); } catch (e) { console.warn('3D enchimento:', e); } }
+  }
+  /* Sala grande com a mobília da PRÓPRIA sala: copia os móveis que a cena já tem (carteiras na sala de aula, macas no
+     hospital, estantes no arquivo, quadros nas paredes…) para os espaços vazios, com os mesmos esconderijos.
+     Nunca fecha os vãos das portas e só aceita uma cópia se ainda dá para andar de qualquer porta a qualquer outra
+     (busca numa grade de 25 cm). Sorteado pela CN: todo mundo vê a mesma sala. */
+  const NAO_CLONAR = new Set(['porta', 'porta_dupla', 'placa', 'placa_sala', 'placa_teto', 'placa_bronze', 'placa_saida', 'luminaria', 'lampada', 'lampada_alerta', 'item_chao', 'documento_sala',
+    'espiral', 'triangulo', 'campo_infinito', 'trono', 'poco', 'nucleo', 'telao', 'tela_cinema', 'projetor', 'porta_cofre', 'elevador', 'texto', 'mancha', 'teia', 'sangue', 'papeis_chao', 'cabos_chao',
+    'agua', 'tapete', 'canos', 'cano_grande', 'gotas', 'rasgos', 'senhas', 'halo', 'silhuetas', 'esteira_carga', 'trilhos', 'turbina', 'helice', 'colunas_anel', 'moldes', 'membrana', 'coracoes',
+    'estrela_cadente', 'grama', 'cortina', 'tenda', 'onda_som', 'grade_chao', 'centelhas', 'foco_cirurgico', 'tubo_neon', 'janela', 'janela_luz', 'seteira', 'mapa_mundi', 'ninho_simbolo', 'escorpiao']);
+  const DECOR_PAREDE = new Set(['quadro', 'pintura', 'cartaz', 'mural', 'relogio', 'fotos', 'negatoscopio', 'lousa', 'mural_graficos', 'quadro_dentes', 'bolsas_parede', 'armario_suspenso', 'espelho']);
+  function encherComMobilia(F, pai, itens, sala) {
+    const T = F.T, H = SALA_M / 2, G = .25, N = Math.round(SALA_M / G), r = NS().rng(sala.cn * 131 + 7);
+    pai.updateMatrixWorld(true);
+    const px = pai.position.x, pz = pai.position.z, bb = new T.Box3();
+    const caixas = [];
+    pai.children.forEach(o => {
+      if (!o.userData.t) return; bb.setFromObject(o); if (bb.isEmpty()) return;
+      caixas.push({ t: o.userData.t, i: o.userData.i, x0: bb.min.x - px, x1: bb.max.x - px, z0: bb.min.z - pz, z1: bb.max.z - pz, y0: bb.min.y, y1: bb.max.y });
+    });
+    const colide = c => !SEM_COLISAO.has(c.t) && c.y0 < 1.8 && c.y1 > .25;
+    const cel = v => Math.max(0, Math.min(N - 1, Math.floor((v + H) / G)));
+    const grade = new Uint8Array(N * N);
+    const marcar = (g, c, m) => { for (let i = cel(c.x0 - m); i <= cel(c.x1 + m); i++) for (let j = cel(c.z0 - m); j <= cel(c.z1 + m); j++) g[i * N + j] = 1; };
+    caixas.forEach(c => { if (colide(c)) marcar(grade, c, RAIO); });
+    // pontos das portas (logo para dentro) e os "aventais" que ficam sempre livres
+    const portas = sala.vaos.map(v => v.lado === 'n' ? [v.u, -H + .5] : v.lado === 's' ? [v.u, H - .5] : v.lado === 'w' ? [-H + .5, v.u] : [H - .5, v.u]);
+    const aventais = sala.vaos.map(v => { const a = CORR_W / 2 + .5, p = 3.6; return v.lado === 'n' ? [v.u - a, v.u + a, -H, -H + p] : v.lado === 's' ? [v.u - a, v.u + a, H - p, H] : v.lado === 'w' ? [-H, -H + p, v.u - a, v.u + a] : [H - p, H, v.u - a, v.u + a]; });
+    // quantas portas se alcançam a partir da primeira porta livre (a cópia não pode diminuir esse número)
+    const alcance = g => {
+      const ks = portas.map(([x, z]) => cel(x) * N + cel(z)).filter(k => !g[k]); if (!ks.length) return 0;
+      const visto = new Uint8Array(N * N), fila = [ks[0]]; visto[ks[0]] = 1;
+      while (fila.length) { const k = fila.pop(), i = (k / N) | 0, j = k % N; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { const u = i + a, w = j + b; if (u < 0 || w < 0 || u >= N || w >= N) return; const q = u * N + w; if (!g[q] && !visto[q]) { visto[q] = 1; fila.push(q); } }); }
+      return ks.filter(k => visto[k]).length;
+    };
+    const base = alcance(grade);
+    const conectado = g => alcance(g) >= base;
+    const livres = g => { let n = 0; for (let i = 0; i < g.length; i++) if (!g[i]) n++; return n / g.length; };
+    // modelos: os móveis originais da cena (cada um com a caixa medida de verdade)
+    const lado = c => { const d = { n: c.z0 + H, s: H - c.z1, w: c.x0 + H, e: H - c.x1 }; const k = Object.keys(d).sort((a, b) => d[a] - d[b])[0]; return d[k] < .45 ? k : null; };
+    const ANG = { n: 0, w: 90, s: 180, e: -90 };
+    const protos = [];
+    caixas.forEach(c => {
+      const it = itens[c.i]; if (!it || it.encher || NAO_CLONAR.has(it.t) || it.v || it.uso || it.img || it.txt || it.txt1 || it.w >= 5) return;
+      const w = c.x1 - c.x0, d = c.z1 - c.z0;
+      const decor = DECOR_PAREDE.has(it.t);
+      if (!decor && (w * d < .12 || w * d > 10 || Math.max(w, d) > 4.6 || c.y1 - c.y0 < .3)) return;
+      const ld = lado(c); if (decor && !ld) return;
+      const ox = it.x || 0, oz = it.z || 0;
+      protos.push({ it, c, ld, decor, cant: [[c.x0 - ox, c.z0 - oz], [c.x1 - ox, c.z0 - oz], [c.x0 - ox, c.z1 - oz], [c.x1 - ox, c.z1 - oz]] });
+    });
+    if (!protos.length) return;
+    // retângulo do móvel girado dg graus (múltiplo de 90) em volta da origem dele
+    const girar = (p, dg) => { const a = dg * Math.PI / 180, cs = Math.round(Math.cos(a)), sn = Math.round(Math.sin(a)); let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; p.cant.forEach(([x, z]) => { const X = x * cs + z * sn, Z = -x * sn + z * cs; x0 = Math.min(x0, X); x1 = Math.max(x1, X); z0 = Math.min(z0, Z); z1 = Math.max(z1, Z); }); return [x0, x1, z0, z1]; };
+    const sobrepoe = (q, m, decorQ, y0, y1) => caixas.some(c => {
+      if (decorQ ? !(c.y1 > y0 - .1 && c.y0 < y1 + .1) : (SEM_COLISAO.has(c.t) && c.y1 < .25) || c.y0 > 2.2) return false;
+      return q[0] - m < c.x1 && q[1] + m > c.x0 && q[2] - m < c.z1 && q[3] + m > c.z0;
+    });
+    const naPorta = q => aventais.some(a => q[0] < a[1] && q[1] > a[0] && q[2] < a[3] && q[3] > a[2]);
+    const meta = Math.min(60, 14 + protos.length * 4);
+    let feitos = 0, escs = 0;
+    for (let tent = 0; tent < 520 && feitos < meta; tent++) {
+      if (livres(grade) < .52) break;
+      const p = protos[Math.floor(r() * protos.length)];
+      let dg = 0, x, z;
+      if (p.ld) {
+        const alvo = ['n', 's', 'w', 'e'][Math.floor(r() * 4)];
+        dg = ((ANG[alvo] - ANG[p.ld]) % 360 + 360) % 360;
+        const [a0, a1, b0, b1] = girar(p, dg), u = (r() - .5) * (SALA_M - 2.4);
+        if (alvo === 'n') { x = u; z = -H + .03 - b0; } else if (alvo === 's') { x = u; z = H - .03 - b1; } else if (alvo === 'w') { z = u; x = -H + .03 - a0; } else { z = u; x = H - .03 - a1; }
+      } else {
+        dg = r() < .8 ? 0 : 180;
+        x = (r() - .5) * (SALA_M - 3.2); z = (r() - .5) * (SALA_M - 3.2);
+      }
+      const [a0, a1, b0, b1] = girar(p, dg), q = [x + a0, x + a1, z + b0, z + b1];
+      if (q[0] < -H + .02 || q[1] > H - .02 || q[2] < -H + .02 || q[3] > H - .02) continue;
+      if (naPorta(q) || sobrepoe(q, p.decor ? .25 : .45, p.decor, p.c.y0, p.c.y1)) continue;
+      const nova = { t: p.it.t, x0: q[0], x1: q[1], z0: q[2], z1: q[3], y0: p.c.y0, y1: p.c.y1 };
+      if (colide(nova)) { const g2 = grade.slice(); marcar(g2, nova, RAIO); if (!conectado(g2) || livres(g2) < .48) continue; grade.set(g2); }
+      const i = itens.length + feitos, it = { ...p.it, x: +x.toFixed(2), z: +z.toFixed(2), r: (p.it.r || 0) + dg, sem: Math.floor(r() * 9000) + 1, encher: 1 };
+      if (it.esc && escs >= 3) delete it.esc; if (it.esc) escs++;
+      let o; try { o = F.P[it.t]({ ...it, sem: it.sem }); } catch (e) { continue; }
+      o.position.set(it.x, it.h0 || 0, it.z); o.rotation.y = it.r * Math.PI / 180; if (it.s) o.scale.setScalar(it.s);
+      o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null; o.userData.uso = null;
+      pai.add(o); caixas.push(nova); feitos++;
+    }
   }
   const dentroDe = (r, x, z) => x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3];
   function obstaculos(T, pai) {
@@ -576,7 +695,7 @@
     { const sd = MAPA.g.saidaDoAndar(a); if (sd && !sd.lado && S[sd.p]) interativos.push({ tipo: 'elevador', pos: new T.Vector3(S[sd.p].cx, 1.1, S[sd.p].cz), sala: sd.p }); }
 
     /* ----- conteúdo das salas: só perto de quem está olhando ----- */
-    const carregadas = new Map();
+    const carregadas = new Map(), campos = [];
     function carregar(p) {
       const s = S[p]; if (carregadas.has(p)) return;
       const ver = ((est().var3d || {})['c' + s.cn]) || 'neutro';
@@ -586,6 +705,7 @@
       const F2 = NSX.criarFabrica(T, anim, luzes, desc, { alt: ALT }); F2.T = T;
       montarItens(F2, cena, g, ver, { cn: s.cn, vaos: Object.entries(s.vaos).map(([lado, v]) => ({ lado, u: v.centro - (lado === 'n' || lado === 's' ? s.cx : s.cz) })) });
       g.updateMatrixWorld(true);
+      g.children.forEach(o => { if (o.userData.campo) campos.push({ p, cn: s.cn, x: s.cx + o.position.x, z: s.cz + o.position.z, ...o.userData.campo }); });
       const virt = luzes.map(l => { const w = new T.Vector3(); l.getWorldPosition(w); l.parent.remove(l); return { l, p: w, base: l.intensity, cn: s.cn }; });
       (cena.luzes || []).forEach((l, i) => {
         const L = new T.PointLight(l.c || '#fff', l.i ?? 1, l.d ?? 8, 2);
@@ -638,6 +758,7 @@
     function atualizarDocs() { carregadas.forEach((c, p) => sincDocs(p)); }
     function descarregar(p) {
       const c = carregadas.get(p); if (!c) return;
+      for (let i = campos.length - 1; i >= 0; i--) if (campos[i].p === p) campos.splice(i, 1);
       raiz.remove(c.g); c.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
       for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc'].includes(interativos[i].tipo) && interativos[i].p === p) interativos.splice(i, 1);
       carregadas.delete(p);
@@ -757,7 +878,7 @@
     }
 
     return {
-      a, S, CS, portas, interativos, carregadas, raiz, tetos,
+      a, S, CS, portas, interativos, carregadas, raiz, tetos, campos,
       livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs, carregar,
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
@@ -800,6 +921,8 @@
     // o jogador só enxerga quem está na mesma sala (ou no corredor à vista); Mestre e auxiliar seguem as regras do mapa
     function quemVe(id, tk) {
       if (!A.visivelPara(tk)) return false;
+      // auxiliar no Controle de um Filho: enxerga como o Filho (escondido e aprovado no teste some)
+      if (ctx.quem === 'aux') { const c = ctx.ctrlAtual(), tc = c && tokens()[c]; if (tc && A.SER[tc.s] && A.SER[tc.s].tipo === 'filho' && A.visivelAoFilho && !A.visivelAoFilho(tk, c)) return false; }
       if (ctx.quem !== 'jog' || id === A.meu) return true;
       const g = MAPA.g, pj = ctx.salaJogador(), pt = g.salaEm(a, tk.x, tk.y);
       if (pt) return pt === pj;
@@ -1268,6 +1391,7 @@
   function alternarLanterna() { if (!V) return; V.lanterna = !V.lanterna; pintarBarra(); }
   function dica() {
     if (!V) return;
+    try { V.tok.sincronizar(); } catch (e) {}   // quem controla mudou: a vista (ex.: a do Filho) pode mudar
     const tq = ehToque(), q = V.quem, ctrl = V.ctrl != null;
     const T2 = id => nomeTecla(teclaDe(id)), wasd = [T2('frente'), T2('esq'), T2('tras'), T2('dir')].join('');
     const andar = ctrl ? (tq ? 'Círculo no canto: anda' : `${wasd}/setas: anda · ${T2('correr')} corre · ${T2('olharTras')} olha para trás`) : (q === 'jog' ? '' : (tq ? 'Círculo: câmera livre' : `${wasd}: câmera livre`));
@@ -1517,6 +1641,24 @@
       const ctrl = V.ctrl, livre = !ctrl;
       const vel = (livre ? (corre ? 8 : 4) : (corre ? 4 : 2)) * dt;
       if (livre) { est.px += dx * vel; est.pz += dz * vel; if (!imersivo(est.modo)) { est.ax = est.px; est.az = est.pz; } return true; }
+      // campo em volta da figura (campo_infinito): a parte do passo que vai em direção a ela encolhe sem nunca chegar;
+      // perto demais, o token fica preso e só se afasta passando num teste (Vontade, por padrão)
+      const cp = campoPerto(est.px, est.pz);
+      if (cp) {
+        const rx = est.px - cp.x, rz = est.pz - cp.z, d = Math.hypot(rx, rz) || .001, ux = rx / d, uz = rz / d;
+        let sx = dx * vel, sz = dz * vel; const rad = sx * ux + sz * uz, tx = sx - rad * ux, tz = sz - rad * uz;
+        const preso = V.preso && V.preso.cn === cp.cn && !V.preso.livre;
+        let nr = rad;
+        if (rad < 0) { const k = Math.pow(Math.max(0, (d - cp.r0) / (cp.ext - cp.r0)), 1.6); nr = rad * k; if (d + nr < cp.r0 + .03) nr = Math.min(0, cp.r0 + .03 - d); if (k < .5) avisar('O ar fica pesado. Por mais que você ande, a figura não chega mais perto.'); }
+        else if (preso && rad > 0) { nr = 0; tentarSoltar(cp); }
+        const k2 = preso ? .35 : 1;
+        sx = tx * k2 + nr * ux; sz = tz * k2 + nr * uz;
+        const m2 = Math.hypot(sx, sz); if (m2 < 1e-5) return false;
+        dx = sx / m2; dz = sz / m2; vel2 = m2;
+        if (d < cp.r1 && !(V.preso && V.preso.cn === cp.cn)) { V.preso = { cn: cp.cn, livre: false, ult: 0 }; toast(`Você chegou perto demais. Algo te segura aqui: para se afastar, ${PER_NOME[cp.per] || cp.per} (DT ${cp.dt}).`); V.choque = 1.2; }
+        if (V.preso && V.preso.cn === cp.cn && V.preso.livre && d > cp.r1 + .6) V.preso = null;
+      } else if (V.preso) V.preso = null;
+      const passo = vel2 != null ? vel2 : vel; vel2 = null;
       const tk = ((A.estado || {}).tokens || {})[ctrl];
       if (!tk) return false;
       if (tk.esq || V.escondido) { avisar('Você está escondido. Aperte E para sair.'); return false; }
@@ -1532,8 +1674,8 @@
         V.autoAlvo = null; avisar(r.motivo || 'Não dá para andar agora.');
         return 'regra';
       };
-      let res = tenta(est.px + dx * vel, est.pz + dz * vel);
-      if (res === 'parede') { res = tenta(est.px + dx * vel, est.pz); if (res === 'parede') res = tenta(est.px, est.pz + dz * vel); }
+      let res = tenta(est.px + dx * passo, est.pz + dz * passo);
+      if (res === 'parede') { res = tenta(est.px + dx * passo, est.pz); if (res === 'parede') res = tenta(est.px, est.pz + dz * passo); }
       if (typeof res === 'string') { if (res === 'parede' && V.autoAlvo) V.autoAlvo = null; return false; }
       if (res.r.esgotou) { [est.px, est.pz] = planta3D(a, res.r.x, res.r.y); avisar(`Deslocamento esgotado (${res.r.lim} m).`); V.autoAlvo = null; }
       else { est.px = res.nx; est.pz = res.nz; }
@@ -1543,6 +1685,20 @@
       return true;
     }
     function avisar(txt) { const agora = performance.now(); if (agora - V.ultToast > 1800) { V.ultToast = agora; toast(txt); } }
+    let vel2 = null;
+    const PER_NOME = { vontade: 'teste de Vontade', fortitude: 'teste de Fortitude', atletismo: 'teste de Atletismo', reflexos: 'teste de Reflexos', ocultismo: 'teste de Ocultismo' };
+    function campoPerto(x, z) { let melhor = null, bd = 1e9; for (const c of mundo.campos) { const d = Math.hypot(x - c.x, z - c.z); if (d < c.ext && d < bd) { bd = d; melhor = c; } } return melhor; }
+    // preso perto da figura: cada tentativa de se afastar (no máximo uma a cada 2,5 s) é um teste; a rolagem vai só ao Mestre
+    function tentarSoltar(cp) {
+      const agora = performance.now(); if (agora - (V.preso.ult || 0) < 2500) return; V.preso.ult = agora;
+      const FX = window.ACF_FICHAS; if (!FX) return;
+      const tk = ((A.estado || {}).tokens || {})[V.ctrl], nome = tk ? A.rotulo(tk) : '';
+      const t = (quem === 'jog' && FX.testarAtiva ? FX.testarAtiva(cp.per) : null) || FX.rolarTeste(1, 0);
+      const ok = t.total >= cp.dt;
+      (A.postarRolagemSecreta || A.postarRolagem)(`${nome} tentou se afastar da figura (CN ${pad2(cp.cn)}): ${PER_NOME[cp.per] || cp.per} ${t.total} [${t.dados.join(', ')}] contra DT ${cp.dt} · ${ok ? 'conseguiu' : 'continua preso'}`);
+      if (ok) { V.preso.livre = true; toast(`Você conseguiu (${t.total} contra DT ${cp.dt}). Afaste-se agora.`); }
+      else { toast(`Falhou (${t.total} contra DT ${cp.dt}). A força te puxa de volta. Tente de novo.`); V.choque = .8; }
+    }
     // parou de andar: manda a posição final (fecha o movimento no Diário e no "Desfazer")
     function talvezFechar() {
       if (!V.movendo || !V.ctrl || performance.now() - V.ultMov < 180) return;
@@ -1592,11 +1748,12 @@
       if (Math.hypot(e.pos.x - est.px, e.pos.z - est.pz) > 1.9) { toast('Chegue mais perto para se esconder.'); return; }
       const q = plantaDe3D(a, e.pos.x, e.pos.z), r = A.moverToken3D(V.ctrl, q.x, q.y, true);
       if (!r.ok) { toast(r.motivo || 'Não dá para chegar lá agora.'); return; }
-      A.esconderToken(V.ctrl, `c${e.cn}:${e.i}`);
-      V.escondido = { ...e, volta: [est.px, est.pz] }; est.px = e.pos.x; est.pz = e.pos.z;
       // regra do livro (Sobrevivendo ao Horror, Furtividade): esconder-se é um teste de Furtividade DT 15;
       // passou, a visibilidade cai 1. A rolagem vai só para o Mestre (Sussurro), para não entregar o esconderijo.
+      // O resultado fica no token (eo): os robôs S.T.A.F.F. veem todo mundo; um Filho na sala só vê quem falhou.
       const FX = window.ACF_FICHAS, t = quem !== 'mestre' && FX && FX.testarAtiva ? FX.testarAtiva('furtividade') : null;
+      A.esconderToken(V.ctrl, `c${e.cn}:${e.i}`, t ? (t.total >= 15 ? 1 : 0) : undefined);
+      V.escondido = { ...e, volta: [est.px, est.pz] }; est.px = e.pos.x; est.pz = e.pos.z;
       if (t) { const ok = t.total >= 15; (A.postarRolagemSecreta || A.postarRolagem)(`escondeu-se (${e.nome}): Furtividade ${t.total} [${t.dados.join(', ')}] contra DT 15 · ${ok ? 'passou: visibilidade −1' : 'falhou: visibilidade igual'}`); toast(`Escondido: ${e.nome}. Furtividade ${t.total} (DT 15): ${ok ? 'passou' : 'falhou'}. E para sair.`); }
       else toast(`Escondido: ${e.nome}. Ninguém vê o seu token.${quem === 'mestre' ? '' : ' Sem ficha ativa: role Furtividade (DT 15) se o Mestre pedir.'} E para sair.`);
       if (!primeiraP(est.modo)) definirModo(V.ctrl ? 'jogo' : 'dentro');
@@ -2384,7 +2541,7 @@
     abrir, fechar, cenaDe, podeAbrir, publicar: agendarPublicar, andarTeste, interagir, abrirDireto, controlar, carregarThree,
     virar(yaw) { if (V) V.cam.yaw = yaw; }, modo: definirModo,
     get aberta() { return !!V; },
-    get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe() } : null; },
+    get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe(), preso: V.preso || null, campos: V.mundo.campos.length } : null; },
     _livre: (x, z) => !!(V && V.mundo.livre3D(x, z)),
     _centro: p => V && V.mundo.centro(p),
     _cam: o => V && Object.assign(V.cam, o),

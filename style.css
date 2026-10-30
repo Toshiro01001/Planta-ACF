@@ -4058,3 +4058,11 @@ body.s3d-aberta .alertas-mestre { z-index: 9550; }
 .s3d-hab-lista button:not(:has(kbd)) { grid-template-areas: "n" "d"; grid-template-columns: 1fr; }
 .cartao .btn-controle { border-color: #ff4d6d; }
 @media (pointer: coarse), (max-width: 560px) { .s3d-hab { max-height: 32vh; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 200px); width: min(300px, calc(100% - 20px)); } }
+/* Presença (espectro): translúcida, flutuando, com brilho frio */
+.ficha.espectro .ficha-cabeca { background: radial-gradient(circle at 50% 40%, rgba(230,240,255,.95), rgba(150,180,230,.55) 60%, rgba(60,80,120,.2)); border: 2px dotted rgba(220,235,255,.9); box-shadow: 0 0 14px 3px rgba(170,200,255,.55); animation: espectroFlutua 3.2s ease-in-out infinite; }
+.ficha.espectro { opacity: .82; }
+.ficha.espectro .ficha-sombra { opacity: .25; }
+@keyframes espectroFlutua { 50% { transform: translateY(-4px); filter: brightness(1.25); } }
+.tray .pinta.espectro { border: 2px dotted #e6efff; border-radius: 50%; box-shadow: 0 0 8px var(--cor); background: radial-gradient(circle, #f2f6ff, var(--cor)); }
+.cartao select[data-acao="vis"] { display: block; margin-top: 4px; min-height: 34px; width: 100%; background: #0b0910; color: var(--texto); border: 1px solid var(--linha); border-radius: 8px; font: 13px var(--mono); }
+@media (prefers-reduced-motion: reduce) { .ficha.espectro .ficha-cabeca { animation: none; } }
