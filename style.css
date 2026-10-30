@@ -3999,3 +3999,62 @@ body.s3d-aberta .alertas-mestre { z-index: 9550; }
 .d3-res { margin: 0; min-height: 18px; font: 700 14px var(--mono); color: #f2ecfa; text-align: center; max-width: 214px; }
 .dados3d.d3-fim .d3-res { color: #ffd34a; }
 @media (max-width: 560px) { .d3-palco { width: 168px; height: 168px; } .d3-res { max-width: 168px; font-size: 13px; } .s3d-metros { top: calc(max(10px, env(safe-area-inset-top)) + 170px); max-width: 128px; font-size: 10px; } .s3d-legenda { font-size: 14px; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 140px); } .s3d-balao { font-size: 12px; max-width: 62vw; } }
+.s3d-balao .s3d-trad { display: block; margin-top: 4px; padding-top: 4px; border-top: 1px dashed currentColor; font: italic 12px/1.3 var(--serif, Georgia, serif); color: #f2ecfa; opacity: .95; }
+.s3d-balao .s3d-trad.nao { font: 10px/1.3 var(--mono); opacity: .6; color: inherit; }
+/* opções do 3D como num jogo: abas, faixas e teclas */
+.s3d-opcoes { width: min(380px, calc(100% - 20px)); max-height: calc(100% - 140px); gap: 10px; }
+.s3d-op-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.s3d-op-cab b { font: 700 14px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--roxo-claro); }
+.s3d-op-abas { display: flex; flex-wrap: wrap; gap: 4px; position: sticky; top: -12px; z-index: 1; background: rgba(15,12,22,.98); padding: 4px 0 6px; }
+.s3d-op-abas button { flex: 1 1 auto; min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--linha); background: transparent; color: var(--texto); font: 12px var(--mono); cursor: pointer; }
+.s3d-op-abas button.on { background: var(--roxo-escuro); border-color: var(--roxo); color: #fff; }
+.s3d-opcoes section { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--linha); }
+.s3d-opcoes h4 { margin: 0; font: 700 12px var(--mono); color: var(--roxo-claro); letter-spacing: .06em; }
+.s3d-lin { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font: 12.5px/1.3 var(--mono); color: var(--texto); }
+.s3d-lin select { min-height: 34px; max-width: 170px; background: #0b0910; color: var(--texto); border: 1px solid var(--linha); border-radius: 8px; font: 12px var(--mono); padding: 3px 6px; }
+.s3d-faixa { grid-template-columns: 1fr; gap: 4px; }
+.s3d-faixa output { color: var(--roxo-claro); margin-left: 4px; }
+.s3d-faixa input[type=range] { width: 100%; accent-color: var(--roxo); min-height: 28px; }
+.s3d-teclas { display: grid; gap: 4px; }
+.s3d-tecla { display: grid; grid-template-columns: 1fr minmax(84px, auto); align-items: center; gap: 8px; font: 12px var(--mono); }
+.s3d-tecla button { min-height: 32px; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--linha); border-bottom-width: 3px; background: #1a1524; color: #fff; font: 700 12px var(--mono); cursor: pointer; }
+.s3d-tecla button.mudada { border-color: var(--roxo); }
+.s3d-tecla button.esperando { background: var(--roxo-escuro); animation: s3dPisca .8s infinite; }
+@keyframes s3dPisca { 50% { opacity: .5; } }
+.s3d-fps { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px); z-index: 4; font: 11px var(--mono); color: #8dffb0; background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 5px; pointer-events: none; }
+.s3d-fps[hidden] { display: none; }
+/* interface escondida (H): só o mundo, a mira e os balões */
+.s3d.s3d-sem-hud .s3d-topo, .s3d.s3d-sem-hud .s3d-barra, .s3d.s3d-sem-hud .s3d-dica, .s3d.s3d-sem-hud .s3d-db, .s3d.s3d-sem-hud .s3d-metros, .s3d.s3d-sem-hud .s3d-hab, .s3d.s3d-sem-hud .s3d-joy { display: none !important; }
+/* efeitos no mapa 2D, em cima do token */
+.fx2d { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, 0); white-space: nowrap; pointer-events: none; z-index: 30; font: 700 12px/1 var(--mono); padding: 3px 7px; border-radius: 6px; background: rgba(8,6,12,.85); color: #fff; animation: fx2dSobe 2.6s ease-out forwards; }
+.fx2d::before { content: ''; position: absolute; left: 50%; top: 100%; width: 70px; height: 70px; margin: 0 0 0 -35px; border-radius: 50%; border: 3px solid currentColor; opacity: 0; animation: fx2dAnel 1.2s ease-out; transform: translateY(-20px); }
+.fx2d-dano { color: #ff4a4a; } .fx2d-san { color: #c08aff; } .fx2d-cura { color: #6aff9a; } .fx2d-hab { color: #8ad8ff; } .fx2d-atk { color: #ff7a5a; } .fx2d-ritual { color: #d8b4ff; }
+@keyframes fx2dSobe { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -26px); } }
+@keyframes fx2dAnel { 0% { opacity: .9; transform: translateY(-20px) scale(.2); } 100% { opacity: 0; transform: translateY(-20px) scale(1.4); } }
+/* efeito de tela no 3D quando é o SEU personagem */
+.s3d-fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: 0; }
+.s3d-fx.dano { background: radial-gradient(ellipse at center, transparent 35%, rgba(170,0,0,.7) 100%); animation: s3dFxTela .9s ease-out; }
+.s3d-fx.san { background: radial-gradient(ellipse at center, transparent 30%, rgba(70,0,110,.75) 100%); animation: s3dFxTela 2.2s ease-in-out; }
+.s3d-fx.ritual { background: radial-gradient(ellipse at center, rgba(200,150,255,.18), transparent 70%); animation: s3dFxTela 1.6s ease-out; }
+.s3d-fx.cura { background: radial-gradient(ellipse at center, transparent 40%, rgba(40,200,110,.35) 100%); animation: s3dFxTela 1.2s ease-out; }
+@keyframes s3dFxTela { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+/* habilidades do Filho no Controle */
+.s3d-hab { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px); z-index: 4; width: min(330px, calc(100% - 20px)); max-height: min(52vh, 420px); overflow: auto; display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(14,6,10,.9); border: 1px solid #7a1a2a; box-shadow: 0 8px 26px rgba(0,0,0,.55); color: var(--texto); }
+.s3d-hab[hidden] { display: none; }
+.s3d-hab header { display: flex; align-items: center; gap: 8px; }
+.s3d-hab header b { font: 700 13px var(--mono); letter-spacing: .04em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s3d-hab header small { font: 700 9px var(--mono); letter-spacing: .14em; color: #ff6a7a; border: 1px solid #ff6a7a; border-radius: 4px; padding: 2px 4px; }
+.s3d-hab header button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--linha); background: transparent; color: var(--texto); cursor: pointer; }
+.s3d-hab-cor { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.s3d-hab.recolhido { width: auto; max-width: min(330px, calc(100% - 20px)); }
+.s3d-hab-vit { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 11px var(--mono); color: #e8d6da; }
+.s3d-hab-vit i { flex: 1 1 80px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #d01830 var(--p), rgba(255,255,255,.12) var(--p)); }
+.s3d-hab-lista { display: grid; gap: 5px; }
+.s3d-hab-lista button { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "k n" "k d"; align-items: center; gap: 1px 8px; text-align: left; min-height: 40px; padding: 5px 8px; border-radius: 8px; border: 1px solid #4a1a24; background: rgba(60,10,20,.55); color: #fff; cursor: pointer; font: 12px var(--mono); }
+.s3d-hab-lista button:hover, .s3d-hab-lista button:focus-visible { border-color: #ff4d6d; background: rgba(110,16,34,.7); }
+.s3d-hab-lista kbd { grid-area: k; min-width: 22px; text-align: center; padding: 3px 5px; border-radius: 5px; border: 1px solid #ff8a9a; border-bottom-width: 3px; font: 700 11px var(--mono); color: #ffd0d6; }
+.s3d-hab-lista span { grid-area: n; font-weight: 700; }
+.s3d-hab-lista small { grid-area: d; color: #c9a8b0; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s3d-hab-lista button:not(:has(kbd)) { grid-template-areas: "n" "d"; grid-template-columns: 1fr; }
+.cartao .btn-controle { border-color: #ff4d6d; }
+@media (pointer: coarse), (max-width: 560px) { .s3d-hab { max-height: 32vh; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 200px); width: min(300px, calc(100% - 20px)); } }

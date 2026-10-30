@@ -1167,7 +1167,7 @@ function ligarArraste(f) {
     }
     arrastando.andou = true;
     if (tk.esq) delete tk.esq;   // sair andando tira do esconderijo
-    tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2);
+    tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2); delete tk.d;   // arrastado no 2D: no 3D volta a olhar para onde anda
     f.style.left = px(tk.x); f.style.top = px(tk.y);
     previaPasso(tk, lim);
     if (arrastando.outros) grupoPasso(arrastando.outros, tk, arrastando.antes);
@@ -1513,6 +1513,8 @@ function desenharCartao() {
   }
 
   if (!mestre && aux && s.tipo === 'filho') acoes = `<div class="acoes">${tk.h ? '<button data-acao="remover-aux">Tirar do mapa</button>' : '<p class="mini">Revelado aos jogadores: só o Mestre tira do mapa.</p>'}</div>`;
+  // Controle: Mestre e auxiliares assumem o Filho no 3D (em primeira pessoa, com as habilidades na tela)
+  if (s.tipo === 'filho' && (mestre || aux) && !espiar) acoes += `<div class="acoes"><button data-acao="controle" class="btn-controle">🎮 Controle (3D)</button></div>`;
   if (podeCor(s.id)) acoes += `<div class="acoes"><button data-acao="cor" class="btn-cor"><span class="pinta" style="--cor:${s.cor}"></span>Mudar a cor de ${esc(s.nome)}</button></div>`;
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
@@ -1532,6 +1534,7 @@ function desenharCartao() {
 
   $('.fechar', c).onclick = () => selecionar(null);
   const bcor = $('[data-acao="cor"]', c); if (bcor) bcor.onclick = () => Cores.escolher(s.id, bcor);
+  const bct = $('[data-acao="controle"]', c); if (bct) bct.onclick = () => { if (window.Sala3D && Sala3D.controlar) Sala3D.controlar(selecionado); };
   const brx = $('[data-acao="remover-aux"]', c); if (brx) brx.onclick = () => { const id = selecionado; if (!confirm('Tirar este Filho do mapa?')) return; selecionar(null); Store.definir(['tokens', id], null); };
   if (mestre) {
     $('[data-acao="ocultar"]', c).onclick = () => Store.definir(['tokens', selecionado], { ...tk, h: !tk.h });
@@ -2924,7 +2927,7 @@ window.addEventListener('keydown', e => {
 
 /* =========================================================
    ATALHOS DE TECLADO
-   Todos: Q/E giram · R régua · C chat · F fichas · B quadro · ? ajuda
+   Todos: Q/E giram · R régua · C ou T chat · F fichas · B quadro · ? ajuda
    Mestre: N próximo turno · A apagão · L loja · V revelar/esconder a sala aberta · P replay
    Ctrl+Z desfaz (já existia)
    ========================================================= */
@@ -2933,7 +2936,7 @@ window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   const clicar = id => { const b = $(id); if (b && !b.disabled && !b.hidden) b.click(); };
   if (k === 'r') clicar('#btnRegua');
-  else if (k === 'c') clicar('#btnChat');
+  else if (k === 'c' || k === 't') clicar('#btnChat');
   else if (k === 'f') clicar('#btnFichas');
   else if (k === 'b') clicar('#btnQuadro');
   else if (k === '?') clicar('#btnAjuda');
@@ -5551,6 +5554,32 @@ function vigiarMetros() {
   Metros.ult = { a: tk.a, x: tk.x, y: tk.y };
 }
 Store.aoMudar(vigiarMetros);
+
+/* ---------- EFEITOS NO MAPA 2D: habilidade, ataque, ritual, dano, sanidade e cura em cima do token ----------
+   As mesmas fontes do 3D (campo fx do token, vitais publicadas e o nó "efeito"), para quem está no mapa. */
+const Fx2d = { ult: new Map(), ultEf: 0 };
+function fx2d(id, tipo, txt) {
+  const f = fichasDom.get(id); if (!f || !f.isConnected) return;
+  const e = document.createElement('span'); e.className = 'fx2d fx2d-' + tipo; e.textContent = txt || '';
+  f.appendChild(e); setTimeout(() => e.remove(), 2600);
+}
+function vigiarFx2d(st) {
+  const agora = Date.now();
+  Object.entries(st.tokens || {}).forEach(([id, tk]) => {
+    if (!tk) return;
+    const u = Fx2d.ult.get(id), vit = tk.vit || {}, fx = tk.fx;
+    Fx2d.ult.set(id, { fx: fx && fx.ts, pv: vit.pv, san: vit.san });
+    if (!u || tk.a !== andarAtual || !visivelPara(tk)) return;
+    if (fx && fx.ts && fx.ts !== u.fx && agora - fx.ts < 15000) fx2d(id, fx.t === 'atk' ? 'atk' : 'hab', (fx.t === 'atk' ? '⚔ ' : '✦ ') + String(fx.n || '').slice(0, 30));
+    if (typeof vit.pv === 'number' && typeof u.pv === 'number' && vit.pv !== u.pv) fx2d(id, vit.pv < u.pv ? 'dano' : 'cura', `${vit.pv < u.pv ? '−' : '+'}${Math.abs(vit.pv - u.pv)} PV`);
+    if (typeof vit.san === 'number' && typeof u.san === 'number' && vit.san < u.san) fx2d(id, 'san', `−${u.san - vit.san} SAN`);
+  });
+}
+Store.aoMudar(vigiarFx2d);
+(function ouvirEfeito2d(n) {
+  if (!(Store.modo === 'firebase' || !FIREBASE)) { if (n < 240) setTimeout(() => ouvirEfeito2d(n + 1), 500); return; }
+  try { Rede.on('efeito', e => { if (!e || !e.ts || e.ts <= Fx2d.ultEf) return; const velho = !Fx2d.ultEf; Fx2d.ultEf = e.ts; if (velho && Date.now() - e.ts > 8000) return; if (e.t === 'sigilo' && e.quem) fx2d(e.quem, 'ritual', '◈ ' + String(e.n || 'Ritual').slice(0, 30)); }, () => {}); } catch (er) {}
+})(0);
 function zerarMetros() { Metros.total = 0; try { localStorage.setItem(chaveMetros(Metros.id || meu || aux), '0'); } catch (e) {} }
 
 /* ---------- ITENS DO LIVRO JOGADOS NAS SALAS ----------
@@ -5844,6 +5873,27 @@ function moverToken3D(id, x, y, fim) {
   if (fim) { delete mov3d[id]; if (!mestre && (novo.x !== s.antes.x || novo.y !== s.antes.y)) empilharLocal(id, s.antes); }
   return { ok: true, x: novo.x, y: novo.y, m: novo.m || 0, lim, esgotou };
 }
+// para onde o token OLHA no 3D (graus; 0 = +z). Quem controla grava, com folga, para os outros verem igual
+const virar3d = {};
+function virarToken3D(id, graus) {
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk || !SER[tk.s] || espiar || !podeMover(tk)) return;
+  const g = Math.round(((graus % 360) + 360) % 360), ant = tk.d;
+  if (ant !== undefined && Math.abs(((g - ant + 540) % 360) - 180) < 6) return;
+  const s = virar3d[id] || (virar3d[id] = { ultimo: 0, timer: null });
+  const enviar = () => { s.timer = null; s.ultimo = performance.now(); const t2 = (Store.state.tokens || {})[id]; if (t2) Store.definir(['tokens', id], { ...t2, d: s.g }); };
+  s.g = g; tk.d = g;
+  if (performance.now() - s.ultimo > 260) enviar(); else if (!s.timer) s.timer = setTimeout(enviar, 260);
+}
+// efeito em volta do token, que todos veem no 3D: { t: 'hab' | 'atk' | 'cura', n: nome, el: elemento }
+function efeitoToken(id, fx) {
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk || !SER[tk.s] || espiar || !podeMover(tk) || !fx) return false;
+  const v = { t: ['hab', 'atk', 'cura'].includes(fx.t) ? fx.t : 'hab', n: String(fx.n || '').slice(0, 60), ts: Date.now() };
+  if (fx.el) v.el = String(fx.el).slice(0, 20);
+  Store.definir(['tokens', id], { ...tk, fx: v });
+  return true;
+}
 // esconderijo (armário, embaixo da cama…): chave = "cNN:i" do objeto; null sai
 function esconderToken(id, chave) {
   const tk = (Store.state.tokens || {})[id];
@@ -5927,7 +5977,7 @@ window.ACF = {
   get andarAtual() { return andarAtual; },
   irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },
   // vista 3D
-  podeMover, visivelPara, moverToken3D, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
+  podeMover, visivelPara, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
   andavel: (a, x, y) => andavel(a, x, y),
   limiteDe: id => limiteDe(id),
   participa: id => !!participante(id),
@@ -5945,7 +5995,8 @@ window.ACF = {
   // texto de uma mensagem do chat como ESTE aparelho pode ler (C2P0 e Mostarda: só com o ritual, Mestre e auxiliares)
   textoChat(m) {
     if (!m) return { txt: '' };
-    if (ehBz(m)) { const ok = bzTraduzido(m); return { txt: ok ? desembaralhar(m.t) : falaDe(m), lingua: true, cifrado: !ok, cls: linguaDe(m).cls }; }
+    // o balão sempre mostra a língua (bips/grunhidos), como no chat; a tradução vem embaixo só para quem pode ler
+    if (ehBz(m)) { const ok = bzTraduzido(m); return { txt: falaDe(m), trad: ok ? desembaralhar(m.t) : '', lingua: true, cifrado: true, cls: linguaDe(m).cls, nome: linguaDe(m).k }; }
     return { txt: String(m.t || '') };
   },
 };

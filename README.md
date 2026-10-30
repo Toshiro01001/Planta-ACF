@@ -268,8 +268,8 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 
 ### Regras do mapa valem no 3D
 
-- **Tamanho no 3D:** a sala tem 10 m de lado e 3,2 m de pé-direito; o corredor tem 14 m de comprimento e 2,4 m de largura.
-- **Distância:** as regras continuam sendo as da planta (sala de 50 m², corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa. Como a sala do 3D é maior que a da regra, dentro dela o passo no 3D "rende" menos metros de regra que parece.
+- **Tamanho no 3D:** a sala tem **20 m de lado** e 3,2 m de pé-direito; o corredor tem 14 m de comprimento e 2,4 m de largura. As cenas feitas para salas menores se espalham sozinhas (o que está na parede continua na parede) e cada sala grande ganha, sorteado pela CN e igual para todos, mais móveis de parede (armários, estantes, arquivos, caixotes), até dois esconderijos novos, papéis, sangue e manchas. Os vãos das portas ficam sempre livres.
+- **Distância:** as regras continuam sendo as da planta (sala de 50 m², corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa. Como a sala do 3D (20 m) é bem maior que a da regra (7,07 m), dentro dela cada passo do 3D rende uns 35% de metro de regra: atravessar a sala inteira no 3D custa os mesmos ~7 m de regra do 2.5D.
 - **Corredores:** 2,4 m de largura, para duas pessoas andarem lado a lado. Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
 - **Portas:** cada corredor tem a porta no estado público da planta (fechada, abrindo, trancada, com teclado, escombros, carne ou aberta). Porta fechada barra o corredor. Ao lado do vão, dentro da sala, fica o painel com o botão vermelho. Tecla **E** (ou toque no botão) aperta o botão quando a regra deixa; com teclado, pede o código. Só o Mestre fecha portas.
 - **Decibelímetro:** o mesmo medidor do 2.5D aparece no canto da tela 3D, com o nível do token que você controla.
@@ -280,7 +280,34 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 - **Portas:** o Mestre abre e fecha pelo próprio 3D: clique na porta ou no botão vermelho ao lado (ou tecla E perto dela). Trancas e escombros continuam sendo mudados no mapa 2.5D.
 - **Versão da sala (5º andar):** neutra, Rei, Mãe ou Consagrado, conforme a cena.
 - **Controlar token:** o Mestre escolhe qualquer token e anda com WASD (as regras continuam valendo) ou usa a câmera fantasma, que atravessa paredes.
+- **Controle de um Filho:** veja abaixo.
 - **Formas dos Filhos:** cada Filho escolhe uma forma (esguio, colosso, rastejante, retalhos, mecânico, sombra, luz, enxame, estática, olhos). O arquivo traz uma PROPOSTA; o Mestre troca quando quiser (`mapa/formas`).
+
+### Controle dos Filhos (Mestre e auxiliares)
+
+No cartão de qualquer Filho no mapa 2D aparece **🎮 Controle (3D)**. O 3D abre na sala do Filho, em primeira pessoa, controlando ele (as regras de movimento continuam valendo). No 3D também dá para assumir pelo 🎛 → **Controlar com WASD**.
+
+- **Habilidades na tela:** um quadro no canto inferior esquerdo mostra a ficha ligada ao Filho (Fichas › Ameaças e Filhos, campo "Filho no mapa"): PV, Defesa, deslocamento e VD, os **ataques** e cada linha de **Habilidades** e **Ações** como um botão. Teclas **1 a 9** usam na ordem (dá para trocar nas Opções).
+- **Ataque:** rola o teste e o dano da ficha em segredo (Sussurro do Mestre; no auxiliar, canal dos Filhos), com os dados 3D na sua tela. Quem vê o Filho enxerga o golpe.
+- **Habilidade ou ação:** mostra o efeito em volta do Filho, com o nome, para todos que veem o Filho (nas duas vistas).
+- **📋 Ficha** abre a ficha completa; **Soltar o Controle** volta à câmera livre.
+- Sem ficha ligada, o quadro explica como ligar.
+
+### Efeitos que todos veem
+
+Aparecem em volta do personagem, para quem está vendo aquele token (no 3D e no mapa 2D):
+
+| O quê | De onde vem |
+|---|---|
+| ◈ Ritual (selo girando no chão na cor do elemento) | Ritual conjurado pela ficha |
+| ✦ Habilidade (onda e faíscas) | "⚡ usar" de uma habilidade na ficha do jogador; habilidade ou ação de um Filho no Controle |
+| ⚔ Ataque (cortes no ar) | Ataque de um Filho no Controle |
+| −X PV (sangue espirrando e poça) | PV da ficha ativa caindo (vitais publicadas no token) |
+| −X SAN (anel roxo e sombra) | Sanidade da ficha ativa caindo |
+| +X PV (brilho verde) | Cura |
+| ★ 20 natural, ✖ 1 natural, óbito, insanidade | Momentos da Mesa |
+
+No **seu** personagem a tela também sente: borda vermelha e tremida no dano, distorção roxa na sanidade.
 
 ### Zona Neutra no 3D
 
@@ -309,7 +336,7 @@ No fim do corredor de saída de cada andar fica o elevador (no 2º andar, a saí
 - As falas do **Mestre** aparecem como legenda na parte de baixo da tela.
 - **Cada personagem tem uma voz**, gerada na hora: Velcro, criança (menina); Papel, mulher (suave); Faca, mulher (firme); Luva, homem; Sabonete, mascarado (abafado); Papelão, remendado (grave, arrastado, várias vozes juntas); B00BIES, M3RL1N e K4ISER, robôs (agudo, grave e metálico). O volume cai com a distância e o som vem do lado onde o personagem está.
 - **Trocar a voz:** ⚙ Opções do 3D → **Voz no chat** (com ▶ para ouvir). Fica no token (`vz`), então todos ouvem a mesma voz. O Mestre troca a de qualquer token no painel 🎛.
-- **C2P0 e Mostarda** continuam com as línguas próprias: o balão mostra os bips e zips ou os grunhidos para quem não conjurou **Compreensão Paranormal**; Mestre e auxiliares leem o original, como no chat.
+- **C2P0 e Mostarda** continuam com as línguas próprias: o balão **sempre** mostra os bips e zips (ou os grunhidos), com o nome da língua no topo. Quem não conjurou **Compreensão Paranormal** vê embaixo "Incompreensível"; Mestre, auxiliares e quem conjurou veem a tradução numa linha separada (✦), como no chat.
 
 ### Dados 3D
 
@@ -333,14 +360,14 @@ Ao entrar num esconderijo, a ficha ativa rola **Furtividade contra DT 15** (Sobr
 
 ### Personagens sólidos
 
-Os tokens não atravessam móveis nem uns aos outros: quem anda bate e desliza, e um token posto pelo mapa 2D em cima de uma cama ou armário aparece no ponto livre mais perto (só na tela; a posição de regra não muda). Dois tokens no mesmo ponto se afastam um pouco.
+Os tokens não atravessam móveis nem uns aos outros: quem anda bate e desliza, e um token posto pelo mapa 2D em cima de uma cama ou armário aparece no ponto livre mais perto (só na tela; a posição de regra não muda). Dois tokens no mesmo ponto se afastam um pouco. O modelo de cada personagem **olha para onde o dono está olhando** no 3D: quem controla grava a direção no token (`d`, em graus, poucas vezes por segundo) e todos veem igual. Arrastado no mapa 2D, volta a olhar para onde anda.
 
 ### Perseguição: 2.5D e 3D juntos (ou só 3D)
 
 As duas vistas usam a MESMA perseguição (`mapa/persg`): ordem de iniciativa, de quem é a vez, o limite de metros de cada um e os metros já gastos na vez (`m` no token). Arrastar no mapa 2D e andar no 3D passam pelas mesmas regras:
 
 - **Fora da vez**, os dois recusam ("Na perseguição, só quem está na vez se move"). No 3D, a faixa do topo mostra de quem é a vez e, na sua, "Sua vez: X / 9 m".
-- **Metros:** o que você anda no 3D é descontado no 2D e vice-versa; quando acaba, o token para no ponto exato ("Deslocamento esgotado"). Os metros são os de regra: a sala do 3D tem 10 m de lado, mas vale a sala da planta (50 m²), então dentro dela cada passo do 3D rende uns 70% de metro de regra; no corredor é igual.
+- **Metros:** o que você anda no 3D é descontado no 2D e vice-versa; quando acaba, o token para no ponto exato ("Deslocamento esgotado"). Os metros são os de regra: a sala do 3D tem 20 m de lado, mas vale a sala da planta (50 m²), então dentro dela cada passo do 3D rende uns 35% de metro de regra; no corredor é igual.
 - **Misturado:** um jogador pode correr no 3D enquanto outro arrasta no 2D, na mesma rodada; o Mestre vê tudo nas duas vistas.
 - **Só no 3D:** funciona igual. O Mestre conduz pela gaveta 🗂 (Painel do Mestre, bloco Perseguição: pedir iniciativa, iniciar, próxima vez, refazer rota, cronômetro); os jogadores rolam a iniciativa pelo pedido que abre na tela (os dados 3D rolam junto); os Filhos andam pelo Mestre ou pelo auxiliar (🎛 → controlar o token), com as mesmas regras, a menos que o Mestre ligue o movimento livre.
 - **Cuidado:** no 3D o jogador só enxerga a própria sala. Para ter a visão do andar inteiro durante a fuga, o Mestre pode deixar o 2.5D aberto em outra aba ou usar o botão 🏢 Andar.
@@ -355,8 +382,8 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 
 | Botão | O que faz |
 |---|---|
-| 🎮 **Jogo** | Terceira pessoa, câmera atrás do ombro do seu token. A câmera encosta na parede em vez de atravessar. É o modo que abre por padrão para quem controla um token |
-| 👁 **Olhos** | Primeira pessoa |
+| 🎮 **Jogo** | **Primeira pessoa**: você é o personagem (balanço dos passos, respiração, Q olha para trás). É o modo que abre por padrão para quem controla um token. Quem preferir a câmera atrás do ombro liga a terceira pessoa em ⚙ Opções › Câmera e mouse |
+| 👁 **Olhos** | Primeira pessoa sem token (câmera livre do Mestre e dos auxiliares). Com o Jogo em primeira pessoa, o botão some para quem controla um token |
 | 🏠 **Fora** | Casa de bonecas: as paredes do lado da câmera somem |
 | ⬇ **Cima** | Vista do teto |
 | 🔦 **Luz** | Lanterna |
@@ -364,22 +391,37 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 
 **Computador (modos Jogo e Olhos):** clique na tela para prender o mouse; aí o mouse gira a câmera e a mira (ponto no centro) mostra para onde você olha. Clique com o mouse preso usa o que está na mira (terminal, Maurício, geladeira, porta) ou interage com o que estiver perto. **Esc** primeiro solta o mouse; um segundo Esc fecha menu, gaveta ou a vista. Roda do mouse aproxima e afasta.
 
-**Teclas:**
+**Teclas (padrão; todas trocáveis em ⚙ Opções › Controles):**
 
 | Tecla | Ação |
 |---|---|
-| WASD / setas | Andar (Shift corre) |
-| E | Interagir (porta, botão, esconderijo, loja, terminal, arquivo, comida, água) |
+| WASD / setas | Andar (setas sempre andam) |
+| Shift (segurar) | Correr |
+| Q (segurar) | Olhar para trás |
+| E | Interagir (porta, botão, esconderijo, loja, terminal, arquivo, comida, água, item, documento) |
+| **T** | **Chat de texto** (Enter também abre, sempre) |
 | Tab | Abre e fecha a gaveta 🗂 com o painel completo |
 | M | Menu ☰ |
-| C | Troca a câmera (Jogo → Olhos → Fora → Cima) |
-| Enter | Chat |
+| O | Opções |
+| C | Troca a câmera (Jogo → Fora → Cima) |
+| Z | Sala / andar inteiro |
+| H | Esconde a interface (só o mundo; Esc ou H de novo mostra) |
 | F | Fichas |
 | B | Quadro da equipe |
 | R | Dados |
 | I | Arquivo · Cifras · Terminal |
 | L | Lanterna |
+| 1 a 9 | Habilidades do Filho no Controle (Mestre e auxiliares) |
 | Esc | Solta o mouse; depois fecha menu, gaveta, painéis e a vista |
+
+### Opções (⚙, tecla O), como num jogo
+
+Tudo fica salvo neste aparelho (`acf-s3d-cfg`).
+
+- **Gráficos:** predefinição (Alta ou Leve), escala de resolução (50% a 150%), sombras da lanterna, brilho das luzes (bloom), aberração cromática, grão de filme, vinheta, névoa (leve, normal, densa, muito densa), poeira no ar, limite de quadros (sem limite, 60, 30) e contador de quadros por segundo. As marcadas com ↻ reabrem o 3D na hora.
+- **Câmera e mouse:** Jogo em terceira pessoa (desligado = primeira pessoa), campo de visão, balanço da câmera, sensibilidade do mouse e do toque, inverter o eixo vertical, nomes em cima dos personagens.
+- **Controles:** clique na tecla de uma ação e aperte a nova. Vale também botão do meio, direito ou lateral do mouse. Se a tecla já era de outra ação, as duas trocam. **Restaurar as teclas padrão** desfaz tudo.
+- **Áudio e chat:** volume do ambiente e dos passos, volume das vozes, balões de fala, a voz do seu personagem e os dados 3D.
 
 Com qualquer janela do site aberta por cima do 3D (ficha, chat, arquivo, loja), as teclas vão para ela, não para o jogo.
 
@@ -414,7 +456,7 @@ O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só o
 
 `{"tipo":"planta-acf-3d","versao":2,"salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r,esc,v}]}},"formas":{"f04":"colosso"}}`
 
-- Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. Sem `lado`, a cena é tratada como do formato antigo (7,07 m) e espalhada sozinha na sala de 10 m: o que está encostado na parede continua encostado.
+- Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. A sala do 3D tem 20 m: cenas com `lado` 10 (ou sem `lado`, formato antigo de 7,07 m) são espalhadas sozinhas e ganham o enchimento sorteado; uma cena feita já com `"lado":20` (de −9,9 a 9,9) entra como está, sem enchimento.
 - Os vãos das portas ficam no meio de cada parede (2,4 m de largura). Deixe esses trechos livres.
 - `uso`: `loja` (Maurício), `agua` ou `comida` (despensa).
 - `imagens`: imagens embutidas na cena (`{"mae":"data:image/jpeg;base64,…"}`), usadas por quadros com `img:"mae"`. Como ficam dentro do arquivo de cenas, não vão para o GitHub.
