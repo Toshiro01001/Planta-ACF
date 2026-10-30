@@ -260,7 +260,7 @@
       },
 
       /* ---------- CN 03 · alta voltagem ---------- */
-      faiscas(o) {
+      centelhas(o) {
         const g = G(), r = rng(o.sem || 85), R = o.raio || .35, cor = o.c || '#bfe4ff';
         const mt = new T.LineBasicMaterial({ color: cor, transparent: true, opacity: 1 }); guardar(mt);
         const linhas = []; for (let k = 0; k < 4; k++) { const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(10 * 3), 3)); guardar(geo); const l = new T.Line(geo, mt); g.add(l); linhas.push(l); }
@@ -281,7 +281,7 @@
         const placa = canvasMat(256, 300, (x, W, H) => { x.fillStyle = '#e8e4d8'; x.fillRect(0, 0, W, H); for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(80,60,30,${Math.random() * .2})`; x.fillRect(Math.random() * W, Math.random() * H, 3, 3); } x.fillStyle = '#e8b417'; x.strokeStyle = '#111'; x.lineWidth = 8; x.beginPath(); x.moveTo(W / 2, 30); x.lineTo(W - 40, 190); x.lineTo(40, 190); x.closePath(); x.fill(); x.stroke(); x.fillStyle = '#111'; x.beginPath(); x.moveTo(W / 2 + 10, 70); x.lineTo(W / 2 - 18, 125); x.lineTo(W / 2 + 4, 125); x.lineTo(W / 2 - 12, 172); x.lineTo(W / 2 + 22, 112); x.lineTo(W / 2 + 2, 112); x.closePath(); x.fill(); x.font = 'bold 44px Arial'; x.textAlign = 'center'; x.fillText(o.txt || 'PERIGO', W / 2, 252); x.strokeStyle = '#111'; x.lineWidth = 4; x.strokeRect(6, 6, W - 12, H - 12); }, { r: .85 });
         pl(g, w * .6, w * .7, placa, -w * .12, h * .62, d / 2 + .01);
         bx(g, w * .9, .25, d * .9, sujo('#2a2c2e'), 0, h, 0);
-        if (o.faiscas !== false) { const f = P.faiscas({ sem: o.sem, raio: .4 }); f.position.set(0, h + .3, 0); g.add(f); }
+        if (o.centelhas !== false) { const f = P.centelhas({ sem: o.sem, raio: .4 }); f.position.set(0, h + .3, 0); g.add(f); }
         return g;
       },
       // fileira de baterias/transformadores com cabos
@@ -671,7 +671,7 @@
         for (let i = 0; i < 3; i++) cy(g, .45 - i * .1, .5 - i * .1, .12, mt, 0, i * .12, 0, 18);
         const vidro = sf(g, .3, m('#d8e8f0', { unico: true, op: .25, r: .02, me: .3 }), 0, .7, 0, 24);
         const nucleo = sf(g, .08, emis(cor, 3), 0, .7, 0, 14);
-        const raios = P.faiscas({ raio: .25, c: '#fff4d0', sem: o.sem }); raios.position.set(0, .7, 0); g.add(raios);
+        const raios = P.centelhas({ raio: .25, c: '#fff4d0', sem: o.sem }); raios.position.set(0, .7, 0); g.add(raios);
         for (let i = 0; i < 5; i++) { const a = i * 1.257; tubo(g, [[Math.sin(a) * .25, .3, Math.cos(a) * .25], [Math.sin(a) * .5, .15, Math.cos(a) * .5], [Math.sin(a) * .8, .02, Math.cos(a) * .8]], .012, m('#1a1612'), 12); }
         const L = luz(g, cor, 1.2, 4, 0, .8, 0);
         anim.push((dt, t) => { const k = .85 + Math.sin(t * 4) * .15; nucleo.material.emissiveIntensity = 3 * k; L.intensity = 1.2 * k; });
@@ -789,6 +789,35 @@
         bx(g, .7, .45, .7, estofo, 0, 0, 0); const enc = bx(g, .7, .85, .18, estofo, 0, .4, -.3); enc.rotation.x = -.25; enc.position.set(0, .45, -.36);
         [-1, 1].forEach(s => { bx(g, .14, .1, .7, estofo, s * .42, .6, 0); bx(g, .04, .03, .5, m('#2a1a10'), s * .42, .7, .05); cy(g, .02, .02, .6, cromo, s * .42, 0, .1, 6); });
         const sp = P.suporte_bolsas({ n: 2, sem: o.sem }); sp.position.set(.65, 0, -.2); g.add(sp);
+        return g;
+      },
+
+      /* ---------- estação de leitura: Terminal O.R.F.E.U. e Arquivo (documentos e cifras) ---------- */
+      terminal_orfeu(o) {
+        const g = G(), mt = sujo('#3a3e42', 'metal_sujo'), r = rng(o.sem || 141);
+        bx(g, 1.3, .05, .75, mt, 0, .74, 0); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => cy(g, .025, .025, .74, metal('#2a2a2a'), a * .6, 0, b * .32, 6)); bx(g, .45, .6, .7, mt, .4, .12, 0);
+        const crt = G(); crt.position.set(-.12, .79, -.08); g.add(crt);
+        bx(crt, .62, .5, .5, m('#c8c2ae', { r: .55 }), 0, 0, -.05); bx(crt, .54, .44, .02, m('#1a1a18'), 0, .03, .2);
+        const [c, x] = tela(256, 192), t = texCanvas(c), tm = m('#ffffff', { unico: true, mapa: t, e: '#ffffff', ei: 1.4 }); tm.emissiveMap = t;
+        const sc = pl(crt, .48, .36, tm, 0, .25, .215);
+        const linhas = ['O.R.F.E.U. TERMINAL v3.1', 'ACERVO INTERNO', '', '> ls', 'docs/  cifras/  visoes/', '> acesso ********', 'ACESSO PARCIAL', '> _'];
+        let ult = 0; anim.push((dt, tt) => { if (tt - ult < .25) return; ult = tt; x.fillStyle = '#020a04'; x.fillRect(0, 0, 256, 192); x.font = 'bold 15px monospace'; x.fillStyle = '#5aff8a'; x.shadowColor = '#5aff8a'; x.shadowBlur = 6; const n = Math.min(linhas.length, 1 + Math.floor(tt * 1.5) % (linhas.length + 4)); for (let i = 0; i < n; i++) { let l = linhas[i]; if (i === n - 1 && l.endsWith('_')) l = Math.floor(tt * 2) % 2 ? l : l.slice(0, -1); x.fillText(l, 10, 22 + i * 21); } x.shadowBlur = 0; x.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 192; i += 3) x.fillRect(0, i, 256, 1); t.needsUpdate = true; });
+        const tec = bx(g, .46, .03, .16, m('#bdb7a2', { r: .6 }), -.12, .79, .2); tec.rotation.x = -.08;
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 12; i++) bx(g, .028, .012, .028, m('#e8e2cc'), -.3 + i * .033, .815, .14 + j * .033);
+        luz(g, '#5aff8a', .7, 3, -.12, 1.1, .5, true);
+        P.cadeira && (() => { const ca = P.cadeira({}); ca.position.set(-.1, 0, .75); ca.rotation.y = Math.PI; g.add(ca); })();
+        const pp = P.pilhas_papel({ n: 3, w: .4, d: .3, soltos: 2, sem: o.sem }); pp.position.set(.42, .79, .05); g.add(pp);
+        return g;
+      },
+      arquivo_orfeu(o) {
+        const g = G(), w = o.w || .95, mt = sujo('#5a5e58', 'metal_sujo');
+        bx(g, w, 1.5, .55, mt);
+        for (let i = 0; i < 4; i++) { bx(g, w - .08, .32, .02, sujo('#6a6e66'), 0, .08 + i * .35, .28); bx(g, .16, .03, .03, metal('#bbb'), 0, .3 + i * .35, .3); const et = pl(g, .2, .07, m('#ece4cc'), 0, .2 + i * .35, .3); }
+        const pb = canvasMat(256, 256, (x, W, H) => { TX.cortica(x, W, rng(5)); x.fillStyle = '#efe6cf'; x.fillRect(20, 30, 140, 100); x.fillStyle = '#221d14'; x.font = 'bold 18px serif'; x.fillText('◈ CIFRA 07', 30, 54); x.font = '26px serif'; x.fillText('ʘ ǂ ǁ ɮ ʭ ɸ', 28, 100); x.fillStyle = '#e8dcc0'; x.fillRect(110, 140, 120, 90); x.fillStyle = '#3a2a1a'; for (let k = 0; k < 6; k++) x.fillRect(120, 156 + k * 12, 90 - k * 6, 3); x.fillStyle = '#b81a1a'; [[30, 36], [120, 146]].forEach(([a, b]) => { x.beginPath(); x.arc(a + 60, b - 10, 5, 0, 7); x.fill(); }); }, { r: .9 });
+        bx(g, w + .3, .9, .04, m('#4a3020', { tex: 'madeira_velha' }), 0, 1.62, -.25); pl(g, w + .2, .8, pb, 0, 2.07, -.225);
+        const pt = canvasMat(512, 96, (x, W, H) => { x.fillStyle = '#c8bea4'; x.fillRect(0, 0, W, H); x.strokeStyle = '#221d14'; x.lineWidth = 6; x.strokeRect(4, 4, W - 8, H - 8); x.fillStyle = '#221d14'; x.font = 'bold 40px Arial'; x.textAlign = 'center'; x.fillText('ARQUIVO · CIFRAS', W / 2, 62); });
+        pl(g, w, .16, pt, 0, 1.4, .285);
+        luz(g, '#ffe0a0', .45, 2.5, 0, 2.6, .3);
         return g;
       },
     });

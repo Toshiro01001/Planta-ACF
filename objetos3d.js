@@ -781,7 +781,7 @@
         cy(g, .1, .1, y, m('#555', { me: .6 }), 0, 0, 0, 10);
         const v = new T.Mesh(guardar(new T.TorusGeometry(R, .05, 10, 28)), mat); v.position.set(0, y + .05, .15); g.add(v);
         for (let i = 0; i < 4; i++) { const r2 = bx(g, R * 2, .04, .04, mat, 0, y + .03, .15); r2.rotation.z = i * Math.PI / 4; }
-        if (o.faiscas) { const fa = sf(g, .06, m('#ffffff', { unico: true, e: '#9fd8ff', ei: 3 }), 0, y - .3, .2, 6); anim.push((dt, t) => { fa.visible = Math.sin(t * 11) > .7; }); luz(g, '#9fd8ff', .6, 3, 0, y, .4, true); }
+        if (o.centelhas) { const fa = sf(g, .06, m('#ffffff', { unico: true, e: '#9fd8ff', ei: 3 }), 0, y - .3, .2, 6); anim.push((dt, t) => { fa.visible = Math.sin(t * 11) > .7; }); luz(g, '#9fd8ff', .6, 3, 0, y, .4, true); }
         return g;
       },
       fornalha(o) {

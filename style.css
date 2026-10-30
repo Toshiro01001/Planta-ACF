@@ -3898,3 +3898,63 @@ body.tokens-moldura .ficha:not(.filho) .ficha-cabeca::after {
     linear-gradient(155deg, rgba(255,255,255,.55), rgba(255,255,255,.08) 30%, rgba(255,255,255,0) 45%),
     radial-gradient(circle at 50% 115%, rgba(0,0,0,.4), transparent 55%);
 }
+
+/* =========================================================
+   O JOGO DENTRO DO 3D: câmera de jogo, menu, painel do site dentro do 3D
+   ========================================================= */
+/* janelas do site (fichas, quadro, arquivo, loja, chat, escudo…) abrem POR CIMA da vista 3D */
+body.s3d-aberta :is(.fx-tela, .qd-tela, .arquivo-tela, .mesa-janela, .escudo, .relatorio-tela, .nex-tela, .parede-tela, .visao-tela,
+  .dil-tela, .expo-tela, .expo-chip, .dest-tela, .hall-tela, .bau-tela, .ab-tela, .sigilo-tela, .momento-tela, .faixa-meianoite,
+  .alertas-mestre, .conq-banner, .hol-banner, .tensao-veu, .efeito-tela, .fx-rolagem, .perfil, .faixa-conexao) { z-index: 9500 !important; }
+body.s3d-aberta :is(.rr-modal, .bz-modal, .fx-modal, .cf-palpite, .cor-pop) { z-index: 9600 !important; }
+body.s3d-aberta .painel-chat { z-index: 9500; top: 0; }
+/* avisos, "sua vez" e dados: levados para dentro da tela 3D */
+.s3d > .aviso { z-index: 40; top: calc(max(10px, env(safe-area-inset-top)) + 64px); max-width: calc(100% - 24px); }
+.s3d > .sua-vez { z-index: 39; }
+.s3d > .painel-dados { z-index: 41; left: max(12px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px); max-height: calc(100% - 160px); overflow-y: auto; }
+/* mira da câmera de jogo / mouse travado */
+.s3d-mira { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 0 2px rgba(0,0,0,.45); pointer-events: none; display: none; z-index: 2; }
+.s3d.s3d-travado .s3d-mira { display: block; }
+.s3d.s3d-travado .s3d-palco canvas { cursor: none; }
+.s3d.s3d-jogo .s3d-palco canvas { cursor: crosshair; }
+/* gaveta: o painel do site (Mestre, auxiliar ou jogador) dentro do 3D */
+.s3d-gaveta {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(430px, 100%); z-index: 30; display: flex; flex-direction: column;
+  background: rgba(12,10,18,.97); border-left: 1px solid var(--roxo); box-shadow: -10px 0 40px rgba(0,0,0,.6);
+  padding-top: env(safe-area-inset-top); padding-right: env(safe-area-inset-right);
+}
+.s3d-gaveta[hidden] { display: none; }
+.s3d-gaveta > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--linha); }
+.s3d-gaveta > header b { font: 700 15px var(--display); letter-spacing: .04em; }
+.s3d-gav-corpo { flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
+.s3d-gaveta .painel { position: static !important; display: block !important; transform: none !important; width: auto !important; height: auto !important;
+  max-height: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important; z-index: auto !important;
+  visibility: visible !important; opacity: 1 !important; transition: none !important; pointer-events: auto !important; }
+.s3d-gaveta .painel .fechar-painel, .s3d-gaveta .painel .painel-alca { display: none !important; }
+.s3d-gaveta .cartao { position: static !important; width: auto !important; max-height: none !important; margin: 10px 12px 0; }
+.s3d-gaveta .cartao[hidden] { display: none !important; }
+.s3d.s3d-com-gaveta .s3d-db, .s3d.s3d-com-gaveta .s3d-painel, .s3d.s3d-com-gaveta .s3d-opcoes { right: min(442px, 100%); }
+/* menu do jogo */
+.s3d-menu { position: absolute; inset: 0; z-index: 35; display: grid; place-items: center; padding: 16px; background: rgba(4,3,7,.6); backdrop-filter: blur(3px); }
+.s3d-menu[hidden] { display: none; }
+.s3d-menu-caixa { width: min(560px, 100%); max-height: calc(100% - 24px); overflow-y: auto; border-radius: 14px; background: #120f1a; border: 1px solid var(--roxo); box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+.s3d-menu-caixa > header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--linha); }
+.s3d-menu-caixa > header b { font: 700 16px var(--display); letter-spacing: .05em; }
+.s3d-menu-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; padding: 12px; }
+.s3d-menu-grade button { display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 86px; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(255,255,255,.03); color: var(--texto); cursor: pointer; font: 600 12px/1.25 var(--mono); text-align: center; }
+.s3d-menu-grade button:hover, .s3d-menu-grade button:focus-visible { border-color: var(--roxo); background: var(--roxo-escuro); }
+.s3d-menu-grade button i { font-style: normal; font-size: 24px; line-height: 1; }
+.s3d-menu-grade button small { font: 10px var(--mono); color: var(--texto-dim); }
+.s3d-bt-menu { border-color: var(--roxo); }
+@media (max-width: 700px) {
+  .s3d-gaveta { top: auto; left: 0; width: 100%; height: min(82%, calc(100% - 60px)); border-left: 0; border-top: 1px solid var(--roxo); border-radius: 14px 14px 0 0; }
+  .s3d.s3d-com-gaveta .s3d-db, .s3d.s3d-com-gaveta .s3d-painel, .s3d.s3d-com-gaveta .s3d-opcoes { right: max(10px, env(safe-area-inset-right)); }
+  .s3d.s3d-com-gaveta .s3d-barra, .s3d.s3d-com-gaveta .s3d-joy, .s3d.s3d-com-gaveta .s3d-prompt { display: none; }
+}
+@media (max-width: 420px) {
+  .s3d-topo-bts { gap: 4px; }
+  .s3d-topo-bts .s3d-x { width: 38px; height: 38px; font-size: 16px; }
+  .s3d-menu { padding: 8px; align-items: end; }
+  .s3d-menu-grade { grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; }
+  .s3d-menu-grade button { min-height: 76px; font-size: 11px; }
+}

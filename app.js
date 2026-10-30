@@ -498,6 +498,8 @@ function recusaLocal(caminho, valor) {
   // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
   if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f\d+-\d+$/.test(caminho[1])) return '';
   if (aux && atual && !valor && SER[atual.s] && SER[atual.s].tipo === 'filho') return atual.h ? '' : 'Este Filho já foi revelado aos jogadores: só o Mestre tira do mapa.';
+  // auxiliar: coloca o PRÓPRIO robô S.T.A.F.F. (vai oculto, com pedido "pr"; a tela do Mestre publica)
+  if (aux && caminho[1] === aux && valor && valor.s === aux && valor.h === true && valor.pr === 1 && (!atual || atual.h)) return '';
   if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar tokens do mapa.';
   if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover esse token.';
   const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
@@ -5651,6 +5653,43 @@ function rolagemAux() {
   $('#rolAuxRes').innerHTML = html + ` <small>${hora(Date.now()).slice(0, 5)}</small>`;
 }
 
+/* ---------- robô S.T.A.F.F. do auxiliar ----------
+   O auxiliar não pode criar tokens públicos (regra do Firebase). Ele grava o próprio robô OCULTO (privado/tokens,
+   que a conta dos auxiliares pode escrever) com o pedido pr:1; a tela do Mestre vê o pedido e publica o robô.
+   Se o robô já está no mapa e no mesmo andar, ele só anda até o ponto (como o arraste). */
+function colocarRoboAux(a, x, y) {
+  if (!aux || mestre) return 'Só o auxiliar coloca o próprio robô.';
+  if (!SER[aux] || SER[aux].tipo !== 'robo') return 'Escolha um robô S.T.A.F.F. no perfil.';
+  const tk = (Store.state.tokens || {})[aux];
+  x = +clamp(x, 0.3, W - 0.3).toFixed(2); y = +clamp(y, 0.3, H - 0.3).toFixed(2);
+  if (!andavel(a, x, y)) return 'Aqui não dá: escolha um ponto dentro de uma sala ou corredor.';
+  if (tk && !tk.h) {
+    if (tk.a !== a) return `Seu robô está no ${tk.a}º andar. Só o Mestre muda o andar dele.`;
+    Store.definir(['tokens', aux], { ...tk, x, y });
+    return '';
+  }
+  Store.definir(['tokens', aux], { s: aux, a, x, y, h: true, vf: false, n: 1, pr: 1 });
+  return '';
+}
+// tela do Mestre: publica os robôs que os auxiliares pediram
+const roboPublicado = {};
+Store.aoMudar(() => {
+  if (!mestre) return;
+  Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
+    if (!tk || tk.pr !== 1 || !SER[tk.s] || SER[tk.s].tipo !== 'robo') return;
+    if (Date.now() - (roboPublicado[id] || 0) < 5000) return;   // foto atrasada do servidor: já publicado
+    roboPublicado[id] = Date.now();
+    const novo = { ...tk, h: false }; delete novo.pr;
+    Store.definir(['tokens', id], novo);
+    Chat.enviar(`🤖 ${SER[tk.s].nome} entrou no ${tk.a}º andar.`, 'geral');
+  });
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#btnRoboAux') || !aux || mestre) return;
+  const r = colocarRoboAux(andarAtual, CENTRO_ZN.x, CENTRO_ZN.y + 1.2);
+  aviso(r || 'Seu robô foi para a Zona Neutra deste andar. Ele aparece para todos quando a tela do Mestre confirmar.');
+});
+
 /* =========================================================
    PONTE PARA A VISTA 3D (sala3d.js)
    O 3D move o token pelas MESMAS regras do arraste no mapa: paredes e portas
@@ -5786,6 +5825,7 @@ window.ACF = {
   geo: { M, R, G, CW, W, H, CORREDORES, retSala, retSaida: a => retSaida(saidaDoAndar(a)), saidaDoAndar, salaEm, corredorEm: (x, y) => corredorEm(x, y), M_POR_UNID, M_CORREDOR },
   rotulo: tk => rotuloBase(tk),
   abrirLoja: () => abrirLoja(),
+  colocarRoboAux: (a, x, y) => colocarRoboAux(a, x, y),
   pegarEstoque: k => pegarEstoque(k),
 };
 })();
