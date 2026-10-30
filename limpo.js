@@ -16,7 +16,7 @@
   /* ---------- câmera: 4 botões à vista, o resto no ⋯ ---------- */
   const cam = $('.camera');
   if (cam) {
-    const basicos = ['mais', 'menos', 'centro', 'eu'];
+    const basicos = ['mais', 'menos', 'centro', 'eu', 'tresd'];
     $$('button[data-cam]', cam).forEach(b => b.classList.toggle('cam-extra', !basicos.includes(b.dataset.cam)));
     const mais = document.createElement('button');
     mais.type = 'button'; mais.className = 'cam-mais'; mais.title = 'Mais controles (girar, vistas, mover, régua)'; mais.setAttribute('aria-label', 'Mais controles da câmera'); mais.setAttribute('aria-expanded', 'false'); mais.textContent = '⋯';

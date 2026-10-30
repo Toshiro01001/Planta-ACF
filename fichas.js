@@ -226,6 +226,8 @@ function rolarTeste(qtdAtr, bonus, extraDados = 0) {
   const q = Math.min(desv ? 2 - n : n, 12);
   const dados = Array.from({ length: q }, d20);
   const esc = desv ? Math.min(...dados) : Math.max(...dados);
+  // aviso para os dados 3D (rolam na tela de quem rolou, com o 3D aberto)
+  document.dispatchEvent(new CustomEvent('acf-dados', { detail: { dados: dados.map(v => ({ f: 20, v })), usado: dados.indexOf(esc), total: esc + bonus, bonus } }));
   return { dados, esc, desv, total: esc + bonus, bonus, extraDados };
 }
 // "2d6+1d8+3" → total e detalhes; mult multiplica só os dados (crítico)
@@ -233,7 +235,7 @@ function rolarExpr(expr, mult = 1) {
   // "1d4/1d6" (alternativas): usa a primeira; texto entre parênteses é ignorado
   const limpo = String(expr || '').replace(/\([^)]*\)/g, '').replace(/\s/g, '').replace(/−/g, '-').replace(/(\d*d\d+)(\/\d*d\d+)+/gi, '$1');
   const partes = limpo.match(/[+-]?[^+-]+/g) || [];
-  let total = 0; const det = [];
+  let total = 0; const det = [], todos = [];
   partes.forEach(p => {
     const s = p[0] === '-' ? -1 : 1;
     const t = p.replace(/^[+-]/, '');
@@ -241,10 +243,12 @@ function rolarExpr(expr, mult = 1) {
     if (m) {
       const q = (parseInt(m[1] || '1', 10)) * mult, f = parseInt(m[2], 10);
       const v = Array.from({ length: Math.min(q, 60) }, () => 1 + Math.floor(Math.random() * f));
+      v.forEach(x => todos.push({ f, v: x }));
       total += s * v.reduce((a, b) => a + b, 0);
       det.push(`${s < 0 ? '−' : ''}${q}d${f} [${v.join(', ')}]`);
     } else if (/^\d+$/.test(t)) { total += s * parseInt(t, 10); det.push(`${s < 0 ? '−' : '+'}${t}`); }
   });
+  if (todos.length) document.dispatchEvent(new CustomEvent('acf-dados', { detail: { dados: todos, total } }));
   return { total, det: det.join(' ') };
 }
 
@@ -1823,6 +1827,17 @@ setTimeout(atualizarBotao, 300);
 window.ACF_FICHAS = {
   abrir, fechar, calc, rolarExpr, conjurarAtiva, rolarTeste, testarPericia, condicoesDe, vitaisDe, aplicarNaAtiva, atualDe, CLASSES, PER, NEXES, NIVEIS, PATENTES, nivelDe, nexDe, corNex,
   ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
+  // teste de perícia com a ficha ativa (o 3D usa para o "esconder-se": Furtividade DT 15)
+  testarAtiva: (per, extra = 0) => (F.ativaD ? testarPericia(F.ativaD, per, extra) : null),
+  // item achado numa sala do 3D: entra no inventário da ficha ativa, com os dados do catálogo
+  darItemAtiva(nome) {
+    if (!F.ativaRef || !F.ativaD) return false;
+    const x = C.itens.find(i => i.n === nome) || { n: String(nome || 'Item').slice(0, 80), t: 'geral', cat: 0, esp: 1, d: '' };
+    const v = { n: x.n, t: x.t || 'geral', cat: x.cat ?? 0, esp: x.esp ?? 1, qtd: 1, d: x.d || '', o: Date.now(), achado: true };
+    if (x.el) v.el = x.el; if (x.a) v.a = { ...x.a }; if (x.def) v.def = x.def; if (x.t === 'protecao') v.vest = true;
+    aplicarNaAtiva([['itens.' + A.Rede.chave(), v]]);
+    return true;
+  },
   // chaves das fichas deste aparelho para a cobaia escolhida (regras restritas usam o hash delas)
   minhasChaves: () => { const q = A.meu; return q ? indice().filter(r => r && r.chave && r.dono === q).map(r => r.chave) : []; },
   // categoria do item pelo nome no catálogo; devolve o estouro do limite da patente, se houver

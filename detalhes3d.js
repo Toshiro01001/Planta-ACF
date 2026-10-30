@@ -823,3 +823,63 @@
     });
   });
 })();
+
+/* ================= itens do livro jogados nas salas e documentos do Arquivo =================
+   item_chao: um item do catálogo (nome exato em "item"); a forma só muda o desenho.
+   documento_sala: pasta de papéis com etiqueta, para os documentos que o Mestre prendeu a uma sala. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  NS.extensoes = NS.extensoes || [];
+  NS.extensoes.push(F => {
+    const { P, m, bx, cy, sf, pl, luz, G, metal, tela, texCanvas, T, rng, anim } = F;
+    const CAT = n => {           // forma a partir do nome do item (o cenário pode mandar "forma")
+      const s = String(n || '').toLowerCase();
+      if (/fuzil|espingarda|escopeta|metralhadora|winchester|arcabuz|railgun|bazuca|lança-chamas|balestra|besta|arbalete|arco/.test(s)) return 'arma_longa';
+      if (/pistola|revólver|revolver|submetralhadora|taser|pregador/.test(s)) return 'arma_curta';
+      if (/faca|punhal|machete|katana|espada|baioneta|lâmina|gadanho|florete|wakizachi|sai\b|cutelo|machadinha|machado|acha/.test(s)) return 'lamina';
+      if (/pé de cabra|marreta|martelo|bastão|maça|taco|picareta|pá\b|serrote|chave de fenda|corrente|soqueira|nunchaku/.test(s)) return 'contundente';
+      if (/bala|cartucho|munição|flecha|projétil|bolinhas/.test(s)) return 'municao';
+      if (/granada|dinamite|explosivo|mina/.test(s)) return 'granada';
+      if (/kit|cicatrizante|antibiótico|antídoto|anti|coagulante|broncodilatador|ansiolítico|antipsicótico|adrenalina|aplicador|seringa|injeção|ervas/.test(s)) return 'kit';
+      if (/manual|documento|livro|pergaminho|carteirinha|cartão|tábula|baralho/.test(s)) return 'papel';
+      if (/lanterna/.test(s)) return 'lanterna';
+      if (/mochila|bolsa|bandoleira|coldre/.test(s)) return 'mochila';
+      if (/celular|rádio|radio|notebook|drone|câmera|camera|scanner|medidor|emissor|escuta|bloqueador|pen drive|disco|óculos|binóculos|alarme/.test(s)) return 'eletronico';
+      if (/proteção|colete|traje|vestimenta|parka|máscara/.test(s)) return 'protecao';
+      if (/corda|arpéu|algemas|amarras|isqueiro|fósforos|chaves|utensílio|galão|extintor|cantil|alimento|água/.test(s)) return 'geral';
+      return 'estranho';
+    };
+    P.item_chao = o => {
+      const g = G(), f = o.forma || CAT(o.item), r = rng(o.sem || 7);
+      const preto = m('#1a1a1c', { r: .5, me: .4 }), aco = metal('#9aa0a6'), madeira = m('#5a3a22', { tex: 'madeira_velha', r: .8 });
+      const grupo = G(); g.add(grupo); grupo.rotation.y = (r() - .5) * 2.4;
+      if (f === 'arma_longa') { bx(grupo, .9, .07, .07, preto, 0, .02, 0); bx(grupo, .32, .1, .08, madeira, -.52, 0, 0); bx(grupo, .06, .14, .05, preto, .05, -.06 + .06, .04); cy(grupo, .018, .018, .5, aco, .5, .05, 0, 8).rotation.z = Math.PI / 2; }
+      else if (f === 'arma_curta') { bx(grupo, .2, .06, .04, preto, 0, .02, 0); const cabo = bx(grupo, .06, .12, .04, preto, -.06, -.02, 0); cabo.rotation.z = -.35; grupo.position.y = .02; }
+      else if (f === 'lamina') { bx(grupo, .12, .03, .035, m('#2a1a10'), -.14, .01, 0); const l = bx(grupo, .3, .01, .05, metal('#c8ccd0'), .08, .015, 0); l.rotation.y = .02; }
+      else if (f === 'contundente') { const c = cy(grupo, .018, .018, .75, metal('#7a2a20'), 0, .02, 0, 8); c.rotation.z = Math.PI / 2; c.position.y = .03; bx(grupo, .05, .03, .1, metal('#7a2a20'), .37, .015, .03); }
+      else if (f === 'municao') { bx(grupo, .16, .07, .1, m('#6a5a2a', { r: .7 })); for (let i = 0; i < 4; i++) cy(grupo, .009, .009, .04, metal('#d8b04a'), -.05 + i * .035, .07, 0, 6); }
+      else if (f === 'granada') { sf(grupo, .045, m('#3a4a2a', { r: .6 }), 0, .045, 0, 10); cy(grupo, .015, .015, .03, aco, 0, .08, 0, 6); }
+      else if (f === 'kit') { bx(grupo, .28, .1, .2, m('#d8d4cc', { r: .5 })); bx(grupo, .1, .005, .03, m('#c81a1a'), 0, .101, 0); bx(grupo, .03, .005, .1, m('#c81a1a'), 0, .101, 0); }
+      else if (f === 'papel') { bx(grupo, .24, .04, .32, m('#7a5a3a', { r: .8 })); bx(grupo, .22, .01, .3, m('#ece4cc'), .01, .04, 0); }
+      else if (f === 'lanterna') { const c = cy(grupo, .025, .03, .22, preto, 0, .03, 0, 10); c.rotation.z = Math.PI / 2; c.position.y = .03; const lente = sf(grupo, .028, m('#ffffff', { unico: true, e: '#fff4c0', ei: 1.5 }), .12, .03, 0, 8); lente.scale.x = .3; }
+      else if (f === 'mochila') { const b = sf(grupo, .2, m('#3a4a32', { r: 1 }), 0, .12, 0, 10); b.scale.set(1.1, .7, .8); bx(grupo, .2, .1, .04, m('#2a3a24'), 0, .02, .14); }
+      else if (f === 'eletronico') { bx(grupo, .16, .04, .1, preto); pl(grupo, .1, .06, m('#ffffff', { unico: true, e: '#4af07a', ei: .9 }), 0, .041, 0).rotation.x = -Math.PI / 2; }
+      else if (f === 'protecao') { const c = bx(grupo, .5, .06, .45, m('#2a2e24', { r: .9 })); bx(grupo, .2, .07, .12, m('#22261c'), -.12, 0, .12); }
+      else if (f === 'geral') { const c = cy(grupo, .07, .07, .14, m('#8a6a3a', { r: .9 }), 0, 0, 0, 10); }
+      else { // objeto amaldiçoado ou desconhecido: caixinha com brilho roxo fraco
+        bx(grupo, .14, .1, .14, m('#2a1a2a', { r: .4 })); const o2 = sf(grupo, .035, m('#ffffff', { unico: true, e: '#a060ff', ei: 1.6 }), 0, .14, 0, 10);
+        luz(g, '#a060ff', .35, 1.6, 0, .25, 0, true); anim.push((dt, t) => { o2.position.y = .14 + Math.sin(t * 2 + (o.sem || 0)) * .012; });
+      }
+      return g;
+    };
+    P.documento_sala = o => {
+      const g = G(), r = rng(o.sem || 11);
+      const pasta = bx(g, .3, .025, .4, m('#b89a5a', { r: .85 })); pasta.rotation.y = (r() - .5) * .6;
+      for (let i = 0; i < 3; i++) { const f = bx(g, .27, .004, .36, m('#ece6d4', { r: .95 }), (r() - .5) * .04, .025 + i * .004, (r() - .5) * .04); f.rotation.y = pasta.rotation.y + (r() - .5) * .25; }
+      const [c, x] = tela(256, 64); x.fillStyle = '#b81a1a'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#fff'; x.font = 'bold 34px Arial'; x.textAlign = 'center'; x.fillText(o.txt || 'O.R.F.E.U.', 128, 44);
+      const et = pl(g, .2, .05, m('#ffffff', { unico: true, mapa: texCanvas(c) }), 0, .04, 0); et.rotation.x = -Math.PI / 2; et.rotation.z = -pasta.rotation.y;
+      return g;
+    };
+  });
+})();

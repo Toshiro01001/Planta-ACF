@@ -722,6 +722,7 @@ $$('.camera button').forEach(b => b.addEventListener('click', () => {
     case 'menos': zoomEm(cx, cy, 0.8); break;
     case 'centro': cam.rot = 0; cam.tilt = 50; enquadrar(); return;
     case 'eu': focarMinhaFicha(celular()); return;
+    case 'tresd': if (window.Sala3D && window.Sala3D.abrirDireto) window.Sala3D.abrirDireto(); else aviso('O 3D ainda está carregando.'); return;
     case 'mover':
       modoMover = !modoMover;
       b.classList.toggle('ativo', modoMover);
@@ -2048,6 +2049,7 @@ function rolar() {
   const escolhido = desv ? Math.min(...dados) : Math.max(...dados);
   const iEsc = dados.indexOf(escolhido);
   const total = escolhido + bonus;
+  document.dispatchEvent(new CustomEvent('acf-dados', { detail: { dados: dados.map(v => ({ f: 20, v })), usado: iEsc, total, bonus, titulo: $('#dadosTitulo').textContent } }));
   $('#dadosResultado').innerHTML =
     `<div class="dados-faces">${dados.map((v, i) => `<span class="face${i === iEsc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>
      <p class="dados-conta">${desv ? 'Menor' : 'Maior'} dado <b>${escolhido}</b> ${bonus >= 0 ? '+' : '−'} ${Math.abs(bonus)} = <span class="dados-total">${total}</span></p>`;
@@ -4072,7 +4074,7 @@ const Chat = {
     this.carregarEnviados();
     const agora = Date.now();
     this.canais().forEach(c => { this.visto[c] = agora; });
-    this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; ouvirBzNovas(this.msgs.geral); this.atualizar(); }, () => {}));
+    this.offs.push(Rede.on('chat/geral', v => { this.msgs.geral = v || {}; ouvirBzNovas(this.msgs.geral); this.atualizar(); document.dispatchEvent(new CustomEvent('acf-chat-geral', { detail: this.msgs.geral })); }, () => {}));
     this.offs.push(Rede.on('chatTrad', v => { BZ.todos = v || {}; if (this.aberto) this.desenhar(); }, () => {}));
     if (mestre) {
       this.offs.push(Rede.on('chat/sussurros', v => { this.msgs.sus = v || {}; this.atualizar(); }, () => {}));
@@ -4225,6 +4227,11 @@ $('#btnApagarChat').addEventListener('click', () => {
 /* ---------- Rolagens no chat ---------- */
 const rolagensAbertas = () => !(Store.state.cfg || {}).rolSecreta;
 $('#chkRolAberta').addEventListener('change', e => Store.definir(['cfg', 'rolSecreta'], e.target.checked ? null : true));
+// rolagem que só o Mestre deve ver (esconder-se não pode virar aviso no chat Geral)
+function postarRolagemSecreta(texto) {
+  if (mestre || !Chat.chaveLigada) return;
+  Chat.enviar('🎲 ' + texto, aux ? 'filhos' : 'sus', true);
+}
 function postarRolagem(texto) {
   if (mestre || !Chat.chaveLigada) return;
   const canal = aux ? 'filhos' : rolagensAbertas() ? 'geral' : 'sus';
@@ -5308,12 +5315,13 @@ function capacidadeEstoque() {
   itensMelhorias().forEach(i => { if (i.comprado && !i.oculto && i.estoque) Object.entries(i.estoque).forEach(([k, n]) => { cap[k] = (cap[k] || 0) + (+n || 0); }); });
   return cap;
 }
-function encherEstoque() { if (mestre) Store.definir(['estoque'], Object.keys(capacidadeEstoque()).length ? capacidadeEstoque() : null); }
+const itensDoChao = () => Object.fromEntries(Object.entries(Store.state.estoque || {}).filter(([k]) => /^i_/.test(k)));
+function encherEstoque() { if (!mestre) return; const v = { ...itensDoChao(), ...capacidadeEstoque() }; Store.definir(['estoque'], Object.keys(v).length ? v : null); }
 // comprou ou desfez uma melhoria de despensa: ajusta sem apagar o que já foi pego
 function ajustarEstoque() {
   if (!mestre) return;
   const cap = capacidadeEstoque(), at = Store.state.estoque || {};
-  const novo = {};
+  const novo = itensDoChao();
   Object.entries(cap).forEach(([k, n]) => { novo[k] = at[k] === undefined ? n : Math.min(at[k], n); });
   if (!igualJSON(novo, at)) Store.definir(['estoque'], Object.keys(novo).length ? novo : null);
 }
@@ -5388,15 +5396,23 @@ function usarMelhoria(it) {
    O jogador cria o pedido; só o Mestre lê a fila, aprova ou recusa.
    Aprovar desconta as sucatas (da ficha ou do cofre) e responde no Sussurro. */
 const Pedidos = {
-  dados: {}, off: null,
+  dados: {}, off: null, vistos: null,
   ligar(sim) {
-    if (sim && !this.off) this.off = Rede.on('pedidos', v => { this.dados = v || {}; desenharPedidos(); }, () => { this.off = null; });
+    if (sim && !this.off) this.off = Rede.on('pedidos', v => {
+      this.dados = v || {};
+      // pedido novo de elevador: alerta na tela do Mestre (também por cima do 3D)
+      const elev = Object.entries(this.dados).filter(([, p]) => p && p.st === 'pend' && p.tipo === 'elev');
+      if (this.vistos) elev.forEach(([k, p]) => { if (!this.vistos.has(k)) alertaMestre(`🛗 ${p.n || '?'} quer usar ${p.t}. Veja em Pedidos.`); });
+      this.vistos = new Set(elev.map(([k]) => k));
+      desenharPedidos();
+    }, () => { this.off = null; });
     if (!sim && this.off) { this.off(); this.off = null; this.dados = {}; }
   },
 };
 function criarPedido(p) {
-  if (!meu) return;
-  const ped = { ...p, de: meu, n: SER[meu] ? SER[meu].nome : meu, cx: Chat.cx(), ts: Date.now(), st: 'pend' };
+  const quem = meu || aux;
+  if (!quem) return;
+  const ped = { ...p, de: quem, n: SER[quem] ? SER[quem].nome : quem, cx: Chat.cx(), ts: Date.now(), st: 'pend' };
   if (!ped.custo) delete ped.custo;
   Rede.push('pedidos', ped).pronto.catch(erroGravacao);
 }
@@ -5418,6 +5434,8 @@ function desenharPedidos() {
   $('#qtdPedidos').textContent = lista.length ? `(${lista.length})` : '';
   $('#listaPedidos').innerHTML = lista.map(([k, p]) => {
     const s = SER[p.de];
+    if (p.tipo === 'elev') return `<li data-k="${k}"><div class="ped-topo">${s ? bola(s) : ''}<span><b>${esc(p.n || '?')}</b> quer usar <b>${esc(p.t)}</b><small>🛗 saída do andar · ${hora(p.ts).slice(0, 5)}</small></span></div>
+      <div class="ferramentas duas"><button class="btn-roxo" data-ped="ok">Levar ao ${+p.a || '?'}º andar</button><button class="btn-fantasma" data-ped="nao">Recusar</button></div></li>`;
     const sf = saldoDe('ficha', p.de), sc = cofre();
     return `<li data-k="${k}"><div class="ped-topo">${s ? bola(s) : ''}<span><b>${esc(p.n || '?')}</b> pede <b>${esc(p.t)}</b><small>${p.tipo === 'melh' ? 'Melhoria da ZN' : 'Loja do Maurício'} · ${p.custo ? txtCusto(p.custo) : 'sem custo'} · ${hora(p.ts).slice(0, 5)}</small>${p.lim ? `<small class="ped-lim">⚠ ${esc(p.lim)}</small>` : ''}</span></div>
       <label class="campo-linha">Pagar com <select class="ped-pg">
@@ -5429,7 +5447,7 @@ function desenharPedidos() {
   $$('#listaPedidos [data-ped]').forEach(b => b.onclick = () => {
     const li = b.closest('li'), k = li.dataset.k, p = Pedidos.dados[k];
     if (!p) return;
-    if (b.dataset.ped === 'ok') aprovarPedido(k, p, $('.ped-pg', li).value);
+    if (b.dataset.ped === 'ok') { if (p.tipo === 'elev') aprovarElevador(k, p); else aprovarPedido(k, p, $('.ped-pg', li).value); }
     else {
       const motivo = prompt('Recusar o pedido. Quer mandar um motivo? (opcional)', '');
       if (motivo === null) return;
@@ -5458,6 +5476,99 @@ function aprovarPedido(k, p, pg) {
   responderSussurro(p.cx, `✅ Pedido aprovado: ${p.t}${pg !== 'nada' && c ? ` · pago com ${pg === 'cofre' ? 'o cofre do grupo' : 'suas sucatas'} (${txtCusto(c)})` : ''}`);
   Diario.registrar('sala', `Pedido aprovado: ${p.n} · ${p.t}`);
 }
+/* ---------- ELEVADOR / SAÍDA DO ANDAR ----------
+   Só o Mestre muda o andar de um token (regra do Firebase). O jogador ou o auxiliar chega até a saída
+   (no 3D: o elevador no fim do corredor de saída) e pede; o pedido entra na fila e o Mestre aprova.
+   Chegada: descendo, a 1ª sala do andar (cânone: Doca de Chegada, Plataforma de Descarga, Antecâmara,
+   Fim da Descida); subindo, a sala da saída do andar de cima. */
+function salaChegada(origem, destino) {
+  if (destino < origem) { const s = saidaDoAndar(destino); return s ? s.p : 25; }
+  return 1;
+}
+function naSaida(tk) {
+  if (!tk) return false;
+  const s = saidaDoAndar(tk.a); if (!s) return false;
+  const rs = retSaida(s);
+  if (rs && dentro(rs, tk.x, tk.y, 0.3)) return true;
+  return salaEm(tk.a, tk.x, tk.y) === s.p;
+}
+function levarElevador(ids, destino) {
+  if (!mestre) return 'Só o Mestre muda o andar dos tokens.';
+  destino = clamp(parseInt(destino, 10) || 1, 1, 5);
+  ids = [...new Set(ids)].filter(id => (Store.state.tokens || {})[id]);
+  if (!ids.length) return 'Nenhum token para levar.';
+  const origem = Store.state.tokens[ids[0]].a;
+  const p = salaChegada(origem, destino), r = retSala(p);
+  ids.forEach((id, i) => {
+    const tk = Store.state.tokens[id];
+    const fila = Math.floor(i / 4), col = i % 4, nessa = Math.min(4, ids.length - fila * 4);
+    const novo = { ...tk, a: destino, x: +(r.x + R * (col + 0.5) / nessa).toFixed(2), y: +(r.y + R - 0.75 - fila * 1.1).toFixed(2) };
+    delete novo.esq; delete novo.x0; delete novo.y0; delete novo.m;
+    Store.definir(['tokens', id], novo);
+  });
+  Diario.registrar('mov', `Saída do andar: ${ids.map(nomeDoId).join(', ')} → ${destino}º andar (CN ${pad2(cnDe(destino, p))})`);
+  return '';
+}
+// tokens que estão na saída (corredor do elevador ou sala da saída) do andar a
+function tokensNaSaida(a) {
+  return Object.entries(Store.state.tokens || {}).filter(([, tk]) => tk && tk.a === a && SER[tk.s] && naSaida(tk)).map(([id]) => id);
+}
+function aprovarElevador(k, p) {
+  const tk = (Store.state.tokens || {})[p.de];
+  if (!tk) { Rede.set('pedidos/' + k + '/st', 'nao').catch(erroGravacao); aviso('O token saiu do mapa.'); return; }
+  const ids = [p.de, ...tokensNaSaida(tk.a).filter(id => { const s = SER[(Store.state.tokens[id] || {}).s]; return s && (s.tipo === 'cobaia' || s.tipo === 'robo' || s.tipo === 'npc'); })];
+  const r = levarElevador(ids, +p.a || tk.a + 1);
+  if (r) { aviso(r); return; }
+  Rede.set('pedidos/' + k + '/st', 'ok').catch(erroGravacao);
+  responderSussurro(p.cx, `✅ Pedido aprovado: ${p.t}.`);
+}
+function pedirElevador(destino) {
+  const quem = meu || aux, tk = quem && (Store.state.tokens || {})[quem];
+  if (!tk) return 'Seu token não está no mapa.';
+  if (!naSaida(tk)) return 'Chegue até a saída do andar para pedir.';
+  destino = clamp(parseInt(destino, 10) || tk.a + 1, 1, 5);
+  if (destino === tk.a) return 'Você já está neste andar.';
+  const ja = Object.values(Pedidos.dados || {}).some(p => p && p.tipo === 'elev' && p.de === quem && p.st === 'pend');
+  criarPedido({ tipo: 'elev', t: `a saída para o ${destino}º andar`, a: destino });
+  return ja ? 'Pedido reenviado ao Mestre.' : '';
+}
+
+/* ---------- METROS ANDADOS (contador no canto do 3D) ----------
+   Conta, neste aparelho, quanto o token do jogador (ou o robô do auxiliar) andou, em metros de regra,
+   pelo mapa 2D ou pelo 3D. Teleporte (o Mestre trouxe, saída do andar) não conta. */
+const Metros = { ult: null, total: 0, id: null };
+const chaveMetros = id => 'acf-metros-' + id;
+function vigiarMetros() {
+  const id = meu || aux; if (!id || mestre) return;
+  if (Metros.id !== id) { Metros.id = id; Metros.ult = null; try { Metros.total = +localStorage.getItem(chaveMetros(id)) || 0; } catch (e) { Metros.total = 0; } }
+  const tk = (Store.state.tokens || {})[id];
+  if (!tk) { Metros.ult = null; return; }
+  const u = Metros.ult;
+  if (u && u.a === tk.a && (u.x !== tk.x || u.y !== tk.y) && Math.hypot(tk.x - u.x, tk.y - u.y) < 6) {
+    Metros.total += custoMetros(u, tk);
+    try { localStorage.setItem(chaveMetros(id), String(+Metros.total.toFixed(2))); } catch (e) {}
+  }
+  Metros.ult = { a: tk.a, x: tk.x, y: tk.y };
+}
+Store.aoMudar(vigiarMetros);
+function zerarMetros() { Metros.total = 0; try { localStorage.setItem(chaveMetros(Metros.id || meu || aux), '0'); } catch (e) {} }
+
+/* ---------- ITENS DO LIVRO JOGADOS NAS SALAS ----------
+   Cada item da cena (item_chao) vira mapa/estoque/i_<CN>_<n> = 1 quando o Mestre "espalha" os itens.
+   Quem pega desconta 1 (a mesma regra da despensa) e o item entra na ficha ativa. */
+function pegarItemChao(k, nome) {
+  if (!/^i_\d+_\d+$/.test(k)) return 'Item inválido.';
+  const n = (Store.state.estoque || {})[k] || 0;
+  if (n <= 0) return 'Alguém já pegou isso.';
+  if (mestre) { Store.definir(['estoque', k], null); return ''; }
+  Store.definir(['estoque', k], n - 1);
+  const FX = window.ACF_FICHAS; let naFicha = false, lim = null;
+  try { lim = FX && FX.checarLimite ? FX.checarLimite(nome) : null; naFicha = !!(FX && FX.darItemAtiva && FX.darItemAtiva(nome)); } catch (e) {}
+  Chat.enviar(`🎒 ${Chat.autorNome()} pegou: ${nome}.`, 'geral');
+  if (!naFicha) return 'Pegou, mas você não tem ficha ativa: anote o item na ficha.';
+  return lim ? `${nome} foi para a ficha, mas passa do limite da patente ${lim.pat} (categoria ${lim.cat}: ${lim.tem + 1}/${lim.max}). Converse com o Mestre.` : '';
+}
+
 // celular: as abas do Mestre ficam por cima do × do painel; este × fica dentro delas
 $('#btnFecharPainelM').addEventListener('click', e => { e.stopPropagation(); $('#btnFecharPainel').click(); });
 $('#btnLimparPedidos').addEventListener('click', () => {
@@ -5814,6 +5925,7 @@ window.ACF = {
   focarSala(cn) { const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1); if (!podeVer(a) || !POS[p]) return false; irParaAndar(a); const s = retSala(p); focar(s.x + s.w / 2, s.y + s.h / 2); if (salaVisivel(a, cn)) selecionarSala(cn); return true; },
   focarToken(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a || !podeVer(tk.a)) return false; irParaAndar(tk.a); focar(tk.x, tk.y); return true; },
   get andarAtual() { return andarAtual; },
+  irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },
   // vista 3D
   podeMover, visivelPara, moverToken3D, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
   andavel: (a, x, y) => andavel(a, x, y),
@@ -5827,5 +5939,14 @@ window.ACF = {
   abrirLoja: () => abrirLoja(),
   colocarRoboAux: (a, x, y) => colocarRoboAux(a, x, y),
   pegarEstoque: k => pegarEstoque(k),
+  // elevador, itens do chão, metros e chat no 3D
+  podeVer: a => podeVer(a), naSaida, get salaSel() { return salaSel; }, metros: () => Metros.total, zerarMetros, levarElevador, pedirElevador, tokensNaSaida, pegarItemChao, postarRolagem, postarRolagemSecreta,
+  custoMetros: (a, b) => custoMetros(a, b), fmtM,
+  // texto de uma mensagem do chat como ESTE aparelho pode ler (C2P0 e Mostarda: só com o ritual, Mestre e auxiliares)
+  textoChat(m) {
+    if (!m) return { txt: '' };
+    if (ehBz(m)) { const ok = bzTraduzido(m); return { txt: ok ? desembaralhar(m.t) : falaDe(m), lingua: true, cifrado: !ok, cls: linguaDe(m).cls }; }
+    return { txt: String(m.t || '') };
+  },
 };
 })();

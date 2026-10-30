@@ -18,6 +18,15 @@
 (() => {
   'use strict';
   const URL3 = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  // objetos dos andares 2 a 5 (andares3d.js): grande, então só baixa quando alguém abre o 3D (mesma versão deste arquivo)
+  const VERSAO = ((document.currentScript && document.currentScript.src) || '').split('?')[1] || '';
+  let extrasP = null;
+  const carregarExtras = () => extrasP || (extrasP = new Promise(ok => {
+    if ((window.ACF3D || {}).andaresProntos) return ok();
+    const s = document.createElement('script'); s.src = 'andares3d.js' + (VERSAO ? '?' + VERSAO : ''); s.async = true;
+    s.onload = () => ok(); s.onerror = () => { extrasP = null; s.remove(); ok(); };   // sem o arquivo, o 3D abre do mesmo jeito
+    document.head.appendChild(s);
+  }));
   const ACF = () => window.ACF;
   const NS = () => window.ACF3D;
   // 'jogo' (terceira pessoa) e 'dentro' (primeira pessoa): você está DENTRO do mundo (teto, névoa, paredes inteiras)
@@ -211,7 +220,8 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao']);
+  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao', 'item_chao', 'documento_sala',
+    'a2_aneis_chao', 'a2_arandela', 'a2_camera_canto', 'a2_defletor', 'a2_documento', 'a2_estandarte', 'a2_evaporador', 'a2_facho', 'a2_faixa_zebrada', 'a2_fila_chao', 'a2_gelo', 'a2_lampada_cultivo', 'a2_metronomo', 'a2_panelas', 'a2_ralo_cabelo', 'a2_regua_altura', 'a2_retalhos', 'a3_bilhete', 'a3_carne_costurada', 'a3_chao', 'a3_eclusa', 'a3_lampada_respira', 'a3_manual_corte', 'a3_poco_teto', 'a3_sob_agua', 'a3_telas', 'a3_trilhos_parede', 'a3_veias', 'a3_vento', 'a4_arandela', 'a4_calcada', 'a4_calendario', 'a4_capacete_riscado', 'a4_carne_parede', 'a4_fachada', 'a4_fenda_portal', 'a4_fita_chao', 'a4_fratura', 'a4_lampiao', 'a4_lustre', 'a4_luz', 'a4_placa_museu', 'a4_poco_espiral', 'a4_porta_nome', 'a4_seteira_vista', 'a5_brinquedos', 'a5_coroa', 'a5_costura', 'a5_cupula', 'a5_facho', 'a5_feixe', 'a5_gotas_paradas', 'a5_olhos_fenda', 'a5_parede_nomes', 'a5_pertences', 'a5_projecao', 'a5_queimado', 'a5_tunel', 'a5_valvula', 'a5_veias', 'a5_vista']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
  const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
@@ -397,6 +407,7 @@
         el.position.copy(cpos(q, fimA, q.linha, 0));
         const lado = (MAPA.g.saidaDoAndar(a) || {}).lado; el.rotation.y = { cima: 0, baixo: Math.PI, esq: Math.PI / 2, dir: -Math.PI / 2 }[lado] || 0;
         raiz.add(el);
+        interativos.push({ tipo: 'elevador', pos: el.position.clone().setY(1.1), obj: el });
       }
     });
     ltC.montar(raiz); ltCT.montar(tetos);
@@ -489,6 +500,8 @@
     }
     const VERM = new T.Color('#ff2a1a');
 
+    { const sd = MAPA.g.saidaDoAndar(a); if (sd && !sd.lado && S[sd.p]) interativos.push({ tipo: 'elevador', pos: new T.Vector3(S[sd.p].cx, 1.1, S[sd.p].cz), sala: sd.p }); }
+
     /* ----- conteúdo das salas: só perto de quem está olhando ----- */
     const carregadas = new Map();
     function carregar(p) {
@@ -517,12 +530,43 @@
       esconde.forEach(e => interativos.push(e));
       // coisas de usar: o Maurício (loja), o bebedouro e a geladeira (despensa)
       g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w, obj: o }); } });
-      carregadas.set(p, { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver });
+      // itens do livro jogados: aparecem quando o Mestre espalha (mapa/estoque/i_<CN>_<n>)
+      g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; interativos.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
+      const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '' };
+      carregadas.set(p, c);
+      atualizarItens(p); sincDocs(p, F2);
     }
+    // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
+    function atualizarItens(pSo) {
+      const e = (est().estoque || {});
+      carregadas.forEach((c, p) => { if (pSo && p !== pSo) return; c.g.children.forEach(o => { if (o.userData.t === 'item_chao') o.visible = (e[`i_${S[p].cn}_${o.userData.i}`] || 0) > 0; }); });
+    }
+    // documentos e cifras que o Mestre prendeu a esta sala (Arquivo: "Na parede de uma sala")
+    function sincDocs(p, F2) {
+      const c = carregadas.get(p); if (!c) return;
+      const AR = window.ACF_ARQUIVO, lista = AR && AR.daSala3D ? AR.daSala3D(S[p].cn) : [];
+      const sig = lista.map(x => x.tipo + x.id + x.tit).join('|');
+      if (sig === c.sigDocs) return;
+      c.sigDocs = sig;
+      c.docs.forEach(d => { c.g.remove(d.obj); const i = interativos.indexOf(d.it); if (i >= 0) interativos.splice(i, 1); }); c.docs = [];
+      const Fd = F2 || NSX.criarFabrica(T, c.anim, [], c.desc, { alt: ALT });
+      const livreAqui = (x, z) => x > -4.4 && x < 4.4 && z > -4.4 && z < 4.4 && !c.obst.some(r => dentroDe(r, x + S[p].cx, z + S[p].cz));
+      lista.forEach((d, k) => {
+        let pt = null;
+        for (let r = 1.2; r < 4.2 && !pt; r += .35) for (let j = 0; j < 12; j++) { const ang = (k * 2.1 + j / 12 * Math.PI * 2), x = Math.cos(ang) * r, z = Math.sin(ang) * r; if (livreAqui(x, z)) { pt = [x, z]; break; } }
+        if (!pt) pt = [0, 0];
+        const o = Fd.P.documento_sala({ sem: 900 + k, txt: d.tipo === 'cifras' ? 'CIFRA' : 'O.R.F.E.U.' });
+        o.position.set(pt[0], 0, pt[1]); o.userData.t = 'documento_sala'; c.g.add(o);
+        const w = new T.Vector3(); o.getWorldPosition(w);
+        const it = { tipo: 'doc', arq: d.tipo, id: d.id, tit: d.tit, cn: S[p].cn, p, pos: w, obj: o };
+        interativos.push(it); c.docs.push({ obj: o, it });
+      });
+    }
+    function atualizarDocs() { carregadas.forEach((c, p) => sincDocs(p)); }
     function descarregar(p) {
       const c = carregadas.get(p); if (!c) return;
       raiz.remove(c.g); c.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
-      for (let i = interativos.length - 1; i >= 0; i--) if ((interativos[i].tipo === 'esconderijo' || interativos[i].tipo === 'uso') && interativos[i].p === p) interativos.splice(i, 1);
+      for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc'].includes(interativos[i].tipo) && interativos[i].p === p) interativos.splice(i, 1);
       carregadas.delete(p);
     }
     const vizinhas = p => CS.filter(c => !c.saida && (c.p1 === p || c.p2 === p)).map(c => [c.p1 === p ? c.p2 : c.p1, c.ci]);
@@ -641,7 +685,7 @@
 
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos,
-      livre3D, area3D, atualizarPortas, recarregar, estadoPorta,
+      livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs,
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
         tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
@@ -661,6 +705,7 @@
           out.push({ k: 'c' + s.cn, som: s.cena.som, g: dentro ? 1 : Math.max(0, 1 - (d - 3.5) / 9) * .4 });
         });
         if (!pAqui) out.push({ k: 'corr' + a, som: [['fluor', 1.1], ['neutra', .6]], g: .8 });   // o zumbido dos corredores
+        if (A.protocolo) out.push({ k: 'protocolo', som: [['sirene', 1]], g: .9 });
         return out;
       },
       descartar() {
@@ -715,7 +760,7 @@
       grupo.add(t.g);
       const [x, z] = planta3D(a, tk.x, tk.y);
       t.g.position.set(x, 0, z);
-      return { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, rotulo: ACF().rotulo(tk) };
+      return { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, rotulo: ACF().rotulo(tk), filho: s.tipo === 'filho', corAro: t.aro ? t.aro.material.emissive.clone() : null };
     }
     function remover(id) { const o = mapa.get(id); if (!o) return; grupo.remove(o.t.g); mapa.delete(id); }
 
@@ -729,12 +774,25 @@
         // forma do Filho trocada, escondido/saiu do esconderijo ou nome mudou: refaz a miniatura
         if (o && (o.forma !== forma || o.esq !== !!tk.esq || o.rotulo !== ACF().rotulo(tk))) { remover(id); o = null; }
         if (!o) { o = criar(id, tk); if (!o) return; mapa.set(id, o); }
-        const [x, z] = planta3D(a, tk.x, tk.y); o.ax = x; o.az = z;
+        // posição do mapa caiu dentro de um móvel (cama, armário…): fica no ponto livre mais perto
+        const ch = tk.x + ',' + tk.y + ':' + mundo.carregadas.size;
+        if (o.chLivre !== ch) { o.chLivre = ch; let [x, z] = planta3D(a, tk.x, tk.y); if (!tk.esq && !mundo.livre3D(x, z) && mundo.area3D(x, z, .05)) [x, z] = pontoLivre(mundo.livre3D, x, z); o.bx = x; o.bz = z; }
+        o.ax = o.bx; o.az = o.bz;
       });
       [...mapa.keys()].forEach(id => { if (!vistos.has(id)) remover(id); });
+      // dois tokens no mesmo lugar: se afastam um pouco (o seu, que você controla, não sai do lugar)
+      const ls2 = [...mapa.entries()];
+      for (let it = 0; it < 4; it++) for (let i = 0; i < ls2.length; i++) for (let j = i + 1; j < ls2.length; j++) {
+        const [ia, A1] = ls2[i], [ib, B1] = ls2[j], dx = B1.ax - A1.ax, dz = B1.az - A1.az, d = Math.hypot(dx, dz) || .001, min = .62;
+        if (d >= min) continue;
+        const fixoA = ia === ctx.ctrlAtual(), fixoB = ib === ctx.ctrlAtual(), k = (min - d) / (fixoA || fixoB ? 1 : 2), ux = (dx || .3) / d, uz = (dz || .1) / d;
+        const tenta = (o, sx) => { const nx = o.ax + ux * k * sx, nz = o.az + uz * k * sx; if (mundo.livre3D(nx, nz)) { o.ax = nx; o.az = nz; } };
+        if (!fixoA) tenta(A1, -1); if (!fixoB) tenta(B1, 1);
+      }
     }
 
     let selecionado = null;
+    const VERM_ARO = new T.Color('#ff1a10');
     function atualizar(dt, t, eu, euPos, modo, camPos) {
       mapa.forEach((o, id) => {
         let tx = o.ax, tz = o.az;
@@ -754,7 +812,12 @@
         // nomes: o seu some quando você está dentro do mundo; os dos outros somem bem perto da câmera (não tampam a tela)
         const perto = camPos && imersivo(modo) && Math.hypot(camPos.x - o.x, camPos.z - o.z) < 2.6;
         o.nome.visible = !(id === eu && imersivo(modo)) && !perto;
-        if (o.t.aro) o.t.aro.material.emissiveIntensity = id === selecionado ? 1.6 + Math.sin(t * 6) * .8 : .9;
+        if (o.t.aro) {
+          // Protocolo: os Filhos soltos ganham o aro vermelho pulsando
+          const prot = o.filho && A.protocolo;
+          if (prot !== !!o.aroProt && o.corAro) { o.aroProt = prot; o.t.aro.material.emissive.copy(prot ? VERM_ARO : o.corAro); }
+          o.t.aro.material.emissiveIntensity = id === selecionado ? 1.6 + Math.sin(t * 6) * .8 : prot ? 1.2 + Math.sin(t * 5 + o.x) * .9 : .9;
+        }
       });
     }
     function objetos() { return grupo.children; }
@@ -830,6 +893,8 @@
       grilos(o, s) { ritmo(o, () => .25 + Math.random() * .6, t => { for (let i = 0; i < 3; i++) toque(t + i * .045, s, { f: 4300 + Math.random() * 300, v: .012, ataque: .003, dur: .03 }); }); ruido(o, marrom, filtro('lowpass', 300, 0, ganho(.02, s))); },
       vento(o, s) { const g = ganho(.08, s); const bp = filtro('bandpass', 380, .6, g); ruido(o, branco, bp); lfo(o, .07, 160, bp.frequency); lfo(o, .11, .04, g.gain); },
       mar(o, s) { const g = ganho(.05, s); ruido(o, marrom, filtro('lowpass', 520, 0, g)); lfo(o, .09, .045, g.gain); },
+      // Protocolo Filho da O.R.F.E.U.: sirene que sobe e desce, com um bipe de alerta por cima
+      sirene(o, s) { const g = ganho(.035, s), lp = filtro('lowpass', 1800, 0, g); const os = ctx.createOscillator(); os.type = 'sawtooth'; os.frequency.value = 640; os.connect(lp); os.start(); o.fontes.push(os); lfo(o, .32, 230, os.frequency); ritmo(o, 2.2, t => { toque(t, s, { tipo: 'square', f: 1250, v: .012, dur: .12 }); toque(t + .18, s, { tipo: 'square', f: 1250, v: .012, dur: .12 }); }); },
       alarme_baixo(o, s) { ritmo(o, 1.6, t => { toque(t, s, { tipo: 'square', f: 440, v: .018, dur: .35 }); toque(t + .4, s, { tipo: 'square', f: 330, v: .018, dur: .35 }); }); },
       respiracao(o, s) { const g = ganho(0, s); ruido(o, branco, filtro('bandpass', 700, .9, g)); ritmo(o, 4.2, t => { g.gain.setTargetAtTime(.05, t, .6); g.gain.setTargetAtTime(.004, t + 1.8, .5); g.gain.setTargetAtTime(.035, t + 2.4, .4); g.gain.setTargetAtTime(0, t + 3.6, .3); }); },
       coro(o, s) { const g = ganho(.012, s); [220, 220.6, 329.6, 330.4, 440.8].forEach(f => osc(o, 'sawtooth', f, filtro('lowpass', 900, 0, g))); lfo(o, .2, .004, g.gain); },
@@ -928,6 +993,7 @@
       <div class="s3d-topo"><div class="s3d-tit"><b id="s3dCN"></b><span id="s3dNome"></span></div>
         <div class="s3d-topo-bts">
           <button type="button" class="s3d-x s3d-mini s3d-bt-menu" data-s3dv="menu" title="Menu do jogo (M)" aria-label="Menu do jogo">☰</button>
+          <button type="button" class="s3d-x s3d-mini" data-s3dv="chat" title="Chat (Enter): a mensagem aparece em cima da cabeça do seu personagem" aria-label="Chat">💬</button>
           <button type="button" class="s3d-x s3d-mini" data-s3dv="gaveta" title="Painel (Tab)" aria-label="Painel">🗂</button>
           <button type="button" class="s3d-x s3d-mini" data-s3dv="painel" id="s3dBtPainel" title="Controles do 3D (luzes, portas, tokens)" aria-label="Controles do 3D" hidden>🎛</button>
           <button type="button" class="s3d-x s3d-mini" data-s3dv="opcoes" title="Opções" aria-label="Opções">⚙</button>
@@ -935,6 +1001,8 @@
         </div></div>
       <div class="s3d-faixas"><div class="s3d-prot" id="s3dProt" hidden>⚠ PROTOCOLO FILHO DA O.R.F.E.U.</div><div class="s3d-persg" id="s3dPersg" hidden></div></div>
       <div class="s3d-db" id="s3dDb" hidden></div>
+      <div class="s3d-metros" id="s3dMetros" hidden><span></span><button type="button" title="Zerar a contagem" aria-label="Zerar os metros andados">↺</button></div>
+      <div class="s3d-legenda" id="s3dLegenda" hidden></div>
       <div class="s3d-msg" id="s3dMsg">Carregando…</div>
       <p class="s3d-dica" id="s3dDica"></p>
       <button type="button" class="s3d-prompt" id="s3dPrompt" hidden></button>
@@ -965,6 +1033,7 @@
       else if (k === 'lanterna') alternarLanterna();
       else if (k === 'som') { Som.preparar(); Som.alternar(); pintarBarra(); }
       else if (k === 'menu') alternarMenu();
+      else if (k === 'chat') { if (document.pointerLockElement) document.exitPointerLock(); clicar('btnChat'); }
       else if (k === 'gaveta') alternarGaveta();
       else if (k === 'zoom') alternarZoom();
       else if (k === 'painel') { const p = $('#s3dPainel'); p.hidden = !p.hidden; $('#s3dOpcoes').hidden = true; if (!p.hidden) desenharPainel(); }
@@ -972,6 +1041,7 @@
       else definirModo(k);
     });
     $('#s3dPrompt', d).addEventListener('click', () => interagir());
+    $('#s3dMetros button', d).addEventListener('click', () => { const A = ACF(); if (A.zerarMetros) A.zerarMetros(); hud(); toast('Contagem de metros zerada.'); });
     $('#s3dCodigo', d).addEventListener('submit', e => { e.preventDefault(); const inp = $('#s3dCodigo input'); const ci = +$('#s3dCodigo').dataset.ci; const r = ACF().porta3D(V.a, ci, 'codigo', inp.value); if (r) toast(r); $('#s3dCodigo').hidden = true; inp.value = ''; inp.blur(); });
     $('#s3dCodigo [data-cod="x"]', d).addEventListener('click', () => { $('#s3dCodigo').hidden = true; });
     ligarJoystick($('#s3dJoy', d));
@@ -1174,7 +1244,7 @@
   }
   async function abrir(cn, op = {}) {
     const a = ACF();
-    if (!op.manter && !podeAbrir(cn)) { a.aviso(a.meu ? 'Para ver esta sala em 3D, o token da sua cobaia precisa estar nela.' : 'Esta sala não está liberada para você.'); return; }
+    if (!op.manter && !op.livre && !podeAbrir(cn)) { a.aviso(a.meu ? 'Para ver esta sala em 3D, o token da sua cobaia precisa estar nela.' : 'Esta sala não está liberada para você.'); return; }
     Som.preparar();   // precisa ser no clique (o celular só libera o som assim)
     const d = criarJanela();
     const manter = op.manter && V ? { cam: { ...V.cam }, lanterna: V.lanterna, ctrl: V.ctrlMestre, a: V.a } : null;
@@ -1183,8 +1253,9 @@
     ['#aviso', '#suaVez', '#painelDados'].forEach(sel => levar($(sel), d));
     const msg = $('#s3dMsg'); msg.hidden = false; msg.textContent = 'Montando o andar…';
     $('#s3dBtPainel').hidden = quemSou() === 'jog';
+    $('[data-s3dv="chat"]', d).hidden = !disponivel('btnChat');
     $('.s3d-x[data-s3dv="fechar"]', d).focus();
-    try { await carregarThree(); await NS().carregarModelos(); } catch (e) { msg.textContent = 'Não consegui carregar o 3D (sem internet?). Tente de novo.'; return; }
+    try { await carregarThree(); await carregarExtras(); await NS().carregarModelos(); } catch (e) { msg.textContent = 'Não consegui carregar o 3D (sem internet?). Tente de novo.'; return; }
     if (d.hidden) return;
     msg.hidden = true;
     try { iniciar({ cn, a: op.a || Math.ceil(cn / 25), largo: !!op.andar, manter }, d); }
@@ -1216,7 +1287,7 @@
     const quem = quemSou();
     const ctx = { T, cena: cenaT, ren, amb, celular, descartes, quem, animMundo: [],
       salaJogador: () => { const tk = ((A.estado || {}).tokens || {})[A.meu]; return tk && tk.a === a ? MAPA.g.salaEm(a, tk.x, tk.y) : null; },
-      zoomLargo: () => !!(V && V.cam.largo) };
+      zoomLargo: () => !!(V && V.cam.largo), ctrlAtual: () => (V ? V.ctrl : null) };
     const mundo = mundoAndar(ctx, a);
     const tok = camadaTokens(ctx, mundo);
 
@@ -1318,6 +1389,7 @@
       // 'parede' = bateu (tenta deslizar); 'regra' = a regra do mapa não deixa (vez, metros…)
       const tenta = (nx, nz) => {
         if (!L3(nx, nz)) return 'parede';
+        for (const [id, o] of tok.mapa) { if (id === ctrl || !o.t.g.visible && id !== ctrl) continue; const dn = Math.hypot(o.x - nx, o.z - nz); if (dn < .5 && dn < Math.hypot(o.x - est.px, o.z - est.pz)) return 'parede'; }
         const q = plantaDe3D(a, nx, nz), r = A.moverToken3D(ctrl, q.x, q.y, false);
         if (r.ok) return { r, nx, nz };
         if (r.parede) return 'parede';
@@ -1386,7 +1458,11 @@
       if (!r.ok) { toast(r.motivo || 'Não dá para chegar lá agora.'); return; }
       A.esconderToken(V.ctrl, `c${e.cn}:${e.i}`);
       V.escondido = { ...e, volta: [est.px, est.pz] }; est.px = e.pos.x; est.pz = e.pos.z;
-      toast(`Escondido: ${e.nome}. Ninguém vê o seu token. E para sair.`);
+      // regra do livro (Sobrevivendo ao Horror, Furtividade): esconder-se é um teste de Furtividade DT 15;
+      // passou, a visibilidade cai 1. A rolagem vai só para o Mestre (Sussurro), para não entregar o esconderijo.
+      const FX = window.ACF_FICHAS, t = quem !== 'mestre' && FX && FX.testarAtiva ? FX.testarAtiva('furtividade') : null;
+      if (t) { const ok = t.total >= 15; (A.postarRolagemSecreta || A.postarRolagem)(`escondeu-se (${e.nome}): Furtividade ${t.total} [${t.dados.join(', ')}] contra DT 15 · ${ok ? 'passou: visibilidade −1' : 'falhou: visibilidade igual'}`); toast(`Escondido: ${e.nome}. Furtividade ${t.total} (DT 15): ${ok ? 'passou' : 'falhou'}. E para sair.`); }
+      else toast(`Escondido: ${e.nome}. Ninguém vê o seu token.${quem === 'mestre' ? '' : ' Sem ficha ativa: role Furtividade (DT 15) se o Mestre pedir.'} E para sair.`);
       if (est.modo !== 'dentro') definirModo('dentro');
     }
     function sairEsconderijo() {
@@ -1403,8 +1479,21 @@
       const tk = V.ctrl && ((A.estado || {}).tokens || {})[V.ctrl];
       if (tk && tk.esq) return { tipo: 'sair', txt: '✋ Sair do esconderijo' };
       let melhor = null, bd = 1.7;
-      mundo.interativos.forEach(it => { const d = Math.hypot(it.pos.x - est.px, it.pos.z - est.pz); if (d < bd) { bd = d; melhor = it; } });
+      mundo.interativos.forEach(it => {
+        if (it.tipo === 'item' && !(it.obj && it.obj.visible)) return;
+        const d = Math.hypot(it.pos.x - est.px, it.pos.z - est.pz) - (it.sala ? 1.4 : 0);
+        if (d < bd) { bd = d; melhor = it; }
+      });
+      // no corredor da saída (ou na sala da saída sem corredor), o elevador fica à mão mesmo de longe
+      if (!melhor && tk && tk.a === a) {
+        const rs = MAPA.g.retSaida(a), sd = MAPA.g.saidaDoAndar(a);
+        const naSaida = rs ? dentroR(rs, tk.x, tk.y) : (sd && MAPA.g.salaEm(a, tk.x, tk.y) === sd.p);
+        if (naSaida) melhor = mundo.interativos.find(it => it.tipo === 'elevador') || null;
+      }
       if (!melhor) return null;
+      if (melhor.tipo === 'elevador') return quem === 'mestre' ? { ...melhor, txt: '🛗 Saída do andar: levar tokens' } : V.ctrl ? { ...melhor, txt: '🛗 Usar a saída do andar (pede ao Mestre)' } : null;
+      if (melhor.tipo === 'item') return V.ctrl || quem === 'mestre' ? { ...melhor, txt: `🎒 Pegar: ${melhor.nome}` } : null;
+      if (melhor.tipo === 'doc') return { ...melhor, txt: melhor.arq === 'cifras' ? `◈ Ver a inscrição: ${melhor.tit}` : `📄 Ler: ${melhor.tit}` };
       if (melhor.tipo === 'esconderijo') return V.ctrl ? { ...melhor, txt: `✋ Esconder-se (${melhor.nome})` } : null;
       if (melhor.tipo === 'uso') return { ...melhor, txt: { loja: '🃏 Falar com o Maurício (loja)', agua: '💧 Pegar água (despensa)', comida: '🥫 Pegar comida (despensa)', arquivo: '📜 Ler o Arquivo (documentos e cifras)', terminal: '⌨ Usar o Terminal O.R.F.E.U.' }[melhor.uso] || '✋ Usar' };
       const e = mundo.estadoPorta(melhor.ci);
@@ -1478,6 +1567,7 @@
       pos.final.uniforms.uVermelho.value += ((A.protocolo ? .35 + .25 * Math.max(0, Math.sin(tt * 4)) : 0) - pos.final.uniforms.uVermelho.value) * .1;
       pos.final.uniforms.uEscuro.value += ((A.apagao ? .25 : 0) - pos.final.uniforms.uEscuro.value) * .05;
       pos.render(cenaT, cam, tt);
+      posicionarBaloes();
       // HUD algumas vezes por segundo
       tHud -= dt;
       if (tHud <= 0) {
@@ -1519,6 +1609,9 @@
       db.hidden = false; db.classList.toggle('alerta', r.n >= 4);
     } else db.hidden = true;
     $('#s3dProt').hidden = !A.protocolo;
+    // metros andados pelo seu token (mapa 2D e 3D), contados neste aparelho
+    const mt = $('#s3dMetros');
+    if (q !== 'mestre' && A.metros && (A.meu || A.aux)) { mt.style.top = db.hidden ? '' : (db.offsetTop + db.offsetHeight + 6) + 'px'; $('span', mt).textContent = `🚶 ${A.fmtM(A.metros())} m`; mt.title = 'Metros que o seu token andou (mapa 2D e 3D, contados neste aparelho)'; mt.hidden = false; } else mt.hidden = true;
     const pg = $('#s3dPersg'), estP = (A.estado || {}).persg;
     if (estP && estP.on) {
       const vez = A.vez, tkv = vez && ((A.estado || {}).tokens || {})[vez];
@@ -1529,8 +1622,76 @@
     } else pg.hidden = true;
   }
 
+  /* ---------- chat no 3D: balão em cima da cabeça, voz de cada personagem e legenda do Mestre ----------
+     O texto é o mesmo do chat Geral. C2P0 e Mostarda: o balão mostra os bips/grunhidos para quem não
+     conjurou Compreensão Paranormal; Mestre e auxiliares leem o original (mesma regra do chat). */
+  const Baloes = { vistos: null, lista: [], tLeg: 0 };
+  const idFala = m => `${m.a || ''}_${m.ts}`;
+  document.addEventListener('acf-chat-geral', e => {
+    const msgs = Object.values(e.detail || {}).filter(Boolean);
+    if (!Baloes.vistos) { Baloes.vistos = new Set(msgs.map(idFala)); return; }
+    const novas = msgs.filter(m => !Baloes.vistos.has(idFala(m))).sort((x, y) => x.ts - y.ts);
+    novas.forEach(m => Baloes.vistos.add(idFala(m)));
+    if (!V) return;
+    novas.forEach(m => { if (Date.now() - (+m.ts || 0) < 60000) { try { mostrarFala(m); } catch (er) { console.warn('3D fala:', er); } } });
+  });
+  function tirarBalao(b) { b.el.remove(); const i = Baloes.lista.indexOf(b); if (i >= 0) Baloes.lista.splice(i, 1); }
+  function mostrarFala(m) {
+    const A = ACF(), t = A.textoChat ? A.textoChat(m) : { txt: m.t };
+    let txt = String(t.txt || '').trim(); if (!txt) return;
+    if (m.a === '_mestre') { legenda('Mestre', txt); return; }
+    const o = V.tok.mapa.get(m.a), tk = ((A.estado || {}).tokens || {})[m.a];
+    if (!o || !tk) return;                                   // fora da vista: nem balão nem voz
+    if (txt.length > 150) txt = txt.slice(0, 147) + '…';
+    Baloes.lista.filter(b => b.id === m.a).forEach(tirarBalao);
+    const el = document.createElement('div');
+    el.className = 's3d-balao' + (t.cifrado ? ' cifrado ' + (t.cls || '') : '') + (m.d ? ' dado' : '');
+    el.innerHTML = `<b>${esc(A.rotulo(tk))}</b><span>${esc(txt)}</span>`;
+    V.d.appendChild(el);
+    Baloes.lista.push({ id: m.a, el, fim: performance.now() + Math.min(13000, 3800 + txt.length * 65) * (window.__acfLento || 1) });
+    // voz: C2P0 e Mostarda já falam pela regra do chat (app.js); os outros, com a voz escolhida
+    if (!t.lingua && !m.d && window.ACF_VOZES) {
+      const s = A.SER[tk.s], voz = window.ACF_VOZES.vozDe(m.a, tk, s && s.tipo);
+      const cp = V.camera.position, d = Math.hypot(o.x - cp.x, o.z - cp.z);
+      const dur = window.ACF_VOZES.falar(voz, txt, { vol: Math.max(.18, 1 - d / 24), pan: panDe(o) });
+      if (dur) { el.classList.add('falando'); setTimeout(() => el.classList.remove('falando'), dur * 1000); }
+    }
+  }
+  const vTmp = { x: 0, y: 0, z: 0 };
+  function panDe(o) { if (!V || !window.THREE) return 0; const v = new window.THREE.Vector3(o.x, 1.5, o.z).project(V.camera); return Math.max(-.8, Math.min(.8, v.x * .8)); }
+  function legenda(quem, txt) {
+    const l = $('#s3dLegenda'); if (!l) return;
+    l.innerHTML = `<b>${esc(quem)}:</b> ${esc(txt.length > 260 ? txt.slice(0, 257) + '…' : txt)}`; l.hidden = false;
+    clearTimeout(Baloes.tLeg); Baloes.tLeg = setTimeout(() => { l.hidden = true; }, Math.min(14000, 4500 + txt.length * 60));
+  }
+  // a cada quadro: o balão segue a cabeça do token na tela
+  function posicionarBaloes() {
+    if (!Baloes.lista.length || !V) return;
+    const T = window.THREE, agora = performance.now(), w = V.d.clientWidth, h = V.d.clientHeight, v = new T.Vector3();
+    [...Baloes.lista].forEach(b => {
+      const o = V.tok.mapa.get(b.id);
+      if (!o || agora > b.fim) { tirarBalao(b); return; }
+      const proprio = b.id === V.ctrl && V.cam.modo === 'dentro';
+      v.set(o.x, (o.t.alt || 1.6) + .62, o.z).project(V.camera);
+      const fora = v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.3;
+      if (fora && !proprio) { b.el.style.visibility = 'hidden'; return; }
+      b.el.style.visibility = '';
+      const x = proprio ? w / 2 : (v.x + 1) / 2 * w, y = proprio ? h * .72 : (1 - v.y) / 2 * h;
+      const meio = (b.el.offsetWidth || 120) / 2 + 8, alto = (b.el.offsetHeight || 40) + 64;   // o balão não sai da tela
+      b.el.style.transform = `translate(${Math.round(Math.max(meio, Math.min(w - meio, x)))}px, ${Math.round(Math.max(alto, y))}px) translate(-50%, -100%)`;
+      b.el.classList.toggle('sumindo', b.fim - agora < 600);
+    });
+  }
+  function limparBaloes() { [...Baloes.lista].forEach(tirarBalao); const l = $('#s3dLegenda'); if (l) l.hidden = true; }
+
   /* ---------- painel do Mestre (e dos auxiliares) ---------- */
   const LUZES = [['normal', 'Normal'], ['fraca', 'Fraca'], ['pisca', 'Piscando'], ['vermelha', 'Vermelha'], ['off', 'Apagada']];
+  // chaves dos itens do livro (item_chao) das cenas de um andar: i_<CN>_<posição na cena>
+  function chavesItens(a) {
+    const out = [];
+    for (let p = 1; p <= 25; p++) { const cn = 25 * (a - 1) + p, c = cenaDe(cn); (c && c.itens || []).forEach((it, i) => { if (it.t === 'item_chao') out.push(`i_${cn}_${i}`); }); }
+    return out;
+  }
   function desenharPainel() {
     if (!V) return;
     const A = ACF(), p = $('#s3dPainel'), q = V.quem, a = V.a, e = A.estado || {};
@@ -1546,6 +1707,8 @@
       h += '</section>';
       h += `<section><h4>Corredores do ${a}º andar</h4><div class="s3d-op">${bts('a' + a, luz('a' + a))}</div></section>`;
       h += `<section><h4>Portas</h4><p class="mini">Clique numa porta (ou no botão vermelho ao lado dela) para abrir ou fechar.</p></section>`;
+      const ks = chavesItens(a), est0 = e.estoque || {}, noChao = ks.filter(k => (est0[k] || 0) > 0).length;
+      if (ks.length) h += `<section><h4>Itens do livro no ${a}º andar</h4><p class="mini">${noChao} de ${ks.length} no chão. Quem pega leva para a ficha ativa (some para todos).</p><div class="s3d-op"><button type="button" data-itens="espalhar">Espalhar todos</button><button type="button" data-itens="recolher">Recolher</button></div></section>`;
     }
     const sel = V.sel && (e.tokens || {})[V.sel];
     if (sel) {
@@ -1554,6 +1717,7 @@
         <div class="s3d-op">${pode ? (V.ctrl === V.sel ? '<button type="button" data-tk="soltar" class="on">Soltar (câmera livre)</button>' : '<button type="button" data-tk="controlar">🎮 Controlar com WASD</button>') : ''}
         <button type="button" data-tk="seguir">🎥 Levar a câmera até ele</button>
         ${q === 'mestre' && sel.esq ? '<button type="button" data-tk="revelar">Tirar do esconderijo</button>' : ''}</div>
+        ${q === 'mestre' ? htmlVoz(V.sel) : ''}
         ${q === 'mestre' && s && s.tipo === 'filho' ? `<p class="mini">Forma da criatura no 3D</p><select data-forma>${NS().FORMAS.map(f => `<option value="${f}" ${((e.formas || {})[sel.s] || 'esguio') === f ? 'selected' : ''}>${esc(NS().NOMES_FORMA[f])}</option>`).join('')}</select>` : ''}</section>`;
     } else h += '<section><h4>Tokens</h4><p class="mini">Toque num token para escolher: dá para controlá-lo com WASD (com as regras de distância) ou levar a câmera até ele.</p></section>';
     if (V.ctrl && V.ctrl !== V.sel && q !== 'jog') h += `<section><div class="s3d-op"><button type="button" data-tk="soltar">Soltar ${esc(A.rotulo((e.tokens || {})[V.ctrl] || {}))}</button></div></section>`;
@@ -1570,14 +1734,42 @@
       desenharPainel();
     });
     const sf = p.querySelector('[data-forma]'); if (sf) sf.onchange = () => { A.definir(['formas', sel.s], sf.value); };
+    ligarVoz(p, desenharPainel);
+    p.querySelectorAll('[data-itens]').forEach(b => b.onclick = () => {
+      const ks = chavesItens(a), novo = { ...(e.estoque || {}) };
+      if (b.dataset.itens === 'espalhar') ks.forEach(k => { if (!(novo[k] > 0)) novo[k] = 1; }); else ks.forEach(k => { delete novo[k]; });
+      A.definir(['estoque'], Object.keys(novo).length ? novo : null); setTimeout(desenharPainel, 120);
+    });
+  }
+  // voz do token no chat do 3D: o jogador escolhe a da cobaia, o auxiliar a do robô; o Mestre escolhe no painel do token
+  function htmlVoz(idForcado) {
+    const A = ACF(), VZ = window.ACF_VOZES; if (!VZ) return '';
+    const id = idForcado || (A.mestre ? null : A.meu || A.aux), tk = id && ((A.estado || {}).tokens || {})[id];
+    if (!tk) return '';
+    if (id === 'c2p0' || id === 'mostarda') return `<b>Voz no chat</b><p class="mini">${id === 'c2p0' ? 'A C2P0 fala em bips e zips' : 'O Mostarda fala em grunhidos, estalos e chiados'}: só quem conjura Compreensão Paranormal entende (Mestre e auxiliares sempre leem).</p>`;
+    const s = A.SER[tk.s], atual = VZ.vozDe(id, tk, s && s.tipo);
+    return `<b>Voz no chat${idForcado ? ' · ' + esc(A.rotulo(tk)) : ''}</b><div class="s3d-voz" data-voz-id="${esc(id)}"><select aria-label="Voz">${Object.entries(VZ.VOZES).map(([k, v]) => `<option value="${k}" ${k === atual ? 'selected' : ''}>${esc(v.n)}${VZ.PADRAO[id] === k ? ' (padrão)' : ''}</option>`).join('')}</select><button type="button" data-voz="ouvir" title="Ouvir">▶</button></div>`;
+  }
+  function ligarVoz(raiz, depois) {
+    const A = ACF(), VZ = window.ACF_VOZES, c = raiz.querySelector('.s3d-voz'); if (!c || !VZ) return;
+    const id = c.dataset.vozId, sel = c.querySelector('select');
+    c.querySelector('[data-voz="ouvir"]').onclick = () => VZ.testar(sel.value);
+    sel.onchange = () => { const tk = ((A.estado || {}).tokens || {})[id]; if (!tk) return; A.definir(['tokens', id], { ...tk, vz: sel.value }); VZ.testar(sel.value); setTimeout(depois, 120); };
   }
   function desenharOpcoes() {
     const o = $('#s3dOpcoes'), alta = lsG('acf-s3d-qualidade', V && V.celular ? 'baixa' : 'alta') === 'alta';
     o.innerHTML = `<b>Opções do 3D (neste aparelho)</b>
       <label class="chave"><input type="radio" name="s3dQ" value="alta" ${alta ? 'checked' : ''}><span>Qualidade alta (brilho, sombras da lanterna)</span></label>
       <label class="chave"><input type="radio" name="s3dQ" value="baixa" ${!alta ? 'checked' : ''}><span>Qualidade leve (celular e computador fraco)</span></label>
+      ${htmlVoz()}
+      <b>Dados</b>
+      <label class="chave"><input type="checkbox" data-op="d3" ${lsG('acf-dados3d', true) ? 'checked' : ''}><span>Dados 3D rolando na tela quando eu rolar</span></label>
+      <label class="chave"><input type="checkbox" data-op="d3m" ${lsG('acf-dados3d-2d', false) ? 'checked' : ''}><span>Também no mapa 2D</span></label>
       <p class="mini">Modelos próprios: coloque arquivos .glb na pasta modelos/ e liste em modelos/modelos.json (veja o README).</p>`;
     o.querySelectorAll('input[name="s3dQ"]').forEach(i => i.onchange = () => { lsS('acf-s3d-qualidade', i.value); if (V) abrir(25 * (V.a - 1) + 1, { a: V.a, manter: true, andar: V.cam.largo }); });
+    const d3 = o.querySelector('[data-op="d3"]'), d3m = o.querySelector('[data-op="d3m"]');
+    d3.onchange = () => lsS('acf-dados3d', d3.checked); d3m.onchange = () => lsS('acf-dados3d-2d', d3m.checked);
+    ligarVoz(o, () => desenharOpcoes());
   }
 
   /* ---------- "E" / botão na tela: interagir com o que está perto ---------- */
@@ -1596,6 +1788,70 @@
     else if (pr.tipo === 'esconderijo') V.usarEsconderijo(pr);
     else if (pr.tipo === 'uso') usar(pr);
     else if (pr.tipo === 'porta') V.usarPorta(pr.ci);
+    else if (pr.tipo === 'elevador') usarElevador(pr);
+    else if (pr.tipo === 'item') { const r = ACF().pegarItemChao(pr.k, pr.nome); toast(r || `🎒 ${pr.nome} foi para a sua ficha.`); }
+    else if (pr.tipo === 'doc') { if (document.pointerLockElement) document.exitPointerLock(); const AR = window.ACF_ARQUIVO; if (AR && AR.abrirNaSala) AR.abrirNaSala(pr.arq, pr.id); }
+  }
+
+  /* ---------- saída do andar (elevador, poço, eclusa, fenda) ----------
+     Mestre: escolhe quem vai e para qual andar. Jogador e auxiliar: pedem; o Mestre aprova na fila de Pedidos. */
+  function usarElevador(pr) {
+    if (!V) return;
+    const A = ACF(), a = V.a, q = V.quem;
+    if (document.pointerLockElement) document.exitPointerLock();
+    let cx = $('#s3dElev');
+    if (!cx) { cx = document.createElement('div'); cx.id = 's3dElev'; cx.className = 's3d-elev'; V.d.appendChild(cx); }
+    const andares = [1, 2, 3, 4, 5].filter(n => n !== a);
+    const padrao = a < 5 ? a + 1 : a - 1;
+    const opAndar = andares.map(n => `<option value="${n}" ${n === padrao ? 'selected' : ''}>${n}º andar${n < a ? ' (subir)' : ''}</option>`).join('');
+    if (q === 'mestre') {
+      const toks = (A.estado || {}).tokens || {};
+      const perto = new Set(A.tokensNaSaida(a));
+      V.tok.mapa.forEach((o, id) => { if (Math.hypot(o.x - pr.pos.x, o.z - pr.pos.z) < 6) perto.add(id); });
+      const ids = [...perto].filter(id => toks[id] && toks[id].a === a);
+      cx.innerHTML = `<b>🛗 Saída do ${a}º andar</b><p class="mini">Quem vai? (marcados: quem está na saída ou perto dela)</p>
+        <div class="s3d-elev-lista">${ids.map(id => `<label class="chave"><input type="checkbox" value="${esc(id)}" ${A.tokensNaSaida(a).includes(id) || id === V.ctrl ? 'checked' : ''}><span>${esc(A.rotulo(toks[id]))}</span></label>`).join('') || '<p class="mini">Ninguém perto da saída.</p>'}</div>
+        <label class="s3d-elev-dest">Para o <select>${opAndar}</select></label>
+        <p class="mini">Descendo, chegam à 1ª sala do andar; subindo, à sala da saída do andar de cima.</p>
+        <div class="s3d-op"><button type="button" data-el="ir" class="on">Levar</button><button type="button" data-el="x">Cancelar</button></div>`;
+    } else {
+      cx.innerHTML = `<b>🛗 Saída do andar</b><p class="mini">Só o Mestre muda o andar de um token. O pedido vai para ele, que decide se a passagem abre (e o que ela cobra).</p>
+        <label class="s3d-elev-dest">Ir para o <select>${opAndar}</select></label>
+        <div class="s3d-op"><button type="button" data-el="pedir" class="on">Pedir ao Mestre</button><button type="button" data-el="x">Cancelar</button></div>`;
+    }
+    cx.hidden = false;
+    cx.onclick = e => {
+      const b = e.target.closest('[data-el]'); if (!b) return;
+      const dest = +$('select', cx).value;
+      if (b.dataset.el === 'x') { cx.hidden = true; return; }
+      if (b.dataset.el === 'pedir') { const r = A.pedirElevador(dest); toast(r || 'Pedido enviado ao Mestre. Espere aqui.'); cx.hidden = true; return; }
+      if (b.dataset.el === 'ir') {
+        const ids = $$('input[type="checkbox"]:checked', cx).map(i => i.value);
+        const r = A.levarElevador(ids, dest); cx.hidden = true;
+        if (r) { toast(r); return; }
+        toast(`Levados para o ${dest}º andar.`);
+        const chegada = dest < a ? (((A.geo.saidaDoAndar(dest)) || {}).p || 25) : 1;
+        setTimeout(() => abrir(25 * (dest - 1) + chegada, { a: dest, manter: true }), 250);
+      }
+    };
+  }
+
+  /* ---------- abrir o 3D direto (botão 3D da coluna da câmera, sem clicar numa sala) ---------- */
+  function abrirDireto() {
+    const A = ACF(); if (!A) return;
+    if (V) { fechar(); return; }
+    const q = quemSou(), id = q === 'jog' ? A.meu : q === 'aux' ? A.aux : null;
+    const tk = id && ((A.estado || {}).tokens || {})[id];
+    if (q === 'jog') {
+      if (!A.meu) { A.aviso('Escolha a sua cobaia para entrar no 3D.'); return; }
+      if (!tk) { A.aviso('O token da sua cobaia ainda não está no mapa.'); return; }
+      if (A.podeVer && !A.podeVer(tk.a)) { if (A.irAndar) A.irAndar(tk.a); A.aviso('Digite a senha do andar para entrar no 3D.'); return; }
+    }
+    prepararMapa();
+    const g = MAPA.g, perto = (a, x, y) => { let best = 13, bd = 1e9; for (let p = 1; p <= 25; p++) { const r = g.retSala(p), d = (r.x + r.w / 2 - x) ** 2 + (r.y + r.h / 2 - y) ** 2; if (d < bd) { bd = d; best = p; } } return best; };
+    if (tk) { const cn = A.salaDe(id) || 25 * (tk.a - 1) + perto(tk.a, tk.x, tk.y); abrir(cn, { a: tk.a, livre: true }); return; }
+    const a = A.andarAtual || 1, sel = A.salaSel && Math.ceil(A.salaSel / 25) === a ? A.salaSel : null;
+    abrir(sel || 25 * (a - 1) + 25, { a, livre: true, andar: !sel });
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -1620,7 +1876,9 @@
     }
     if (trocando) return;
     if (document.pointerLockElement) document.exitPointerLock();
-    const gv = $('#s3dGaveta'); if (gv) gv.hidden = true; fecharMenu(); devolverTudo();
+    const gv = $('#s3dGaveta'); if (gv) gv.hidden = true; fecharMenu(); devolverTudo(); limparBaloes();
+    const el = $('#s3dElev'); if (el) el.hidden = true;
+    if (window.ACF_DADOS3D) window.ACF_DADOS3D.encerrar();
     Som.atualizar([]); Som.parar();
     const d = $('#s3d'); if (d) { d.hidden = true; ['#s3dJoy', '#s3dPainel', '#s3dOpcoes', '#s3dCodigo', '#s3dFresta', '#s3dPrompt'].forEach(s => { const x = $(s, d); if (x) x.hidden = true; }); }
     document.body.classList.remove('s3d-aberta');
@@ -1646,7 +1904,11 @@
       if (V.quem === 'jog') {
         const tk = (e.tokens || {})[A.meu];
         if (!tk) { fechar(); A.aviso('O token da sua cobaia saiu do mapa: o 3D foi fechado.'); return; }
-        if (tk.a !== a) { abrir(A.salaDe(A.meu) || 25 * (tk.a - 1) + 13, { a: tk.a, manter: true }); return; }
+        if (tk.a !== a) {
+          // andar novo sem a senha digitada neste aparelho: fecha o 3D e mostra a tela da senha
+          if (A.podeVer && !A.podeVer(tk.a)) { fechar(); if (A.irAndar) A.irAndar(tk.a); A.aviso(`Sua cobaia chegou ao ${tk.a}º andar. Digite a senha do andar para continuar no 3D.`); return; }
+          abrir(A.salaDe(A.meu) || 25 * (tk.a - 1) + 13, { a: tk.a, manter: true }); return;
+        }
         if (!V.ctrl) V.ctrl = A.meu;
         if (!tk.esq && V.escondido) V.escondido = null;
       }
@@ -1656,6 +1918,8 @@
       const va = JSON.stringify(e.var3d || {});
       if (va !== varAntes) { const antes = varAntes; varAntes = va; if (antes) Object.keys({ ...JSON.parse(antes || '{}'), ...(e.var3d || {}) }).forEach(k => { const p = +k.slice(1) - 25 * (a - 1); if (p >= 1 && p <= 25) V.mundo.recarregar(p); }); }
       V.mundo.atualizarPortas();
+      V.mundo.atualizarItens();
+      V.mundo.atualizarDocs();
       V.tok.sincronizar();
     }, 120);
   }
@@ -1673,13 +1937,14 @@
     V.teclas = salva; return [+V.cam.px.toFixed(2), +V.cam.pz.toFixed(2)];
   }
   window.Sala3D = {
-    abrir, fechar, cenaDe, podeAbrir, publicar: agendarPublicar, andarTeste, interagir,
+    abrir, fechar, cenaDe, podeAbrir, publicar: agendarPublicar, andarTeste, interagir, abrirDireto, carregarThree,
     virar(yaw) { if (V) V.cam.yaw = yaw; }, modo: definirModo,
     get aberta() { return !!V; },
     get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe() } : null; },
     _livre: (x, z) => !!(V && V.mundo.livre3D(x, z)),
     _centro: p => V && V.mundo.centro(p),
     _cam: o => V && Object.assign(V.cam, o),
+    _tok: id => V && V.tok.posDe(id),
     _v: () => V && { raf: V.raf, rodando: V.rodando, n: V.mundo.carregadas.size },
     _mapa: { planta3D: (a, x, y) => (prepararMapa(), planta3D(a, x, y)), plantaDe3D: (a, x, z) => (prepararMapa(), plantaDe3D(a, x, z)) },
     Som
