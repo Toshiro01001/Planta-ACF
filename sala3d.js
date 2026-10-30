@@ -20,6 +20,8 @@
   const URL3 = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   const ACF = () => window.ACF;
   const NS = () => window.ACF3D;
+  // 'jogo' (terceira pessoa) e 'dentro' (primeira pessoa): você está DENTRO do mundo (teto, névoa, paredes inteiras)
+  const imersivo = m => m === 'dentro' || m === 'jogo';
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const pad2 = n => String(n).padStart(2, '0');
@@ -209,7 +211,7 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'faiscas', 'livro_aberto', 'escorpiao']);
+  const SEM_COLISAO = new Set(['tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
  const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
@@ -514,7 +516,7 @@
       g.children.forEach(o => { if (o.userData.esc) { const w = new T.Vector3(); o.getWorldPosition(w); esconde.push({ tipo: 'esconderijo', cn: s.cn, p, i: o.userData.i, nome: o.userData.esc, pos: w, obj: o }); } });
       esconde.forEach(e => interativos.push(e));
       // coisas de usar: o Maurício (loja), o bebedouro e a geladeira (despensa)
-      g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w }); } });
+      g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w, obj: o }); } });
       carregadas.set(p, { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver });
     }
     function descarregar(p) {
@@ -538,9 +540,9 @@
       if (ctx.quem === 'jog') { const pj = ctx.salaJogador(); if (pj) quer.add(pj); }
       else {
         const p0 = salaNoPonto3D(a, x, z) || centroMaisPerto(x, z); quer.add(p0);
-        const largo = modo !== 'dentro' && ctx.zoomLargo();
+        const largo = !imersivo(modo) && ctx.zoomLargo();
         if (largo) { Object.values(S).map(s => [s.p, (s.cx - x) ** 2 + (s.cz - z) ** 2]).sort((u, v) => u[1] - v[1]).slice(0, celular ? 3 : 7).forEach(([p]) => quer.add(p)); }
-        else vizinhas(p0).forEach(([p, ci]) => { const P = portas.find(q => q && q.c.ci === ci); if (P && P.v === 'a' || (modo !== 'dentro' && !celular)) quer.add(p); });
+        else vizinhas(p0).forEach(([p, ci]) => { const P = portas.find(q => q && q.c.ci === ci); if (P && P.v === 'a' || (!imersivo(modo) && !celular)) quer.add(p); });
       }
       [...quer].forEach(p => { if (!salaVisivel(p)) quer.delete(p); });
       [...carregadas.keys()].forEach(p => { if (!quer.has(p)) descarregar(p); });
@@ -604,9 +606,9 @@
       ctx.amb.intensity += (ai - ctx.amb.intensity) * k;
       ctx.amb.color.lerp(cTmp.set(at.c), k); ctx.amb.groundColor.lerp(cTmp.set(at.chao), k);
       ctx.cena.fog.color.lerp(cTmp.set(at.nc), k);
-      const nd = at.nd * (modo === 'dentro' ? 1 : .12);
+      const nd = at.nd * (imersivo(modo) ? 1 : .12);
       ctx.cena.fog.density += (nd - ctx.cena.fog.density) * k;
-      ctx.cena.background.lerp(cTmp.set(modo === 'dentro' ? at.fundo : '#050403'), k);
+      ctx.cena.background.lerp(cTmp.set(imersivo(modo) ? at.fundo : '#050403'), k);
       ctx.ren.toneMappingExposure += (at.exp - ctx.ren.toneMappingExposure) * k;
     }
 
@@ -620,9 +622,16 @@
       return true;
     }
 
+    // dentro de uma sala ou corredor (ignora os móveis): a câmera de jogo não sai pelas paredes
+    function area3D(x, z, mg = .12) {
+      for (const s of Object.values(S)) if (x >= s.x0 + mg && x <= s.x1 - mg && z >= s.z0 + mg && z <= s.z1 - mg) return true;
+      for (const r of zonasCorr) if (x >= r[0] - RAIO + mg && x <= r[1] + RAIO - mg && z >= r[2] - RAIO + mg && z <= r[3] + RAIO - mg) return true;
+      return false;
+    }
+
     // casa de bonecas: na vista de fora, as paredes viradas para a câmera somem
     function casaDeBonecas(cx, cz, modo) {
-      const fora = modo !== 'dentro';
+      const fora = !imersivo(modo);
       Object.values(S).forEach(s => {
         const ps = s.paredes, dx = cx - s.cx, dz = cz - s.cz;
         if (!fora) { ps.n.visible = ps.s.visible = ps.w.visible = ps.e.visible = true; return; }
@@ -632,7 +641,7 @@
 
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos,
-      livre3D, atualizarPortas, recarregar, estadoPorta,
+      livre3D, area3D, atualizarPortas, recarregar, estadoPorta,
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
         tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
@@ -641,7 +650,7 @@
         for (let i = 0; i < ctx.animMundo.length; i++) ctx.animMundo[i](dt, t);
         distribuirLuzes(cam.x, cam.z, t);
         atmosfera(x, z, modo, dt);
-        tetos.visible = modo === 'dentro';
+        tetos.visible = imersivo(modo);
         casaDeBonecas(cam.x, cam.z, modo);
       },
       sons(x, z) {
@@ -726,7 +735,7 @@
     }
 
     let selecionado = null;
-    function atualizar(dt, t, eu, euPos, modo) {
+    function atualizar(dt, t, eu, euPos, modo, camPos) {
       mapa.forEach((o, id) => {
         let tx = o.ax, tz = o.az;
         if (id === eu && euPos) { tx = euPos[0]; tz = euPos[1]; }
@@ -740,8 +749,11 @@
         o.t.g.rotation.y += dr * Math.min(1, dt * 10);
         o.t.anim(dt, t, o.andando > 0);
         // o próprio token não aparece na vista de dentro (você é a câmera)
-        o.t.g.visible = !(id === eu && modo === 'dentro');
-        o.nome.visible = modo !== 'dentro' || id !== eu;
+        // no modo Jogo, se a parede empurrou a câmera para colada no token, ele some para não tampar a tela
+        o.t.g.visible = !(id === eu && (modo === 'dentro' || (modo === 'jogo' && camPos && Math.hypot(camPos.x - o.x, camPos.z - o.z) < .75)));
+        // nomes: o seu some quando você está dentro do mundo; os dos outros somem bem perto da câmera (não tampam a tela)
+        const perto = camPos && imersivo(modo) && Math.hypot(camPos.x - o.x, camPos.z - o.z) < 2.6;
+        o.nome.visible = !(id === eu && imersivo(modo)) && !perto;
         if (o.t.aro) o.t.aro.material.emissiveIntensity = id === selecionado ? 1.6 + Math.sin(t * 6) * .8 : .9;
       });
     }
@@ -915,7 +927,9 @@
       <div class="s3d-fresta" id="s3dFresta" hidden></div>
       <div class="s3d-topo"><div class="s3d-tit"><b id="s3dCN"></b><span id="s3dNome"></span></div>
         <div class="s3d-topo-bts">
-          <button type="button" class="s3d-x s3d-mini" data-s3dv="painel" id="s3dBtPainel" title="Controles do Mestre" aria-label="Controles do Mestre" hidden>🎛</button>
+          <button type="button" class="s3d-x s3d-mini s3d-bt-menu" data-s3dv="menu" title="Menu do jogo (M)" aria-label="Menu do jogo">☰</button>
+          <button type="button" class="s3d-x s3d-mini" data-s3dv="gaveta" title="Painel (Tab)" aria-label="Painel">🗂</button>
+          <button type="button" class="s3d-x s3d-mini" data-s3dv="painel" id="s3dBtPainel" title="Controles do 3D (luzes, portas, tokens)" aria-label="Controles do 3D" hidden>🎛</button>
           <button type="button" class="s3d-x s3d-mini" data-s3dv="opcoes" title="Opções" aria-label="Opções">⚙</button>
           <button type="button" class="s3d-x" data-s3dv="fechar" aria-label="Fechar">✕</button>
         </div></div>
@@ -929,13 +943,19 @@
       <div class="s3d-joy" id="s3dJoy" hidden aria-hidden="true"><span></span></div>
       <aside class="s3d-painel" id="s3dPainel" hidden></aside>
       <div class="s3d-opcoes" id="s3dOpcoes" hidden></div>
+      <div class="s3d-mira" id="s3dMira" aria-hidden="true"></div>
+      <aside class="s3d-gaveta" id="s3dGaveta" hidden aria-label="Painel">
+        <header><b id="s3dGavTit">Painel</b><button type="button" class="s3d-x" data-s3dv="gaveta" aria-label="Fechar painel">✕</button></header>
+        <div class="s3d-gav-corpo" id="s3dGavCorpo"><div id="s3dGavCartao"></div><div id="s3dGavPainel"></div></div>
+      </aside>
+      <div class="s3d-menu" id="s3dMenu" hidden><div class="s3d-menu-caixa"><header><b>Menu</b><button type="button" class="s3d-x" data-s3dv="menu" aria-label="Fechar menu">✕</button></header><div class="s3d-menu-grade" id="s3dMenuGrade"></div></div></div>
       <div class="s3d-barra">
+        <button type="button" data-s3dv="jogo" title="Câmera de jogo, atrás do token (C troca a câmera)"><i>🎮</i><span>Jogo</span></button>
+        <button type="button" data-s3dv="dentro" title="Ver pelos olhos do token (WASD ou setas; Shift corre)"><i>👁</i><span>Olhos</span></button>
         <button type="button" data-s3dv="fora" class="on" title="Ver de fora, como uma maquete"><i>🏠</i><span>Fora</span></button>
-        <button type="button" data-s3dv="dentro" title="Ver pelos olhos do token (WASD ou setas; Shift corre)"><i>👁</i><span>Dentro</span></button>
         <button type="button" data-s3dv="cima" title="Vista de cima"><i>⬇</i><span>Cima</span></button>
-        <button type="button" data-s3dv="lanterna" title="Lanterna (L)"><i>🔦</i><span>Lanterna</span></button>
+        <button type="button" data-s3dv="lanterna" title="Lanterna (L)"><i>🔦</i><span>Luz</span></button>
         <button type="button" data-s3dv="zoom" title="Alternar entre a sala e o andar inteiro"><i>🏢</i><span>Andar</span></button>
-        <button type="button" data-s3dv="som" title="Som ambiente"><i>🔊</i><span>Som</span></button>
       </div>`;
     document.body.appendChild(d);
     d.addEventListener('click', e => {
@@ -944,6 +964,8 @@
       if (k === 'fechar') fechar();
       else if (k === 'lanterna') alternarLanterna();
       else if (k === 'som') { Som.preparar(); Som.alternar(); pintarBarra(); }
+      else if (k === 'menu') alternarMenu();
+      else if (k === 'gaveta') alternarGaveta();
       else if (k === 'zoom') alternarZoom();
       else if (k === 'painel') { const p = $('#s3dPainel'); p.hidden = !p.hidden; $('#s3dOpcoes').hidden = true; if (!p.hidden) desenharPainel(); }
       else if (k === 'opcoes') { const o = $('#s3dOpcoes'); o.hidden = !o.hidden; $('#s3dPainel').hidden = true; if (!o.hidden) desenharOpcoes(); }
@@ -957,26 +979,44 @@
   }
   function pintarBarra() {
     if (!V) return;
-    const b = $('#s3d [data-s3dv="som"]'); b.classList.toggle('on', Som.ligado); $('i', b).textContent = Som.ligado ? '🔊' : '🔇';
+    const b = $('#s3d [data-s3dv="som"]'); if (b) { b.classList.toggle('on', Som.ligado); $('i', b).textContent = Som.ligado ? '🔊' : '🔇'; }
     $('#s3d [data-s3dv="lanterna"]').classList.toggle('on', !!V.lanterna);
     const z = $('#s3d [data-s3dv="zoom"]'); $('i', z).textContent = V.cam.largo ? '🧊' : '🏢'; $('span', z).textContent = V.cam.largo ? 'Sala' : 'Andar';
   }
-  let tToast = null;
+  let tToast = null, V_destravou = 0;
+  document.addEventListener('pointerlockchange', () => { const d = $('#s3d'); const trav = !!(document.pointerLockElement && d && d.contains(document.pointerLockElement)); if (d) d.classList.toggle('s3d-travado', trav); if (!trav) V_destravou = performance.now(); });
   function toast(txt) { const t = $('#s3dToast'); if (!t) return; t.textContent = txt; t.hidden = false; clearTimeout(tToast); tToast = setTimeout(() => { t.hidden = true; }, 2600); }
 
   // teclado: com o 3D aberto, NENHUMA tecla chega ao mapa (ex.: "A" é o apagão do Mestre, "F" abre as fichas)
   const TECLAS = { w: 'f', arrowup: 'f', s: 't', arrowdown: 't', a: 'e', arrowleft: 'e', d: 'd', arrowright: 'd' };
   window.addEventListener('keydown', e => {
     const d = $('#s3d'); if (!V || !d || d.hidden) return;
-    if (document.querySelector('dialog[open]')) return;   // a loja (ou outra janela) está aberta por cima do 3D
-    if (e.target && e.target.matches && e.target.matches('input, textarea, select')) { if (e.key === 'Escape') e.target.blur(); return; }
+    // janela do site aberta por cima do 3D (loja, fichas, arquivo, chat…): o teclado é dela
+    if (sobreposta()) return;
+    if (e.target && e.target.matches && e.target.matches('input, textarea, select, [contenteditable="true"]')) { if (e.key === 'Escape') e.target.blur(); return; }
     const k = (e.key || '').toLowerCase();
     e.stopImmediatePropagation();
-    if (k === 'escape') { e.preventDefault(); if (!$('#s3dPainel').hidden || !$('#s3dOpcoes').hidden) { $('#s3dPainel').hidden = true; $('#s3dOpcoes').hidden = true; } else fechar(); return; }
+    if (k === 'escape') {
+      e.preventDefault();
+      if (document.pointerLockElement || performance.now() - V_destravou < 400) return;   // o Esc só soltou o mouse
+      if (!$('#s3dMenu').hidden) { fecharMenu(); return; }
+      if (!$('#s3dGaveta').hidden) { alternarGaveta(false); return; }
+      if (!$('#s3dPainel').hidden || !$('#s3dOpcoes').hidden) { $('#s3dPainel').hidden = true; $('#s3dOpcoes').hidden = true; } else fechar();
+      return;
+    }
+    if (k === 'tab') { e.preventDefault(); alternarGaveta(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 'shift') V.correr = true;
-    if (k === 'e' && !e.repeat) { e.preventDefault(); interagir(); return; }
-    if (k === 'l' && !e.repeat) { alternarLanterna(); return; }
+    if (e.repeat && !TECLAS[k]) return;
+    if (k === 'e') { e.preventDefault(); interagir(); return; }
+    if (k === 'l') { alternarLanterna(); return; }
+    if (k === 'm') { alternarMenu(); return; }
+    if (k === 'c') { const ord = V.ctrl ? ['jogo', 'dentro', 'fora'] : ['dentro', 'fora', 'cima']; const i = ord.indexOf(V.cam.modo); definirModo(ord[(i + 1) % ord.length]); return; }
+    if (k === 'enter') { e.preventDefault(); if (document.pointerLockElement) document.exitPointerLock(); clicar('btnChat'); return; }
+    if (k === 'f') { if (document.pointerLockElement) document.exitPointerLock(); clicar('btnFichas'); return; }
+    if (k === 'b') { if (document.pointerLockElement) document.exitPointerLock(); clicar('btnQuadro'); return; }
+    if (k === 'r') { if (document.pointerLockElement) document.exitPointerLock(); clicar('btnDados'); return; }
+    if (k === 'i') { if (document.pointerLockElement) document.exitPointerLock(); if (window.ACF_ARQUIVO) window.ACF_ARQUIVO.abrir(); return; }
     if (TECLAS[k]) { e.preventDefault(); V.teclas.add(TECLAS[k]); V.autoAlvo = null; }
   }, true);
   window.addEventListener('keyup', e => {
@@ -1005,20 +1045,28 @@
   function definirModo(k) {
     if (!V) return;
     const c = V.cam;
-    $$('.s3d-barra [data-s3dv]').forEach(b => { if (['fora', 'dentro', 'cima'].includes(b.dataset.s3dv)) b.classList.toggle('on', b.dataset.s3dv === k); });
+    $$('.s3d-barra [data-s3dv]').forEach(b => { if (['jogo', 'fora', 'dentro', 'cima'].includes(b.dataset.s3dv)) b.classList.toggle('on', b.dataset.s3dv === k); });
     const asp = V.camera.aspect || 1, recuo = asp < 1 ? Math.pow(1 / asp, .9) : 1;
     c.modo = k;
     if (k === 'dentro') { c.fov = asp < 1 ? 82 : 70; if (V.ctrl == null && V.quem !== 'mestre' && V.quem !== 'aux') toast('Sem token neste andar: você só olha em volta.'); }
+    else if (k === 'jogo') {
+      if (V.ctrl == null) { toast(V.quem === 'jog' ? 'Sem token neste andar.' : 'Controle um token (🎛 ou toque nele) para jogar em terceira pessoa.'); return definirModo(V.quem === 'jog' ? 'fora' : 'dentro'); }
+      c.fovJ = asp < 1 ? 80 : 64; if (c.pitch > .3 || c.pitch < -.8) c.pitch = -.14; c.dj = c.dj || (asp < 1 ? 3.6 : 3.3); c.djAt = null;
+      if (c.modoAnt !== 'jogo' && c.modoAnt !== 'dentro') c.yaw = c.theta || 0;
+    }
     else if (k === 'cima') { c.theta = .0001; c.phi = .05; c.r = (c.largo ? 62 : 14) * recuo; }
     else { c.theta = c.theta || .62; c.phi = c.largo ? .62 : .85; c.r = (c.largo ? 58 : 13) * recuo; }
     const j = $('#s3dJoy'); if (j) j.hidden = !ehToque();
-    V.d.classList.toggle('s3d-andando', k === 'dentro');
+    V.d.classList.toggle('s3d-andando', imersivo(k));
+    V.d.classList.toggle('s3d-jogo', k === 'jogo');
+    c.modoAnt = k;
+    if (!imersivo(k) && document.pointerLockElement) document.exitPointerLock();
     dica();
   }
   function alternarZoom() {
     if (!V) return; const c = V.cam; c.largo = !c.largo;
     if (c.largo) { c.ax = 0; c.az = 0; } else { const q = V.ctrl ? V.tok.posDe(V.ctrl) : null; const [x, z] = q || [c.px, c.pz]; c.ax = x; c.az = z; }
-    if (c.modo === 'dentro') c.modo = 'fora';
+    if (imersivo(c.modo) && c.largo) c.modo = 'fora';
     definirModo(c.modo); pintarBarra();
   }
   function alternarLanterna() { if (!V) return; V.lanterna = !V.lanterna; pintarBarra(); }
@@ -1026,9 +1074,95 @@
     if (!V) return;
     const tq = ehToque(), q = V.quem, ctrl = V.ctrl != null;
     const andar = ctrl ? (tq ? 'Círculo no canto: anda' : 'WASD/setas: anda · Shift corre') : (q === 'jog' ? '' : (tq ? 'Círculo: câmera livre' : 'WASD: câmera livre'));
-    const olhar = V.cam.modo === 'dentro' ? 'arraste para olhar' : (tq ? 'arraste gira · pinça aproxima' : 'arraste gira · roda aproxima');
-    const toque = V.cam.modo !== 'dentro' ? (ctrl ? (tq ? ' · toque no chão para ir' : ' · clique no chão para ir') : (q === 'jog' ? '' : ' · clique numa sala para ir')) : '';
-    $('#s3dDica').textContent = [andar, olhar].filter(Boolean).join(' · ') + toque + (tq ? '' : ' · E interage · L lanterna');
+    const olhar = imersivo(V.cam.modo) ? (tq ? 'arraste para olhar' + (V.cam.modo === 'jogo' ? ' · pinça aproxima' : '') : 'clique para travar o mouse e olhar' + (V.cam.modo === 'jogo' ? ' · roda aproxima' : '')) : (tq ? 'arraste gira · pinça aproxima' : 'arraste gira · roda aproxima');
+    const toque = !imersivo(V.cam.modo) ? (ctrl ? (tq ? ' · toque no chão para ir' : ' · clique no chão para ir') : (q === 'jog' ? '' : ' · clique numa sala para ir')) : '';
+    $('#s3dDica').textContent = [andar, olhar].filter(Boolean).join(' · ') + toque + (tq ? '' : ' · E interage · Tab painel · M menu · C câmera');
+  }
+
+  /* ================= o jogo dentro do 3D: menu, painel do site e janelas por cima =================
+     O 3D não copia as ferramentas do site: ele LEVA as peças de verdade para dentro da tela 3D (o painel
+     lateral inteiro, o cartão da sala, os dados, os avisos) e devolve quando fecha. Assim todas as mecânicas
+     de jogador, auxiliar e Mestre funcionam iguais às do mapa 2.5D, com as mesmas regras e o mesmo Firebase. */
+  const levados = [];
+  function levar(el, destino) {
+    if (!el || !destino || el.parentNode === destino) return;
+    if (!levados.some(l => l[0] === el)) levados.push([el, el.parentNode, el.nextSibling]);
+    destino.appendChild(el);
+  }
+  function devolver(el) {
+    const i = levados.findIndex(l => l[0] === el); if (i < 0) return;
+    const [, pai, prox] = levados[i]; levados.splice(i, 1);
+    if (prox && prox.parentNode === pai) pai.insertBefore(el, prox); else pai.appendChild(el);
+  }
+  function devolverTudo() { [...levados].reverse().forEach(l => devolver(l[0])); }
+  const clicar = id => { const b = document.getElementById(id); if (b) { b.click(); return true; } return false; };
+  const disponivel = id => { const b = document.getElementById(id); return !!b && !b.hidden && !b.closest('[hidden]'); };
+  // janelas do site abertas por cima do 3D: o teclado do jogo deixa elas em paz
+  const SOBRE = ['dialog[open]', '.fx-tela', '.qd-tela', '.arquivo-tela', '.mesa-janela', '.escudo', '.relatorio-tela', '.nex-tela', '.parede-tela',
+    '.visao-tela', '.rr-modal', '.bz-modal', '.dil-tela', '.expo-tela', '.dest-tela', '.hall-tela', '.bau-tela', '.ab-tela', '.fx-modal', '.cf-palpite', '.cor-pop', '#painelChat', '#perfil'];
+  const visivelEl = el => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  function sobreposta() { for (const sel of SOBRE) for (const el of document.querySelectorAll(sel)) if (visivelEl(el) && !el.closest('#s3d')) return true; return false; }
+  function salaAtualCN() {
+    if (!V) return null; const c = V.cam;
+    const p = salaNoPonto3D(V.a, imersivo(c.modo) || V.ctrl ? c.px : c.ax, imersivo(c.modo) || V.ctrl ? c.pz : c.az);
+    return p ? 25 * (V.a - 1) + p : null;
+  }
+  function alternarGaveta(forca) {
+    if (!V) return;
+    const g = $('#s3dGaveta'), abrirG = forca ?? g.hidden;
+    if (abrirG) {
+      fecharMenu();
+      if (document.pointerLockElement) document.exitPointerLock();
+      const A = ACF(), cn = salaAtualCN();
+      $('#s3dGavTit').textContent = V.quem === 'mestre' ? 'Painel do Mestre' : V.quem === 'aux' ? 'Painel do auxiliar' : 'Sua cobaia';
+      levar($('#cartao'), $('#s3dGavCartao'));
+      levar($('#painel'), $('#s3dGavPainel'));
+      if (cn) { try { A.focarSala(cn); } catch (e) {} }
+      g.hidden = false; V.d.classList.add('s3d-com-gaveta');
+    } else {
+      g.hidden = true; V.d.classList.remove('s3d-com-gaveta');
+      devolver($('#painel')); devolver($('#cartao'));
+    }
+  }
+  function fecharMenu() { const m = $('#s3dMenu'); if (m) m.hidden = true; }
+  function alternarMenu(forca) {
+    if (!V) return;
+    const m = $('#s3dMenu'), abrirM = forca ?? m.hidden;
+    if (!abrirM) { m.hidden = true; return; }
+    if (document.pointerLockElement) document.exitPointerLock();
+    const A = ACF(), q = V.quem, it = [];
+    const add = (ic, t, fn, dica) => it.push({ ic, t, fn, dica });
+    add('🗂', q === 'mestre' ? 'Painel do Mestre' : q === 'aux' ? 'Painel' : 'Minha cobaia', () => alternarGaveta(true), 'Tab');
+    if (q === 'mestre' || q === 'aux') add('🎛', 'Controles do 3D', () => { const p = $('#s3dPainel'); p.hidden = false; $('#s3dOpcoes').hidden = true; desenharPainel(); }, 'luzes, portas, tokens');
+    if (q === 'aux') add('🤖', 'Meu robô aqui', () => colocarMeuRobo(), 'coloca ou traz o seu S.T.A.F.F.');
+    if (disponivel('btnFichas')) add('📋', 'Fichas', () => clicar('btnFichas'), 'F');
+    if (q === 'aux' && window.ACF_FICHAS) add('☠', 'Ameaças e Filhos', () => window.ACF_FICHAS.abrir('aux'));
+    add('🎲', 'Dados', () => { clicar('btnDados'); }, 'R');
+    if (disponivel('btnChat')) add('💬', 'Chat', () => clicar('btnChat'), 'Enter');
+    if (window.ACF_ARQUIVO) add('📜', 'Arquivo · Cifras · Terminal', () => window.ACF_ARQUIVO.abrir(), 'I');
+    if (q === 'jog' && disponivel('btnAbrirLoja')) add('🛒', 'Loja do Maurício', () => clicar('btnAbrirLoja'));
+    if (q === 'mestre') add('🛒', 'Loja (Mestre)', () => clicar('btnAbrirLojaM'));
+    if (disponivel('btnQuadro')) add('🖍', 'Quadro da equipe', () => clicar('btnQuadro'), 'B');
+    if (q === 'jog') add('📓', 'Caderno', () => { alternarGaveta(true); const c = $('#caderno'); if (c) { c.closest('section')?.scrollIntoView({ block: 'start' }); setTimeout(() => c.focus(), 200); } });
+    [['btnRegras', '📖', 'Regras'], ['btnHall', '🏛', 'Hall da Caixa'], ['btnParede', '🧱', 'Parede de Desejos'], ['btnMinhaCor', '🎨', 'Cor da minha cobaia']].forEach(([id, ic, t]) => { if (disponivel(id)) add(ic, t, () => clicar(id)); });
+    if ((q === 'mestre' || q === 'aux') && window.ACF_MESA && window.ACF_MESA.abrirEscudo) add('🛡', 'Escudo do Mestre', () => window.ACF_MESA.abrirEscudo());
+    add(Som.ligado ? '🔊' : '🔇', 'Som do 3D', () => { Som.preparar(); Som.alternar(); pintarBarra(); });
+    add('⚙', 'Opções do 3D', () => { const o = $('#s3dOpcoes'); o.hidden = false; $('#s3dPainel').hidden = true; desenharOpcoes(); });
+    if (disponivel('btnAjuda')) add('❓', 'Ajuda', () => clicar('btnAjuda'));
+    add('🚪', 'Sair do 3D', () => fechar(), 'Esc');
+    $('#s3dMenuGrade').innerHTML = it.map((x, i) => `<button type="button" data-mi="${i}"><i>${x.ic}</i><span>${esc(x.t)}</span>${x.dica ? `<small>${esc(x.dica)}</small>` : ''}</button>`).join('');
+    $('#s3dMenuGrade').onclick = e => { const b = e.target.closest('[data-mi]'); if (!b) return; m.hidden = true; it[+b.dataset.mi].fn(); };
+    m.hidden = false;
+  }
+  // auxiliar: coloca (ou traz) o próprio robô S.T.A.F.F. onde a câmera está
+  function colocarMeuRobo() {
+    if (!V) return; const A = ACF(), c = V.cam;
+    const x = imersivo(c.modo) || V.ctrl ? c.px : c.ax, z = imersivo(c.modo) || V.ctrl ? c.pz : c.az;
+    let [px, pz] = V.mundo.livre3D(x, z) ? [x, z] : pontoLivre(V.mundo.livre3D, x, z);
+    const q = plantaDe3D(V.a, px, pz), r = A.colocarRoboAux ? A.colocarRoboAux(V.a, q.x, q.y) : 'Atualize o site.';
+    if (r) { toast(r); return; }
+    toast('Robô colocado. Ele aparece para todos quando a tela do Mestre confirmar.');
+    setTimeout(() => { if (V && V.quem === 'aux' && ((A.estado || {}).tokens || {})[A.aux]) { V.ctrl = A.aux; c.px = px; c.pz = pz; definirModo('jogo'); dica(); } }, 600);
   }
 
   /* ---------- abrir e fechar ---------- */
@@ -1046,6 +1180,7 @@
     const manter = op.manter && V ? { cam: { ...V.cam }, lanterna: V.lanterna, ctrl: V.ctrlMestre, a: V.a } : null;
     if (V) fechar(true);
     d.hidden = false; document.body.classList.add('s3d-aberta');
+    ['#aviso', '#suaVez', '#painelDados'].forEach(sel => levar($(sel), d));
     const msg = $('#s3dMsg'); msg.hidden = false; msg.textContent = 'Montando o andar…';
     $('#s3dBtPainel').hidden = quemSou() === 'jog';
     $('.s3d-x[data-s3dv="fechar"]', d).focus();
@@ -1088,8 +1223,9 @@
     const cam = new T.PerspectiveCamera(50, 1, .05, 220);
     const est = { modo: 'fora', theta: .62, phi: .85, r: 13, ax: 0, az: 0, px: 0, pz: 0, yaw: 0, pitch: -.08, fov: 70, passo: 0, largo: op.largo };
     // quem é controlado: o jogador anda com o próprio token; Mestre e auxiliar começam com a câmera livre
-    const meuTk = () => ((A.estado || {}).tokens || {})[A.meu];
-    const ctrlJog = quem === 'jog' && meuTk() && meuTk().a === a ? A.meu : null;
+    const meuId = quem === 'jog' ? A.meu : quem === 'aux' ? A.aux : null;
+    const meuTk = () => ((A.estado || {}).tokens || {})[meuId];
+    const ctrlJog = meuId && meuTk() && meuTk().a === a ? meuId : null;
     const [cx, cz] = mundo.centro(op.cn - 25 * (a - 1));
     if (ctrlJog) { const tk = meuTk(); [est.px, est.pz] = planta3D(a, tk.x, tk.y); }
     else { [est.px, est.pz] = [cx, cz + 1.5]; }
@@ -1120,7 +1256,7 @@
 
     const tamanho = () => { const w = palco.clientWidth || innerWidth, h = palco.clientHeight || innerHeight; ren.setPixelRatio(dpr); ren.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); pos.tamanho(w, h, dpr); };
     tamanho(); V.tamanho = tamanho; addEventListener('resize', tamanho);
-    definirModo(op.manter ? op.manter.cam.modo : 'fora');
+    definirModo(op.manter ? (op.manter.cam.modo === 'jogo' && !V.ctrl ? 'fora' : op.manter.cam.modo) : (V.ctrl ? 'jogo' : 'fora'));
     $('#s3dCN').textContent = `${a}º ANDAR`;
 
     /* ---------- controles: arrastar gira/olha; pinça e roda aproximam; toque escolhe ---------- */
@@ -1131,24 +1267,32 @@
       ini0 = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
       if (pts.size === 2) { const [p, q] = [...pts.values()]; dist0 = Math.hypot(p[0] - q[0], p[1] - q[1]); }
     });
+    el.addEventListener('mousemove', e => { if (document.pointerLockElement === el && imersivo(est.modo)) olharDelta(e.movementX, e.movementY, .0024); });
     el.addEventListener('pointermove', e => {
+      if (document.pointerLockElement === el) return;
       if (!pts.has(e.pointerId)) return;
       const [px, py] = pts.get(e.pointerId); const dx = e.clientX - px, dy = e.clientY - py; pts.set(e.pointerId, [e.clientX, e.clientY]);
       if (pts.size === 2) { const [p, q] = [...pts.values()]; const dd = Math.hypot(p[0] - q[0], p[1] - q[1]); if (dist0) zoom((dist0 - dd) * .02); dist0 = dd; return; }
-      if (est.modo === 'dentro') { est.yaw -= dx * .005; est.pitch = Math.max(-1.25, Math.min(1.25, est.pitch - dy * .005)); }
+      if (imersivo(est.modo)) olharDelta(dx, dy);
       else { est.theta -= dx * .006; est.phi = Math.max(.05, Math.min(1.45, est.phi - dy * .006)); }
     });
     const ray = new T.Raycaster(), chao = new T.Plane(new T.Vector3(0, 1, 0), 0), pt = new T.Vector3(), v2 = new T.Vector2();
     const solta = e => {
       if (ini0 && e.type === 'pointerup' && Math.hypot(e.clientX - ini0.x, e.clientY - ini0.y) < 8 && performance.now() - ini0.t < 450) {
-        const r = el.getBoundingClientRect(); v2.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-        ray.setFromCamera(v2, cam); tocar(ray, chao, pt);
+        const travado = document.pointerLockElement === el;
+        if (!travado && e.pointerType === 'mouse' && imersivo(est.modo)) { try { el.requestPointerLock(); } catch (er) {} }
+        else {
+          const r = el.getBoundingClientRect();
+          if (travado) v2.set(0, 0); else v2.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+          ray.setFromCamera(v2, cam); tocar(ray, chao, pt, travado);
+        }
       }
       ini0 = null; pts.delete(e.pointerId); if (pts.size < 2) dist0 = 0;
     };
     el.addEventListener('pointerup', solta); el.addEventListener('pointercancel', solta);
     el.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY * .01); }, { passive: false });
-    function zoom(k) { if (est.modo === 'dentro') est.fov = Math.max(35, Math.min(100, est.fov + k * 8)); else est.r = Math.max(3, Math.min(110, est.r * (1 + k * .12))); }
+    function zoom(k) { if (est.modo === 'dentro') est.fov = Math.max(35, Math.min(100, est.fov + k * 8)); else if (est.modo === 'jogo') est.dj = Math.max(1.2, Math.min(7, (est.dj || 3.2) * (1 + k * .12))); else est.r = Math.max(3, Math.min(110, est.r * (1 + k * .12))); }
+    function olharDelta(dx, dy, k = .005) { est.yaw -= dx * k; est.pitch = Math.max(est.modo === 'jogo' ? -1.05 : -1.25, Math.min(est.modo === 'jogo' ? .55 : 1.25, est.pitch - dy * k)); }
 
     /* ---------- andar: o token anda pelas regras do mapa (paredes, portas, vez e metros) ---------- */
     const L3 = (x, z) => mundo.livre3D(x, z);
@@ -1157,7 +1301,7 @@
       if (V.teclas.has('f')) f += 1; if (V.teclas.has('t')) f -= 1; if (V.teclas.has('d')) s += 1; if (V.teclas.has('e')) s -= 1;
       let corre = V.correr;
       if (V.joy) { f += V.joy.y; s += V.joy.x; if (Math.hypot(V.joy.x, V.joy.y) > .92) corre = true; }
-      const ang = est.modo === 'dentro' ? est.yaw : est.theta, sy = Math.sin(ang), cyw = Math.cos(ang);
+      const ang = imersivo(est.modo) ? est.yaw : est.theta, sy = Math.sin(ang), cyw = Math.cos(ang);
       let dx = 0, dz = 0;
       const m = Math.hypot(f, s);
       if (m > .05) { const k = m > 1 ? 1 / m : 1; dx = (-sy * f + cyw * s) * k; dz = (-cyw * f - sy * s) * k; }
@@ -1165,7 +1309,7 @@
       if (!dx && !dz) return false;
       const ctrl = V.ctrl, livre = !ctrl;
       const vel = (livre ? (corre ? 8 : 4) : (corre ? 4 : 2)) * dt;
-      if (livre) { est.px += dx * vel; est.pz += dz * vel; if (est.modo !== 'dentro') { est.ax = est.px; est.az = est.pz; } return true; }
+      if (livre) { est.px += dx * vel; est.pz += dz * vel; if (!imersivo(est.modo)) { est.ax = est.px; est.az = est.pz; } return true; }
       const tk = ((A.estado || {}).tokens || {})[ctrl];
       if (!tk) return false;
       if (tk.esq || V.escondido) { avisar('Você está escondido. Aperte E para sair.'); return false; }
@@ -1200,7 +1344,7 @@
     V.mover = mover;
 
     /* ---------- tocar/clicar: token, porta, esconderijo ou chão ---------- */
-    function tocar(ray, plano, ptv) {
+    function tocar(ray, plano, ptv, mira) {
       const alvos = [...tok.objetos(), ...mundo.raiz.children];
       const hits = ray.intersectObjects(alvos, true);
       // o raio do Three.js não liga para o que está escondido: pula paredes ocultas, véus e tetos
@@ -1212,8 +1356,11 @@
         if (o.userData.porta !== undefined && o.userData.porta >= 0) { usarPorta(o.userData.porta, true); return; }
         let p = o; while (p && !p.userData.esc && p.parent) p = p.parent;
         if (p && p.userData.esc) { const e = mundo.interativos.find(x => x.obj === p); if (e) { usarEsconderijo(e); return; } }
+        let u = o; while (u && !u.userData.uso && u.parent) u = u.parent;
+        if (u && u.userData.uso) { const e = mundo.interativos.find(x => x.obj === u); if (e && Math.hypot(e.pos.x - est.px, e.pos.z - est.pz) < 3.2) { usar(e); return; } }
         break;
       }
+      if (mira) { interagir(); return; }
       if (!ray.ray.intersectPlane(plano, ptv)) return;
       if (V.ctrl) { V.autoAlvo = [ptv.x, ptv.z]; return; }
       if (quem !== 'jog') { const p = salaNoPonto3D(a, ptv.x, ptv.z); const [x, z] = p ? mundo.centro(p) : [ptv.x, ptv.z]; est.px = x; est.pz = z; est.ax = x; est.az = z; }
@@ -1259,7 +1406,7 @@
       mundo.interativos.forEach(it => { const d = Math.hypot(it.pos.x - est.px, it.pos.z - est.pz); if (d < bd) { bd = d; melhor = it; } });
       if (!melhor) return null;
       if (melhor.tipo === 'esconderijo') return V.ctrl ? { ...melhor, txt: `✋ Esconder-se (${melhor.nome})` } : null;
-      if (melhor.tipo === 'uso') return { ...melhor, txt: { loja: '🃏 Falar com o Maurício (loja)', agua: '💧 Pegar água (despensa)', comida: '🥫 Pegar comida (despensa)' }[melhor.uso] || '✋ Usar' };
+      if (melhor.tipo === 'uso') return { ...melhor, txt: { loja: '🃏 Falar com o Maurício (loja)', agua: '💧 Pegar água (despensa)', comida: '🥫 Pegar comida (despensa)', arquivo: '📜 Ler o Arquivo (documentos e cifras)', terminal: '⌨ Usar o Terminal O.R.F.E.U.' }[melhor.uso] || '✋ Usar' };
       const e = mundo.estadoPorta(melhor.ci);
       const txt = quem === 'mestre' ? (e === 'a' ? '🚪 Fechar a porta' : '🚪 Abrir a porta') : e === 'a' ? null : e === 'tk' ? '🔢 Digitar o código' : e === 'f' ? '🔴 Apertar o botão da porta' : null;
       return txt ? { ...melhor, txt } : null;
@@ -1286,13 +1433,26 @@
           if (Math.hypot(fx - est.px, fz - est.pz) > .35) { est.px = fx; est.pz = fz; }
         }
       }
-      if (V.ctrl && est.modo !== 'dentro' && !est.largo) { est.ax += (est.px - est.ax) * Math.min(1, dt * 4); est.az += (est.pz - est.az) * Math.min(1, dt * 4); }
+      if (V.ctrl && !imersivo(est.modo) && !est.largo) { est.ax += (est.px - est.ax) * Math.min(1, dt * 4); est.az += (est.pz - est.az) * Math.min(1, dt * 4); }
       const olhoY = V.escondido ? (/cama/i.test(V.escondido.nome) ? .32 : 1.5) : 1.6;
       if (est.modo === 'dentro') {
         cam.fov += (est.fov - cam.fov) * .2;
         const y = olhoY + (andou ? Math.sin(est.passo) * .025 : 0);
         cam.position.set(est.px, y, est.pz);
         cam.lookAt(est.px - Math.sin(est.yaw) * Math.cos(est.pitch), y + Math.sin(est.pitch), est.pz - Math.cos(est.yaw) * Math.cos(est.pitch));
+      } else if (est.modo === 'jogo') {
+        // terceira pessoa, como num jogo: a câmera fica atrás e um pouco ao lado do token e nunca atravessa parede
+        cam.fov += ((est.fovJ || 66) - cam.fov) * .2;
+        const L = [-Math.sin(est.yaw) * Math.cos(est.pitch), Math.sin(est.pitch), -Math.cos(est.yaw) * Math.cos(est.pitch)];
+        const dir2 = [Math.cos(est.yaw), -Math.sin(est.yaw)], ombro = V.celular ? .25 : .38;
+        const retrato = innerWidth < innerHeight, ty = (retrato ? 1.68 : 1.5) + (andou ? Math.sin(est.passo) * .015 : 0), tx = est.px + dir2[0] * ombro, tz = est.pz + dir2[1] * ombro;
+        const quer = est.dj || 3.2; let ok = quer;
+        for (let i = 1; i <= 24; i++) { const k = quer * i / 24, cx = tx - L[0] * k, cz = tz - L[2] * k, cyy = ty - L[1] * k; if (!mundo.area3D(cx, cz, .16) || cyy > ALT - .18 || cyy < .25) { ok = Math.max(.35, quer * (i - 1) / 24); break; } }
+        est.djAt = est.djAt == null ? ok : (ok < est.djAt ? ok : est.djAt + (ok - est.djAt) * Math.min(1, dt * 3));
+        const d = est.djAt;
+        cam.position.set(tx - L[0] * d, ty - L[1] * d, tz - L[2] * d);
+        cam.lookAt(tx + L[0] * 3, ty + L[1] * 3 + (retrato ? .22 : .1), tz + L[2] * 3);   // mira um pouco acima: o token fica no terço de baixo da tela
+        alvo.set(est.px, 1, est.pz); est.ax = est.px; est.az = est.pz;
       } else {
         cam.fov += (50 - cam.fov) * .2;
         alvo.x += (est.ax - alvo.x) * .15; alvo.z += (est.az - alvo.z) * .15; alvo.y = 1;
@@ -1300,18 +1460,18 @@
         cam.lookAt(alvo);
       }
       cam.updateProjectionMatrix();
-      const foco = est.modo === 'dentro' || V.ctrl ? [est.px, est.pz] : [alvo.x, alvo.z];
+      const foco = imersivo(est.modo) || V.ctrl ? [est.px, est.pz] : [alvo.x, alvo.z];
       mundo.atualizar(dt, tt, foco[0], foco[1], est.modo, cam.position);
-      tok.atualizar(dt, tt, V.ctrl, V.ctrl ? [est.px, est.pz] : null, est.modo);
+      tok.atualizar(dt, tt, V.ctrl, V.ctrl ? [est.px, est.pz] : null, est.modo, cam.position);
       // lanterna: sai dos olhos (dentro) ou do token (fora)
       if (V.lanterna) {
         cam.getWorldDirection(dir);
-        if (est.modo === 'dentro' || !V.ctrl) { lanterna.position.copy(cam.position); lanterna.target.position.copy(cam.position).add(dir); }
+        if (imersivo(est.modo) || !V.ctrl) { lanterna.position.copy(cam.position); lanterna.target.position.copy(cam.position).add(dir); }
         else { const rot = (V.tok.mapa.get(V.ctrl) || {}).rot || 0; lanterna.position.set(est.px, 1.5, est.pz); lanterna.target.position.set(est.px + Math.sin(rot) * 3, .6, est.pz + Math.cos(rot) * 3); }
         lanterna.intensity = 2.4;
       } else lanterna.intensity = 0;
       // poeira acompanha a câmera
-      const cp = est.modo === 'dentro' ? cam.position : alvo;
+      const cp = imersivo(est.modo) ? cam.position : alvo;
       if (Math.hypot(poeira.position.x - cp.x, poeira.position.z - cp.z) > 4) poeira.position.set(cp.x, 0, cp.z);
       poeira.rotation.y += dt * .01;
       // efeitos de tela: Protocolo deixa tudo vermelho; apagão escurece
@@ -1374,7 +1534,7 @@
   function desenharPainel() {
     if (!V) return;
     const A = ACF(), p = $('#s3dPainel'), q = V.quem, a = V.a, e = A.estado || {};
-    const est = V.cam, pS = salaNoPonto3D(a, est.modo === 'dentro' || V.ctrl ? est.px : est.ax, est.modo === 'dentro' || V.ctrl ? est.pz : est.az);
+    const est = V.cam, pS = salaNoPonto3D(a, imersivo(est.modo) || V.ctrl ? est.px : est.ax, imersivo(est.modo) || V.ctrl ? est.pz : est.az);
     const cn = pS ? 25 * (a - 1) + pS : null;
     const luz = k => (e.luz || {})[k] || 'normal';
     const bts = (grupo, atual) => LUZES.map(([v, t]) => `<button type="button" data-luz="${grupo}" data-v="${v}" class="${atual === v ? 'on' : ''}">${t}</button>`).join('');
@@ -1421,12 +1581,20 @@
   }
 
   /* ---------- "E" / botão na tela: interagir com o que está perto ---------- */
+  // objetos de usar: Maurício (loja), geladeira e bebedouro (despensa), estação de leitura (Arquivo e Terminal)
+  function usar(e) {
+    const A = ACF();
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (e.uso === 'loja') A.abrirLoja && A.abrirLoja();
+    else if (e.uso === 'arquivo' || e.uso === 'terminal') { if (window.ACF_ARQUIVO) window.ACF_ARQUIVO.abrir(e.uso === 'terminal' ? 'terminal' : undefined); }
+    else A.pegarEstoque && A.pegarEstoque(e.uso);
+  }
   function interagir() {
     if (!V) return;
     const pr = V.pertoDe(); if (!pr) { toast('Nada por perto para usar.'); return; }
     if (pr.tipo === 'sair') V.sairEsconderijo();
     else if (pr.tipo === 'esconderijo') V.usarEsconderijo(pr);
-    else if (pr.tipo === 'uso') { const A = ACF(); if (pr.uso === 'loja') A.abrirLoja && A.abrirLoja(); else A.pegarEstoque && A.pegarEstoque(pr.uso); }
+    else if (pr.tipo === 'uso') usar(pr);
     else if (pr.tipo === 'porta') V.usarPorta(pr.ci);
   }
 
@@ -1451,6 +1619,8 @@
       V = null;
     }
     if (trocando) return;
+    if (document.pointerLockElement) document.exitPointerLock();
+    const gv = $('#s3dGaveta'); if (gv) gv.hidden = true; fecharMenu(); devolverTudo();
     Som.atualizar([]); Som.parar();
     const d = $('#s3d'); if (d) { d.hidden = true; ['#s3dJoy', '#s3dPainel', '#s3dOpcoes', '#s3dCodigo', '#s3dFresta', '#s3dPrompt'].forEach(s => { const x = $(s, d); if (x) x.hidden = true; }); }
     document.body.classList.remove('s3d-aberta');
@@ -1480,6 +1650,7 @@
         if (!V.ctrl) V.ctrl = A.meu;
         if (!tk.esq && V.escondido) V.escondido = null;
       }
+      if (V.quem === 'aux' && A.aux) { const rb = (e.tokens || {})[A.aux]; if (!V.ctrl && rb && rb.a === a) V.ctrl = A.aux; if (V.ctrl === A.aux && (!rb || rb.a !== a)) { V.ctrl = null; if (V.cam.modo === 'jogo') definirModo('fora'); } }
       if (V.ctrl && !(e.tokens || {})[V.ctrl]) { V.ctrl = null; V.ctrlMestre = null; }
       if (assinatura(a) !== V.sig) { abrir(25 * (a - 1) + 13, { a, manter: true, andar: V.cam.largo }); return; }
       const va = JSON.stringify(e.var3d || {});
