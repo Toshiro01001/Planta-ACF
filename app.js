@@ -100,21 +100,34 @@ function salaRevelada(andar, cn) {
   const v = (Store.state.salas || {})['c' + cn];
   return v === undefined ? andar === 1 : !!v;
 }
+// vista de um Filho (auxiliar no Controle, no 3D): escondido só aparece se falhou no teste (ou o Mestre liberou) e na mesma sala
+function visivelAoFilho(tk, filhoId) {
+  if (!tk || !SER[tk.s] || !tk.esq) return true;
+  const t = SER[tk.s].tipo; if (t !== 'cobaia' && t !== 'npc') return true;
+  if (tk.vf) return true;
+  const f = (Store.state.tokens || {})[filhoId];
+  if (!f || f.a !== tk.a || salaEm(f.a, f.x, f.y) !== salaEm(tk.a, tk.x, tk.y)) return false;
+  return tk.eo !== 1;
+}
 const salaVisivel = (andar, cn) => V().mestre || !!V().aux || salaRevelada(andar, cn);
 
 /* Quem enxerga cada ficha.
-   h  = Ocultação geral: escondida dos jogadores.
-   vf = Visível aos Filhos: o Mestre revelou essa cobaia/NPC aos Mestres Auxiliares.
-   Mestre vê tudo. Auxiliar vê Filhos e robôs sempre, e cobaias/NPCs só com vf.
+   h   = Ocultação geral: escondida dos jogadores.
+   esq = escondida num esconderijo; eo = 1 se passou no teste de Furtividade ao se esconder.
+   vf  = o Mestre decidiu que os Filhos enxergam essa cobaia/NPC mesmo escondida.
+   vis = presença (espectro): o único jogador que a enxerga.
+   Mestre vê tudo. Auxiliar (robôs S.T.A.F.F.) vê todas as cobaias, escondidas ou não; quando ele controla um
+   Filho no 3D, a vista é a do Filho (filtroFilho): quem está escondido e passou no teste some para ele.
    Jogador vê o que não está oculto e a própria cobaia. */
 function visivelPara(tk) {
   if (!tk || !SER[tk.s]) return false;
   const v = V();
   if (v.mestre) return true;
-  // escondido num esconderijo (vista 3D): só quem se escondeu (e o Mestre) enxerga
-  if (tk.esq && tk.s !== v.meu) return false;
   const tipo = SER[tk.s].tipo;
-  if (v.aux) return tipo === 'filho' || tipo === 'robo' || !!tk.vf;
+  if (tipo === 'espectro') return !!v.aux || (!!v.meu && tk.vis === v.meu);
+  if (v.aux) return true;
+  // escondido num esconderijo: só quem se escondeu (e o Mestre e os auxiliares) enxerga
+  if (tk.esq && tk.s !== v.meu) return false;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
   if (apagaoAtivo() && tk.s !== v.meu && (!isentoDe(v.meu) || apagaoQueda)) return false;
   if (cegoDe(v.meu) && tk.s !== v.meu) return false;
@@ -497,6 +510,7 @@ function recusaLocal(caminho, valor) {
   const atual = (Store.state.tokens || {})[caminho[1]];
   // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
   if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f\d+-\d+$/.test(caminho[1])) return '';
+  if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'espectro' && valor.h === true && valor.pr === 1 && /^fe-\d+$/.test(caminho[1])) return '';
   if (aux && atual && !valor && SER[atual.s] && SER[atual.s].tipo === 'filho') return atual.h ? '' : 'Este Filho já foi revelado aos jogadores: só o Mestre tira do mapa.';
   // auxiliar: coloca o PRÓPRIO robô S.T.A.F.F. (vai oculto, com pedido "pr"; a tela do Mestre publica)
   if (aux && caminho[1] === aux && valor && valor.s === aux && valor.h === true && valor.pr === 1 && (!atual || atual.h)) return '';
@@ -1001,6 +1015,7 @@ function rotuloFicha(tk, id) {
 function rotuloBase(tk) {
   const s = SER[tk.s];
   if (s.tipo === 'filho') return tk.n > 1 ? `${s.codigo} ${s.nome} #${tk.n}` : `${s.codigo} ${s.nome}`;
+  if (s.tipo === 'espectro') return tk.n > 1 ? `${s.nome} #${tk.n}` : s.nome;
   return s.nome;
 }
 
@@ -1166,7 +1181,7 @@ function ligarArraste(f) {
       tk.m = +Math.min(lim, usado + custo).toFixed(2);
     }
     arrastando.andou = true;
-    if (tk.esq) delete tk.esq;   // sair andando tira do esconderijo
+    if (tk.esq) { delete tk.esq; delete tk.eo; }   // sair andando tira do esconderijo
     tk.x = +alvo.x.toFixed(2); tk.y = +alvo.y.toFixed(2); delete tk.d;   // arrastado no 2D: no 3D volta a olhar para onde anda
     f.style.left = px(tk.x); f.style.top = px(tk.y);
     previaPasso(tk, lim);
@@ -1498,7 +1513,11 @@ function desenharCartao() {
   if (s.tipo === 'npc') linhas = fn ? `<p>Função: ${fn} <span class="so-mestre">só o Mestre vê</span></p>` : '';
   if (s.tipo === 'filho') linhas = `<p>Filho da O.R.F.E.U.</p>`;
   if (s.tipo === 'robo') linhas = `<p>Robô S.T.A.F.F. · não faz barulho</p>`;
-  const titulo = s.tipo === 'filho' ? s.nome + (tk.n > 1 ? ` #${tk.n}` : '') : s.nome;
+  if (s.tipo === 'espectro') {
+    const cob = SERES.filter(x => x.tipo === 'cobaia');
+    linhas = `<p>Presença · os jogadores não veem, só quem for escolhido aqui.</p>${(mestre || aux) && !espiar ? `<label class="mini">Quem enxerga, entre os jogadores <select data-acao="vis"><option value="">Ninguém</option>${cob.map(x => `<option value="${x.id}" ${tk.vis === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>${tk.pr ? '<p class="mini">Aguardando a tela do Mestre publicar.</p>' : ''}` : ''}`;
+  }
+  const titulo = s.tipo === 'filho' || s.tipo === 'espectro' ? s.nome + (tk.n > 1 ? ` #${tk.n}` : '') : s.nome;
 
   let acoes = '';
   if (mestre) {
@@ -1506,15 +1525,17 @@ function desenharCartao() {
     const podeVF = s.tipo === 'cobaia' || s.tipo === 'npc';
     acoes = `<div class="acoes">
       <button data-acao="ocultar">${tk.h ? 'Ocultação geral: LIGADA · revelar aos jogadores' : 'Ocultação geral: desligada · ocultar dos jogadores'}</button>
-      ${podeVF ? `<button data-acao="vf">${tk.vf ? 'Visível aos Filhos · esconder dos Filhos' : 'Oculta dos Filhos · revelar aos Filhos'}</button>` : ''}
+      ${podeVF ? `<button data-acao="vf" title="Vale quando a cobaia está escondida: os Filhos enxergam mesmo que ela tenha passado no teste">${tk.vf ? 'Filhos veem mesmo escondida · desfazer' : 'Escondida: segue o teste · Filhos veem mesmo assim'}</button>` : ''}
       <select data-acao="andar" aria-label="Enviar para o andar">${opcoes}</select>
       <button data-acao="remover">Tirar do mapa</button>
     </div>`;
   }
 
   if (!mestre && aux && s.tipo === 'filho') acoes = `<div class="acoes">${tk.h ? '<button data-acao="remover-aux">Tirar do mapa</button>' : '<p class="mini">Revelado aos jogadores: só o Mestre tira do mapa.</p>'}</div>`;
+  // escondido: o Mestre vê o resultado da Furtividade e pode trocar (vale para a vista dos Filhos)
+  if (mestre && tk.esq && (s.tipo === 'cobaia' || s.tipo === 'npc')) acoes += `<div class="acoes"><p class="mini">👁 Escondido: ${tk.eo === 1 ? 'passou na Furtividade (os Filhos não veem)' : tk.eo === 0 ? 'falhou na Furtividade (os Filhos na sala veem)' : 'sem teste (os Filhos na sala veem)'}</p><button data-acao="eo">${tk.eo === 1 ? 'Marcar como falhou' : 'Marcar como passou'}</button></div>`;
   // Controle: Mestre e auxiliares assumem o Filho no 3D (em primeira pessoa, com as habilidades na tela)
-  if (s.tipo === 'filho' && (mestre || aux) && !espiar) acoes += `<div class="acoes"><button data-acao="controle" class="btn-controle">🎮 Controle (3D)</button></div>`;
+  if ((s.tipo === 'filho' || s.tipo === 'espectro') && (mestre || aux) && !espiar) acoes += `<div class="acoes"><button data-acao="controle" class="btn-controle">🎮 Controle (3D)</button></div>`;
   if (podeCor(s.id)) acoes += `<div class="acoes"><button data-acao="cor" class="btn-cor"><span class="pinta" style="--cor:${s.cor}"></span>Mudar a cor de ${esc(s.nome)}</button></div>`;
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
@@ -1534,6 +1555,8 @@ function desenharCartao() {
 
   $('.fechar', c).onclick = () => selecionar(null);
   const bcor = $('[data-acao="cor"]', c); if (bcor) bcor.onclick = () => Cores.escolher(s.id, bcor);
+  const bvis = $('[data-acao="vis"]', c); if (bvis) bvis.onchange = () => { const t2 = Store.state.tokens[selecionado]; if (!t2) return; const novo = { ...t2 }; if (bvis.value) novo.vis = bvis.value; else delete novo.vis; Store.definir(['tokens', selecionado], novo); };
+  const beo = $('[data-acao="eo"]', c); if (beo) beo.onclick = () => { const t2 = Store.state.tokens[selecionado]; if (t2) Store.definir(['tokens', selecionado], { ...t2, eo: t2.eo === 1 ? 0 : 1 }); };
   const bct = $('[data-acao="controle"]', c); if (bct) bct.onclick = () => { if (window.Sala3D && Sala3D.controlar) Sala3D.controlar(selecionado); };
   const brx = $('[data-acao="remover-aux"]', c); if (brx) brx.onclick = () => { const id = selecionado; if (!confirm('Tirar este Filho do mapa?')) return; selecionar(null); Store.definir(['tokens', id], null); };
   if (mestre) {
@@ -1577,7 +1600,7 @@ function desenharPainel() {
   $('#listaPresencas').innerHTML = podeAndar ? pres.map(([id, tk]) => {
     const s = SER[tk.s];
     return `<li data-id="${id}">${bola(s)}<span class="info">
-      <strong>${s.tipo === 'filho' ? `${s.codigo} · ${s.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : s.nome}</strong>
+      <strong>${s.tipo === 'filho' ? `${s.codigo} · ${s.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : rotuloBase(tk)}</strong>
       <span class="onde">${descreveLocal(tk)}${mestre && tk.h ? ' · oculto' : ''}${mestre && tk.vf ? ' · visível aos Filhos' : ''}</span></span></li>`;
   }).join('') : '';
   $('#semPresencas').hidden = podeAndar && pres.length > 0;
@@ -1607,10 +1630,10 @@ function desenharTray() {
       <span class="pinta" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>${s.nome}
       ${onde ? `<span class="qtd">${onde}</span>` : ''}</button>`;
   }).join('');
-  $('#trayFilhos').innerHTML = SERES.filter(s => s.tipo === 'filho').map(s => {
+  $('#trayFilhos').innerHTML = SERES.filter(s => s.tipo === 'filho' || s.tipo === 'espectro').map(s => {
     const qtd = Object.values(tokens).filter(t => t.s === s.id).length;
-    return `<button data-ser="${s.id}" title="Colocar mais um no andar aberto">
-      <span class="pinta filho" style="--cor:${s.cor}"></span>${s.codigo} ${s.nome}
+    return `<button data-ser="${s.id}" title="${s.tipo === 'espectro' ? 'Colocar uma Presença na Zona Neutra do andar aberto (ninguém a vê até você escolher no cartão)' : 'Colocar mais um no andar aberto'}">
+      <span class="pinta ${s.tipo}" style="--cor:${s.cor}"></span>${s.tipo === 'espectro' ? '' : s.codigo + ' '}${s.nome}
       ${qtd ? `<span class="qtd">×${qtd}</span>` : ''}</button>`;
   }).join('');
   $$('#trayNpc button, #trayFilhos button').forEach(b => b.onclick = () => colocar(b.dataset.ser));
@@ -1621,6 +1644,15 @@ function colocar(serId) {
   const tokens = Store.state.tokens || {};
   const jitter = () => +(Math.random() * 2.4 - 1.2).toFixed(2);
   const pos = { x: CENTRO_ZN.x + jitter(), y: CENTRO_ZN.y - 1.2 + jitter() };
+  if (s.tipo === 'espectro') {
+    // Presença: pública e sem ninguém que a veja (vis vazio) até o Mestre ou o auxiliar escolher no cartão.
+    // O auxiliar não grava no mapa público: vai oculta com pedido (pr) e a tela do Mestre publica.
+    const usados = Object.values(tokens).filter(t => t.s === serId).map(t => t.n || 1);
+    const n = usados.length ? Math.max(...usados) + 1 : 1, id = `${serId}-${n}`;
+    Store.definir(['tokens', id], mestre ? { s: serId, a: andarAtual, ...pos, h: false, n } : { s: serId, a: andarAtual, ...pos, h: true, n, pr: 1 });
+    selecionar(id);
+    return;
+  }
   if (s.tipo !== 'filho') {
     const atual = tokens[serId];
     if (atual && atual.a === andarAtual) { irParaFicha(serId); return; }
@@ -2401,7 +2433,7 @@ function salvarPerfil(v) {
   try { v ? localStorage.setItem('acf-perfil', v) : localStorage.removeItem('acf-perfil'); } catch (e) {}
 }
 const podeMover = tk => !!tk && !!SER[tk.s] && (mestre || (!!meu && tk.s === meu) ||
-  (!!aux && (SER[tk.s].tipo === 'filho' || tk.s === aux)));
+  (!!aux && (SER[tk.s].tipo === 'filho' || SER[tk.s].tipo === 'espectro' || tk.s === aux)));
 let aux = null;   // robô do Mestre Auxiliar neste navegador
 
 function atualizarBotaoPerfil() {
@@ -5768,16 +5800,16 @@ function desenharKitAux() {
   bloco.hidden = !(aux && !mestre);
   if (bloco.hidden) return;
   const tokens = Store.state.tokens || {};
-  const html = SERES.filter(x => x.tipo === 'filho').map(x => {
+  const html = SERES.filter(x => x.tipo === 'filho' || x.tipo === 'espectro').map(x => {
     const qtd = Object.values(tokens).filter(t => t.s === x.id).length;
-    return `<button data-filho-aux="${x.id}" title="Colocar mais um, oculto, numa sala sorteada deste andar"><span class="pinta filho" style="--cor:${x.cor}"></span>${x.codigo} ${esc(x.nome)}${qtd ? `<span class="qtd">×${qtd}</span>` : ''}</button>`;
+    return `<button data-filho-aux="${x.id}" title="${x.tipo === 'espectro' ? 'Colocar uma Presença na Zona Neutra deste andar (a tela do Mestre publica; ninguém a vê até você escolher no cartão)' : 'Colocar mais um, oculto, numa sala sorteada deste andar'}"><span class="pinta ${x.tipo}" style="--cor:${x.cor}"></span>${x.tipo === 'espectro' ? '' : x.codigo + ' '}${esc(x.nome)}${qtd ? `<span class="qtd">×${qtd}</span>` : ''}</button>`;
   }).join('');
   const t = $('#trayFilhosAux');
   if (t.dataset.html !== html) { t.innerHTML = html; t.dataset.html = html; }
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-filho-aux]');
-  if (b && aux && !mestre) { colocar(b.dataset.filhoAux); aviso(`${SER[b.dataset.filhoAux].nome} entrou no ${andarAtual}º andar, oculto dos jogadores.`); return; }
+  if (b && aux && !mestre) { colocar(b.dataset.filhoAux); aviso(SER[b.dataset.filhoAux].tipo === 'espectro' ? `Presença pedida na Zona Neutra do ${andarAtual}º andar: aparece quando a tela do Mestre confirmar.` : `${SER[b.dataset.filhoAux].nome} entrou no ${andarAtual}º andar, oculto dos jogadores.`); return; }
   const k = e.target.closest('[data-kit]'); if (!k || !(aux && !mestre)) return;
   if (k.dataset.kit === 'fichas' && window.ACF_FICHAS) window.ACF_FICHAS.abrir('aux');
   if (k.dataset.kit === 'escudo' && window.ACF_MESA) window.ACF_MESA.abrirEscudo();
@@ -5816,12 +5848,12 @@ const roboPublicado = {};
 Store.aoMudar(() => {
   if (!mestre) return;
   Object.entries(Store.state.tokens || {}).forEach(([id, tk]) => {
-    if (!tk || tk.pr !== 1 || !SER[tk.s] || SER[tk.s].tipo !== 'robo') return;
+    if (!tk || tk.pr !== 1 || !SER[tk.s] || (SER[tk.s].tipo !== 'robo' && SER[tk.s].tipo !== 'espectro')) return;
     if (Date.now() - (roboPublicado[id] || 0) < 5000) return;   // foto atrasada do servidor: já publicado
     roboPublicado[id] = Date.now();
     const novo = { ...tk, h: false }; delete novo.pr;
     Store.definir(['tokens', id], novo);
-    Chat.enviar(`🤖 ${SER[tk.s].nome} entrou no ${tk.a}º andar.`, 'geral');
+    if (SER[tk.s].tipo === 'robo') Chat.enviar(`🤖 ${SER[tk.s].nome} entrou no ${tk.a}º andar.`, 'geral');
   });
 });
 document.addEventListener('click', e => {
@@ -5866,7 +5898,7 @@ function moverToken3D(id, x, y, fim) {
   const s = mov3d[id] || (mov3d[id] = { antes: { a: tk.a, x: tk.x, y: tk.y, m: tk.m || 0 }, ultimo: 0 });
   const novo = { ...tk, x: +alvo.x.toFixed(2), y: +alvo.y.toFixed(2) };
   if (lim) novo.m = +m.toFixed(2);
-  if (novo.esq && Math.hypot(novo.x - tk.x, novo.y - tk.y) > 0.05) delete novo.esq;   // só sai do esconderijo quem anda de verdade
+  if (novo.esq && Math.hypot(novo.x - tk.x, novo.y - tk.y) > 0.05) { delete novo.esq; delete novo.eo; }   // só sai do esconderijo quem anda de verdade
   const agora = performance.now();
   if (fim || agora - s.ultimo > 140) { s.ultimo = agora; Store.definir(['tokens', id], novo); }
   else Store.state.tokens[id] = novo;   // o próximo envio leva a posição mais nova
@@ -5895,11 +5927,13 @@ function efeitoToken(id, fx) {
   return true;
 }
 // esconderijo (armário, embaixo da cama…): chave = "cNN:i" do objeto; null sai
-function esconderToken(id, chave) {
+// eo: 1 passou no teste de Furtividade (os Filhos não veem), 0 falhou, undefined sem teste
+function esconderToken(id, chave, eo) {
   const tk = (Store.state.tokens || {})[id];
   if (!tk || !podeMover(tk)) return false;
   const novo = { ...tk };
-  if (chave) novo.esq = String(chave).slice(0, 24); else delete novo.esq;
+  if (chave) { novo.esq = String(chave).slice(0, 24); if (eo === 0 || eo === 1) novo.eo = eo; else delete novo.eo; }
+  else { delete novo.esq; delete novo.eo; }
   Store.definir(['tokens', id], novo);
   return true;
 }
@@ -5977,7 +6011,7 @@ window.ACF = {
   get andarAtual() { return andarAtual; },
   irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },
   // vista 3D
-  podeMover, visivelPara, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
+  podeMover, visivelPara, visivelAoFilho, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
   andavel: (a, x, y) => andavel(a, x, y),
   limiteDe: id => limiteDe(id),
   participa: id => !!participante(id),

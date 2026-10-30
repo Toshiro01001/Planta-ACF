@@ -259,7 +259,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 | `sala3d.js` | Motor: monta o andar, corredores, portas, luzes, câmera, HUD e liga tudo às regras do mapa |
 | `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
 | `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
-| `tokens3d.js` | Miniaturas: as sete cobaias, os robôs S.T.A.F.F., NPCs e as formas dos Filhos |
+| `tokens3d.js` | Miniaturas: as sete cobaias, as quatro cobaias NPC (Coelho, Cara Pálida, Risa, Onírico, que anda rastejando), os robôs S.T.A.F.F., a Presença (aparição translúcida) e as formas dos Filhos. Rostos pintados em textura, com sombra, íris, brilho e cílios |
 | `andares3d.js` | Objetos próprios dos andares 2 a 5 (máquinas, relíquias, crescimentos de carne…), no mesmo estilo do `detalhes3d.js` |
 | `vozes.js` | Vozes das mensagens do chat no 3D, geradas na hora (sem arquivos de áudio) |
 | `dados3d.js` | Dados 3D com física (d4, d6, d8, d10, d12, d20) na tela de quem rolou; a física vem do cannon.js (jsDelivr), baixado só na primeira rolagem |
@@ -269,6 +269,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 ### Regras do mapa valem no 3D
 
 - **Tamanho no 3D:** a sala tem **20 m de lado** e 3,2 m de pé-direito; o corredor tem 14 m de comprimento e 2,4 m de largura. As cenas feitas para salas menores se espalham sozinhas (o que está na parede continua na parede) e cada sala grande ganha, sorteado pela CN e igual para todos, mais móveis de parede (armários, estantes, arquivos, caixotes), até dois esconderijos novos, papéis, sangue e manchas. Os vãos das portas ficam sempre livres.
+- **Mobília da própria sala:** além disso, cada sala grande copia os móveis que a cena já tem (carteiras na sala de aula, macas e armários no hospital, estantes no arquivo, cadeiras, bancadas, quadros e cartazes nas paredes…) para os espaços vazios, com os mesmos esconderijos (até 3 a mais por sala). Uma cópia só entra se ainda der para andar de qualquer porta a qualquer outra (o site confere numa grade de 25 cm) e se a sala continuar com pelo menos metade do chão livre. Também é sorteado pela CN: todos veem a mesma sala.
 - **Distância:** as regras continuam sendo as da planta (sala de 50 m², corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa. Como a sala do 3D (20 m) é bem maior que a da regra (7,07 m), dentro dela cada passo do 3D rende uns 35% de metro de regra: atravessar a sala inteira no 3D custa os mesmos ~7 m de regra do 2.5D.
 - **Corredores:** 2,4 m de largura, para duas pessoas andarem lado a lado. Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
 - **Portas:** cada corredor tem a porta no estado público da planta (fechada, abrindo, trancada, com teclado, escombros, carne ou aberta). Porta fechada barra o corredor. Ao lado do vão, dentro da sala, fica o painel com o botão vermelho. Tecla **E** (ou toque no botão) aperta o botão quando a regra deixa; com teclado, pede o código. Só o Mestre fecha portas.
@@ -309,6 +310,23 @@ Aparecem em volta do personagem, para quem está vendo aquele token (no 3D e no 
 
 No **seu** personagem a tela também sente: borda vermelha e tremida no dano, distorção roxa na sanidade.
 
+### Presença (aparição que só um jogador vê)
+
+O Mestre (bandeja dos Filhos, botão **Presença**) e os auxiliares (kit do auxiliar) colocam uma Presença na Zona Neutra do andar aberto. Ela é pública, mas **nenhum jogador a enxerga** até alguém escolher no cartão dela o campo **Quem enxerga, entre os jogadores** (uma cobaia). A partir daí, só aquele jogador (além do Mestre e dos auxiliares) a vê, no 2D e no 3D. Mestre e auxiliares movem a Presença arrastando no 2D ou pelo **🎮 Controle (3D)**. A do auxiliar entra quando a tela do Mestre confirma (como o robô). No 3D ela tem modelo próprio (aparição translúcida flutuando).
+
+- **Limite:** como todo token público, quem abrir as ferramentas do navegador pode achar o registro dela no Firebase. A ocultação é de tela.
+- O auxiliar não tira do mapa uma Presença já publicada (regra do Firebase): só o Mestre.
+
+### Figura flutuante e campo (objeto `campo_infinito` da cena)
+
+Uma sala pode ter, na cena, o objeto `campo_infinito`: uma figura (triângulo invertido) flutuando, com anéis girando e ondas no chão. Ninguém chega nela:
+
+- Dentro do raio `ext` (padrão 7 m), a parte do passo que vai **em direção** à figura encolhe cada vez mais (andar de lado continua normal). Dá para insistir, mas nunca se passa de `r0` (1,3 m).
+- Quem força até `r1` (2,6 m) fica **preso**: a tela distorce e cada tentativa de se afastar (no máximo uma a cada 2,5 s) é um teste (`per`, padrão Vontade; `dt`, padrão 20) com a ficha ativa. A rolagem vai só para o Mestre (Sussurro). Passou, o token pode se afastar; falhou, continua preso.
+- Mestre e auxiliares controlando um token também ficam presos (rolam d20 puro). A câmera livre do Mestre não sente o campo.
+- **Limite:** vale no 3D. Arrastando no mapa 2D, o token não sente o campo.
+- O `salas-3d.json` desta versão traz o objeto na sala que tem a figura. **É preciso importar o arquivo de novo** (cartão de qualquer sala, perfil do Mestre).
+
 ### Zona Neutra no 3D
 
 Toda Zona Neutra (sala 25 de cada andar) tem beliches, camas, armários, mural, geladeira, bebedouro e a banca do Maurício (o palhaço de mola na caixa "PROJ Maurício", com armas, lanternas, latas e máscaras de gás, e a placa "COMPRE OU TROQUE!"). Cada andar mantém o próprio jeito (bunker, alojamento, guarita, vagão, quarto branco).
@@ -319,7 +337,14 @@ Toda Zona Neutra (sala 25 de cada andar) tem beliches, camas, armários, mural, 
 
 ### Esconderijos
 
-Móveis marcados como esconderijo (embaixo da cama, dentro do armário, atrás do balcão…) mostram "E · Esconder". O token fica escondido: some da tela de todos, menos do dono e do Mestre, nas duas vistas. Andar de novo tira do esconderijo. **Limite:** é ocultação visual; a posição continua no Firebase.
+Móveis marcados como esconderijo (embaixo da cama, dentro do armário, atrás do balcão…) mostram "E · Esconder". O token fica escondido: some da tela dos outros jogadores, nas duas vistas. Andar de novo tira do esconderijo. **Limite:** é ocultação visual; a posição continua no Firebase.
+
+**Quem enxerga quem está escondido:**
+
+- **Mestre:** todo mundo, sempre.
+- **Robôs S.T.A.F.F. (auxiliares):** todas as cobaias e NPCs, escondidos ou não, nas duas vistas (no 3D com "· escondido" no nome).
+- **Filhos:** quando o auxiliar está no **Controle de um Filho** no 3D, a tela passa a ser a do Filho. Quem está escondido **na mesma sala** só aparece se **falhou** no teste de Furtividade feito ao se esconder (DT 15). Passou, o Filho não vê. Sem ficha ativa (sem teste), o Filho vê.
+- O resultado do teste fica no token (`eo`). No cartão da cobaia escondida, o Mestre vê "passou" ou "falhou" e pode trocar. O botão **Filhos veem mesmo escondida** (antigo "Visível aos Filhos") faz os Filhos enxergarem aquela cobaia mesmo que ela tenha passado.
 
 ### Saída do andar (elevador, poço, eclusa, fenda)
 

@@ -134,6 +134,10 @@ const SERES = [
   { id: 'f00', tipo: 'filho', codigo: 'F-00', nome: 'Zero',       cor: '#ffffff' },
   { id: 'f20', tipo: 'filho', codigo: 'F-20', nome: 'Pele-Alheia',    cor: '#e76f51' },
   { id: 'f21', tipo: 'filho', codigo: 'F-21', nome: 'O Ouvinte',   cor: '#1b263b' },
+
+  // Presença: aparição que o Mestre e os auxiliares põem no mapa. Entre os jogadores, só quem o Mestre escolher
+  // (campo vis do token) enxerga; os outros nem sabem que ela está ali.
+  { id: 'fe', tipo: 'espectro', codigo: 'P-01', nome: 'Presença', cor: '#bcd4ff' },
 ];
 
 /* ---------------------------------------------------------
