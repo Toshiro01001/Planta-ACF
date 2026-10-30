@@ -930,5 +930,12 @@ document.addEventListener('keydown', e => {
 const btn = $('#btnArquivo'); if (btn) btn.addEventListener('click', () => abrir());
 setInterval(marcarSalas, 1500);
 setTimeout(redesenhar, 800);
-window.ACF_ARQUIVO = { abrir, fechar, glifoSVG, GLIFOS, mostrarVisao, tentarCodigo, sincCofres };
+// o 3D põe na sala uma pasta (documento) ou a cifra na parede; tocar abre o Arquivo nela
+function daSala3D(cn) {
+  const cs = A.mestre ? daSala(sg()._cifras || {}, cn).filter(([, c]) => c.pub) : daSala(cifrasPub(), cn);
+  const ds = A.mestre ? daSala(sg()._docs || {}, cn).filter(([, d]) => d.pub) : daSala(docsPub(), cn);
+  return [...cs.map(([id, c]) => ({ tipo: 'cifras', id, tit: c.tit || 'Inscrição' })), ...ds.map(([id, d]) => ({ tipo: 'docs', id, tit: d.tit || 'Documento' }))];
+}
+function abrirNaSala(tipo, id) { abrir(tipo === 'cifras' ? 'cifras' : 'docs'); if (id) { Arq.sel[tipo === 'cifras' ? 'cifras' : 'docs'] = id; Arq.mob = 'leitor'; desenharLeitor(true); } }
+window.ACF_ARQUIVO = { abrir, fechar, glifoSVG, GLIFOS, mostrarVisao, tentarCodigo, sincCofres, daSala3D, abrirNaSala };
 })();

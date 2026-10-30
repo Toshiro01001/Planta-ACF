@@ -247,8 +247,9 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 
 ### Como abrir
 
+- **Botão 3D** (roxo, na coluna de controles da câmera, no canto do mapa): entra direto no mundo 3D, sem clicar numa sala. Jogador e auxiliar entram onde está o próprio token (se estiver num corredor, na sala mais perto); o Mestre entra na sala selecionada ou na Zona Neutra do andar que está na tela.
 - No cartão da sala: **🧊 Ver a sala em 3D** e **🏢 Andar inteiro (3D)**.
-- **Jogador:** só abre a sala onde está o token da cobaia dele. Se o token muda de andar, a vista reabre no andar novo.
+- **Jogador:** só abre a sala onde está o token da cobaia dele. Se o token muda de andar, a vista reabre no andar novo. Se o andar novo ainda está trancado neste aparelho, o 3D fecha e aparece a tela da senha; depois de digitar, é só tocar no 3D de novo.
 - **Mestre e auxiliares:** abrem qualquer sala e qualquer andar.
 
 ### Arquivos
@@ -259,6 +260,9 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 | `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
 | `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
 | `tokens3d.js` | Miniaturas: as sete cobaias, os robôs S.T.A.F.F., NPCs e as formas dos Filhos |
+| `andares3d.js` | Objetos próprios dos andares 2 a 5 (máquinas, relíquias, crescimentos de carne…), no mesmo estilo do `detalhes3d.js` |
+| `vozes.js` | Vozes das mensagens do chat no 3D, geradas na hora (sem arquivos de áudio) |
+| `dados3d.js` | Dados 3D com física (d4, d6, d8, d10, d12, d20) na tela de quem rolou; a física vem do cannon.js (jsDelivr), baixado só na primeira rolagem |
 | `salas-3d.json` | O que existe em cada uma das 125 salas. **Fica fora do GitHub.** O Mestre importa pelo cartão de qualquer sala |
 | `modelos/` (opcional) | Modelos 3D em `.glb` que substituem as miniaturas desenhadas por código |
 
@@ -284,17 +288,123 @@ Toda Zona Neutra (sala 25 de cada andar) tem beliches, camas, armários, mural, 
 
 - Perto da banca: **E · Falar com o Maurício** abre a Loja do Maurício (as mesmas regras de loja aberta/fechada).
 - Perto da geladeira ou do bebedouro: **E** pega 1 comida ou 1 água da despensa (mesma regra do botão "Pegar 1").
+- **Estação de leitura O.R.F.E.U.:** em toda Zona Neutra há um terminal (mesa com monitor verde) e um arquivo de aço com mural de cifras, com a placa "ESTAÇÃO DE LEITURA O.R.F.E.U.". Perto do terminal: **E · Usar o Terminal O.R.F.E.U.** abre o Arquivo direto na aba Terminal. Perto do arquivo: **E · Ler o Arquivo** abre documentos e cifras. São as mesmas telas do 📜 Arquivo do painel, com as mesmas liberações do Mestre.
 
 ### Esconderijos
 
 Móveis marcados como esconderijo (embaixo da cama, dentro do armário, atrás do balcão…) mostram "E · Esconder". O token fica escondido: some da tela de todos, menos do dono e do Mestre, nas duas vistas. Andar de novo tira do esconderijo. **Limite:** é ocultação visual; a posição continua no Firebase.
 
-### Na tela 3D
+### Saída do andar (elevador, poço, eclusa, fenda)
 
-- **Fora:** casa de bonecas (as paredes do lado da câmera somem). **Dentro:** primeira pessoa. **Cima:** vista do teto. **Andar/Sala:** alterna a sala e o andar inteiro. **Lanterna (L)**, **Som**.
-- **Teclado:** WASD ou setas; Shift corre; E interage; L lanterna; Esc fecha. Clique no chão anda até o ponto. Com a vista aberta, nenhuma tecla chega ao mapa.
-- **Celular:** joystick no canto no modo Dentro; arrastar a tela olha em volta.
-- **Qualidade:** ⚙ → Alta (sombras, brilho, anti-serrilhado) ou Leve. Fica salva no aparelho. Celular começa em Leve.
+No fim do corredor de saída de cada andar fica o elevador (no 2º andar, a saída é o poço dentro da própria sala). Chegando nele: **E · Usar a saída do andar**.
+
+- **Jogador e auxiliar:** escolhem o andar e **pedem ao Mestre**. Só o Mestre muda o andar de um token (regra do Firebase), e é ele quem decide se a passagem abre e o que ela cobra. O pedido aparece como alerta na tela do Mestre (também por cima do 3D) e na fila **Pedidos**, com **Levar ao Nº andar** ou **Recusar**. Aprovado, vão juntos quem pediu e as cobaias, robôs e NPCs que estiverem na saída.
+- **Mestre:** no próprio 3D, marca quem vai (já vêm marcados os tokens que estão na saída) e o andar, e toca em **Levar**. A vista dele acompanha.
+- **Chegada:** descendo, a 1ª sala do andar (Doca de Chegada, Plataforma de Descarga, Antecâmara das Relíquias, O Fim da Descida); subindo, a sala da saída do andar de cima.
+- O jogador ainda precisa da senha do andar novo para ver o 2.5D e o 3D dele.
+
+### Chat dentro do 3D: balões e vozes
+
+- **💬** no topo da vista (ou Enter) abre o chat por cima do 3D. A mensagem do Geral aparece num **balão em cima da cabeça** de quem falou, para quem está vendo aquele token (o jogador só vê quem está na mesma sala; os balões seguem o personagem e somem depois de alguns segundos). Rolagens aparecem como balão roxo.
+- As falas do **Mestre** aparecem como legenda na parte de baixo da tela.
+- **Cada personagem tem uma voz**, gerada na hora: Velcro, criança (menina); Papel, mulher (suave); Faca, mulher (firme); Luva, homem; Sabonete, mascarado (abafado); Papelão, remendado (grave, arrastado, várias vozes juntas); B00BIES, M3RL1N e K4ISER, robôs (agudo, grave e metálico). O volume cai com a distância e o som vem do lado onde o personagem está.
+- **Trocar a voz:** ⚙ Opções do 3D → **Voz no chat** (com ▶ para ouvir). Fica no token (`vz`), então todos ouvem a mesma voz. O Mestre troca a de qualquer token no painel 🎛.
+- **C2P0 e Mostarda** continuam com as línguas próprias: o balão mostra os bips e zips ou os grunhidos para quem não conjurou **Compreensão Paranormal**; Mestre e auxiliares leem o original, como no chat.
+
+### Dados 3D
+
+Toda rolagem feita no site (🎲 Dados, perícias, ataques, dano e rituais da ficha) mostra, na tela de quem rolou, um quadradinho com os dados caindo numa bandeja com física de verdade. O número que fica para cima é sempre o que o site sorteou (a física roda primeiro e as faces são numeradas para a face de cima ser a sorteada). Em testes com vários d20, o dado usado brilha. Toque no quadradinho para fechar. Opções do 3D: ligar ou desligar e também mostrar no mapa 2D.
+
+### Metros andados
+
+No canto superior direito, abaixo do decibelímetro: **🚶 X m**, os metros de regra que o seu token andou (mapa 2D e 3D), contados neste aparelho. ↺ zera. Teleporte (o Mestre trouxe, saída do andar) não conta. Na perseguição, a faixa do topo continua mostrando os metros da vez.
+
+### Itens do livro nas salas
+
+As cenas trazem itens do livro jogados pelas salas (pé de cabra, lanternas, kits, munição, medicamentos…; poucos itens amaldiçoados, nos andares de baixo). Eles só aparecem quando o Mestre quer: painel 🎛 → **Itens do livro no Nº andar → Espalhar todos** (ou **Recolher**). Perto de um item: **E · Pegar**. Ele some para todos (`mapa/estoque/i_<CN>_<n>`, a mesma regra da despensa) e entra no inventário da **ficha ativa** com os dados do catálogo (marcado como achado); o chat avisa quem pegou.
+
+### Documentos e cifras nas salas
+
+Documento ou cifra do Arquivo com **Onde aparece: Na parede de uma sala** e publicado vira uma pasta no chão daquela sala no 3D. **E · Ler** abre o Arquivo direto nele.
+
+### Esconder-se (regra do livro)
+
+Ao entrar num esconderijo, a ficha ativa rola **Furtividade contra DT 15** (Sobrevivendo ao Horror, Furtividade: "Esconder-se"; passou, a visibilidade cai 1). A rolagem vai só para o Mestre (Sussurro; no auxiliar, canal dos Filhos), para o chat Geral não entregar quem se escondeu. Sem ficha ativa, o aviso pede para rolar se o Mestre pedir.
+
+### Personagens sólidos
+
+Os tokens não atravessam móveis nem uns aos outros: quem anda bate e desliza, e um token posto pelo mapa 2D em cima de uma cama ou armário aparece no ponto livre mais perto (só na tela; a posição de regra não muda). Dois tokens no mesmo ponto se afastam um pouco.
+
+### Perseguição: 2.5D e 3D juntos (ou só 3D)
+
+As duas vistas usam a MESMA perseguição (`mapa/persg`): ordem de iniciativa, de quem é a vez, o limite de metros de cada um e os metros já gastos na vez (`m` no token). Arrastar no mapa 2D e andar no 3D passam pelas mesmas regras:
+
+- **Fora da vez**, os dois recusam ("Na perseguição, só quem está na vez se move"). No 3D, a faixa do topo mostra de quem é a vez e, na sua, "Sua vez: X / 9 m".
+- **Metros:** o que você anda no 3D é descontado no 2D e vice-versa; quando acaba, o token para no ponto exato ("Deslocamento esgotado"). Os metros são os de regra: a sala do 3D tem 10 m de lado, mas vale a sala da planta (50 m²), então dentro dela cada passo do 3D rende uns 70% de metro de regra; no corredor é igual.
+- **Misturado:** um jogador pode correr no 3D enquanto outro arrasta no 2D, na mesma rodada; o Mestre vê tudo nas duas vistas.
+- **Só no 3D:** funciona igual. O Mestre conduz pela gaveta 🗂 (Painel do Mestre, bloco Perseguição: pedir iniciativa, iniciar, próxima vez, refazer rota, cronômetro); os jogadores rolam a iniciativa pelo pedido que abre na tela (os dados 3D rolam junto); os Filhos andam pelo Mestre ou pelo auxiliar (🎛 → controlar o token), com as mesmas regras, a menos que o Mestre ligue o movimento livre.
+- **Cuidado:** no 3D o jogador só enxerga a própria sala. Para ter a visão do andar inteiro durante a fuga, o Mestre pode deixar o 2.5D aberto em outra aba ou usar o botão 🏢 Andar.
+
+### Protocolo no 3D
+
+Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as luzes ficam vermelhas e pulsando, a tela puxa para o vermelho e toca uma **sirene**. Os Filhos que o Mestre (ou o auxiliar) revela aparecem com as formas escolhidas.
+
+### Na tela 3D: jogando como num jogo
+
+**Câmeras (barra de baixo):**
+
+| Botão | O que faz |
+|---|---|
+| 🎮 **Jogo** | Terceira pessoa, câmera atrás do ombro do seu token. A câmera encosta na parede em vez de atravessar. É o modo que abre por padrão para quem controla um token |
+| 👁 **Olhos** | Primeira pessoa |
+| 🏠 **Fora** | Casa de bonecas: as paredes do lado da câmera somem |
+| ⬇ **Cima** | Vista do teto |
+| 🔦 **Luz** | Lanterna |
+| 🏢 **Andar/Sala** | Alterna a sala e o andar inteiro |
+
+**Computador (modos Jogo e Olhos):** clique na tela para prender o mouse; aí o mouse gira a câmera e a mira (ponto no centro) mostra para onde você olha. Clique com o mouse preso usa o que está na mira (terminal, Maurício, geladeira, porta) ou interage com o que estiver perto. **Esc** primeiro solta o mouse; um segundo Esc fecha menu, gaveta ou a vista. Roda do mouse aproxima e afasta.
+
+**Teclas:**
+
+| Tecla | Ação |
+|---|---|
+| WASD / setas | Andar (Shift corre) |
+| E | Interagir (porta, botão, esconderijo, loja, terminal, arquivo, comida, água) |
+| Tab | Abre e fecha a gaveta 🗂 com o painel completo |
+| M | Menu ☰ |
+| C | Troca a câmera (Jogo → Olhos → Fora → Cima) |
+| Enter | Chat |
+| F | Fichas |
+| B | Quadro da equipe |
+| R | Dados |
+| I | Arquivo · Cifras · Terminal |
+| L | Lanterna |
+| Esc | Solta o mouse; depois fecha menu, gaveta, painéis e a vista |
+
+Com qualquer janela do site aberta por cima do 3D (ficha, chat, arquivo, loja), as teclas vão para ela, não para o jogo.
+
+**Celular:** joystick no canto esquerdo anda; arrastar a tela olha em volta; pinça aproxima. No celular a gaveta abre como uma folha que sobe de baixo (82% da tela) e esconde joystick e barra enquanto está aberta. Toque no objeto (ou no aviso "E · …" que aparece embaixo) para usar.
+
+**Topo da tela:** ☰ Menu · 💬 Chat · 🗂 Gaveta · 🎛 Controles (Mestre e auxiliares) · ⚙ Opções · ✕ Sair.
+
+### Tudo do site dentro do 3D
+
+O 3D não tem um painel paralelo: a gaveta 🗂 recebe o **painel verdadeiro do site** (o mesmo `#painel` e o cartão da sala), e ele volta para o lugar quando a vista fecha. Por isso qualquer função nova do painel já funciona no 3D sem retrabalho. Dados, avisos e o "Sua vez" também aparecem por cima do 3D, e todas as janelas do site (fichas, quadro, arquivo, loja, chat, diálogos) abrem por cima da cena.
+
+**Menu ☰ por perfil:**
+
+- **Jogador:** Minha cobaia (gaveta), Fichas, Dados, Chat, Arquivo · Cifras · Terminal, Loja do Maurício, Quadro, Caderno, Som, Opções, Ajuda, Sair.
+- **Mestre auxiliar:** Painel, Controles do 3D, **Meu robô aqui**, Fichas, Ameaças e Filhos, Dados, Chat, Arquivo, Quadro, Escudo, Som, Opções, Ajuda, Sair.
+- **Mestre:** a gaveta vira o **Painel do Mestre** (as mesmas abas da tela 2D, com as notas e a membrana da sala) e o menu traz Controles do 3D, Fichas, Dados, Chat, Arquivo, Loja (Mestre), Quadro, Escudo, Som, Opções, Ajuda, Sair.
+- Regras, Hall da Caixa, Parede de Desejos e Cor da cobaia entram no menu quando o botão correspondente existe no painel daquele perfil.
+
+### Robôs S.T.A.F.F. dos auxiliares
+
+Cada auxiliar com perfil de robô (C2P0, B00BIES, M3RL1N, K4ISER) coloca o próprio robô no mapa:
+
+- **No 2D:** painel do auxiliar → **🤖 Colocar meu robô no mapa** (entra na Zona Neutra do andar que está na tela).
+- **No 3D:** menu ☰ → **Meu robô aqui** (entra num ponto livre perto da câmera) e a vista passa a controlar o robô no modo Jogo.
+- **Como funciona:** o auxiliar grava o robô escondido em `privado/tokens`; a tela do Mestre confirma e publica no mapa (com aviso no chat "🤖 … entrou no Nº andar"). **A tela do Mestre precisa estar aberta** para o robô aparecer. Se o robô já está no mapa, o botão leva o robô até o ponto, desde que seja o mesmo andar. Trocar o robô de andar continua sendo com o Mestre (elevador).
 
 ### Desempenho
 
