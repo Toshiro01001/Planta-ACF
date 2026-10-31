@@ -152,6 +152,7 @@ Ficha editável de Ordem Paranormal, no estilo do C.R.I.S.: atributos, perícias
 - **🎮 Em jogo (aba padrão):** tudo o que se usa na mesa em botões grandes: PV, PE e SAN com − e +, o turno (Padrão, Movimento e Reação, que se marcam sozinhos ao atacar ou conjurar e somem quando o turno muda), ataques, perícias treinadas, habilidades com botão de uso, rituais e itens usáveis.
 - **Ataque em um clique:** "⚔ Atacar" rola o ataque e o dano juntos; se o d20 escolhido chega na margem de crítico da arma, o dano sai multiplicado. "Só dano" fica para ataques que acertam sem teste.
 - **Habilidades com uso:** um botão "⚡ usar" gasta o custo (respeitando o limite por turno) e guarda o bônus para o próximo teste que combinar (qualquer, perícia treinada ou sem treino, ataque ou um atributo). Saber é Poder, Perito e Eclético já vêm preenchidas; as outras se configuram dentro da habilidade.
+- **Poderes que mudam a conta sozinhos:** com **Racionalidade Inflexível** na aba Habilidades (pelo nome, com ou sem acento), Vontade passa a usar Intelecto e o PE máximo é calculado com Intelecto; a barra mostra "PE · INT". Vale quando Intelecto é maior ou igual a Presença (o poder diz "pode usar"). Um atributo escolhido à mão na perícia continua mandando. PD (regra de Determinação) e DT de rituais seguem com Presença. Quem já tinha compensado o poder no "ajuste" do PE precisa zerar o ajuste.
 - **Itens usáveis:** "Usar em mim" rola e soma na ficha; "Usar em outra pessoa" rola e mostra o número. Gasta uma unidade se marcado. O Cicatrizante já vem pronto; os outros se configuram no item. Conjurar sem Componentes Ritualísticos do elemento pede confirmação.
 - **Registro da cobaia (aba Descrição):** contadores de 20 e 1 naturais, rituais conjurados, Presenças resistidas, interlúdios e noites em claro, com medalhas de bronze, prata e ouro.
 - **Exportar e importar:** cada ficha baixa um arquivo `.json` (cópia de segurança). "Importar arquivos" cria fichas novas a partir deles, vários de uma vez, na aba aberta: Minhas fichas (jogador, auxiliar ou Mestre) ou Ameaças e Filhos (Mestre e auxiliares).
@@ -260,7 +261,8 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 | `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
 | `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
 | `tokens3d.js` | Miniaturas: as sete cobaias, as quatro cobaias NPC (Coelho, Cara Pálida, Risa, Onírico, que anda rastejando), os robôs S.T.A.F.F., a Presença (aparição translúcida) e as formas dos Filhos. Rostos pintados em textura, com sombra, íris, brilho e cílios |
-| `andares3d.js` | Objetos próprios dos andares 2 a 5 (máquinas, relíquias, crescimentos de carne…), no mesmo estilo do `detalhes3d.js` |
+| `andares3d.js` | Objetos próprios dos cinco andares (máquinas, relíquias, crescimentos de carne, vigas, passarelas, rastros, barricadas…), no mesmo estilo do `detalhes3d.js`, usados pelas salas montadas à mão para 20 m |
+| `exposicao3d.js` | Ambientes das Salas de Exposição no 3D (chuva, maré, paredes que fecham, desabamento, labirinto, horda, fogo, gelo…) e a camada animada por cima da sala no mapa 2.5D. Só construtores genéricos: nomes e textos das salas de exposição ficam no arquivo fora do GitHub |
 | `vozes.js` | Vozes das mensagens do chat no 3D, geradas na hora (sem arquivos de áudio) |
 | `dados3d.js` | Dados 3D com física (d4, d6, d8, d10, d12, d20) na tela de quem rolou; a física vem do cannon.js (jsDelivr), baixado só na primeira rolagem |
 | `salas-3d.json` | O que existe em cada uma das 125 salas. **Fica fora do GitHub.** O Mestre importa pelo cartão de qualquer sala |
@@ -268,8 +270,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 
 ### Regras do mapa valem no 3D
 
-- **Tamanho no 3D:** a sala tem **20 m de lado** e 3,2 m de pé-direito; o corredor tem 14 m de comprimento e 2,4 m de largura. As cenas feitas para salas menores se espalham sozinhas (o que está na parede continua na parede) e cada sala grande ganha, sorteado pela CN e igual para todos, mais móveis de parede (armários, estantes, arquivos, caixotes), até dois esconderijos novos, papéis, sangue e manchas. Os vãos das portas ficam sempre livres.
-- **Mobília da própria sala:** além disso, cada sala grande copia os móveis que a cena já tem (carteiras na sala de aula, macas e armários no hospital, estantes no arquivo, cadeiras, bancadas, quadros e cartazes nas paredes…) para os espaços vazios, com os mesmos esconderijos (até 3 a mais por sala). Uma cópia só entra se ainda der para andar de qualquer porta a qualquer outra (o site confere numa grade de 25 cm) e se a sala continuar com pelo menos metade do chão livre. Também é sorteado pela CN: todos veem a mesma sala.
+- **Tamanho no 3D:** a sala tem **20 m de lado** e **4 m de pé-direito**; o corredor tem 14 m de comprimento e 2,4 m de largura. Cada sala foi montada à mão para esse tamanho (cenas com `"lado":20`), com peças próprias de cada andar: ponto focal ligado ao nome e à descrição da sala, zonas (entrada, área principal, fundos, paredes e teto com detalhe), pequenas cenas de terror, esconderijos plausíveis, luz com cantos escuros e nada flutuando. Os vãos das portas e o caminho entre elas ficam sempre livres (o gerador confere numa grade de 25 cm).
 - **Distância:** as regras continuam sendo as da planta (sala de 50 m², corredor de 14 m). O movimento passa por `ACF.moverToken3D`, que aplica o limite de metros da perseguição, as paredes e as portas. Numa fuga, o token para quando acaba o deslocamento, igual ao mapa. Como a sala do 3D (20 m) é bem maior que a da regra (7,07 m), dentro dela cada passo do 3D rende uns 35% de metro de regra: atravessar a sala inteira no 3D custa os mesmos ~7 m de regra do 2.5D.
 - **Corredores:** 2,4 m de largura, para duas pessoas andarem lado a lado. Paredes amareladas no estilo Backrooms; quanto mais fundo o andar, mais sangue, carne e lâmpadas mortas.
 - **Portas:** cada corredor tem a porta no estado público da planta (fechada, abrindo, trancada, com teclado, escombros, carne ou aberta). Porta fechada barra o corredor. Ao lado do vão, dentro da sala, fica o painel com o botão vermelho. Tecla **E** (ou toque no botão) aperta o botão quando a regra deixa; com teclado, pede o código. Só o Mestre fecha portas.
@@ -326,6 +327,29 @@ Uma sala pode ter, na cena, o objeto `campo_infinito`: uma figura (triângulo in
 - Mestre e auxiliares controlando um token também ficam presos (rolam d20 puro). A câmera livre do Mestre não sente o campo.
 - **Limite:** vale no 3D. Arrastando no mapa 2D, o token não sente o campo.
 - O `salas-3d.json` desta versão traz o objeto na sala que tem a figura. **É preciso importar o arquivo de novo** (cartão de qualquer sala, perfil do Mestre).
+
+### Mochila (tecla I)
+
+Jogador: **I** (no mapa e no 3D), o ☰ Menu → **Mochila** no 3D. Mostra o que a **ficha ativa** carrega, como num jogo: carga (com o aviso de sobrecarga), os limites de categoria da patente, filtros (Armas, Proteção, Consumíveis, Outros) e cada item com ícone, quantidade, categoria e espaço. Tocando num item aparecem a descrição, o dano, o elemento e, nos itens de cura e afins, **Usar** (mesma regra do botão "Usar em mim" da ficha: rola, soma na ficha e gasta o item). Itens pegos no 3D aparecem marcados como "achado". Editar o inventário continua sendo na ficha (📋 Ver na ficha). I ou Esc fecha.
+
+### Narrador (só o Mestre; tecla N no 3D)
+
+Quando uma cobaia entra numa sala, abre para o Mestre um quadro com: quem entrou, a sala (com "primeira vez" na primeira visita), o texto **Para ler à mesa** (o que as cobaias veem, do caderno), o **Na mesa** do caderno, as suas notas da sala, a sala de exposição posta ali e quantos itens há no chão. **📢 Narrar no chat** manda o texto para ler no chat Geral (no 3D aparece como legenda do Mestre). Tocar no nome da sala leva a vista até ela. O botão "Abre sozinho / Só no N" escolhe se o quadro abre sozinho a cada entrada.
+
+- Os textos vêm junto do arquivo de cenas 3D (`salas-3d.json`, campo `narrativa`) e, ao importar, vão para os segredos do Mestre (`segredos/_narrativa`). Jogadores nunca recebem esses textos.
+
+### Itens que o Mestre deixa nas salas (3D)
+
+No 3D, painel 🎛 → **Deixar um item nesta sala**: escreva o nome (a lista sugere os itens do catálogo) e toque em **Colocar**. O item aparece no chão à sua frente (em primeira pessoa) ou no centro da vista, para todos que veem a sala, com a mesma peça dos itens do livro. Quem chega perto usa **E · Pegar**: o item some para todos e entra na ficha ativa (com os dados do catálogo, se o nome bater). No mesmo bloco o Mestre vê os itens que deixou ali (e os que já foram pegos) e tira com ✕. Fica em `mapa/itens3d` e `mapa/estoque/m_<chave>`.
+
+### Salas de Exposição no 3D e no mapa 2.5D
+
+Quando o Mestre dá **▶ Iniciar** numa Sala de Exposição posta numa CN, aquela sala **se transforma** para todos que a veem, e muda com as rodadas e com o progresso do grupo:
+
+- **3D:** o ambiente entra por cima da cena da sala (chuva de sangue ou de cinzas, água subindo a cada rodada, paredes se fechando, teto rachando e pedaços caindo, labirinto de paredes altas, enxame de silhuetas, vento, gelo, fogo, floresta, plateia, relógio gigante…), com névoa e luz próprias enquanto você está ali. Paredes do labirinto e afins bloqueiam o andar, mas nunca os vãos das portas. Ao encerrar, a sala volta ao normal.
+- **Mapa 2.5D:** uma camada animada por cima da sala (chuva caindo, líquido subindo, paredes fechando, grade do labirinto, zonas piscando) e o selo **EXPOSIÇÃO · nome · rodada N**. Respeita "reduzir movimento" do aparelho.
+- O visual de cada sala de exposição vem do campo `cena3d` da biblioteca (`salas-exposicao.json`, fora do GitHub). Sem `cena3d`, o site escolhe pelo `modelo`, elemento e ambiente sonoro. **Importe a biblioteca de novo** (Mesa → Salas de Exposição → ⬆ Importar) para trazer o `cena3d` das 37 salas.
+- **Limite:** como o resto do estado da exposição em andamento, o nome público e o visual ficam em `mapa/expo` (todos leem). O efeito secreto e os eventos continuam só com o Mestre.
 
 ### Zona Neutra no 3D
 
@@ -434,7 +458,9 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 | F | Fichas |
 | B | Quadro da equipe |
 | R | Dados |
-| I | Arquivo · Cifras · Terminal |
+| I | Mochila (inventário da ficha ativa) |
+| K | Arquivo · Cifras · Terminal |
+| N | Narrador (Mestre) |
 | L | Lanterna |
 | 1 a 9 | Habilidades do Filho no Controle (Mestre e auxiliares) |
 | Esc | Solta o mouse; depois fecha menu, gaveta, painéis e a vista |
@@ -481,11 +507,12 @@ O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só o
 
 `{"tipo":"planta-acf-3d","versao":2,"salas":{"c4":{piso,parede,teto,amb,nevoa,som,itens:[{t:"cadeira_dentista",x,z,r,esc,v}]}},"formas":{"f04":"colosso"}}`
 
-- Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. A sala do 3D tem 20 m: cenas com `lado` 10 (ou sem `lado`, formato antigo de 7,07 m) são espalhadas sozinhas e ganham o enchimento sorteado; uma cena feita já com `"lado":20` (de −9,9 a 9,9) entra como está, sem enchimento.
+- Medidas em metros. Com `"lado":10`, a sala vai de −4,9 a 4,9 em x (oeste → leste) e em z (norte → sul); pé-direito 3,2 m. A sala do 3D tem 20 m: cenas com `lado` 10 (ou sem `lado`, formato antigo de 7,07 m) são só espalhadas (ficam ralas); uma cena feita já com `"lado":20` (de −9,9 a 9,9, pé-direito 4 m) entra como está. O arquivo desta versão traz as 125 salas com `"lado":20`.
 - Os vãos das portas ficam no meio de cada parede (2,4 m de largura). Deixe esses trechos livres.
 - `uso`: `loja` (Maurício), `agua` ou `comida` (despensa).
 - `imagens`: imagens embutidas na cena (`{"mae":"data:image/jpeg;base64,…"}`), usadas por quadros com `img:"mae"`. Como ficam dentro do arquivo de cenas, não vão para o GitHub.
 - `esc`: nome do esconderijo. `v`: versão da sala onde o item aparece (`neutro`, `rei`, `mae`, `consagrado`).
+- `narrativa`: `{"c13":{"nome":…,"el":…,"ler":"texto para ler à mesa","mesa":"nota do Mestre"}}`. Ao importar, vai para `segredos/_narrativa` (só o Mestre lê) e alimenta o Narrador.
 - Som gerado pelo navegador, sem arquivos: zumbido, fluor, freezer, ventilacao, vapor, gotas, coracao, bip, estatica, vela, maquinas, neutra, eco, relogio, geiger, grilos, vento, mar, alarme_baixo, respiracao, coro.
 
 ### Modelos 3D próprios (opcional)

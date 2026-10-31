@@ -320,7 +320,7 @@ function salaPublica(s) {
   const { meta = {} } = s;
   return { id: s.id, nome: s.nome, el: s.el, vd: s.vd, modelo: s.modelo, obj: s.obj, desc: s.desc, rodTxt: (s.rodada || {}).txt || '',
     meta: { modo: meta.modo || 'grupo', rotulo: meta.rotulo || 'sucessos', sucessos: meta.sucessos || null, falhasMax: meta.falhasMax || null, rodadas: /^\d+$/.test(String(meta.rodadas || '')) ? meta.rodadas : null, distancia: meta.distancia || null, horda: meta.horda || null },
-    acoes: (s.acoes || []).map(a => ({ n: a.n, per: a.per || [], livre: !!a.livre, dt: a.dt === undefined ? null : a.dt, dtOutras: a.dtOutras, s: int(a.s), dobro: !!a.dobro, dano: a.dano || '', tipo: a.tipo || '', danoFalha: a.danoFalha || '', tipoFalha: a.tipoFalha || '', txt: String(a.txt || '').slice(0, 900) })) };
+    acoes: (s.acoes || []).map(a => ({ n: a.n, per: a.per || [], livre: !!a.livre, dt: a.dt === undefined ? null : a.dt, dtOutras: a.dtOutras, s: int(a.s), dobro: !!a.dobro, dano: a.dano || '', tipo: a.tipo || '', danoFalha: a.danoFalha || '', tipoFalha: a.tipoFalha || '', txt: String(a.txt || '').slice(0, 900) })), cena3d: s.cena3d || null };
 }
 function vigiarEntradas() {
   if (!A.mestre || !A.segredosProntos) return;

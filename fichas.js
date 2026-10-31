@@ -130,7 +130,8 @@ function calc(d) {
   const ganho = (base, porNivel, attr) => base + attr + (n - 1) * (porNivel + (fixo ? 0 : attr));
   const r = { n };
   r.pvMax = ganho(cl.pv[0], cl.pv[1], at('vig')) + int((d.pv || {}).aj);
-  r.peMax = ganho(cl.pe[0], cl.pe[1], at('pre')) + int((d.pe || {}).aj);
+  r.peAtr = racional(d) ? 'int' : 'pre';
+  r.peMax = ganho(cl.pe[0], cl.pe[1], at(r.peAtr)) + int((d.pe || {}).aj);
   r.sanMax = cl.san[0] + (n - 1) * cl.san[1] + int((d.san || {}).aj);
   r.pdMax = ganho(cl.pd[0], cl.pd[1], at('pre')) + int((d.pd || {}).aj);
   r.peTurno = (cl.estagio || d.classe === 'mundano' ? 1 : n) + int(d.peTurnoAj);
@@ -167,7 +168,13 @@ function patenteDe(d) {
   PATENTES.forEach(x => { if (int(d.pp) >= x.pp) p = x; });
   return p;
 }
-const atrDaPericia = (d, id) => { const a = ((d.per || {})[id] || {}).a; return ATRS.some(x => x[0] === a) ? a : PER[id][2]; };
+// Poderes que mudam a conta da ficha sozinhos (pelo nome do poder na aba Habilidades)
+const semAc = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const temPoder = (d, nome) => lista((d || {}).hab).some(h => semAc(h.n).startsWith(nome));
+// Racionalidade Inflexível: Intelecto no lugar de Presença em Vontade e nos PE (usa o maior dos dois: o poder diz "pode usar")
+const racional = d => temPoder(d, 'racionalidade inflexivel') && int((d.atr || {}).int) >= int((d.atr || {}).pre);
+const atrPadrao = (d, id) => (id === 'vontade' && racional(d) ? 'int' : PER[id][2]);
+const atrDaPericia = (d, id) => { const a = ((d.per || {})[id] || {}).a; return ATRS.some(x => x[0] === a) ? a : atrPadrao(d, id); };
 const catEfetiva = it => int(it.cat) + lista(it.mods).length;
 const lista = o => Object.entries(o || {}).map(([id, v]) => ({ ...v, id })).sort((a, b) => (a.o || 0) - (b.o || 0));
 
@@ -677,8 +684,8 @@ function desenharFicha() {
     <section class="fx-col fx-col-meio fx-painel">
       <h4 class="fx-ph"><i>04</i>Perícias</h4>
       <table class="fx-pericias"><thead><tr><th>Perícia</th><th>Atr.</th><th title="Treinado, Veterano, Expert">Treino</th><th>Outros</th><th>Total</th></tr></thead>
-      <tbody>${PERICIAS.map(([id, n, a, so, carga]) => {
-        const p = d.per[id] || {};
+      <tbody>${PERICIAS.map(([id, n, a0, so, carga]) => {
+        const p = d.per[id] || {}, a = atrPadrao(d, id);
         const t = int(p.t);
         return `<tr data-per="${id}" class="${t ? 'treinada t' + t : ''}">
           <td><button class="fx-rolar" data-acao="rolar-per" data-v="${id}" title="Rolar ${n}">${n}<sup>${so ? '*' : ''}${carga ? '+' : ''}</sup></button></td>
@@ -826,9 +833,18 @@ function atualizarDerivados() {
     const b = r.bonus(id);
     put('per-' + id, b > 0 ? '+' + b : b < 0 ? '−' + Math.abs(b) : '0');
     const tr = $(`tr[data-per="${id}"]`, raiz);
-    if (tr) { const t = int((d.per[id] || {}).t); tr.className = t ? 'treinada t' + t : ''; $$('.fx-treino button', tr).forEach(x => x.classList.toggle('on', t >= int(x.dataset.v))); }
+    if (tr) {
+      const t = int((d.per[id] || {}).t); tr.className = t ? 'treinada t' + t : ''; $$('.fx-treino button', tr).forEach(x => x.classList.toggle('on', t >= int(x.dataset.v)));
+      // atributo automático (poder adicionado ou removido): só onde o jogador não escolheu outro à mão
+      const pa = (d.per[id] || {}).a, a = atrPadrao(d, id), sel = $('.fx-per-atr', tr), ro = $('.fx-per-atr-ro', tr);
+      if (sel && sel.value !== (pa || a) && document.activeElement !== sel) sel.value = pa || a;
+      if (sel) sel.classList.toggle('mudado', !!(pa && pa !== a));
+      if (ro) { ro.textContent = (pa || a).toUpperCase(); ro.classList.toggle('fx-mudado', !!(pa && pa !== a)); }
+      tr.title = a !== PER[id][2] ? 'Racionalidade Inflexível: Intelecto no lugar de Presença' : '';
+    }
   });
   $$('.fx-pips', raiz).forEach(p => { const v = int(d.atr[p.dataset.pips]); [...p.children].forEach((x, i) => x.classList.toggle('on', i < v)); p.classList.toggle('mais', v > 5); });
+  $$('[data-barra="pe"] .fx-barra-tit i', raiz).forEach(i => { i.textContent = r.peAtr === 'int' ? 'PE · INT' : 'PE'; i.title = r.peAtr === 'int' ? 'Racionalidade Inflexível: PE calculados com Intelecto' : ''; });
   $$('.fx-barra', raiz).forEach(b => {
     const k = b.dataset.barra, mx = r[b.dataset.max];
     const a = d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx;
@@ -1851,6 +1867,29 @@ window.ACF_FICHAS = {
     return tem + 1 > max ? { cat: ROM[int(x.cat)], tem, max, pat: r.patente.n } : null;
   },
   consumoMissao,
+  // mochila: o inventário da ficha ativa, pronto para mostrar (3D e mapa)
+  mochila() {
+    if (!F.ativaD) return null;
+    const d = F.ativaD, r = calc(d);
+    const itens = lista(d.itens).map(it => ({ id: it.id, n: it.n || 'Item', t: it.t || 'geral', cat: catEfetiva(it), catR: ROM[catEfetiva(it)] || '0', esp: num(it.esp), qtd: it.qtd === undefined || it.qtd === '' ? 1 : int(it.qtd),
+      d: it.d || '', el: it.el || '', achado: !!it.achado, vest: !!it.vest, dano: it.a && it.a.dano ? it.a.dano : '', usavel: !!usoItem(it), uso: usoItem(it) }));
+    return { nome: d.nome || '', itens, carga: +r.carga.toFixed(1), cargaMax: r.cargaMax, sobrecarga: r.sobrecarga, contagem: r.contagem, lim: r.patente.lim, patente: r.patente.n, ROM };
+  },
+  // usar um item da mochila (cura e afins) na ficha ativa: mesma regra do botão "Usar em mim" da ficha
+  async usarItemAtiva(id) {
+    const d = F.ativaD; if (!d) return 'Sem ficha ativa.';
+    const it = (d.itens || {})[id], u = usoItem(it); if (!u) return 'Este item não tem uso direto.';
+    const qtd = it.qtd === undefined || it.qtd === '' ? 1 : int(it.qtd);
+    if (qtd <= 0) return `Acabou: ${it.n}.`;
+    const rr = rolarExpr(u.x), r = calc(d), k = u.rec, mx = r[k + 'Max'], mud = [];
+    if (mx !== undefined) mud.push([k + '.a', Math.min(mx, atualDe(d, k, mx) + rr.total)]);
+    if (u.gasta) mud.push(qtd - 1 <= 0 ? ['itens.' + id, null] : [`itens.${id}.qtd`, qtd - 1]);
+    if (!(await aplicarNaAtiva(mud))) return 'O servidor recusou.';
+    A.rolagemDaFicha(`💊 ${d.nome} usou ${it.n}: +${rr.total} ${k.toUpperCase()}`);
+    return `💊 ${it.n}: +${rr.total} ${k.toUpperCase()} (${rr.det}).`;
+  },
+  // nomes do catálogo de itens (o Mestre escolhe o que deixar numa sala do 3D)
+  catalogoItens: () => (C.itens || []).map(i => ({ n: i.n, cat: i.cat || 0, t: i.t || 'geral' })),
   // fichas de "Ameaças e Filhos" ligadas a um Filho do mapa (o 3D mostra as habilidades de quem está no Controle)
   fichasDoFilho(serId, cb) {
     if (!(ehMestre() || ehAux())) { cb([]); return () => {}; }

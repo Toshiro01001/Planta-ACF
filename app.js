@@ -2959,7 +2959,7 @@ window.addEventListener('keydown', e => {
 
 /* =========================================================
    ATALHOS DE TECLADO
-   Todos: Q/E giram · R régua · C ou T chat · F fichas · B quadro · ? ajuda
+   Todos: Q/E giram · R régua · C ou T chat · F fichas · I mochila · B quadro · ? ajuda
    Mestre: N próximo turno · A apagão · L loja · V revelar/esconder a sala aberta · P replay
    Ctrl+Z desfaz (já existia)
    ========================================================= */
@@ -2969,6 +2969,7 @@ window.addEventListener('keydown', e => {
   const clicar = id => { const b = $(id); if (b && !b.disabled && !b.hidden) b.click(); };
   if (k === 'r') clicar('#btnRegua');
   else if (k === 'c' || k === 't') clicar('#btnChat');
+  else if (k === 'i' && meu && !mestre) { const o = $('#mochila'); if (o && !o.hidden) fecharMochila(); else abrirMochila(); }
   else if (k === 'f') clicar('#btnFichas');
   else if (k === 'b') clicar('#btnQuadro');
   else if (k === '?') clicar('#btnAjuda');
@@ -3121,7 +3122,7 @@ const REST_CATS = [
   { id: 'sons', n: 'Sons próprios', d: 'Áudios e links enviados no Ambiente.', on: false, nos: ['sons', 'sonsIdx'] },
   { id: 'loja', n: 'Loja do Maurício', d: 'Vendas criadas, melhorias, itens ocultos e imagens.', on: false, nos: ['lojaImg'], seg: ['_lojaOculta', '_melhOculta'], mapa: ['loja', 'melhorias'] },
   { id: 'quadros', n: 'Quadros', d: 'Quadros da equipe e tudo o que foi desenhado neles.', on: false, nos: ['quadrosMeta', 'quadrosItens'] },
-  { id: 'prep', n: 'Gatilhos, cenas e anotações', d: 'Gatilhos das salas, cenas prontas, anotações das salas e salas sem sinal.', on: false, seg: ['_gatilhos', '_cenas', '_notas', '_semSinal'] },
+  { id: 'prep', n: 'Gatilhos, cenas e anotações', d: 'Gatilhos das salas, cenas prontas, anotações das salas e salas sem sinal.', on: false, seg: ['_gatilhos', '_cenas', '_notas', '_semSinal', '_narrativa'] },
   { id: 'senhas', n: 'Senhas', d: 'A pasta Senhas e as senhas dos andares trocadas pelo site.', on: false, nos: ['senhas'], mapa: ['senhasAndar'] },
   { id: 'funcoes', n: 'Funções e nomes secretos das salas', d: 'As funções das cobaias, quem vê no apagão e os nomes secretos das salas.', on: false, seg: ['_apagao', '_apagaoVe', '*funcoes'], priv: ['salas', 'saidas', 'andares'] },
 ];
@@ -5350,7 +5351,7 @@ function capacidadeEstoque() {
   itensMelhorias().forEach(i => { if (i.comprado && !i.oculto && i.estoque) Object.entries(i.estoque).forEach(([k, n]) => { cap[k] = (cap[k] || 0) + (+n || 0); }); });
   return cap;
 }
-const itensDoChao = () => Object.fromEntries(Object.entries(Store.state.estoque || {}).filter(([k]) => /^i_/.test(k)));
+const itensDoChao = () => Object.fromEntries(Object.entries(Store.state.estoque || {}).filter(([k]) => /^[im]_/.test(k)));
 function encherEstoque() { if (!mestre) return; const v = { ...itensDoChao(), ...capacidadeEstoque() }; Store.definir(['estoque'], Object.keys(v).length ? v : null); }
 // comprou ou desfez uma melhoria de despensa: ajusta sem apagar o que já foi pego
 function ajustarEstoque() {
@@ -5587,6 +5588,157 @@ function vigiarMetros() {
 }
 Store.aoMudar(vigiarMetros);
 
+/* ---------- NARRADOR (só o Mestre) ----------
+   Quando uma cobaia entra numa sala, aparece para o Mestre: quem entrou, o texto para ler à mesa (o que eles veem),
+   o "Na mesa" do caderno, as notas da sala, a sala de exposição posta ali e os itens à vista. Os textos vêm do
+   arquivo de cenas 3D (importado no cartão de qualquer sala) e ficam em segredos/_narrativa. Tecla N no 3D. */
+const Narrador = { ult: {}, esq: {}, eventos: [], pronto: false, aberto: false };
+const narrAuto = () => { try { return localStorage.getItem('acf-narr-auto') !== '0'; } catch (e) { return true; } };
+const narrVistas = () => { try { return JSON.parse(localStorage.getItem('acf-narr-vistas') || '{}'); } catch (e) { return {}; } };
+function vigiarNarrador(st) {
+  if (!mestre || !Segredos.pronto) return;
+  const agora = Date.now(), novos = [], infos = [], tks = st.tokens || {};
+  const cnDe = tk => { const p = salaEm(tk.a, tk.x, tk.y); return p ? 25 * (tk.a - 1) + p : null; };
+  Object.entries(tks).forEach(([id, tk]) => {
+    if (!tk || !SER[tk.s]) return;
+    const tipo = SER[tk.s].tipo, cn = cnDe(tk), ant = Narrador.ult[id];
+    Narrador.ult[id] = cn;
+    if (tipo === 'cobaia') {
+      // esconderijo: quem se escondeu e se passou na Furtividade
+      const eAnt = Narrador.esq[id]; Narrador.esq[id] = tk.esq || '';
+      if (Narrador.pronto && eAnt !== undefined && !eAnt && tk.esq) infos.push({ cn, txt: `${SER[id].nome} se escondeu (${tk.eo === 1 ? 'passou na Furtividade: Filhos não veem' : tk.eo === 0 ? 'falhou na Furtividade' : 'sem teste'}).` });
+      if (Narrador.pronto && eAnt && !tk.esq) infos.push({ cn, txt: `${SER[id].nome} saiu do esconderijo.` });
+    }
+    if (!Narrador.pronto || !cn || ant === cn || ant === undefined) return;
+    if (tipo === 'cobaia') novos.push([id, cn]);
+    // um Filho entrou onde há cobaias: hora de narrar
+    if (tipo === 'filho') { const ali = Object.entries(tks).filter(([, t]) => t && SER[t.s] && SER[t.s].tipo === 'cobaia' && cnDe(t) === cn).map(([i]) => SER[i].nome); if (ali.length) infos.push({ cn, txt: `⚠ ${rotuloBase(tk)} entrou na sala de ${ali.join(', ')}.`, alerta: true }); }
+  });
+  infos.forEach(x => Narrador.eventos.unshift({ info: true, cn: x.cn, txt: x.txt, alerta: !!x.alerta, ts: agora, ids: [] }));
+  Narrador.pronto = true;
+  if (!novos.length && !infos.length) return;
+  const vistas = narrVistas();
+  novos.forEach(([id, cn]) => {
+    let ev = Narrador.eventos.find(e => !e.info && e.cn === cn && agora - e.ts < 12000);
+    if (ev) { if (!ev.ids.includes(id)) ev.ids.push(id); }
+    else { ev = { cn, ids: [id], ts: agora, primeira: !vistas[cn] }; Narrador.eventos.unshift(ev); }
+    vistas[cn] = 1;
+  });
+  Narrador.eventos = Narrador.eventos.slice(0, 30);
+  try { localStorage.setItem('acf-narr-vistas', JSON.stringify(vistas)); } catch (e) {}
+  if (narrAuto()) abrirNarrador(true); else desenharNarrador();
+}
+Store.aoMudar(vigiarNarrador);
+function abrirNarrador(auto) {
+  if (!mestre) return;
+  let o = $('#narrador');
+  if (!o) {
+    o = document.createElement('aside'); o.id = 'narrador'; o.className = 'narrador'; o.setAttribute('aria-label', 'Narrador do Mestre');
+    document.body.appendChild(o);
+    o.addEventListener('click', e => {
+      const b = e.target.closest('[data-na]'); if (!b) return;
+      const k = b.dataset.na, ev = Narrador.eventos[+b.dataset.i];
+      if (k === 'x') { o.hidden = true; Narrador.aberto = false; }
+      if (k === 'auto') { try { localStorage.setItem('acf-narr-auto', narrAuto() ? '0' : '1'); } catch (er) {} desenharNarrador(); }
+      if (k === 'ler' && ev) { const n = narrDe(ev.cn); if (n && n.ler) { Chat.enviar(n.ler, 'geral'); aviso('Descrição narrada no chat (e como legenda no 3D).'); } }
+      if (k === 'ir' && ev) { if (document.body.classList.contains('s3d-aberta') && window.Sala3D) Sala3D.abrir(ev.cn, { a: Math.ceil(ev.cn / 25), livre: true }); else window.ACF.focarSala(ev.cn); }
+      if (k === 'feito' && ev) { Narrador.eventos.splice(+b.dataset.i, 1); desenharNarrador(); }
+      if (k === 'limpar') { Narrador.eventos = []; desenharNarrador(); }
+    });
+  }
+  o.hidden = false; Narrador.aberto = true; o.classList.toggle('auto', !!auto);
+  desenharNarrador();
+}
+const narrDe = cn => (Segredos.dados._narrativa || {})['c' + cn] || null;
+function desenharNarrador() {
+  const o = $('#narrador'); if (!o || o.hidden) return;
+  const tks = Store.state.tokens || {}, expo = Segredos.dados._expoMapa || {}, lib = Segredos.dados._expo || {};
+  const est = Store.state.estoque || {}, it3 = Store.state.itens3d || {};
+  o.innerHTML = `<header><b>🎭 Narrador</b><button type="button" data-na="auto" class="mini ${narrAuto() ? 'on' : ''}" title="Abrir sozinho quando alguém entra numa sala">${narrAuto() ? 'Abre sozinho' : 'Só no N'}</button>${Narrador.eventos.length ? '<button type="button" data-na="limpar" class="mini">Limpar</button>' : ''}<button type="button" data-na="x" aria-label="Fechar o narrador">✕</button></header>
+    <div class="na-lista">${Narrador.eventos.length ? Narrador.eventos.map((ev, i) => {
+      if (ev.info) return `<p class="na-info ${ev.alerta ? 'alerta' : ''}"><span>${esc(ev.txt)}</span>${ev.cn ? `<button type="button" data-na="ir" data-i="${i}" class="na-sala">CN ${pad2(ev.cn)}</button>` : ''}<small>${hora(ev.ts).slice(0, 5)}</small></p>`;
+      const n = narrDe(ev.cn), quem = ev.ids.map(id => (SER[id] || {}).nome || id), ex = expo['c' + ev.cn], exS = ex && lib[ex.s];
+      const nIt = Object.entries(it3).filter(([k, v]) => v && v.cn === ev.cn && (est['m_' + k] || 0) > 0).length + Object.keys(est).filter(k => k.startsWith(`i_${ev.cn}_`) && est[k] > 0).length;
+      const nota = notaDe(ev.cn);
+      return `<article class="na-ev ${i === 0 ? 'novo' : ''}">
+        <h4>${esc(quem.join(', '))} ${quem.length > 1 ? 'entraram' : 'entrou'} na <button type="button" data-na="ir" data-i="${i}" class="na-sala">CN ${pad2(ev.cn)} · ${esc(window.ACF.nomeSala(ev.cn).replace(/^CN \d+\s*·?\s*/, '') || (n && n.nome) || '')}</button>${ev.primeira ? '<span class="na-1a">primeira vez</span>' : ''}<small>${hora(ev.ts).slice(0, 5)}</small></h4>
+        ${n && n.ler ? `<p class="na-ler"><b>Para ler à mesa</b>${esc(n.ler)}</p>` : '<p class="na-mini">Sem texto desta sala: importe de novo o arquivo de cenas 3D (cartão de qualquer sala) para trazer a narração.</p>'}
+        ${n && n.mesa ? `<p class="na-mesa"><b>Na mesa</b>${esc(n.mesa)}</p>` : ''}
+        ${nota ? `<p class="na-nota"><b>Suas notas</b>${esc(nota)}</p>` : ''}
+        ${exS ? `<p class="na-expo"><b>Sala de exposição aqui</b>${esc(exS.nome)} · ${esc(exS.el || '')} · VD ${esc(exS.vd || '')}</p>` : ''}
+        ${nIt ? `<p class="na-mini">🎒 ${nIt} item(ns) no chão desta sala.</p>` : ''}
+        <div class="na-bts">${n && n.ler ? `<button type="button" data-na="ler" data-i="${i}">📢 Narrar no chat</button>` : ''}<button type="button" data-na="feito" data-i="${i}">✓ Feito</button></div>
+      </article>`; }).join('') : '<p class="na-mini">Quando uma cobaia entrar numa sala, a descrição aparece aqui.</p>'}</div>`;
+}
+Narrador.redesenhar = desenharNarrador;
+document.addEventListener('acf-segredos', () => desenharNarrador());
+
+/* ---------- MOCHILA (atalho I no mapa e no 3D) ----------
+   Inventário da ficha ativa do jogador, como num jogo: carga, limites da patente, filtros e cada item com detalhes.
+   Itens de cura e afins têm "Usar" (mesma regra do botão da ficha). Só leitura do resto: editar continua na ficha. */
+const Mochila = { filtro: 'tudo', sel: null };
+const ICONE_ITEM = { arma: '⚔', protecao: '🛡', municao: '◦', amaldicoado: '☠', geral: '🎒' };
+function iconeItem(it) {
+  if (it.usavel) return '💊';
+  if (/lanterna/i.test(it.n)) return '🔦'; if (/documento|livro|manual|carta|bilhete|diário/i.test(it.n)) return '📄';
+  if (/componente/i.test(it.n)) return '◈'; if (/chave/i.test(it.n)) return '🗝';
+  return ICONE_ITEM[it.t] || '🎒';
+}
+function abrirMochila() {
+  const FX = window.ACF_FICHAS;
+  if (mestre || (!meu && aux)) { aviso('A mochila é das cobaias: abra a ficha de quem você quer ver.'); return; }
+  if (!meu) { aviso('Escolha a sua cobaia para ver a mochila.'); return; }
+  let o = $('#mochila');
+  if (!o) {
+    o = document.createElement('div'); o.id = 'mochila'; o.className = 'mochila'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Mochila');
+    document.body.appendChild(o);
+    o.addEventListener('click', e => {
+      if (e.target === o || e.target.closest('[data-mo="x"]')) { fecharMochila(); return; }
+      const f = e.target.closest('[data-mo-f]'); if (f) { Mochila.filtro = f.dataset.moF; desenharMochila(); return; }
+      const it = e.target.closest('[data-mo-it]'); if (it) { Mochila.sel = it.dataset.moIt; desenharMochila(); return; }
+      if (e.target.closest('[data-mo="ficha"]')) { fecharMochila(); if (FX && FX.abrirAtiva) FX.abrirAtiva(); return; }
+      const u = e.target.closest('[data-mo="usar"]'); if (u && FX && FX.usarItemAtiva) { u.disabled = true; FX.usarItemAtiva(u.dataset.id).then(r => { aviso(r); setTimeout(desenharMochila, 400); }); }
+    });
+    o.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); fecharMochila(); } });
+  }
+  o.hidden = false; document.body.classList.add('mochila-aberta');
+  if (document.pointerLockElement) document.exitPointerLock();
+  desenharMochila();
+  const x = $('[data-mo="x"]', o); if (x) x.focus();
+}
+function fecharMochila() { const o = $('#mochila'); if (o) o.hidden = true; document.body.classList.remove('mochila-aberta'); }
+function desenharMochila() {
+  const o = $('#mochila'); if (!o || o.hidden) return;
+  const FX = window.ACF_FICHAS, mo = FX && FX.mochila ? FX.mochila() : null;
+  if (!mo) { o.innerHTML = `<div class="mo-caixa"><header><b>🎒 Mochila</b><button type="button" data-mo="x" aria-label="Fechar">✕</button></header><p class="mo-vazio">Sem ficha ativa. Abra suas fichas (F) e escolha a ativa para ver o que você carrega.</p><div class="mo-acoes"><button type="button" data-mo="ficha">📋 Abrir fichas</button></div></div>`; return; }
+  const F = { tudo: () => true, armas: i => i.t === 'arma' || i.t === 'municao', protecao: i => i.t === 'protecao', consumo: i => i.usavel, outros: i => !['arma', 'municao', 'protecao'].includes(i.t) && !i.usavel };
+  const lista = mo.itens.filter(F[Mochila.filtro] || F.tudo);
+  if (!mo.itens.some(i => i.id === Mochila.sel)) Mochila.sel = (lista[0] || {}).id || null;
+  const sel = mo.itens.find(i => i.id === Mochila.sel);
+  const pct = Math.min(100, mo.cargaMax ? mo.carga / mo.cargaMax * 100 : 0);
+  const lims = mo.lim.map((l, i) => `<span class="${mo.contagem[i] > l ? 'estoura' : ''}" title="Itens de categoria ${mo.ROM[i + 1]}: ${mo.contagem[i]} de ${l} (patente ${esc(mo.patente)})">${mo.ROM[i + 1]} ${mo.contagem[i]}/${l}</span>`).join('');
+  o.innerHTML = `<div class="mo-caixa">
+    <header><b>🎒 Mochila · ${esc(mo.nome)}</b><button type="button" data-mo="x" aria-label="Fechar a mochila">✕</button></header>
+    <div class="mo-carga ${mo.sobrecarga ? 'sobre' : ''}"><span>Carga ${String(mo.carga).replace('.', ',')} / ${mo.cargaMax}</span><i style="--p:${pct}%"></i>${mo.sobrecarga ? '<em>Sobrecarregado: −5 Defesa, −3 m</em>' : ''}</div>
+    <div class="mo-lims">${lims}</div>
+    <nav class="mo-filtros">${[['tudo', 'Tudo'], ['armas', 'Armas'], ['protecao', 'Proteção'], ['consumo', 'Consumíveis'], ['outros', 'Outros']].map(([k, t]) => `<button type="button" data-mo-f="${k}" class="${Mochila.filtro === k ? 'on' : ''}">${t}</button>`).join('')}</nav>
+    <div class="mo-corpo">
+      <ul class="mo-grade">${lista.length ? lista.map(i => `<li><button type="button" data-mo-it="${esc(i.id)}" class="${i.id === Mochila.sel ? 'on' : ''}${i.achado ? ' achado' : ''}" title="${esc(i.n)}"><i>${iconeItem(i)}</i><span>${esc(i.n)}</span>${i.qtd > 1 ? `<b>×${i.qtd}</b>` : ''}${i.cat ? `<small>${mo.ROM[i.cat]}</small>` : ''}</button></li>`).join('') : '<li class="mo-vazio">Nada aqui.</li>'}</ul>
+      <aside class="mo-det">${sel ? `<h4>${iconeItem(sel)} ${esc(sel.n)}${sel.qtd > 1 ? ` ×${sel.qtd}` : ''}</h4>
+        <p class="mo-tags">${[sel.cat ? 'Categoria ' + mo.ROM[sel.cat] : 'Categoria 0', 'Espaço ' + String(sel.esp).replace('.', ','), sel.dano ? 'Dano ' + esc(sel.dano) : '', sel.el ? esc(sel.el) : '', sel.vest ? 'Vestido' : '', sel.achado ? 'Achado na Caixa' : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('')}</p>
+        <p class="mo-desc">${esc(sel.d || 'Sem descrição.')}</p>
+        <div class="mo-acoes">${sel.usavel ? `<button type="button" class="pri" data-mo="usar" data-id="${esc(sel.id)}">Usar (${esc(sel.uso.x)} ${esc(String(sel.uso.rec).toUpperCase())})</button>` : ''}<button type="button" data-mo="ficha">📋 Ver na ficha</button></div>` : '<p class="mo-vazio">Toque num item para ver os detalhes.</p>'}</aside>
+    </div>
+    <p class="mo-dica">I abre e fecha · Esc fecha</p></div>`;
+}
+document.addEventListener('acf-ativa', () => desenharMochila());
+// no 3D o teclado do jogo não chega às janelas por cima: I e Esc fecham a mochila daqui
+window.addEventListener('keydown', e => {
+  const o = $('#mochila'); if (!o || o.hidden || !document.body.classList.contains('s3d-aberta')) return;
+  if (e.target && e.target.matches && e.target.matches('input, textarea, select')) return;
+  if (e.key === 'Escape' || (e.key || '').toLowerCase() === 'i') { e.preventDefault(); e.stopImmediatePropagation(); fecharMochila(); }
+}, true);
+
 /* ---------- EFEITOS NO MAPA 2D: habilidade, ataque, ritual, dano, sanidade e cura em cima do token ----------
    As mesmas fontes do 3D (campo fx do token, vitais publicadas e o nó "efeito"), para quem está no mapa. */
 const Fx2d = { ult: new Map(), ultEf: 0 };
@@ -5617,8 +5769,20 @@ function zerarMetros() { Metros.total = 0; try { localStorage.setItem(chaveMetro
 /* ---------- ITENS DO LIVRO JOGADOS NAS SALAS ----------
    Cada item da cena (item_chao) vira mapa/estoque/i_<CN>_<n> = 1 quando o Mestre "espalha" os itens.
    Quem pega desconta 1 (a mesma regra da despensa) e o item entra na ficha ativa. */
+// item deixado pelo Mestre numa sala do 3D: itens3d/<chave> = { n, a, cn, x, y } e estoque m_<chave> = 1
+function colocarItem3D(nome, a, x, y) {
+  if (!mestre) return 'Só o Mestre coloca itens.';
+  nome = String(nome || '').trim().slice(0, 80); if (!nome) return 'Escolha o item.';
+  const p = salaEm(a, x, y); if (!p) return 'Coloque dentro de uma sala.';
+  const k = Rede.chave().replace(/[^\w-]/g, '');
+  Store.definir(['itens3d', k], { n: nome, a, cn: 25 * (a - 1) + p, x: +x.toFixed(2), y: +y.toFixed(2), ts: Date.now() });
+  Store.definir(['estoque', 'm_' + k], 1);
+  Diario.registrar && Diario.registrar('sala', `Item deixado na CN ${pad2(25 * (a - 1) + p)}: ${nome}`);
+  return '';
+}
+function tirarItem3D(k) { if (!mestre) return; Store.definir(['itens3d', k], null); Store.definir(['estoque', 'm_' + k], null); }
 function pegarItemChao(k, nome) {
-  if (!/^i_\d+_\d+$/.test(k)) return 'Item inválido.';
+  if (!/^i_\d+_\d+$/.test(k) && !/^m_[\w-]+$/.test(k)) return 'Item inválido.';
   const n = (Store.state.estoque || {})[k] || 0;
   if (n <= 0) return 'Alguém já pegou isso.';
   if (mestre) { Store.definir(['estoque', k], null); return ''; }
@@ -6011,7 +6175,7 @@ window.ACF = {
   get andarAtual() { return andarAtual; },
   irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },
   // vista 3D
-  podeMover, visivelPara, visivelAoFilho, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
+  abrirMochila, fecharMochila, abrirNarrador, colocarItem3D, tirarItem3D, podeMover, visivelPara, visivelAoFilho, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
   andavel: (a, x, y) => andavel(a, x, y),
   limiteDe: id => limiteDe(id),
   participa: id => !!participante(id),
