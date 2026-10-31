@@ -86,7 +86,7 @@
     ['frente', 'Andar para a frente', 'w', 'mov'], ['tras', 'Andar para trás', 's', 'mov'], ['esq', 'Passo para a esquerda', 'a', 'mov'], ['dir', 'Passo para a direita', 'd', 'mov'],
     ['correr', 'Correr (segurar)', 'shift', 'mov'], ['olharTras', 'Olhar para trás (segurar)', 'q', 'mov'],
     ['interagir', 'Interagir / usar', 'e', 'jogo'], ['lanterna', 'Lanterna', 'l', 'jogo'], ['camera', 'Trocar a câmera', 'c', 'jogo'], ['zoomAndar', 'Sala / andar inteiro', 'z', 'jogo'],
-    ['chat', 'Chat de texto', 't', 'atalho'], ['fichas', 'Fichas', 'f', 'atalho'], ['dados', 'Dados', 'r', 'atalho'], ['quadro', 'Quadro', 'b', 'atalho'], ['arquivo', 'Arquivo', 'i', 'atalho'],
+    ['chat', 'Chat de texto', 't', 'atalho'], ['fichas', 'Fichas', 'f', 'atalho'], ['dados', 'Dados', 'r', 'atalho'], ['quadro', 'Quadro', 'b', 'atalho'], ['mochila', 'Mochila (inventário)', 'i', 'atalho'], ['arquivo', 'Arquivo', 'k', 'atalho'], ['narrador', 'Narrador (Mestre)', 'n', 'atalho'],
     ['menu', 'Menu do jogo', 'm', 'atalho'], ['painel', 'Painel lateral', 'tab', 'atalho'], ['opcoes', 'Opções', 'o', 'atalho'], ['hud', 'Esconder a interface', 'h', 'atalho'],
     ['hab1', 'Habilidade 1 (no Controle)', '1', 'hab'], ['hab2', 'Habilidade 2', '2', 'hab'], ['hab3', 'Habilidade 3', '3', 'hab'], ['hab4', 'Habilidade 4', '4', 'hab'], ['hab5', 'Habilidade 5', '5', 'hab'],
     ['hab6', 'Habilidade 6', '6', 'hab'], ['hab7', 'Habilidade 7', '7', 'hab'], ['hab8', 'Habilidade 8', '8', 'hab'], ['hab9', 'Habilidade 9', '9', 'hab'],
@@ -158,6 +158,8 @@
       const n = Object.keys(d.salas).length, nf = Object.keys(d.formas || {}).length;
       if (!confirm(`Importar ${n} cena(s) 3D${nf ? ` e a forma de ${nf} Filho(s)` : ''}? As cenas ficam nos seus segredos e só aparecem aos jogadores nas salas reveladas. Cenas com o mesmo número serão substituídas.`)) return;
       Object.entries(d.salas).forEach(([k, v]) => ACF().gravarSegredo(['_3d', k], v));
+      // narração das salas (texto para ler à mesa e "Na mesa"): só o Mestre vê (segredos/_narrativa)
+      if (d.narrativa && typeof d.narrativa === 'object') Object.entries(d.narrativa).forEach(([k, v]) => ACF().gravarSegredo(['_narrativa', k], v));
       // formas dos Filhos: só as que o Mestre ainda não escolheu
       const atuais = (ACF().estado || {}).formas || {};
       Object.entries(d.formas || {}).forEach(([id, fm]) => { if (!atuais[id]) ACF().definir(['formas', id], fm); });
@@ -188,10 +190,10 @@
 
   /* ================= escala: planta (quadradinhos) <-> 3D (metros) ================= */
   // Sala do 3D: 20 m de lado (o dobro da versão anterior, para o clima de terror). Corredor: 14 m.
-  // As cenas feitas para 10 m (ou 7,07 m) são levadas para 20 m por ajustarItem (objetos de parede continuam na
-  // parede; o miolo se espalha) e ganham entulho, manchas, móveis de parede e esconderijos (encherSalaGrande).
+  // As cenas são montadas para 20 m (lado 20). Cenas antigas (10 m ou 7,07 m) ainda funcionam: ajustarItem as leva
+  // para 20 m (objetos de parede continuam na parede; o miolo se espalha).
   // Na largura, o corredor do 3D é mais estreito que o desenho: a posição é comprimida (KC).
-  const SALA_M = 20, ALT = 3.2, CORR_W = 2.4, CORR_H = 2.7, VAO_H = 2.2, ESP = .2, RAIO = .22;
+  const SALA_M = 20, ALT = 4.0, CORR_W = 2.4, CORR_H = 2.7, VAO_H = 2.2, ESP = .2, RAIO = .22;
   let MAPA = null;
   function prepararMapa() {
     if (MAPA) return MAPA;
@@ -283,56 +285,15 @@
 
   /* ================= objetos da cena ================= */
   // objetos que não atrapalham a caminhada (no chão, na parede ou no teto)
-  const SEM_COLISAO = new Set(['campo_infinito', 'tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao', 'item_chao', 'documento_sala',
+  const SEM_COLISAO = new Set(['item_m', 'campo_infinito', 'tapete', 'ralo', 'cabos', 'ventilador', 'luminaria', 'lampada', 'placa', 'quadro', 'cartaz', 'pintura', 'relogio', 'telao', 'senhas', 'espelho', 'triangulo', 'rasgos', 'canos', 'gotas', 'mural', 'helice', 'porta', 'porta_dupla', 'sangue', 'texto', 'janela', 'placa_bronze', 'placa_saida', 'seteira', 'silhuetas', 'fotos', 'mapa_mundi', 'halo', 'estrela_cadente', 'grama', 'agua', 'cortina', 'membrana', 'ninho_simbolo', 'botao_porta', 'coracoes', 'parede_monitores', 'ventilador_parede', 'tenda', 'espiral', 'placa_teto', 'papeis_chao', 'cabos_chao', 'mancha', 'teia', 'placa_sala', 'lampada_alerta', 'onda_som', 'grade_chao', 'foco_cirurgico', 'tubo_neon', 'negatoscopio', 'quadro_dentes', 'lousa', 'mural_graficos', 'janela_luz', 'bolsas_parede', 'armario_suspenso', 'centelhas', 'livro_aberto', 'escorpiao', 'item_chao', 'documento_sala',
     'a2_aneis_chao', 'a2_arandela', 'a2_camera_canto', 'a2_defletor', 'a2_documento', 'a2_estandarte', 'a2_evaporador', 'a2_facho', 'a2_faixa_zebrada', 'a2_fila_chao', 'a2_gelo', 'a2_lampada_cultivo', 'a2_metronomo', 'a2_panelas', 'a2_ralo_cabelo', 'a2_regua_altura', 'a2_retalhos', 'a3_bilhete', 'a3_carne_costurada', 'a3_chao', 'a3_eclusa', 'a3_lampada_respira', 'a3_manual_corte', 'a3_poco_teto', 'a3_sob_agua', 'a3_telas', 'a3_trilhos_parede', 'a3_veias', 'a3_vento', 'a4_arandela', 'a4_calcada', 'a4_calendario', 'a4_capacete_riscado', 'a4_carne_parede', 'a4_fachada', 'a4_fenda_portal', 'a4_fita_chao', 'a4_fratura', 'a4_lampiao', 'a4_lustre', 'a4_luz', 'a4_placa_museu', 'a4_poco_espiral', 'a4_porta_nome', 'a4_seteira_vista', 'a5_brinquedos', 'a5_coroa', 'a5_costura', 'a5_cupula', 'a5_facho', 'a5_feixe', 'a5_gotas_paradas', 'a5_olhos_fenda', 'a5_parede_nomes', 'a5_pertences', 'a5_projecao', 'a5_queimado', 'a5_tunel', 'a5_valvula', 'a5_veias', 'a5_vista']);
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
  const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
-  // sala grande (cena feita para uma sala menor): a cena se espalha e, para não ficar vazia, ganha móveis de parede,
-  // esconderijos, papéis, sangue e manchas. Tudo sorteado pela CN (todo mundo vê igual) e fora dos vãos das portas.
-  function encherSalaGrande(itens, cn, vaos) {
-    const H = SALA_M / 2, r = NS().rng(cn * 97 + 13), out = [], ocup = itens.map(it => [it.x || 0, it.z || 0]);
-    const livre = (x, z, d) => !ocup.some(([a, b]) => Math.hypot(a - x, b - z) < d);
-    const porta = (lado, u) => vaos.some(v => v.lado === lado && Math.abs(v.u - u) < CORR_W / 2 + 1.7);
-    const LADOS = { n: [0, -1, 0], s: [0, 1, 180], w: [-1, 0, 90], e: [1, 0, -90] };
-    let escs = 0;
-    Object.entries(LADOS).forEach(([lado, [sx, sz, rot]]) => {
-      for (let u = -H + 1.6; u <= H - 1.6; u += 2.3) {
-        if (porta(lado, u) || r() < .62) continue;
-        const k = r(), tipo = k < .26 ? 'armario_metal' : k < .48 ? 'estante' : k < .66 ? 'arquivo' : k < .84 ? 'caixote' : 'pilha';
-        const prof = { armario_metal: .32, estante: .3, arquivo: .36, caixote: .85, pilha: .7 }[tipo];
-        const x = sx ? sx * (H - prof) : u, z = sz ? sz * (H - prof) : u;
-        if (!livre(x, z, 1.7)) continue;
-        const it = { t: tipo, x: +x.toFixed(2), z: +z.toFixed(2), r: rot, sem: Math.floor(r() * 900) + 1, encher: 1 };
-        if (tipo === 'armario_metal') { it.n = 1 + Math.floor(r() * 3); if (escs < 2 && r() < .7) { it.esc = 'Dentro do armário'; escs++; } }
-        if (tipo === 'estante') { it.w = 1.8; it.h = 2.4; }
-        if (tipo === 'caixote') { it.n = 2 + Math.floor(r() * 3); if (escs < 2 && r() < .3) { it.esc = 'Atrás dos caixotes'; escs++; } }
-        if (tipo === 'pilha') it.n = 3 + Math.floor(r() * 4);
-        out.push(it); ocup.push([x, z]);
-      }
-      // manchas e escorridos na parede
-      for (let i = 0; i < 2; i++) {
-        const u = (r() - .5) * (SALA_M - 3), x = sx ? sx * (H - .02) : u, z = sz ? sz * (H - .02) : u;
-        if (porta(lado, u)) continue;
-        out.push(r() < .7 ? { t: 'mancha', x: +x.toFixed(2), z: +z.toFixed(2), r: rot, w: 1.2 + r() * 1.6, h: 1 + r() * 1.6, y: r() * .6, sem: Math.floor(r() * 900), c: r() < .4 ? '#2a0606' : '#16120c', encher: 1 }
-          : { t: 'gotas', x: +(x - sx * .01).toFixed(2), z: +(z - sz * .01).toFixed(2), r: rot, n: 6 + Math.floor(r() * 6), w: 2 + r() * 2, sem: Math.floor(r() * 900), encher: 1 });
-      }
-    });
-    // chão: papéis espalhados, sangue e marcas de arrasto no miolo da sala (não bloqueiam ninguém)
-    const nChao = 6 + Math.floor(r() * 5);
-    for (let i = 0; i < nChao; i++) {
-      const x = (r() - .5) * (SALA_M - 3), z = (r() - .5) * (SALA_M - 3);
-      if (!livre(x, z, 1.1)) continue;
-      out.push(r() < .55 ? { t: 'papeis_chao', x: +x.toFixed(2), z: +z.toFixed(2), n: 8 + Math.floor(r() * 14), w: 1.4 + r() * 1.4, d: 1.2 + r() * 1.4, sangue: r() < .3 ? .25 : 0, sem: Math.floor(r() * 900), encher: 1 }
-        : { t: 'sangue', x: +x.toFixed(2), z: +z.toFixed(2), chao: 1, estilo: r() < .35 ? 'poca' : 'respingo', w: .7 + r() * 1.1, sem: Math.floor(r() * 900), encher: 1 });
-    }
-    return out;
-  }
   function montarItens(F, cena, pai, ver, sala) {
     F.imagens = cena.imagens || {};
     const lado = cena.lado || 7.071;
     let itens = (cena.itens || []).map(it => lado === SALA_M ? it : NS().ajustarItem(it, lado, SALA_M, ALT));
-    if (sala && lado < SALA_M * .8 && F.P.papeis_chao) itens = itens.concat(encherSalaGrande(itens, sala.cn, sala.vaos));
     itens.forEach((it, i) => {
       if (it.t === 'porta' || !naVersao(it, ver)) return;   // no 3D novo, as portas de verdade são as dos corredores
       const fab = F.P[it.t]; if (!fab) return;
@@ -344,92 +305,6 @@
       if (it.t === 'campo_infinito') o.userData.campo = { r0: it.r0 || 1.3, r1: it.r1 || 2.6, ext: it.ext || 7, per: it.per || 'vontade', dt: it.dt || 20 };
       pai.add(o);
     });
-    if (sala && lado < SALA_M * .8) { try { encherComMobilia(F, pai, itens, sala); } catch (e) { console.warn('3D enchimento:', e); } }
-  }
-  /* Sala grande com a mobília da PRÓPRIA sala: copia os móveis que a cena já tem (carteiras na sala de aula, macas no
-     hospital, estantes no arquivo, quadros nas paredes…) para os espaços vazios, com os mesmos esconderijos.
-     Nunca fecha os vãos das portas e só aceita uma cópia se ainda dá para andar de qualquer porta a qualquer outra
-     (busca numa grade de 25 cm). Sorteado pela CN: todo mundo vê a mesma sala. */
-  const NAO_CLONAR = new Set(['porta', 'porta_dupla', 'placa', 'placa_sala', 'placa_teto', 'placa_bronze', 'placa_saida', 'luminaria', 'lampada', 'lampada_alerta', 'item_chao', 'documento_sala',
-    'espiral', 'triangulo', 'campo_infinito', 'trono', 'poco', 'nucleo', 'telao', 'tela_cinema', 'projetor', 'porta_cofre', 'elevador', 'texto', 'mancha', 'teia', 'sangue', 'papeis_chao', 'cabos_chao',
-    'agua', 'tapete', 'canos', 'cano_grande', 'gotas', 'rasgos', 'senhas', 'halo', 'silhuetas', 'esteira_carga', 'trilhos', 'turbina', 'helice', 'colunas_anel', 'moldes', 'membrana', 'coracoes',
-    'estrela_cadente', 'grama', 'cortina', 'tenda', 'onda_som', 'grade_chao', 'centelhas', 'foco_cirurgico', 'tubo_neon', 'janela', 'janela_luz', 'seteira', 'mapa_mundi', 'ninho_simbolo', 'escorpiao']);
-  const DECOR_PAREDE = new Set(['quadro', 'pintura', 'cartaz', 'mural', 'relogio', 'fotos', 'negatoscopio', 'lousa', 'mural_graficos', 'quadro_dentes', 'bolsas_parede', 'armario_suspenso', 'espelho']);
-  function encherComMobilia(F, pai, itens, sala) {
-    const T = F.T, H = SALA_M / 2, G = .25, N = Math.round(SALA_M / G), r = NS().rng(sala.cn * 131 + 7);
-    pai.updateMatrixWorld(true);
-    const px = pai.position.x, pz = pai.position.z, bb = new T.Box3();
-    const caixas = [];
-    pai.children.forEach(o => {
-      if (!o.userData.t) return; bb.setFromObject(o); if (bb.isEmpty()) return;
-      caixas.push({ t: o.userData.t, i: o.userData.i, x0: bb.min.x - px, x1: bb.max.x - px, z0: bb.min.z - pz, z1: bb.max.z - pz, y0: bb.min.y, y1: bb.max.y });
-    });
-    const colide = c => !SEM_COLISAO.has(c.t) && c.y0 < 1.8 && c.y1 > .25;
-    const cel = v => Math.max(0, Math.min(N - 1, Math.floor((v + H) / G)));
-    const grade = new Uint8Array(N * N);
-    const marcar = (g, c, m) => { for (let i = cel(c.x0 - m); i <= cel(c.x1 + m); i++) for (let j = cel(c.z0 - m); j <= cel(c.z1 + m); j++) g[i * N + j] = 1; };
-    caixas.forEach(c => { if (colide(c)) marcar(grade, c, RAIO); });
-    // pontos das portas (logo para dentro) e os "aventais" que ficam sempre livres
-    const portas = sala.vaos.map(v => v.lado === 'n' ? [v.u, -H + .5] : v.lado === 's' ? [v.u, H - .5] : v.lado === 'w' ? [-H + .5, v.u] : [H - .5, v.u]);
-    const aventais = sala.vaos.map(v => { const a = CORR_W / 2 + .5, p = 3.6; return v.lado === 'n' ? [v.u - a, v.u + a, -H, -H + p] : v.lado === 's' ? [v.u - a, v.u + a, H - p, H] : v.lado === 'w' ? [-H, -H + p, v.u - a, v.u + a] : [H - p, H, v.u - a, v.u + a]; });
-    // quantas portas se alcançam a partir da primeira porta livre (a cópia não pode diminuir esse número)
-    const alcance = g => {
-      const ks = portas.map(([x, z]) => cel(x) * N + cel(z)).filter(k => !g[k]); if (!ks.length) return 0;
-      const visto = new Uint8Array(N * N), fila = [ks[0]]; visto[ks[0]] = 1;
-      while (fila.length) { const k = fila.pop(), i = (k / N) | 0, j = k % N; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { const u = i + a, w = j + b; if (u < 0 || w < 0 || u >= N || w >= N) return; const q = u * N + w; if (!g[q] && !visto[q]) { visto[q] = 1; fila.push(q); } }); }
-      return ks.filter(k => visto[k]).length;
-    };
-    const base = alcance(grade);
-    const conectado = g => alcance(g) >= base;
-    const livres = g => { let n = 0; for (let i = 0; i < g.length; i++) if (!g[i]) n++; return n / g.length; };
-    // modelos: os móveis originais da cena (cada um com a caixa medida de verdade)
-    const lado = c => { const d = { n: c.z0 + H, s: H - c.z1, w: c.x0 + H, e: H - c.x1 }; const k = Object.keys(d).sort((a, b) => d[a] - d[b])[0]; return d[k] < .45 ? k : null; };
-    const ANG = { n: 0, w: 90, s: 180, e: -90 };
-    const protos = [];
-    caixas.forEach(c => {
-      const it = itens[c.i]; if (!it || it.encher || NAO_CLONAR.has(it.t) || it.v || it.uso || it.img || it.txt || it.txt1 || it.w >= 5) return;
-      const w = c.x1 - c.x0, d = c.z1 - c.z0;
-      const decor = DECOR_PAREDE.has(it.t);
-      if (!decor && (w * d < .12 || w * d > 10 || Math.max(w, d) > 4.6 || c.y1 - c.y0 < .3)) return;
-      const ld = lado(c); if (decor && !ld) return;
-      const ox = it.x || 0, oz = it.z || 0;
-      protos.push({ it, c, ld, decor, cant: [[c.x0 - ox, c.z0 - oz], [c.x1 - ox, c.z0 - oz], [c.x0 - ox, c.z1 - oz], [c.x1 - ox, c.z1 - oz]] });
-    });
-    if (!protos.length) return;
-    // retângulo do móvel girado dg graus (múltiplo de 90) em volta da origem dele
-    const girar = (p, dg) => { const a = dg * Math.PI / 180, cs = Math.round(Math.cos(a)), sn = Math.round(Math.sin(a)); let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; p.cant.forEach(([x, z]) => { const X = x * cs + z * sn, Z = -x * sn + z * cs; x0 = Math.min(x0, X); x1 = Math.max(x1, X); z0 = Math.min(z0, Z); z1 = Math.max(z1, Z); }); return [x0, x1, z0, z1]; };
-    const sobrepoe = (q, m, decorQ, y0, y1) => caixas.some(c => {
-      if (decorQ ? !(c.y1 > y0 - .1 && c.y0 < y1 + .1) : (SEM_COLISAO.has(c.t) && c.y1 < .25) || c.y0 > 2.2) return false;
-      return q[0] - m < c.x1 && q[1] + m > c.x0 && q[2] - m < c.z1 && q[3] + m > c.z0;
-    });
-    const naPorta = q => aventais.some(a => q[0] < a[1] && q[1] > a[0] && q[2] < a[3] && q[3] > a[2]);
-    const meta = Math.min(60, 14 + protos.length * 4);
-    let feitos = 0, escs = 0;
-    for (let tent = 0; tent < 520 && feitos < meta; tent++) {
-      if (livres(grade) < .52) break;
-      const p = protos[Math.floor(r() * protos.length)];
-      let dg = 0, x, z;
-      if (p.ld) {
-        const alvo = ['n', 's', 'w', 'e'][Math.floor(r() * 4)];
-        dg = ((ANG[alvo] - ANG[p.ld]) % 360 + 360) % 360;
-        const [a0, a1, b0, b1] = girar(p, dg), u = (r() - .5) * (SALA_M - 2.4);
-        if (alvo === 'n') { x = u; z = -H + .03 - b0; } else if (alvo === 's') { x = u; z = H - .03 - b1; } else if (alvo === 'w') { z = u; x = -H + .03 - a0; } else { z = u; x = H - .03 - a1; }
-      } else {
-        dg = r() < .8 ? 0 : 180;
-        x = (r() - .5) * (SALA_M - 3.2); z = (r() - .5) * (SALA_M - 3.2);
-      }
-      const [a0, a1, b0, b1] = girar(p, dg), q = [x + a0, x + a1, z + b0, z + b1];
-      if (q[0] < -H + .02 || q[1] > H - .02 || q[2] < -H + .02 || q[3] > H - .02) continue;
-      if (naPorta(q) || sobrepoe(q, p.decor ? .25 : .45, p.decor, p.c.y0, p.c.y1)) continue;
-      const nova = { t: p.it.t, x0: q[0], x1: q[1], z0: q[2], z1: q[3], y0: p.c.y0, y1: p.c.y1 };
-      if (colide(nova)) { const g2 = grade.slice(); marcar(g2, nova, RAIO); if (!conectado(g2) || livres(g2) < .48) continue; grade.set(g2); }
-      const i = itens.length + feitos, it = { ...p.it, x: +x.toFixed(2), z: +z.toFixed(2), r: (p.it.r || 0) + dg, sem: Math.floor(r() * 9000) + 1, encher: 1 };
-      if (it.esc && escs >= 3) delete it.esc; if (it.esc) escs++;
-      let o; try { o = F.P[it.t]({ ...it, sem: it.sem }); } catch (e) { continue; }
-      o.position.set(it.x, it.h0 || 0, it.z); o.rotation.y = it.r * Math.PI / 180; if (it.s) o.scale.setScalar(it.s);
-      o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null; o.userData.uso = null;
-      pai.add(o); caixas.push(nova); feitos++;
-    }
   }
   const dentroDe = (r, x, z) => x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3];
   function obstaculos(T, pai) {
@@ -437,7 +312,7 @@
     pai.updateMatrixWorld(true);
     pai.children.forEach(o => {
       const t = o.userData.t;
-      if (!t || SEM_COLISAO.has(t)) return;
+      if (!t || SEM_COLISAO.has(t) || (NS().semColisao && NS().semColisao.has(t))) return;
       NS().caixasColisao(T, o).forEach(b => {
         if (b.max.y < .25 || b.min.y > 1.8) return;
         out.push([b.min.x - RAIO, b.max.x + RAIO, b.min.z - RAIO, b.max.z + RAIO]);
@@ -727,13 +602,31 @@
       g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; interativos.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
       const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '' };
       carregadas.set(p, c);
-      atualizarItens(p); sincDocs(p, F2);
+      atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
     }
     // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
     function atualizarItens(pSo) {
       const e = (est().estoque || {});
-      carregadas.forEach((c, p) => { if (pSo && p !== pSo) return; c.g.children.forEach(o => { if (o.userData.t === 'item_chao') o.visible = (e[`i_${S[p].cn}_${o.userData.i}`] || 0) > 0; }); });
+      carregadas.forEach((c, p) => { if (pSo && p !== pSo) return; c.g.children.forEach(o => { if (o.userData.t === 'item_chao') o.visible = (e[`i_${S[p].cn}_${o.userData.i}`] || 0) > 0; else if (o.userData.km) o.visible = (e[o.userData.km] || 0) > 0; }); });
     }
+    // itens que o Mestre deixou nesta sala (mapa/itens3d): aparecem para todos e se pegam com E
+    function sincItensM(p, F2) {
+      const c = carregadas.get(p); if (!c) return;
+      const cn = S[p].cn, lista = Object.entries(est().itens3d || {}).filter(([, v]) => v && v.cn === cn && v.a === a);
+      const sig = lista.map(([k, v]) => k + v.x + v.y + v.n).join('|');
+      if (sig === c.sigItm) return; c.sigItm = sig;
+      (c.itm || []).forEach(d => { c.g.remove(d.obj); const i = interativos.indexOf(d.it); if (i >= 0) interativos.splice(i, 1); }); c.itm = [];
+      const Fd = F2 || NSX.criarFabrica(T, c.anim, [], c.desc, { alt: ALT });
+      lista.forEach(([k, v], j) => {
+        let [x, z] = planta3D(a, v.x, v.y); x -= S[p].cx; z -= S[p].cz;
+        const o = Fd.P.item_chao({ item: v.n, sem: 700 + j }); o.position.set(x, 0, z); o.userData.t = 'item_m'; o.userData.km = 'm_' + k; c.g.add(o);
+        const w = new T.Vector3(); o.getWorldPosition(w);
+        const it = { tipo: 'item', k: 'm_' + k, nome: v.n, cn, p, pos: w, obj: o };
+        interativos.push(it); c.itm.push({ obj: o, it });
+      });
+      atualizarItens(p);
+    }
+    function atualizarItensM() { carregadas.forEach((c, p) => sincItensM(p)); }
     // documentos e cifras que o Mestre prendeu a esta sala (Arquivo: "Na parede de uma sala")
     function sincDocs(p, F2) {
       const c = carregadas.get(p); if (!c) return;
@@ -829,6 +722,7 @@
     const corredorAtm = { i: .16, c: '#c9c0a0', chao: '#1a140c', nc: '#0b0904', nd: tema.nevoa, fundo: '#050403', exp: 1.25 };
     const ambDe = c => ({ i: Math.max(c.amb?.i ?? .3, c.amb?.min ?? .15), c: c.amb?.c || '#bfc6d6', chao: c.amb?.chao || '#1a1410' });
     const atmDe = p => {
+      if (expoCena && p === expoCena.p && Object.keys(expoCena.atm).length) { const e0 = expoCena; expoCena = null; const base = atmDe(p); expoCena = e0; return { ...base, ...e0.atm }; }
       const s = p && S[p];
       if (!s || !salaVisivel(p)) return corredorAtm;
       if (!s.cena) return { i: .22, c: '#c8c0b0', chao: '#141010', nc: '#060505', nd: tema.nevoa * .6, fundo: '#060505', exp: 1.25 };
@@ -857,7 +751,32 @@
       if (!ok) for (const r of zonasCorr) if (dentroDe(r, x, z)) { ok = true; break; }
       if (!ok) return false;
       for (const c of carregadas.values()) for (const r of c.obst) if (dentroDe(r, x, z)) return false;
+      if (expoCena && expoCena.r.colisoes) for (const r of expoCena.r.colisoes) if (x >= r[0] - RAIO && x <= r[1] + RAIO && z >= r[2] - RAIO && z <= r[3] + RAIO) return false;
       return true;
+    }
+
+    /* ----- sala de exposição em andamento (mapa/expo): a sala vira o ambiente da exposição (exposicao3d.js) ----- */
+    let expoCena = null;
+    function sincExpo() {
+      const x = est().expo, quer = x && x.on && x.cn && Math.ceil(x.cn / 25) === a && NS().expo3d ? x : null;
+      if (expoCena && (!quer || expoCena.id !== quer.id)) {
+        raiz.remove(expoCena.r.grupo); try { expoCena.r.descartar && expoCena.r.descartar(); } catch (e) {}
+        expoCena.desc.forEach(d => { try { d.dispose(); } catch (e) {} }); expoCena = null;
+      }
+      if (!quer) return;
+      const p = quer.cn - 25 * (a - 1), sd = S[p]; if (!sd) return;
+      if (!expoCena) {
+        const anim = [], luzes = [], desc = [];
+        const F3 = NSX.criarFabrica(T, anim, luzes, desc, { alt: ALT }); F3.T = T;
+        const vaos = Object.entries(sd.vaos).map(([lado, v]) => ({ lado, u: v.centro - (lado === 'n' || lado === 's' ? sd.cx : sd.cz) }));
+        let r = null;
+        try { r = NS().expo3d.montar({ T, F: F3, sala: { cn: sd.cn, cx: sd.cx, cz: sd.cz, x0: sd.x0, x1: sd.x1, z0: sd.z0, z1: sd.z1, vaos }, expo: quer, ALT, SALA_M, celular: ctx.celular }); }
+        catch (e) { console.warn('3D exposição:', e); }
+        if (!r || !r.grupo) return;
+        raiz.add(r.grupo);
+        const at = r.atmosfera || {};
+        expoCena = { r, id: quer.id, p, anim, desc, atm: { ...(at.amb ? { i: at.amb.i, c: at.amb.c } : {}), ...(at.nevoa ? { nc: at.nevoa.c, nd: at.nevoa.d } : {}), ...(at.fundo ? { fundo: at.fundo } : {}), ...(at.exposicao ? { exp: at.exposicao } : {}) } };
+      } else { try { expoCena.r.atualizar && expoCena.r.atualizar(quer); } catch (e) { console.warn('3D exposição:', e); } }
     }
 
     // dentro de uma sala ou corredor (ignora os móveis): a câmera de jogo não sai pelas paredes
@@ -877,9 +796,10 @@
       });
     }
 
+    setTimeout(() => { try { sincExpo(); } catch (e) {} }, 0);
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos, campos,
-      livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs, carregar,
+      livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
         tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
@@ -887,6 +807,7 @@
         portas.forEach(P => { if (P) for (let i = 0; i < P.anim.length; i++) P.anim[i](dt, t); });
         for (let i = 0; i < ctx.animMundo.length; i++) ctx.animMundo[i](dt, t);
         distribuirLuzes(cam.x, cam.z, t);
+        if (expoCena) { for (let i = 0; i < expoCena.anim.length; i++) expoCena.anim[i](dt, t); try { if (typeof expoCena.r.anim === 'function') expoCena.r.anim(dt, t, cam); } catch (e) {} }
         atmosfera(x, z, modo, dt);
         tetos.visible = imersivo(modo);
         casaDeBonecas(cam.x, cam.z, modo);
@@ -903,6 +824,7 @@
         return out;
       },
       descartar() {
+        if (expoCena) { try { expoCena.r.descartar && expoCena.r.descartar(); } catch (e) {} expoCena.desc.forEach(d => { try { d.dispose(); } catch (e) {} }); expoCena = null; }
         [...carregadas.keys()].forEach(descarregar);
         portas.forEach(P => P && P.desc.forEach(x => { try { x.dispose(); } catch (e) {} }));
       }
@@ -1288,6 +1210,8 @@
       case 'quadro': solta(); clicar('btnQuadro'); break;
       case 'dados': solta(); clicar('btnDados'); break;
       case 'arquivo': solta(); if (window.ACF_ARQUIVO) window.ACF_ARQUIVO.abrir(); break;
+      case 'mochila': { solta(); const A = ACF(), mo = document.getElementById('mochila'); if (mo && !mo.hidden) A.fecharMochila(); else if (A.abrirMochila) A.abrirMochila(); break; }
+      case 'narrador': { solta(); const A = ACF(); if (A.abrirNarrador) A.abrirNarrador(); break; }
       case 'painel': if (e) e.preventDefault(); alternarGaveta(); break;
       case 'opcoes': { solta(); const o = $('#s3dOpcoes'); o.hidden = !o.hidden; $('#s3dPainel').hidden = true; if (!o.hidden) desenharOpcoes(); break; }
       case 'hud': V.d.classList.toggle('s3d-sem-hud'); toast(V.d.classList.contains('s3d-sem-hud') ? `Interface escondida (${nomeTecla(teclaDe('hud'))} mostra de novo).` : 'Interface de volta.'); break;
@@ -1421,7 +1345,7 @@
   const disponivel = id => { const b = document.getElementById(id); return !!b && !b.hidden && !b.closest('[hidden]'); };
   // janelas do site abertas por cima do 3D: o teclado do jogo deixa elas em paz
   const SOBRE = ['dialog[open]', '.fx-tela', '.qd-tela', '.arquivo-tela', '.mesa-janela', '.escudo', '.relatorio-tela', '.nex-tela', '.parede-tela',
-    '.visao-tela', '.rr-modal', '.bz-modal', '.dil-tela', '.expo-tela', '.dest-tela', '.hall-tela', '.bau-tela', '.ab-tela', '.fx-modal', '.cf-palpite', '.cor-pop', '#painelChat', '#perfil'];
+    '.visao-tela', '.rr-modal', '.bz-modal', '.dil-tela', '.expo-tela', '.dest-tela', '.hall-tela', '.bau-tela', '.ab-tela', '.fx-modal', '.cf-palpite', '.cor-pop', '#painelChat', '#perfil', '#mochila', '#narrador'];
   const visivelEl = el => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   function sobreposta() { for (const sel of SOBRE) for (const el of document.querySelectorAll(sel)) if (visivelEl(el) && !el.closest('#s3d')) return true; return false; }
   function salaAtualCN() {
@@ -1457,11 +1381,13 @@
     add('🗂', q === 'mestre' ? 'Painel do Mestre' : q === 'aux' ? 'Painel' : 'Minha cobaia', () => alternarGaveta(true), 'Tab');
     if (q === 'mestre' || q === 'aux') add('🎛', 'Controles do 3D', () => { const p = $('#s3dPainel'); p.hidden = false; $('#s3dOpcoes').hidden = true; desenharPainel(); }, 'luzes, portas, tokens');
     if (q === 'aux') add('🤖', 'Meu robô aqui', () => colocarMeuRobo(), 'coloca ou traz o seu S.T.A.F.F.');
+    if (q === 'jog' && A.abrirMochila) add('🎒', 'Mochila', () => A.abrirMochila(), nomeTecla(teclaDe('mochila')));
+    if (q === 'mestre' && A.abrirNarrador) add('🎭', 'Narrador', () => A.abrirNarrador(), nomeTecla(teclaDe('narrador')));
     if (disponivel('btnFichas')) add('📋', 'Fichas', () => clicar('btnFichas'), 'F');
     if (q === 'aux' && window.ACF_FICHAS) add('☠', 'Ameaças e Filhos', () => window.ACF_FICHAS.abrir('aux'));
     add('🎲', 'Dados', () => { clicar('btnDados'); }, 'R');
     if (disponivel('btnChat')) add('💬', 'Chat', () => clicar('btnChat'), 'Enter');
-    if (window.ACF_ARQUIVO) add('📜', 'Arquivo · Cifras · Terminal', () => window.ACF_ARQUIVO.abrir(), 'I');
+    if (window.ACF_ARQUIVO) add('📜', 'Arquivo · Cifras · Terminal', () => window.ACF_ARQUIVO.abrir(), nomeTecla(teclaDe('arquivo')));
     if (q === 'jog' && disponivel('btnAbrirLoja')) add('🛒', 'Loja do Maurício', () => clicar('btnAbrirLoja'));
     if (q === 'mestre') add('🛒', 'Loja (Mestre)', () => clicar('btnAbrirLojaM'));
     if (disponivel('btnQuadro')) add('🖍', 'Quadro da equipe', () => clicar('btnQuadro'), 'B');
@@ -2193,6 +2119,13 @@
       h += '</section>';
       h += `<section><h4>Corredores do ${a}º andar</h4><div class="s3d-op">${bts('a' + a, luz('a' + a))}</div></section>`;
       h += `<section><h4>Portas</h4><p class="mini">Clique numa porta (ou no botão vermelho ao lado dela) para abrir ou fechar.</p></section>`;
+      if (cn) {
+        const meus = Object.entries(e.itens3d || {}).filter(([, v]) => v && v.cn === cn), est1 = e.estoque || {};
+        h += `<section><h4>Deixar um item nesta sala</h4><p class="mini">Fica no chão ${imersivo(est.modo) ? 'à sua frente' : 'no centro da vista'} e todos veem. Quem pega leva para a ficha ativa.</p>
+          <div class="s3d-item-m"><input type="text" list="s3dCatItens" placeholder="Nome do item (catálogo ou livre)" aria-label="Item"><button type="button" data-itm="por">Colocar</button></div>
+          <datalist id="s3dCatItens">${((window.ACF_FICHAS && window.ACF_FICHAS.catalogoItens && window.ACF_FICHAS.catalogoItens()) || []).map(x => `<option value="${esc(x.n)}">`).join('')}</datalist>
+          ${meus.length ? `<ul class="s3d-itm-lista">${meus.map(([k, v]) => `<li><span>${(est1['m_' + k] || 0) > 0 ? '🎒' : '✓ pego:'} ${esc(v.n)}</span><button type="button" data-itm="tirar" data-k="${esc(k)}" aria-label="Tirar ${esc(v.n)}">✕</button></li>`).join('')}</ul>` : ''}</section>`;
+      }
       const ks = chavesItens(a), est0 = e.estoque || {}, noChao = ks.filter(k => (est0[k] || 0) > 0).length;
       if (ks.length) h += `<section><h4>Itens do livro no ${a}º andar</h4><p class="mini">${noChao} de ${ks.length} no chão. Quem pega leva para a ficha ativa (some para todos).</p><div class="s3d-op"><button type="button" data-itens="espalhar">Espalhar todos</button><button type="button" data-itens="recolher">Recolher</button></div></section>`;
     }
@@ -2221,6 +2154,15 @@
     });
     const sf = p.querySelector('[data-forma]'); if (sf) sf.onchange = () => { A.definir(['formas', sel.s], sf.value); };
     ligarVoz(p, desenharPainel);
+    p.querySelectorAll('[data-itm]').forEach(b => b.onclick = () => {
+      if (b.dataset.itm === 'tirar') { A.tirarItem3D(b.dataset.k); setTimeout(desenharPainel, 150); return; }
+      const nome = ($('.s3d-item-m input', p) || {}).value || ''; if (!nome.trim()) { toast('Escreva o nome do item.'); return; }
+      const c = V.cam; let x, z;
+      if (imersivo(c.modo)) { x = c.px - Math.sin(c.yaw) * 1.6; z = c.pz - Math.cos(c.yaw) * 1.6; } else { x = c.ax; z = c.az; }
+      [x, z] = pontoLivre(V.mundo.livre3D, x, z);
+      const q = plantaDe3D(a, x, z), r = A.colocarItem3D(nome, a, q.x, q.y);
+      toast(r || `Item deixado: ${nome}.`); setTimeout(desenharPainel, 150);
+    });
     p.querySelectorAll('[data-itens]').forEach(b => b.onclick = () => {
       const ks = chavesItens(a), novo = { ...(e.estoque || {}) };
       if (b.dataset.itens === 'espalhar') ks.forEach(k => { if (!(novo[k] > 0)) novo[k] = 1; }); else ks.forEach(k => { delete novo[k]; });
@@ -2495,6 +2437,8 @@
       const va = JSON.stringify(e.var3d || {});
       if (va !== varAntes) { const antes = varAntes; varAntes = va; if (antes) Object.keys({ ...JSON.parse(antes || '{}'), ...(e.var3d || {}) }).forEach(k => { const p = +k.slice(1) - 25 * (a - 1); if (p >= 1 && p <= 25) V.mundo.recarregar(p); }); }
       V.mundo.atualizarPortas();
+      V.mundo.atualizarItensM();
+      V.mundo.sincExpo();
       V.mundo.atualizarItens();
       V.mundo.atualizarDocs();
       V.tok.sincronizar();
