@@ -262,6 +262,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 | `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
 | `tokens3d.js` | Miniaturas: as sete cobaias, as quatro cobaias NPC (Coelho, Cara Pálida, Risa, Onírico, que anda rastejando), os robôs S.T.A.F.F., a Presença (aparição translúcida) e as formas dos Filhos. Rostos pintados em textura, com sombra, íris, brilho e cílios |
 | `andares3d.js` | Objetos próprios dos cinco andares (máquinas, relíquias, crescimentos de carne, vigas, passarelas, rastros, barricadas…), no mesmo estilo do `detalhes3d.js`, usados pelas salas montadas à mão para 20 m |
+| `interacoes3d.js` | Interações das salas no 3D (abrir, ligar, jogar, tocar, ler, vestir, telão com vídeo do YouTube), sons curtos gerados na hora e o traje vestido por cima da miniatura |
 | `exposicao3d.js` | Ambientes das Salas de Exposição no 3D (chuva, maré, paredes que fecham, desabamento, labirinto, horda, fogo, gelo…) e a camada animada por cima da sala no mapa 2.5D. Só construtores genéricos: nomes e textos das salas de exposição ficam no arquivo fora do GitHub |
 | `vozes.js` | Vozes das mensagens do chat no 3D, geradas na hora (sem arquivos de áudio) |
 | `dados3d.js` | Dados 3D com física (d4, d6, d8, d10, d12, d20) na tela de quem rolou; a física vem do cannon.js (jsDelivr), baixado só na primeira rolagem |
@@ -350,6 +351,40 @@ Quando o Mestre dá **▶ Iniciar** numa Sala de Exposição posta numa CN, aque
 - **Mapa 2.5D:** uma camada animada por cima da sala (chuva caindo, líquido subindo, paredes fechando, grade do labirinto, zonas piscando) e o selo **EXPOSIÇÃO · nome · rodada N**. Respeita "reduzir movimento" do aparelho.
 - O visual de cada sala de exposição vem do campo `cena3d` da biblioteca (`salas-exposicao.json`, fora do GitHub). Sem `cena3d`, o site escolhe pelo `modelo`, elemento e ambiente sonoro. **Importe a biblioteca de novo** (Mesa → Salas de Exposição → ⬆ Importar) para trazer o `cena3d` das 37 salas.
 - **Limite:** como o resto do estado da exposição em andamento, o nome público e o visual ficam em `mapa/expo` (todos leem). O efeito secreto e os eventos continuam só com o Mestre.
+
+### Interações nas salas (tecla E)
+
+Cada sala tem objetos que se usam com **E** (ou tocando no botão que aparece na tela quando você chega perto). Quem usa é quem controla um token (o jogador com a cobaia, o Mestre e os auxiliares controlando alguém); o Mestre usa também da câmera livre.
+
+| No botão | O que faz | Quem vê |
+|---|---|---|
+| 🚪 Abrir / Fechar | portões, armários, gavetas, geladeiras. Portão fechado barra a passagem; aberto, deixa passar | todos na sala, com som |
+| 💡 Ligar / Desligar | luminárias, TVs, monitores, projetor, máquinas: o brilho e a luz da peça apagam ou acendem | todos |
+| 🕹 Jogar | fliperamas: a tela roda uma partida por alguns segundos | todos, com som |
+| 🎵 Tocar… | piano, órgão, telefone, sino, gravador, rádio | todos por perto ouvem |
+| 📄 Ler | avisos, etiquetas, instruções (só o que a sala mostra; nada de segredo) | só quem leu |
+| 🦺 Vestir | trajes num cabide (veja abaixo) | todos veem o traje na miniatura |
+
+- O estado fica em `mapa/inter` (o portão que um abriu fica aberto para todos). **Atualize as regras do Firebase** com o `regras-firebase.json` desta versão (novo: `mapa/inter`, que qualquer conta logada grava no formato certo). Sem isso, só o Mestre consegue abrir e ligar as coisas.
+- **Limite:** o portão aberto deixa passar no 3D. No mapa 2D, as paredes e portas continuam as da planta.
+
+### Telão do cinema (vídeo do YouTube)
+
+Na sala com telão, o Mestre abre o 🎛 (ou aperta E no telão) → **Telão desta sala**: cola o link do YouTube e toca em **▶ Passar**. O vídeo aparece na tela do cinema para todos que estiverem na sala, sincronizado (quem entra depois pega o vídeo andando), e o som sobe quanto mais perto da tela. **⏹ Parar** tira. Fica em `mapa/video`.
+
+- **Limites:** o vídeo é desenhado por cima do 3D, então alguém andando na frente da tela não o cobre. O navegador pode segurar o som até a pessoa tocar na tela uma vez. Vídeos que o dono bloqueou para incorporação não tocam. Fora da sala o vídeo para de carregar (economiza dados).
+
+### Trajes (vestir pelo 3D, pela mochila ou pela ficha)
+
+Nos cabides de trajes (ex.: vestiário do 3º andar), **E · Vestir** coloca o traje na ficha ativa **já vestido**, e o cabide fica com um a menos para todos (`mapa/estoque/v_…`; o Mestre repõe no 🎛 → Trajes nesta sala). A miniatura passa a aparecer de traje (capuz, viseira, luvas, botas), no 3D de todos.
+
+Regras dos livros que o site aplica:
+- **Traje Hazmat** (livro base): +5 em testes de resistência contra efeitos ambientais e resistência a químico 10. Categoria I, 2 espaços.
+- **Traje de Isolamento Elétrico**: RD 5 e +5 em resistência contra eletricidade. **Traje de Mergulho** (SaH): +5 contra efeitos ambientais, resistência a químico 5, 1 hora de oxigênio. **Traje Espacial** (SaH): +10, resistência a químico 20, oito horas. **Roupa de Aproximação**: resistência a fogo 2 e +5 em Fortitude contra calor e fumaça.
+- Vestir ou tirar é **ação completa** (o traje espacial leva duas rodadas): o aviso lembra.
+- No máximo **duas vestimentas** ao mesmo tempo: a terceira entra na ficha sem vestir.
+- Na ficha, o traje tem a caixa "vestido"; a aba Em jogo mostra **Vestindo** com o que ele dá. Na mochila (I), **🦺 Vestir / Tirar**.
+- **O que não é automático:** o +5 depende de o teste ser contra um efeito ambiental (ou elétrico), e só o Mestre sabe disso na hora: o site mostra o lembrete, não soma sozinho. As resistências aparecem escritas, para o Mestre descontar o dano.
 
 ### Zona Neutra no 3D
 

@@ -287,7 +287,15 @@
           if (o.teia) { const cx2 = W0 / 2, cy2 = H0 / 2; for (let k = 1; k < 6; k++) { x.beginPath(); x.arc(cx2, cy2, k * Math.min(W0, H0) / 13, 0, 7); x.stroke(); } for (let k = 0; k < 14; k++) { x.beginPath(); x.moveTo(cx2, cy2); x.lineTo(cx2 + Math.cos(k * .449) * W0 * .45, cy2 + Math.sin(k * .449) * H0 * .45); x.stroke(); } }
           x.lineWidth = 6; x.strokeStyle = '#3a2a1a'; x.strokeRect(3, 3, W0 - 6, H0 - 6);
         }
-        else { x.font = 'bold 22px Arial'; x.textAlign = 'center'; x.fillText(o.txt || '', c.width / 2, 34); x.font = '14px Arial'; for (let i = 0; i < 9; i++) x.fillRect(24, 60 + i * 20, 160 + r() * 50, 4); }
+        else {
+          // título que cabe na folha (quebra em linhas e diminui a letra), depois as linhas de texto miúdo
+          const L = String(o.txt || '').split('\n').flatMap(l => { const ws = l.split(' '), out = []; let cur = ''; x.font = 'bold 22px Arial'; ws.forEach(w2 => { const t = cur ? cur + ' ' + w2 : w2; if (x.measureText(t).width > c.width * .86 && cur) { out.push(cur); cur = w2; } else cur = t; }); out.push(cur); return out; }).slice(0, 4);
+          let tam = 22; x.font = `bold ${tam}px Arial`;
+          while (tam > 9 && Math.max(...L.map(l => x.measureText(l).width)) > c.width * .9) { tam -= 1; x.font = `bold ${tam}px Arial`; }
+          x.textAlign = 'center'; L.forEach((l, i) => x.fillText(l, c.width / 2, 30 + i * tam * 1.15));
+          const y0 = 30 + L.length * tam * 1.15 + 6;
+          for (let i = 0; i < 9 && y0 + i * 20 < c.height - 14; i++) x.fillRect(24, y0 + i * 20, 160 + r() * 50, 4);
+        }
         pl(g, w, h, m('#ffffff', { unico: true, mapa: texCanvas(c), r: .95 }), 0, y + h / 2, .01);
         return g;
       },
@@ -605,14 +613,35 @@
         return g;
       },
       texto(o) {
-        // texto pintado na parede (tinta escorrida)
+        // texto pintado na parede (tinta escorrida): a letra se ajusta ao quadro (nada sai cortado)
+        // e a tinta escorre de baixo das letras, não por cima delas
         const g = G(), w = o.w || 3, h = o.h || .8, y = o.y ?? 1.4;
-        const [c, x] = tela(1024, Math.round(1024 * h / w)); x.clearRect(0, 0, c.width, c.height);
-        x.fillStyle = o.c || '#e0b400'; x.font = `bold ${o.tam || Math.round(c.height * .42)}px ${o.fonte || 'Georgia, serif'}`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        const L = String(o.txt || '').split('\n'), alt = c.height / (L.length + .4);
-        L.forEach((l, i) => x.fillText(l, c.width / 2, alt * (i + .7)));
-        if (o.escorre !== false) { const r = rng(o.sem || 43); for (let i = 0; i < 40; i++) { const px = 40 + r() * (c.width - 80); x.fillRect(px, c.height * .3 + r() * c.height * .4, 3 + r() * 4, 20 + r() * c.height * .5); } }
+        const CW = 2048, CH = Math.max(256, Math.min(2048, Math.round(CW * h / w)));
+        const [c, x] = tela(CW, CH); x.clearRect(0, 0, c.width, c.height);
+        const L = String(o.txt || '').split('\n'), fonte = o.fonte || 'Georgia, serif', cor = o.c || '#e0b400';
+        const esc = o.escorre !== false, alturaUtil = CH * (esc ? .72 : .9);
+        let tam = o.tam ? o.tam * CW / 1024 : Math.floor(alturaUtil / (L.length * 1.18));
+        x.font = `bold ${tam}px ${fonte}`;
+        const larg = () => Math.max(...L.map(l => x.measureText(l).width));
+        while (tam > 10 && larg() > CW * .9) { tam -= 4; x.font = `bold ${tam}px ${fonte}`; }
+        const alt = tam * 1.18, y0 = (esc ? CH * .06 : (CH - alt * L.length) / 2) + alt / 2;
+        x.fillStyle = cor; x.textAlign = 'center'; x.textBaseline = 'middle';
+        L.forEach((l, i) => x.fillText(l, CW / 2, y0 + i * alt));
+        if (esc) {
+          // escorridos: saem da base de cada linha, finos, com gota na ponta e o topo largo (pincel)
+          const r = rng(o.sem || 43);
+          L.forEach((l, i) => {
+            const lw = x.measureText(l).width, base = y0 + i * alt + tam * .34, n = Math.max(4, Math.round(l.length * .9));
+            for (let k = 0; k < n; k++) {
+              const px = CW / 2 - lw / 2 + r() * lw, comp = tam * (.25 + r() * (i === L.length - 1 ? 1.6 : .7)), lg = 2 + r() * tam * .045;
+              const gr = x.createLinearGradient(0, base, 0, base + comp); gr.addColorStop(0, cor); gr.addColorStop(1, cor);
+              x.fillStyle = gr; x.beginPath(); x.moveTo(px - lg, base - 2); x.lineTo(px + lg, base - 2); x.lineTo(px + lg * .55, base + comp); x.lineTo(px - lg * .55, base + comp); x.closePath(); x.fill();
+              x.beginPath(); x.arc(px, base + comp, lg * .9, 0, Math.PI * 2); x.fill();
+            }
+          });
+        }
         const mat = m('#ffffff', { unico: true, mapa: texCanvas(c), r: .6 }); mat.transparent = true; mat.depthWrite = false;
+        if (mat.map) mat.map.anisotropy = 8;
         if (o.brilho) { mat.emissive = new T.Color('#ffffff'); mat.emissiveMap = mat.map; mat.emissiveIntensity = o.brilho; }
         pl(g, w, h, mat, 0, y + h / 2, .013);
         return g;
@@ -1149,11 +1178,13 @@
   // caixas de colisão de um objeto da cena: peças grandes e "compostas" (anel de colunas, vagão,
   // fileira de mesas) viram uma caixa por peça, para não bloquear a sala inteira com uma caixa só
   function caixasColisao(T, obj, out = [], prof = 0) {
+    // partes que abrem e fecham (folha de portão, porta de armário): quem cuida delas é o 3D (interacoes3d.js)
+    if (obj.userData && obj.userData.folha) return out;
     const b = new T.Box3().setFromObject(obj);
     if (b.isEmpty()) return out;
     const w = b.max.x - b.min.x, d = b.max.z - b.min.z;
     const filhos = obj.children.filter(c => !c.isLight && !c.isSprite && !c.isPoints);
-    if (prof < 3 && filhos.length > 1 && (w * d > 3.2 || Math.max(w, d) > 3.4)) { filhos.forEach(c => caixasColisao(T, c, out, prof + 1)); return out; }
+    if (prof < 4 && filhos.length > 1 && (w * d > 3.2 || Math.max(w, d) > 3.4 || obj.userData.temFolha)) { filhos.forEach(c => caixasColisao(T, c, out, prof + 1)); return out; }
     out.push(b);
     return out;
   }

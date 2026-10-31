@@ -396,7 +396,8 @@
         for (let i = 0; i < n; i++) { const x0 = -w / 2 + w / n * (i + .5); bx(g, w / n - .08, .42, .08, m('#1a1a1a', { me: .4 }), x0, 1.08, -.06); pl(g, w / n - .14, .34, tela2, x0, 1.29, -.015); }
         for (let i = 0; i < 10; i++) { const b = cy(g, .02, .02, .025, m(['#ff3020', '#30ff60', '#ffd020', '#ddd'][Math.floor(r() * 4)], { e: r() < .5 ? '#ff6020' : '#000', ei: .8 }), (r() - .5) * (w - .2), 1.0, .14 + r() * .1, 8); b.rotation.x = .45; }
         for (let i = 0; i < 2; i++) { const mo = cy(g, .06, .06, .02, m('#e8e4d8'), (i - .5) * .3, .7, .36, 14); mo.rotation.x = Math.PI / 2; }
-        const cab = P.cabos_chao({ n: 4, w: w, d: 1.2, sem: o.sem, c: '#121212' }); cab.position.z = .9; g.add(cab);
+        // cabos soltos no chão só quando a cena pede (o.cabos): ponta solta no meio da sala não convence
+        if (o.cabos) { const cab = P.cabos_chao({ n: 4, w: w, d: 1.2, sem: o.sem, c: '#121212' }); cab.position.z = .9; g.add(cab); }
         const off = r() * 5; anim.push((dt, t) => { tela2.emissiveIntensity = 1.0 + Math.sin(t * 9 + off) * .15 + (Math.random() < .02 ? .8 : 0); });
         return g;
       },
@@ -532,7 +533,7 @@
         const mic = P.microfone({}); mic.position.set(.35, .79, .05); g.add(mic);
         const fone = new T.Mesh(guardar(new T.TorusGeometry(.09, .012, 6, 14, Math.PI)), m('#151515')); fone.position.set(-.45, .82, .15); fone.rotation.x = -1.2; g.add(fone); [-1, 1].forEach(s => { const e = cy(g, .045, .045, .03, m('#222'), -.45 + s * .09, .79, .2, 12); });
         const pp = P.papeis_chao({ n: 4, w: .8, d: .4, sem: o.sem }); pp.position.y = .78; g.add(pp);
-        const cab = P.cabos_chao({ n: 3, w: .8, d: 1.2, sem: o.sem, sobe: .75 }); cab.position.z = .55; g.add(cab);
+        if (o.cabos) { const cab = P.cabos_chao({ n: 3, w: .8, d: 1.2, sem: o.sem, sobe: .75 }); cab.position.z = .55; g.add(cab); }
         return g;
       },
       // a "onda de som" visível no ar (efeito)
