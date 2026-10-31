@@ -58,7 +58,7 @@ const vezId = () => { const p = persg(), o = ordemP(); return p.on && o.length ?
 const celular = () => Math.min(innerWidth, innerHeight) < 700 || matchMedia('(pointer: coarse)').matches;
 const nomeTk = tk => (A().rotulo ? A().rotulo(tk) : (SERd(tk.s) || {}).nome || '');
 // o Filho está à vista dos jogadores? (sem ocultação geral, especial, forma de objeto, cópia nem pedido de publicar)
-const filhoAVista = tk => tipoDe(tk) === 'filho' && !tk.h && !tk.oc && !tk.fo && !tk.pp && !tk.cp;
+const filhoAVista = tk => tipoDe(tk) === 'filho' && !tk.h && !tk.oc && !tk.fo && !tk.pp && !tk.cp && !(FIL() && FIL().foraDoEncontro && FIL().foraDoEncontro(tk));
 
 /* =========================================================
    ÁUDIO: um contexto só, sons feitos na hora, com posição (PannerNode)

@@ -131,6 +131,8 @@ function visivelPara(tk) {
   if (v.aux) return window.ACF_FILHOS ? ACF_FILHOS.veAux(tk) : true;
   // ocultação especial dos Filhos (no teto, na parede, forma de objeto…): some para os jogadores
   if (tipo !== 'cobaia' && (tk.oc || tk.fo || tk.pp)) return false;
+  // "só por uma lente" (filhos.js): some para quem não está olhando por uma, salvo durante o Flash
+  if (tipo === 'filho' && window.ACF_FILHOS && ACF_FILHOS.visivelJogador && !ACF_FILHOS.visivelJogador(tk)) return false;
   // escondido num esconderijo: só quem se escondeu (e o Mestre e os auxiliares) enxerga
   if (tk.esq && tk.s !== v.meu) return false;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
@@ -529,7 +531,7 @@ function recusaLocal(caminho, valor) {
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
   // auxiliar: coloca Filhos novos (ocultos) e tira os que ainda estão ocultos
-  if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f\d+-\d+$/.test(caminho[1])) return '';
+  if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'filho' && valor.h === true && /^f[0-9a-z]+-\d+$/.test(caminho[1])) return '';
   if (aux && !atual && valor && SER[valor.s] && SER[valor.s].tipo === 'espectro' && valor.h === true && valor.pr === 1 && /^fe-\d+$/.test(caminho[1])) return '';
   if (aux && atual && !valor && SER[atual.s] && SER[atual.s].tipo === 'filho') return atual.h ? '' : 'Este Filho já foi revelado aos jogadores: só o Mestre tira do mapa.';
   // auxiliar: coloca o PRÓPRIO robô S.T.A.F.F. (vai oculto, com pedido "pr"; a tela do Mestre publica)
@@ -1135,6 +1137,13 @@ function desenharFichas() {
     // características dos Filhos: token que pisca (jogadores), ocultação especial e marca do sentido (Mestre e auxiliares)
     f.classList.toggle('pisca-filho', !!tk.pi && !V().mestre && !V().aux);
     f.classList.toggle('oculta-especial', (V().mestre || !!V().aux) && !!(tk.oc || tk.fo || tk.pp));
+    // filhos.js: cria pequena, etiqueta "amigável", imagem falsa, só por lente, Flash, forma rolada e cobaia olhando por uma lente
+    const xf = window.ACF_FILHOS && ACF_FILHOS.extraFicha ? ACF_FILHOS.extraFicha(id, tk) : null;
+    if (xf) {
+      f.classList.toggle('mini', xf.mini); f.classList.toggle('amigavel', xf.amigavel); f.classList.toggle('falso', xf.falso);
+      f.classList.toggle('so-lente', xf.lente); f.classList.toggle('no-flash', xf.flash); f.classList.toggle('olha-lente', xf.olhaLente);
+      if ((f.dataset.el || '') !== xf.el) { if (xf.el) f.dataset.el = xf.el; else delete f.dataset.el; }
+    }
     const sb = window.ACF_FILHOS ? ACF_FILHOS.marcaSentido(id, tk) : '';
     if ((f.dataset.sentido || '') !== sb) { f.dataset.sentido = sb; f.title = sb ? 'Percebida pelo sentido: ' + sb : ''; }
     f.classList.toggle('selecionada', selecionado === id);
@@ -2105,6 +2114,8 @@ let quemMove = null;
 function andavel(andar, x, y) {
   if (bloqueadoPorPorta(andar, x, y)) return false;
   if (quemMove && window.ACF_FILHOS && ACF_FILHOS.bloqueia(quemMove, andar, x, y)) return false;
+  // características dos Filhos: quem atravessa paredes anda por toda a planta do andar
+  if (quemMove && window.ACF_FILHOS && ACF_FILHOS.atravessa && ACF_FILHOS.atravessa(quemMove)) return x >= 0 && y >= 0 && x <= W && y <= H;
   for (let p = 1; p <= 25; p++) if (dentro(retSala(p), x, y)) return true;
   for (const c of CORREDORES) if (dentro(c, x, y)) return true;
   const rs = retSaida(saidaDoAndar(andar));
