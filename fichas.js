@@ -174,6 +174,19 @@ const temPoder = (d, nome) => lista((d || {}).hab).some(h => semAc(h.n).startsWi
 // Racionalidade Inflexível: Intelecto no lugar de Presença em Vontade e nos PE (usa o maior dos dois: o poder diz "pode usar")
 const racional = d => temPoder(d, 'racionalidade inflexivel') && int((d.atr || {}).int) >= int((d.atr || {}).pre);
 const atrPadrao = (d, id) => (id === 'vontade' && racional(d) ? 'int' : PER[id][2]);
+// Trajes e vestimentas (livro: "vestir ou despir é uma ação completa"; no máximo duas vestimentas)
+const ehVestivel = it => it && it.t !== 'protecao' && /^(traje|roupa de aproximacao|vestimenta)/.test(semAc(it.n));
+const vestidos = d => lista((d || {}).itens).filter(it => ehVestivel(it) && it.vest);
+// o que o traje dá, lido da descrição do livro (Resistência a químico 10, RD 5, +5 contra efeitos ambientais…)
+function efeitosTraje(it) {
+  const t = String(it.d || ''), out = [];
+  const rs = [...t.matchAll(/resist[êe]ncia a (?:dano )?([a-zà-ú]+) (\d+)/gi)].map(m => `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}`);
+  rs.forEach(x => out.push('Resistência a ' + x));
+  const rd = t.match(/\bRD (\d+)/); if (rd) out.push('RD ' + rd[1]);
+  [...t.matchAll(/\+(\d+) em testes de ([^.;]+?)(?= e resist| e RD|[.;]|$)/gi)].forEach(m => out.push(`+${m[1]} em testes de ${m[2].trim()}`));
+  const ox = t.match(/(\d+ horas?|uma hora|1 hora) de oxig[êe]nio|oxig[êe]nio para (\w+ horas?)/i); if (ox) out.push('Oxigênio: ' + (ox[1] || ox[2]));
+  return out;
+}
 const atrDaPericia = (d, id) => { const a = ((d.per || {})[id] || {}).a; return ATRS.some(x => x[0] === a) ? a : atrPadrao(d, id); };
 const catEfetiva = it => int(it.cat) + lista(it.mods).length;
 const lista = o => Object.entries(o || {}).map(([id, v]) => ({ ...v, id })).sort((a, b) => (a.o || 0) - (b.o || 0));
@@ -820,7 +833,9 @@ function atualizarDerivados() {
     const tr = Object.entries(d.treino || {}).filter(([, v]) => v);
     const podeT = F.atual && F.atual.editavel;
     const sono = Object.keys(d.condSono || {}).filter(k => d.condSono[k]);
-    const html = (sono.length ? `<span class="fx-k">Do sono</span>${sono.map(k => `<i class="fx-cond">${esc(COND_NOME[k] || k)}${xg('condSono/' + k)}</i>`).join('')}` : '')
+    const vs = vestidos(d);
+    const html = (vs.length ? `<span class="fx-k">Vestindo</span>${vs.map(it => `<i class="fx-cond fx-bonus" title="${esc(it.d || '')}">🦺 ${esc(it.n)}${efeitosTraje(it).length ? ': ' + esc(efeitosTraje(it).join(' · ')) : ''}</i>`).join('')}${vs.length > 2 ? '<i class="fx-cond">⚠ mais de duas vestimentas: o livro só soma duas</i>' : ''}` : '')
+      + (sono.length ? `<span class="fx-k">Do sono</span>${sono.map(k => `<i class="fx-cond">${esc(COND_NOME[k] || k)}${xg('condSono/' + k)}</i>`).join('')}` : '')
       + (nomes.length ? `<span class="fx-k">Condições</span>${nomes.map(k => { const c = (A.COND || {})[k]; return `<i class="fx-cond" title="${esc(COND_NOME[k] || (c && c.n) || k)}">${c ? c.i + ' ' : ''}${esc((c && c.n) || COND_NOME[k] || k)}</i>`; }).join('')}` : '')
       + (extra.length || tr.length ? `<span class="fx-k">Bônus de interlúdio</span>${extra.map(x => `<i class="fx-cond fx-bonus">${x}</i>`).join('')}${tr.map(([p, v]) => `<i class="fx-cond fx-bonus">${v === 'le' ? '📖' : '🏋️'} +1d6 ${esc((PER[p] || [, p])[1])}${podeT ? ` <button class="fx-x" data-acao="tirar-treino" data-v="${esc(p)}" title="A semana acabou: tirar">×</button>` : xg('treino/' + p)}</i>`).join('')}` : '')
       + (d.bonusProx ? `<span class="fx-k">Guardado</span><i class="fx-cond fx-bonus">⚡ ${esc(d.bonusProx.b)} · ${esc(d.bonusProx.n)}${podeT ? ' <button class="fx-x" data-acao="tirar-bp" title="Descartar">×</button>' : xg('bonusProx')}</i>` : '')
@@ -1094,7 +1109,7 @@ function itemHTML(it, ed) {
   const ce = catEfetiva(it);
   const a = it.a || {};
   const mods = lista(it.mods);
-  const cab = `<summary><b>${esc(it.n || 'Item')}</b>${it.t === 'municao' ? `<small class="fx-mun${qtdDe(it) <= 0 ? ' fx-mun-falta' : ''}">${esc(textoMun(it))}</small>` : int(it.qtd) > 1 ? `<small>×${int(it.qtd)}</small>` : ''}<small>${TIPOS_ITEM[it.t] || ''}</small>${it.el ? `<i class="fx-el" style="--el:${corEl(it.el)}">${esc(it.el)}</i>` : ''}<span class="fx-cat">Categoria: ${ROM[ce] || ce} · Espaços: ${num(it.esp)}</span>${it.t === 'protecao' && it.vest ? '<i class="fx-vest">vestida</i>' : ''}</summary>`;
+  const cab = `<summary><b>${esc(it.n || 'Item')}</b>${it.t === 'municao' ? `<small class="fx-mun${qtdDe(it) <= 0 ? ' fx-mun-falta' : ''}">${esc(textoMun(it))}</small>` : int(it.qtd) > 1 ? `<small>×${int(it.qtd)}</small>` : ''}<small>${TIPOS_ITEM[it.t] || ''}</small>${it.el ? `<i class="fx-el" style="--el:${corEl(it.el)}">${esc(it.el)}</i>` : ''}<span class="fx-cat">Categoria: ${ROM[ce] || ce} · Espaços: ${num(it.esp)}</span>${it.t === 'protecao' && it.vest ? '<i class="fx-vest">vestida</i>' : ''}${ehVestivel(it) && it.vest ? '<i class="fx-vest">vestido</i>' : ''}</summary>`;
   if (!ed) {
     const linhas = [];
     if (it.t === 'arma') linhas.push(`${esc([a.prof, a.tipo, a.emp].filter(Boolean).join(' · '))}<br>Dano ${esc(a.dano || '')} · Crítico ${int(a.margem) < 20 && int(a.margem) ? int(a.margem) + '/' : ''}x${int(a.mult) || 2}${a.td ? ' · ' + esc(a.td) : ''}${a.alc ? ' · Alcance ' + esc(a.alc) : ''}`);
@@ -1111,6 +1126,7 @@ function itemHTML(it, ed) {
       <label>Qtd. ${campo(base + '.qtd', 'n', ' min="0"')}</label>
       ${it.t === 'amaldicoado' ? `<label>Elemento <input data-c="${base}.el" list="fxElementos2" value="${esc(it.el || '')}"></label>` : ''}
       ${it.t === 'protecao' ? `<label>Defesa ${campo(base + '.def', 'n')}</label><label class="fx-check"><input type="checkbox" data-c="${base}.vest" ${it.vest ? 'checked' : ''}> vestida (soma na Defesa)</label>` : ''}
+      ${ehVestivel(it) ? `<label class="fx-check"><input type="checkbox" data-c="${base}.vest" ${it.vest ? 'checked' : ''}> vestido (vestir ou tirar: ação completa)</label>${efeitosTraje(it).length ? `<p class="fx-legenda">${efeitosTraje(it).map(esc).join(' · ')}</p>` : ''}` : ''}
       ${it.t === 'arma' ? `<label>Proficiência <input data-c="${base}.a.prof" list="fxProf" value="${esc(a.prof || '')}"></label>
         <label>Tipo <input data-c="${base}.a.tipo" list="fxTipoArma" value="${esc(a.tipo || '')}"></label>
         <label>Empunhadura <input data-c="${base}.a.emp" list="fxEmp" value="${esc(a.emp || '')}"></label>
@@ -1793,6 +1809,8 @@ function vitaisDe(d) {
   const cur = (k, mx) => (d[k] && d[k].a !== undefined && d[k].a !== null && d[k].a !== '' ? int(d[k].a) : mx);
   const det = d.regra === 'determinacao';
   const v = { nome: d.nome || '', pv: cur('pv', r.pvMax), pvM: r.pvMax, nex: nexDe(d), nv: CLASSES[d.classe] && CLASSES[d.classe].estagio ? 'E' + (int(d.estagio) || 1) : r.n };
+  const tv = vestidos(d).map(it => (window.ACF3D && window.ACF3D.inter ? window.ACF3D.inter.tipoTraje(it.n) : '')).find(Boolean);
+  if (tv) v.tj = tv;
   if (det) { v.det = 1; v.pd = cur('pd', r.pdMax); v.pdM = r.pdMax; if (d.enl) v.enl = 1; }
   else { v.pe = cur('pe', r.peMax); v.peM = r.peMax; v.san = cur('san', r.sanMax); v.sanM = r.sanMax; }
   return v;
@@ -1845,6 +1863,26 @@ window.ACF_FICHAS = {
   ativa: () => (F.ativaD ? { ref: F.ativaRef, d: F.ativaD, r: calc(F.ativaD) } : null),
   // teste de perícia com a ficha ativa (o 3D usa para o "esconder-se": Furtividade DT 15)
   testarAtiva: (per, extra = 0) => (F.ativaD ? testarPericia(F.ativaD, per, extra) : null),
+  // vestir ou tirar um traje/vestimenta pela mochila (no máximo duas vestidas)
+  alternarVestidoAtiva(id) {
+    if (!F.ativaD) return 'Sem ficha ativa.';
+    const it = (F.ativaD.itens || {})[id]; if (!it || !ehVestivel(it)) return 'Isso não se veste.';
+    if (!it.vest && vestidos(F.ativaD).length >= 2) return 'Você já usa duas vestimentas: tire uma antes.';
+    aplicarNaAtiva([[`itens.${id}.vest`, !it.vest]]);
+    const acao = /espacial/i.test(it.n) ? 'leva duas rodadas' : 'ação completa';
+    return it.vest ? `Você tirou ${it.n} (${acao}).` : `🦺 Você vestiu ${it.n} (${acao}).`;
+  },
+  // traje de um cabide do 3D: entra na ficha ativa já vestido (se ainda couber: duas vestimentas)
+  vestirAtiva(nome) {
+    if (!F.ativaRef || !F.ativaD) return { erro: 'Você precisa de uma ficha ativa para vestir o traje.' };
+    const x = C.itens.find(i => i.n === nome) || { n: String(nome || 'Traje').slice(0, 80), t: 'geral', cat: 1, esp: 2, d: '' };
+    const ja = vestidos(F.ativaD).length;
+    const v = { n: x.n, t: x.t || 'geral', cat: x.cat ?? 1, esp: x.esp ?? 2, qtd: 1, d: x.d || '', o: Date.now(), achado: true, vest: ja < 2 };
+    aplicarNaAtiva([['itens.' + A.Rede.chave(), v]]);
+    const ef = efeitosTraje(v);
+    const acao = /espacial/i.test(v.n) ? 'leva duas rodadas' : 'ação completa';
+    return { msg: ja < 2 ? `🦺 Você vestiu ${v.n} (${acao}).${ef.length ? ' ' + ef.join(' · ') + '.' : ''}` : `${v.n} foi para a ficha, mas você já usa duas vestimentas: tire uma na ficha para vestir este.` };
+  },
   // item achado numa sala do 3D: entra no inventário da ficha ativa, com os dados do catálogo
   darItemAtiva(nome) {
     if (!F.ativaRef || !F.ativaD) return false;
@@ -1872,7 +1910,7 @@ window.ACF_FICHAS = {
     if (!F.ativaD) return null;
     const d = F.ativaD, r = calc(d);
     const itens = lista(d.itens).map(it => ({ id: it.id, n: it.n || 'Item', t: it.t || 'geral', cat: catEfetiva(it), catR: ROM[catEfetiva(it)] || '0', esp: num(it.esp), qtd: it.qtd === undefined || it.qtd === '' ? 1 : int(it.qtd),
-      d: it.d || '', el: it.el || '', achado: !!it.achado, vest: !!it.vest, dano: it.a && it.a.dano ? it.a.dano : '', usavel: !!usoItem(it), uso: usoItem(it) }));
+      d: it.d || '', el: it.el || '', achado: !!it.achado, vest: !!it.vest, vestivel: ehVestivel(it), dano: it.a && it.a.dano ? it.a.dano : '', usavel: !!usoItem(it), uso: usoItem(it) }));
     return { nome: d.nome || '', itens, carga: +r.carga.toFixed(1), cargaMax: r.cargaMax, sobrecarga: r.sobrecarga, contagem: r.contagem, lim: r.patente.lim, patente: r.patente.n, ROM };
   },
   // usar um item da mochila (cura e afins) na ficha ativa: mesma regra do botão "Usar em mim" da ficha

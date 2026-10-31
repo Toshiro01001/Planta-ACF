@@ -3527,7 +3527,7 @@
   const SEMC = NS.semColisao = NS.semColisao || new Set();
   ['p1_calha', 'p1_duto', 'p1_eletrocalha', 'p1_canos_teto', 'p1_cabos_teto', 'p1_carne_parede', 'p1_espiral_mural', 'p1_quadro_rede', 'p1_telao_avisos',
     'p1_quadro_socorro', 'p1_mural_impressos', 'p1_ventilador_teto', 'p1_papeis_vento', 'p1_vapor', 'p1_mancha_escorre', 'p1_rastro_sangue', 'p1_placa_perigo',
-    'p1_gancho_fones', 'p1_espelho_falso', 'p1_rasgos_fundos', 'p1_monitor_parede', 'p1_lousa_frase', 'p1_carne_teto', 'p1_mural_fonemas', 'p1_quadro_avisos'].forEach(t => SEMC.add(t));
+    'p1_gancho_fones', 'p1_espelho_falso', 'p1_rasgos_fundos', 'p1_monitor_parede', 'p1_lousa_frase', 'p1_carne_teto', 'p1_mural_fonemas', 'p1_quadro_avisos', 'p1_canaleta', 'p1_cabo'].forEach(t => SEMC.add(t));
 
   (NS.extensoes = NS.extensoes || []).push(F => {
     const { P, m, pl, luz, G, metal, tela, texCanvas, T, rng, anim, guardar, ALT } = F;
@@ -3648,7 +3648,11 @@
     // cabos grossos pendurados entre dois pontos do forro (correm em x)
     P.p1_cabos_teto = o => {
       const g = G(), l = o.l || 6, n = o.n || 4, r = rng(o.sem || 11), k = kit(), cab = borracha();
-      for (let i = 0; i < n; i++) { const z = (r() - .5) * (o.d || 1.2), q = .5 + r() * (o.cai || 1.3), a = -l / 2 + r() * .3, b = l / 2 - r() * .3; k.tubo(i % 3 === 2 ? m('#4a1a10', { r: .8 }) : cab, [[a, ALT, z], [a + .2, ALT - .3, z], [(a + b) / 2, ALT - q, z + (r() - .5) * .3], [b - .2, ALT - .3, z], [b, ALT, z]], .025 + r() * .025, 28, 6); }
+      const zs = [];
+      for (let i = 0; i < n; i++) { const z = (r() - .5) * (o.d || 1.2), q = .5 + r() * (o.cai || 1.3), a = -l / 2 + .1, b = l / 2 - .1; zs.push(z); k.tubo(i % 3 === 2 ? m('#4a1a10', { r: .8 }) : cab, [[a, ALT - .12, z], [a + .2, ALT - .35, z], [(a + b) / 2, ALT - q, z + (r() - .5) * .3], [b - .2, ALT - .35, z], [b, ALT - .12, z]], .025 + r() * .025, 28, 6); }
+      // as duas pontas entram numa caixa de passagem presa no forro
+      const z0 = Math.min(...zs), z1 = Math.max(...zs), cx = sujo('#5a5e62', { me: .45 });
+      [-1, 1].forEach(s2 => { k.box(cx, .3, .18, z1 - z0 + .24, s2 * (l / 2 - .05), ALT - .18, (z0 + z1) / 2); k.box(m('#2a2c2e', { me: .5 }), .34, .02, z1 - z0 + .28, s2 * (l / 2 - .05), ALT - .2, (z0 + z1) / 2); zs.forEach(z => k.cylc(m('#2a2c2e', { me: .5 }), .045, .045, .05, s2 * (l / 2 - .2), ALT - .12, z, 0, 0, PI / 2, 8)); });
       return k.fim(g);
     };
 
@@ -3780,7 +3784,9 @@
       const g = G(), k = kit(), aco = inox(), esc = borracha(), r = rng(o.sem || 21), n = o.n ?? 2, c = o.c || '#6a0a10', H = 2.0;
       base5(k, aco, esc); k.cyl(aco, .016, .016, H, 0, .06, 0, 8); k.cylc(aco, .01, .01, .44, 0, H, 0, 0, 0, PI / 2, 6); [-1, 1].forEach(s => k.toro(aco, .03, .006, s * .2, H - .03, 0, 0, 0, 0, 4, 8, PI));
       const ps = bolsas(k, n, c, H - .02, r), tub = m(c === '#6a0a10' ? '#7a1a1a' : '#d8e4e8', { op: .7, r: .2 });
-      ps.forEach(([x, y, z], i) => { const a = o.alvo || [.4 + i * .1, .4, .5 + r() * .3]; k.tubo(tub, [[x, y, z], [x + (a[0] - x) * .2, y - .5, z + .1], [(x + a[0]) / 2, Math.min(y, a[1]) - .35, (z + a[2]) / 2 + .1], [a[0], a[1], a[2]]], .006, 20, 4); });
+      ps.forEach(([x, y, z], i) => { if (o.alvo) { const a = o.alvo; k.tubo(tub, [[x, y, z], [x + (a[0] - x) * .2, y - .5, z + .1], [(x + a[0]) / 2, Math.min(y, a[1]) - .35, (z + a[2]) / 2 + .1], [a[0], a[1], a[2]]], .006, 20, 4); return; }
+        // sem paciente: o equipo desce, faz a volta e fica enganchado no suporte
+        const yb = 1.05 + i * .12; k.tubo(tub, [[x, y, z], [x * .7, y - .4, .06], [x * .3 + .05, yb - .25, .1], [.06, yb - .32, .02], [.025, yb, 0]], .006, 24, 4); k.box(m('#e8eef0', { r: .3 }), .03, .03, .03, .022, yb, 0); });
       return k.fim(g);
     };
     // fluxo de sangue no equipo (listras que correm)
@@ -3937,9 +3943,10 @@
       const eg = guardar(new T.SphereGeometry(1, 18, 12)), im = new T.InstancedMesh(eg, olhoMat(), eyes.length); corpo.add(im);
       if (eyes.length) { const bb = new T.Box3(); eyes.forEach(e => bb.expandByPoint(V(e.x - e.rr, e.y - e.rr, e.z - e.rr)).expandByPoint(V(e.x + e.rr, e.y + e.rr, e.z + e.rr))); eg.boundingBox = bb; eg.boundingSphere = bb.getBoundingSphere(new T.Sphere()); }
       const q = new T.Quaternion(), e3 = new T.Euler(), M = new T.Matrix4(), S = V(1, 1, 1), Pp = V(0, 0, 0);
-      const alvo = o.alvo || [0, 1.6, 9];
+      const alvo = o.alvo || [0, 1.6, 9]; let toque = -99, tAgora = 0;
+      g.userData.aoInter = (v, inst, ev) => { if (ev) toque = tAgora; };
       const pose = t => {
-        const sinc = Math.max(0, Math.sin(t * .23 + (o.sem || 0)) * 3 - 2.2);   // de tempos em tempos, todos olham para o mesmo ponto
+        tAgora = t; const sinc = t - toque < 5 ? 3 : Math.max(0, Math.sin(t * .23 + (o.sem || 0)) * 3 - 2.2);   // de tempos em tempos, todos olham para o mesmo ponto
         eyes.forEach((e, i) => {
           let yaw = Math.sin(t * .37 + e.f) * .45 + Math.sin(t * 1.9 + e.f * 2) * .05, pit = Math.sin(t * .29 + e.f * 2) * .22;
           const ay = Math.atan2(alvo[0] - e.x, alvo[2] - e.z), ap = Math.atan2(alvo[1] - e.y, Math.hypot(alvo[0] - e.x, alvo[2] - e.z)), k = Math.min(1, sinc);
@@ -3950,7 +3957,7 @@
         im.instanceMatrix.needsUpdate = true;
       };
       pose(0);
-      anim.push((dt, t) => { const b = batida(t + (o.sem || 0) * .01); corpo.scale.z = 1 + b * .07; veia.emissiveIntensity = .12 + b * .5; pose(t); });
+      anim.push((dt, t) => { const b = batida(t + (o.sem || 0) * .01) * (t - toque < 5 ? 2.2 : 1); corpo.scale.z = 1 + b * .07; veia.emissiveIntensity = .12 + b * .5; pose(t); });
       return g;
     }
     P.p1_carne_parede = o => carneParede(o, false);
@@ -3993,19 +4000,37 @@
       const atualiza = t => { const fi = -t * v; for (let i = 0; i <= N; i++) { const th = i * dth, r1 = k0 * th, r2 = r1 + passo * .5, a = th + fi, c = Math.cos(a), s = Math.sin(a);
           clip(sx * r1 * c, cy0 + r1 * s, i * 6); clip(sx * r2 * c, cy0 + r2 * s, i * 6 + 3); } geo.attributes.position.needsUpdate = true; };
       atualiza(0); let acc = 0; anim.push((dt, t) => { acc += dt; if (acc < .045) return; acc = 0; atualiza(t); });
-      // triângulo invertido: preto, contorno branco, o vértice "passa" pela porta
+      // triângulo invertido: preto e enorme, com uma faixa branca larga em volta (lê-se de longe, por trás dos anéis da figura)
+      // e um traço branco por dentro; o vértice "passa" pela porta (o vão fica recortado)
       if (o.tri !== 0) {
-        const tb = o.triBase || 2.9, tt = o.triTopo || 3.78, ta = o.triApice ?? 0;
-        const sh = new T.Shape(); sh.moveTo(-tb, tt); sh.lineTo(tb, tt); sh.lineTo(0, ta); sh.closePath();
-        if (vao) { const f = new T.Path(); f.moveTo(-vao[0] / 2, ta - .01); f.lineTo(-vao[0] / 2, vao[1]); f.lineTo(vao[0] / 2, vao[1]); f.lineTo(vao[0] / 2, ta - .01); f.closePath(); sh.holes.push(f); }
-        const tri = new T.Mesh(guardar(new T.ShapeGeometry(sh)), m('#08080a', { r: .9 })); tri.position.z = .03; g.add(tri);
-        const k = kit(), branco = m('#f4f1ea', { r: .7, e: '#ffffff', ei: .15 }), lw = .14;
-        const borda = (x1, y1, x2, y2) => { const L = Math.hypot(x2 - x1, y2 - y1); k.plano(branco, L, lw, (x1 + x2) / 2, (y1 + y2) / 2, .04, 0, 0, Math.atan2(y2 - y1, x2 - x1)); };
-        const yc = vao ? vao[1] + .02 : ta, xc = tb * (yc - ta) / (tt - ta);
-        borda(-tb - .05, tt + .03, tb + .05, tt + .03); borda(-tb, tt, -xc, yc); borda(tb, tt, xc, yc);
-        const t2 = .78; borda(-tb * t2, tt - .22, tb * t2, tt - .22); k.fim(g);
+        const tb = o.triBase || 2.9, tt = Math.min(h - .02, o.triTopo || 3.78), ta = o.triApice ?? 0, halo = o.halo ?? .34;
+        // triângulo (topo em "topo", vértice em "apice") já recortado em volta do vão da porta, sem furos
+        const tri = (b, topo, apice) => { const sh = new T.Shape(), hw = y => b * (y - apice) / (topo - apice);
+          if (!vao) { sh.moveTo(-b, topo); sh.lineTo(b, topo); sh.lineTo(0, apice); sh.closePath(); return sh; }
+          const dx = vao[0] / 2, dy = vao[1];
+          if (hw(dy) <= dx) { sh.moveTo(-b, topo); sh.lineTo(b, topo); sh.lineTo(hw(dy), dy); sh.lineTo(-hw(dy), dy); sh.closePath(); return sh; }
+          const ye = apice + dx / b * (topo - apice);
+          sh.moveTo(-b, topo); sh.lineTo(b, topo);
+          if (ye >= 0) sh.lineTo(dx, ye); else { sh.lineTo(hw(0), 0); sh.lineTo(dx, 0); }
+          sh.lineTo(dx, dy); sh.lineTo(-dx, dy);
+          if (ye >= 0) sh.lineTo(-dx, ye); else { sh.lineTo(-dx, 0); sh.lineTo(-hw(0), 0); }
+          sh.closePath(); return sh; };
+        // a faixa branca: o mesmo triângulo crescido "halo" para fora (o topo fica no forro)
+        const k2 = Math.hypot(tb, tt - ta) / tb, bH = tb + halo * k2 * 1.05, aH = ta - halo * k2;
+        const branco0 = m('#f6f3ec', { r: .6, e: '#ffffff', ei: .6, unico: true });
+        const shH = tri(bH, Math.min(h, tt + halo * .6), aH); const mH = new T.Mesh(guardar(new T.ShapeGeometry(shH)), branco0); mH.position.z = .06; g.add(mH);
+        // camadas bem separadas (de longe, 1 cm vira briga de profundidade com a espiral)
+        [branco0].forEach(mm => { mm.polygonOffset = true; mm.polygonOffsetFactor = -2; mm.polygonOffsetUnits = -4; });
+        const preto = m('#050506', { r: .95, unico: true }); preto.polygonOffset = true; preto.polygonOffsetFactor = -4; preto.polygonOffsetUnits = -8; const mt = new T.Mesh(guardar(new T.ShapeGeometry(tri(tb, tt, ta))), preto); mt.position.z = .09; g.add(mt);
+        // traço branco por dentro (a 0,3 m da borda) e a barra horizontal do topo
+        const k = kit(), branco = m('#f4f1ea', { r: .7, e: '#ffffff', ei: .55 }), lw = .16, ins = .36;
+        const borda = (x1, y1, x2, y2) => { const L = Math.hypot(x2 - x1, y2 - y1); k.plano(branco, L, lw, (x1 + x2) / 2, (y1 + y2) / 2, .12, 0, 0, Math.atan2(y2 - y1, x2 - x1)); };
+        const ti = tt - ins, bi = tb - ins * k2 * 1.6, yc = vao ? vao[1] + .03 : ta + ins * 2, xc = bi * (yc - (ta + ins * k2)) / (ti - (ta + ins * k2));
+        borda(-bi, ti, bi, ti); borda(-bi, ti, -Math.max(xc, vao ? vao[0] / 2 + .05 : 0), yc); borda(bi, ti, Math.max(xc, vao ? vao[0] / 2 + .05 : 0), yc);
+        k.fim(g);
+        // o olho de luz acima da porta
         const sh2 = new T.Shape(), lb = o.luzBase || .5, ly = (vao ? vao[1] : 1) + .55; sh2.moveTo(-lb, ly + .75); sh2.lineTo(lb, ly + .75); sh2.lineTo(0, ly); sh2.closePath();
-        const gm = m('#ffffff', { e: '#ffffff', ei: 1.6, r: .2, unico: true }), gl = new T.Mesh(guardar(new T.ShapeGeometry(sh2)), gm); gl.position.z = .05; g.add(gl);
+        const gm = m('#ffffff', { e: '#ffffff', ei: 1.6, r: .2, unico: true }), gl = new T.Mesh(guardar(new T.ShapeGeometry(sh2)), gm); gl.position.z = .13; g.add(gl);
         anim.push((dt, t) => { gm.emissiveIntensity = 1.3 + Math.sin(t * 1.4) * .4; });
       }
       return g;
@@ -4134,40 +4159,19 @@
     P.p1_caixa_registradora = o => {
       const g = G(), k = kit(), r = rng(o.sem || 59), corpo = m('#2a2c30', { r: .5, me: .3 });
       k.box(corpo, .42, .14, .4, 0, 0, -.05); k.boxc(corpo, .4, .16, .1, 0, .2, -.2, -.5, 0, 0); k.box(corpo, .16, .12, .05, 0, .14, -.24);
-      k.box(m('#1a1a1c'), .38, .07, .32, 0, .03, .26); for (let i = 0; i < 4; i++) k.box(m('#3a3a3a'), .005, .06, .3, -.15 + i * .1, .04, .26);
+      // a gaveta (grupo próprio: abre e fecha) com as notas e as moedas
+      const gv = G(); g.add(gv); const kg = kit();
+      kg.box(m('#1a1a1c'), .38, .07, .32, 0, .03, .26); for (let i = 0; i < 4; i++) kg.box(m('#3a3a3a'), .005, .06, .3, -.15 + i * .1, .04, .26); kg.box(m('#1a1a1c'), .4, .09, .02, 0, .02, .425); kg.box(metal('#9a9a9a'), .12, .015, .015, 0, .055, .44);
       const notas = ['#5a8a5a', '#4a6aa8', '#b88a4a', '#8a4a8a'];
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) k.box(m(notas[i], { r: .9 }), .085, .004, .14, -.14 + i * .1, .06 + j * .006, .22);
-      for (let i = 0; i < 8; i++) k.cyl(m(r() < .5 ? '#c8a050' : '#b8b8b0', { me: .8, r: .3 }), .012, .012, .006, -.15 + r() * .3, .07, .36 + r() * .04, 10);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) kg.box(m(notas[i], { r: .9 }), .085, .004, .14, -.14 + i * .1, .06 + j * .006, .22);
+      for (let i = 0; i < 8; i++) kg.cyl(m(r() < .5 ? '#c8a050' : '#b8b8b0', { me: .8, r: .3 }), .012, .012, .006, -.15 + r() * .3, .07, .32 + r() * .04, 10);
+      kg.fim(gv);
+      if (o.int === 'abrir') abre(g, k2 => { gv.position.z = -(1 - k2) * .27; }, 2.4);
       for (let i = 0; i < 5; i++) k.cyl(m(i % 2 ? '#c8a050' : '#b8b8b0', { me: .8, r: .3 }), .013, .013, .02 + i * .004, .34 + i * .045, 0, .12, 10);
       for (let i = 0; i < 3; i++) k.box(m(notas[i], { r: .9 }), .15, .003 + i * .002, .07, .45, i * .004, -.02, 0, .15 * i, 0);
       k.box(m('#f0ece0', { r: .9 }), .06, .002, .3, -.1, .005, .55, 0, .2, 0);
       k.fim(g); const tl = pl(g, .3, .08, uma('regTela', () => cmat(128, 32, (x, W, H) => { x.fillStyle = '#0a1a10'; x.fillRect(0, 0, W, H); x.fillStyle = '#5aff8a'; x.font = 'bold 22px "Courier New", monospace'; x.fillText('  0,00', 8, 24); }, { r: .4, ei: .9 })), 0, .24, -.145); tl.rotation.x = -.5;
       return g;
-    };
-    // CN 02 · alambrado (tela de arame) com postes e um portão com cadeado (porta = posição x do portão)
-    P.p1_gaiola = o => {
-      const g = G(), w = o.w || 6, h = o.h || 2.8, k = kit(), aco = metal('#6a6e72');
-      const cv = uma('elos', () => { const [c, x] = tela(64, 64); x.clearRect(0, 0, 64, 64); x.strokeStyle = '#d0d4d8'; x.lineWidth = 5; x.beginPath(); x.moveTo(0, 32); x.lineTo(32, 0); x.lineTo(64, 32); x.lineTo(32, 64); x.closePath(); x.stroke(); return c; });
-      const tx = texCanvas(cv, [w * 3, h * 3]), tela1 = m('#9aa0a6', { unico: true, mapa: tx, me: .7, r: .4, lado: 2 }); tela1.alphaMap = tx; tela1.alphaTest = .45;
-      const pv = o.porta, pw = 1.1;
-      const trechos = pv === undefined ? [[-w / 2, w / 2]] : [[-w / 2, pv - pw / 2], [pv + pw / 2, w / 2]];
-      trechos.forEach(([a, b]) => { if (b - a < .05) return; const p = pl(g, b - a, h - .1, tela1, (a + b) / 2, .05 + (h - .1) / 2, 0); });
-      for (let x = -w / 2; x <= w / 2 + .01; x += Math.min(2.5, w / Math.max(1, Math.round(w / 2.5)))) k.cyl(aco, .03, .03, h, x, 0, 0, 8);
-      k.cylc(aco, .02, .02, w, 0, h, 0, 0, 0, PI / 2, 6); k.cylc(aco, .02, .02, w, 0, .05, 0, 0, 0, PI / 2, 6);
-      if (pv !== undefined) { const p = G(); p.position.set(pv - pw / 2, 0, 0); p.rotation.y = -(o.aberto || .35); g.add(p); const k2 = kit(); k2.box(aco, .03, h - .2, .03, 0, .05, 0); k2.box(aco, .03, h - .2, .03, pw, .05, 0); k2.box(aco, pw, .03, .03, pw / 2, .05, 0); k2.box(aco, pw, .03, .03, pw / 2, h - .18, 0); k2.box(m('#c8a030', { me: .8, r: .3 }), .06, .08, .03, pw - .05, 1.1, .03); k2.fim(p); pl(p, pw, h - .25, tela1, pw / 2, .06 + (h - .25) / 2, 0); }
-      return k.fim(g);
-    };
-    // CN 02 · parede coberta de impressões com sequências de símbolos (w x h, y = base)
-    P.p1_mural_impressos = o => {
-      const g = G(), w = o.w || 4, h = o.h || 2.2, y = o.y ?? .5, r = rng(o.sem || 61);
-      const mt = cmat(512, Math.max(64, Math.round(512 * h / w)), (x, W, H) => {
-        x.clearRect(0, 0, W, H); const sw = W / (w / .21), sh = sw * 1.41, SIM = '◇△⊗∴§¶ΣΩ#%&@ΔΞ∵⊕';
-        for (let k = 0; k < (w * h * 28); k++) { const px = r() * (W - sw), py = r() * (H - sh); x.save(); x.translate(px + sw / 2, py + sh / 2); x.rotate((r() - .5) * .12); x.fillStyle = r() < .2 ? '#e8e2cc' : '#f2f0ea'; x.fillRect(-sw / 2, -sh / 2, sw, sh);
-          x.fillStyle = 'rgba(30,30,30,.75)'; x.font = `${Math.max(4, sw / 9)}px monospace`; for (let l = 0; l < 9; l++) { let s = ''; for (let c = 0; c < 8; c++) s += SIM[Math.floor(r() * SIM.length)]; x.fillText(s, -sw / 2 + 2, -sh / 2 + 6 + l * sh / 10); }
-          if (r() < .15) { x.strokeStyle = '#c0201a'; x.lineWidth = 1.5; x.beginPath(); x.ellipse((r() - .5) * sw * .5, (r() - .5) * sh * .5, sw * .25, sh * .08, 0, 0, 7); x.stroke(); }
-          x.fillStyle = 'rgba(230,220,170,.7)'; x.fillRect(-sw * .2, -sh / 2 - 2, sw * .4, 5); x.restore(); }
-      }, { r: .9, transp: true, alphaTest: .1 });
-      pl(g, w, h, mt, 0, y + h / 2, .01); return g;
     };
     // CN 05 · computador central com fitas que giram e um painel de luzes (O.R.F.E.U.)
     P.p1_mainframe = o => {
@@ -4183,7 +4187,7 @@
       const verde = m('#ffffff', { e: '#3dff6a', ei: 1.3 }); pl(g, w - .2, .04, verde, 0, 1.03, d / 2 + .012);
       const placa = uma('placaMF', () => cmat(128, 32, (x, W, H) => { x.fillStyle = '#c8c8c0'; x.fillRect(0, 0, W, H); x.fillStyle = '#1a1a1a'; x.font = 'bold 18px Arial'; x.textAlign = 'center'; x.fillText('O.R.F.E.U.', W / 2, 23); }, { r: .5 }));
       pl(g, w * .5, .08, placa, 0, 2.04, d / 2 + .006);
-      const f = r() * 9; anim.push((dt, t) => { const v = Math.max(0, Math.sin(t * .7 + f)) * 6 + (Math.sin(t * 3.1 + f) > .6 ? 3 : 0); rolos.forEach(([rr, s]) => { rr.rotation.z -= dt * v * s; }); });
+      const f = r() * 9; anim.push((dt, t) => { const v = Math.max(0, Math.sin(t * .7 + f)) * 6 + (Math.sin(t * 3.1 + f) > .6 ? 3 : 0); if (!ligado(g)) return; rolos.forEach(([rr, s]) => { rr.rotation.z -= dt * v * s; }); });
       return g;
     };
     // CN 07 · ventilador industrial preso ao teto (raio, v = velocidade em rad/s)
@@ -4195,7 +4199,7 @@
       const n = o.pas || 5; for (let i = 0; i < n; i++) { const a = i / n * TAU; k2.boxc(pa, R - .2, .02, .34, Math.cos(a) * (R / 2 + .1), -.12, Math.sin(a) * (R / 2 + .1), 0, -a, .22); }
       k2.toro(aco, R + .04, .015, 0, -.12, 0, PI / 2, 0, 0, 4, 36); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; k2.boxc(aco, R, .012, .012, Math.cos(a) * R / 2, -.12, Math.sin(a) * R / 2, 0, -a, 0); }
       k2.fim(rot0);
-      const v = o.v ?? 4, f = r() * 9; anim.push((dt, t) => { rot0.rotation.y += dt * v * (1 + .15 * Math.sin(t * .4 + f)); rot0.rotation.x = Math.sin(t * v * .5) * .012; });
+      const v = o.v ?? 4, f = r() * 9; let vel = 1; anim.push((dt, t) => { vel += ((ligado(g) ? 1 : 0) - vel) * Math.min(1, dt * .5); rot0.rotation.y += dt * v * vel * (1 + .15 * Math.sin(t * .4 + f)); rot0.rotation.x = Math.sin(t * v * .5) * .012 * vel; });
       return g;
     };
     // CN 07 · papéis carregados pelo vento (redemoinho no ar)
@@ -4270,7 +4274,7 @@
       k2.add(pa, new T.ConeGeometry(.32, .7, 16).rotateX(PI / 2).translate(0, 0, .25)); k2.add(pa, new T.CylinderGeometry(.32, .32, .4, 16).rotateX(PI / 2).translate(0, 0, -.2));
       const n = o.pas || 7; for (let i = 0; i < n; i++) { const a = i / n * TAU; k2.add(pa, rot(new T.BoxGeometry(R - .35, .5, .03), .45, 0, 0).translate((R - .35) / 2 + .3, 0, 0).rotateZ(a)); }
       k2.fim(rot0);
-      const f = r() * 9; let vel = 2; anim.push((dt, t) => { const raj = Math.sin(t * .31 + f) > .7 ? 14 : 3; vel += (raj - vel) * Math.min(1, dt * .8); rot0.rotation.z += dt * vel * (o.v || 1); });
+      const f = r() * 9; let vel = 2; anim.push((dt, t) => { const raj = !ligado(g) ? 0 : Math.sin(t * .31 + f) > .7 ? 14 : 3; vel += (raj - vel) * Math.min(1, dt * (ligado(g) ? .8 : .35)); rot0.rotation.z += dt * vel * (o.v || 1); });
       return g;
     };
     // CN 10 · hélice arrancada caída no chão (pás tortas, marca de arrasto)
@@ -4302,7 +4306,7 @@
       const g = G(), w = o.w || 1.6, y = o.y ?? 1.55, n = o.n || 4, k = kit(), r = rng(o.sem || 79), esc = m('#1e1e20', { r: .5 }), aco = metal('#6a6a6a');
       k.box(aco, w, .04, .03, 0, y, .015);
       for (let i = 0; i < n; i++) { const x = -w / 2 + (i + .5) * w / n, yy = y - .12 - r() * .05; k.box(aco, .015, .015, .08, x, y - .01, .05); k.toro(esc, .085, .012, x, yy, .09, 0, 0, 0, 5, 14, PI); [-1, 1].forEach(s => k.cylc(m('#3a3430', { r: .8 }), .045, .045, .035, x + s * .085, yy - .02, .09, 0, 0, PI / 2, 10));
-        k.tubo(esc, [[x + .085, yy - .05, .09], [x + .1, yy - .3, .1], [x + .06 + (r() - .5) * .1, yy - .55 - r() * .3, .11], [x + .02, yy - .7 - r() * .3, .1]], .004, 10, 3); }
+        const fd = .5 + r() * .25; k.tubo(esc, [[x + .085, yy - .05, .09], [x + .11, yy - fd * .5, .1], [x + .06, yy - fd, .11], [x - .03, yy - fd * .8, .11], [x - .05, yy - fd * .4, .1], [x - .01, y - .01, .06]], .004, 18, 3); }
       return k.fim(g);
     };
     // CN 12 · tabela de fonemas de línguas que ninguém fala (y = base)
@@ -4322,7 +4326,7 @@
       k.add(m('#2a221a', { tex: 'metal_sujo', me: .5, r: .6 }), new T.CylinderGeometry(R + .5, R + .6, .25, 32).translate(0, .125, 0));
       k.add(m('#1a1410', { r: .7 }), new T.CylinderGeometry(R - .2, R - .2, .02, 24).translate(0, .26, 0));
       for (let i = 0; i < n; i++) { const a = i / n * TAU; k.box(aco, .5, .6, .7, Math.cos(a) * (R + .15), .25, Math.sin(a) * (R + .15), 0, -a, 0); k.add(aco, new T.CylinderGeometry(.24, .24, 1.0, 14).rotateZ(PI / 2).rotateY(-a).translate(Math.cos(a) * (R - .2), 1.15, Math.sin(a) * (R - .2))); k.cyl(aco, .08, .1, ALT - 1.4, Math.cos(a) * (R + .15), 1.4, Math.sin(a) * (R + .15), 8);
-        k.tubo(m('#1a1a1a', { r: .7 }), [[Math.cos(a) * (R + .2), 1.2, Math.sin(a) * (R + .2)], [Math.cos(a + .2) * (R + .6), .6, Math.sin(a + .2) * (R + .6)], [Math.cos(a + .25) * (R + .85), .03, Math.sin(a + .25) * (R + .85)]], .04, 14, 5); }
+        k.tubo(m('#1a1a1a', { r: .7 }), [[Math.cos(a) * (R + .2), 1.2, Math.sin(a) * (R + .2)], [Math.cos(a + .2) * (R + .6), .6, Math.sin(a + .2) * (R + .6)], [Math.cos(a + .25) * (R + .85), .03, Math.sin(a + .25) * (R + .85)]], .04, 14, 5); k.cyl(metal('#3a3a3a'), .08, .09, .06, Math.cos(a + .25) * (R + .85), 0, Math.sin(a + .25) * (R + .85), 10); }
       k.toro(aco, R + .15, .08, 0, ALT - .15, 0, PI / 2, 0, 0, 6, 36); k.fim(g);
       const nm = m('#ffffff', { e: '#ff7a1a', ei: 2.2, r: .3, unico: true }), nuc = new T.Mesh(guardar(new T.IcosahedronGeometry(.42, 2)), nm); nuc.position.y = 1.15; g.add(nuc);
       const casca = new T.Mesh(guardar(new T.IcosahedronGeometry(.55, 1)), m('#3a2a1a', { me: .7, r: .4, wireframe: false, op: .45 })); casca.position.y = 1.15; g.add(casca);
@@ -4413,7 +4417,7 @@
       [-.55, 0, .55].forEach(x => { for (let i = 0; i < 7; i++) k.cyl(por, .11 - (i % 2) * .03, .11 - (i % 2) * .03, .07, x, 1.93 + i * .07, .2, 12); k.cyl(metal('#b88a4a'), .04, .04, .12, x, 1.93 + .49, .2, 8); });
       [-.4, 0, .4].forEach(x => { for (let i = 0; i < 3; i++) k.cyl(por, .06, .06, .05, x, 1.93 + i * .05, -.3, 10); });
       k.add(aco, new T.CylinderGeometry(.25, .25, 1.2, 16).rotateZ(PI / 2).translate(0, 2.4, -.35)); [-1, 1].forEach(s => k.box(aco, .06, .45, .06, s * .45, 1.93, -.35));
-      k.tubo(borracha(), [[-.55, 2.42, .2], [-.6, 3.2, .3], [-.5, ALT, .2]], .04, 10, 6); k.tubo(borracha(), [[.55, 2.42, .2], [.7, 3.3, .2], [.6, ALT, .1]], .04, 10, 6); k.tubo(borracha(), [[0, 2.42, .2], [0, 3.1, .5], [.1, ALT, .4]], .04, 10, 6);
+      k.tubo(borracha(), [[-.55, 2.42, .2], [-.6, 3.2, .3], [-.5, ALT, .2]], .04, 10, 6); k.tubo(borracha(), [[.55, 2.42, .2], [.7, 3.3, .2], [.6, ALT, .1]], .04, 10, 6); k.tubo(borracha(), [[0, 2.42, .2], [0, 3.1, .5], [.1, ALT, .4]], .04, 10, 6); k.box(sujo('#4a4e52', { me: .5 }), 1.6, .08, .5, 0, ALT - .08, .25); [[-.5, .2], [.6, .1], [.1, .4]].forEach(([x, z]) => k.cyl(m('#2a2c2e', { me: .5 }), .07, .07, .08, x, ALT - .16, z, 10));
       k.fim(g);
       const fresta = m('#ffffff', { e: '#ff8a2a', ei: .25, unico: true }); [-1, 1].forEach(s => pl(g, 1.5, .02, fresta, 0, .4 + (s + 1) * .6, .552));
       const placa = uma('plTrafo', () => cmat(128, 96, (x, W, H) => { x.fillStyle = '#e8c020'; x.fillRect(0, 0, W, H); x.fillStyle = '#111'; x.beginPath(); x.moveTo(64, 8); x.lineTo(96, 58); x.lineTo(32, 58); x.closePath(); x.fill(); x.fillStyle = '#e8c020'; x.font = 'bold 30px Arial'; x.textAlign = 'center'; x.fillText('!', 64, 52); x.fillStyle = '#111'; x.font = 'bold 15px Arial'; x.fillText('PERIGO', 64, 76); x.font = 'bold 11px Arial'; x.fillText('ALTA TENSÃO', 64, 91); }, { r: .6 }));
@@ -4433,7 +4437,7 @@
       k.cyl(aco, .005, .005, .4, -.15, 1.52, -.05, 4); k.cyl(aco, .005, .005, .4, .1, 1.52, -.05, 4);
       k.box(m('#141416', { r: .4 }), .44, .09, .32, 0, .58, 0); k.box(m('#0a0a0a'), .2, .025, .01, -.08, .62, .161);
       k.box(m('#1a1a1a', { r: .5 }), .19, .02, .1, -.08, .618, .17);
-      k.tubo(borracha(), [[.1, .62, -.16], [.15, .4, -.25], [.2, .05, -.3], [.6, .01, -.5]], .008, 12, 4); k.tubo(borracha(), [[0, 1.05, -.27], [.1, .7, -.27], [.12, .64, -.17]], .008, 10, 4);
+      k.tubo(borracha(), [[.1, .62, -.16], [.15, .4, -.25], [.2, .05, -.3], [.6, .015, -.5]], .008, 12, 4); k.box(m('#d8d4c8', { r: .6 }), .12, .04, .08, .66, 0, -.52); k.box(m('#1a1a1a'), .05, .03, .02, .62, .02, -.49); k.tubo(borracha(), [[0, 1.05, -.27], [.1, .7, -.27], [.12, .64, -.17]], .008, 10, 4);
       k.fim(g);
       const [c, x] = tela(128, 96), tx = texCanvas(c); const chuv = m('#000', { unico: true, mapa: tx, e: '#ffffff', ei: 1.1, r: .2 }); chuv.emissiveMap = tx;
       const img = x.createImageData(128, 96), pinta = () => { for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = v * .8; img.data[i + 1] = v * .85; img.data[i + 2] = v; img.data[i + 3] = 255; } x.putImageData(img, 0, 0); tx.needsUpdate = true; };
@@ -4526,6 +4530,359 @@
       k.fim(g); pl(g, w, h, mt, 0, y + h / 2, .03);
       return g;
     };
+
+    /* ================= rodada 2: interações e cabos ligados ================= */
+    // anima uma parte entre fechado (0) e aberto (1): pos(k) aplica a fração k (já suavizada); a peça responde ao motor de interações
+    function abre(g, pos, vel = 1.5, depois) {
+      let alvo = 0, atual = 0; const ap = k => pos(k * k * (3 - 2 * k)); ap(0);
+      g.userData.aoInter = (v, inst) => { alvo = v ? 1 : 0; if (inst) { atual = alvo; ap(atual); } if (depois) depois(v, inst); };
+      anim.push(dt => { if (atual === alvo) return; atual += Math.sign(alvo - atual) * Math.min(Math.abs(alvo - atual), dt * vel); ap(atual); });
+    }
+    // o motor marca g.userData._lig = 0 quando o jogador desliga (ligar sem resposta própria)
+    const ligado = g => g.userData._lig !== 0;
+    // cilindro de a até b (prensa-cabo, eletroduto)
+    function haste(k, mat, a, b, r, seg = 8) { const va = V(...a), vb = V(...b), d = vb.clone().sub(va), L = d.length(); if (L < 1e-4) return; const geo = new T.CylinderGeometry(r, r, L, seg); geo.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize()))); geo.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); k.add(mat, geo); }
+
+    // ---------- conteúdo de armários (desenhado no kit, dentro da caixa w x d, a partir da altura y) ----------
+    function recheio(k, tipo, w, d, y, hh, r, sem) {
+      const x0 = -w / 2 + .06, x1 = w / 2 - .06, zf = d / 2 - .1, zb = -d / 2 + .06, prof = zf - zb;
+      if (tipo === 'papeis') { let x = x0; while (x < x1 - .06) { const bw = .05 + r() * .04, bh = Math.min(hh - .04, .26 + r() * .06); if (r() < .78) k.boxc(m(['#2a3a5a', '#5a2a22', '#3a4a2a', '#1e2024', '#6a5a3a'][Math.floor(r() * 5)], { r: .8 }), bw, bh, prof * .8, x + bw / 2, y + bh / 2 + .005, (zf + zb) / 2, 0, 0, r() < .15 ? .25 : 0); x += bw + .008; }
+        for (let i = 0; i < 6; i++) k.box(m(i % 2 ? '#e8e2d0' : '#d8d0b8', { r: .95 }), .3, .006, .22, x0 + .2 + (r() - .5) * .04, y + .004 + i * .007, zb + .14, 0, (r() - .5) * .2, 0); }
+      else if (tipo === 'frascos') { let x = x0 + .03; while (x < x1 - .03) { const rr = .022 + r() * .025, h = .07 + r() * .12, z = zb + .05 + r() * (prof - .1); const mt = m(['#7a4a18', '#c8c8c0', '#5a2a10', '#2a4a7a', '#e8e4d8', '#8a1a14'][Math.floor(r() * 6)], { r: .25, op: r() < .4 ? .75 : undefined }); if (r() < .1) k.cylc(mt, rr, rr, h, x, y + rr, z, PI / 2, r() * 3, 0, 8); else { k.cyl(mt, rr, rr, h, x, y, z, 8); k.cyl(m('#e8e4dc', { r: .5 }), rr * .7, rr * .7, .02, x, y + h, z, 8); } x += rr * 2 + .015 + r() * .03; } }
+      else if (tipo === 'ferramentas') { k.box(m('#a82a1a', { r: .5, me: .4 }), .38, .14, .18, x0 + .22, y, zb + .12); k.box(metal('#3a3a3a'), .3, .02, .02, x0 + .22, y + .16, zb + .12); k.toro(m('#c8a020', { r: .6 }), .1, .025, x1 - .14, y + .04, (zf + zb) / 2, PI / 2, 0, 0, 6, 16); k.toro(m('#1a1a1a', { r: .7 }), .08, .02, x1 - .14, y + .08, (zf + zb) / 2, PI / 2, 0, 0, 6, 16);
+        if (hh > .3) { k.sph(m('#e8c020', { r: .4 }), .12, (x0 + x1) / 2, y + .02, zb + .2, 1, .7, 1.1, 12); } }
+      else if (tipo === 'caixas') { let x = x0; while (x < x1 - .2) { const bw = .22 + r() * .14; if (x + bw > x1) break; const bh = Math.min(hh - .03, .16 + r() * .14); k.box(m(['#b89a6a', '#a8885a', '#c8b080'][Math.floor(r() * 3)], { r: .9 }), bw, bh, prof * .85, x + bw / 2, y, (zf + zb) / 2, 0, (r() - .5) * .1, 0); x += bw + .02; } }
+      else if (tipo === 'fitas') { let x = x0; while (x < x1 - .03) { k.box(m(r() < .2 ? '#2a2a2a' : '#121212', { r: .5 }), .028, .19, .105, x + .014, y, zf - .07); x += .031; } }
+      else if (tipo === 'bolsas' || tipo === 'amostras') { const bm = m('#6a0a10', { r: .25, op: .88 }), cl = m('#e8eef0', { r: .3 }); let x = x0 + .05; while (x < x1 - .05) { if (tipo === 'bolsas') { k.box(bm, .1, .17, .03, x, y + .005, zb + .12 + r() * .1, -.3 + r() * .2, 0, 0); k.box(cl, .1, .02, .035, x, y + .17, zb + .12); x += .12; } else { k.cyl(bm, .014, .014, .09, x, y, zb + .1 + r() * (prof - .2), 6); k.cyl(m(['#5a2a7a', '#e08a20', '#4a0a10'][Math.floor(r() * 3)], { r: .5 }), .017, .017, .02, x, y + .09, zb + .1, 6); x += .04; } } }
+      else if (tipo === 'comida') { for (let i = 0; i < 5; i++) k.cyl(m(['#e8e4d8', '#3a5a7a', '#a82a1a', '#c8a020'][i % 4], { r: .4 }), .035, .035, .16, x0 + .06 + i * .09, y, zb + .12, 10); k.box(m('#5a4a3a', { r: .9 }), .2, .08, .14, x1 - .14, y, (zf + zb) / 2); }
+      else if (tipo === 'roupa') { k.cylc(metal('#888'), .01, .01, w - .1, 0, y + hh - .08, (zf + zb) / 2, 0, 0, PI / 2, 6); for (let i = 0; i < 2; i++) { const x = -w / 4 + i * w / 2; k.box(m(i ? '#d8d8d0' : '#5a6a52', { r: 1 }), .34, Math.min(hh - .2, 1.0), .06, x, y + hh - .12 - Math.min(hh - .2, 1.0), (zf + zb) / 2 + .03 * i, 0, (r() - .5) * .3, 0); k.toro(metal('#999'), .06, .006, x, y + hh - .1, (zf + zb) / 2, 0, 0, 0, 4, 10, PI); } }
+    }
+    // ---------- disjuntores (por dentro de um quadro elétrico): trilhos, barramento e fiação presa nas duas pontas ----------
+    function disjuntores(k, w, h, d, r) {
+      const placa = m('#c8c4b8', { r: .7 }), dj = m('#e8e6e0', { r: .5 }), alav = m('#1a1a1a', { r: .5 }), cobre = m('#b8743a', { me: .8, r: .35 }), fio = [m('#1a1a1a', { r: .7 }), m('#2a4a9a', { r: .7 }), m('#a82a1a', { r: .7 }), m('#2a6a2a', { r: .7 })];
+      const zb = -d / 2 + .04; k.box(placa, w - .08, h - .3, .01, 0, .15, zb);
+      const fil = Math.max(2, Math.floor((h - .5) / .28));
+      for (let j = 0; j < fil; j++) { const y = .35 + j * (h - .55) / fil; k.box(metal('#9a9a9a'), w - .16, .035, .01, 0, y, zb + .01); const n = Math.floor((w - .2) / .055);
+        for (let i = 0; i < n; i++) { const x = -w / 2 + .1 + i * .055 + .025; if (r() < .1) continue; k.box(dj, .048, .11, .07, x, y - .035, zb + .045); k.box(alav, .016, .03, .02, x, y + (r() < .2 ? -.02 : .005), zb + .085);
+          // fio do disjuntor descendo pela canaleta até o barramento (as duas pontas presas)
+          if (j === 0 || r() < .5) k.tubo(fio[Math.floor(r() * 4)], [[x, y - .035, zb + .06], [x, y - .1, zb + .07], [x + (r() - .5) * .02, .22, zb + .05]], .005, 6, 4); } }
+      k.box(cobre, w - .2, .02, .02, 0, .2, zb + .03); k.box(m('#6a6a62', { r: .6 }), w - .12, .06, .05, 0, .16, zb + .03);
+      // chave geral com alavanca vermelha
+      k.box(m('#3a3a3a', { r: .5 }), .14, .2, .1, w / 2 - .16, h - .38, zb + .06); k.box(m('#c0201a', { r: .5 }), .03, .12, .04, w / 2 - .16, h - .34, zb + .13, -.4, 0, 0);
+    }
+    const etiqueta = (txt, c = '#e8c020', f = '#111') => uma('etq' + txt + c, () => cmat(256, 128, (x, W, H) => { x.fillStyle = c; x.fillRect(0, 0, W, H); x.strokeStyle = f; x.lineWidth = 6; x.strokeRect(5, 5, W - 10, H - 10); x.fillStyle = f; const L = String(txt).split('\n'); let t = Math.round(H / (L.length + .6) * .62); x.font = `bold ${t}px Arial`; while (L.some(l => x.measureText(l).width > W - 24) && t > 10) { t--; x.font = `bold ${t}px Arial`; } x.textAlign = 'center'; L.forEach((l, i) => x.fillText(l, W / 2, H * (i + 1) / (L.length + 1) + t * .35)); gasto(x, W, H, rng(txt.length), 120, .2); }, { r: .6 }));
+
+    // armário com portas que abrem (abrir) e coisas dentro. estilo: metal | hospital | madeira | eletrico | geladeira;
+    // conteudo: 'papeis,frascos,ferramentas,caixas,fitas,bolsas,amostras,comida,roupa,mancha' (por prateleira); vidro: portas de vidro
+    P.p1_armario = o => {
+      const g = G(), est = o.estilo || 'metal', w = o.w || (est === 'eletrico' ? .9 : 1.0), h = o.h || (est === 'eletrico' ? 1.9 : 1.9), d = o.d || (est === 'geladeira' ? .7 : est === 'eletrico' ? .4 : .5), r = rng(o.sem || 301), k = kit(), t = .025;
+      const cores = { metal: '#5a6066', hospital: '#d8dcd6', madeira: '#5a4028', eletrico: '#6e7268', geladeira: '#e6e6e0' }, cor = o.c || cores[est] || '#5a6066';
+      const casca = est === 'madeira' ? m(cor, { tex: 'madeira_velha', r: .75 }) : sujo(cor, { me: est === 'hospital' || est === 'geladeira' ? .12 : .45, r: .55 });
+      const fundo = m(o.ci || (est === 'madeira' ? '#2e2216' : est === 'geladeira' ? '#d8dcd8' : '#26282a'), { r: .85 });
+      k.box(casca, w, h, t, 0, 0, -d / 2 + t / 2); [-1, 1].forEach(s => k.box(casca, t, h, d - .03, s * (w / 2 - t / 2), 0, -.015)); k.box(casca, w, t, d - .03, 0, h - t, -.015); k.box(casca, w, .08, d - .03, 0, 0, -.015);
+      k.box(fundo, w - 2 * t, h - .12, .004, 0, .08, -d / 2 + t + .003);
+      const tipos = String(o.conteudo || (est === 'eletrico' ? '' : 'papeis')).split(',').filter(Boolean), mancha = tipos.includes('mancha'), lista = tipos.filter(x => x !== 'mancha');
+      if (est === 'eletrico') disjuntores(k, w, h, d, r);
+      else {
+        const np = o.prat ?? 3, ys = [.08]; for (let i = 0; i < np; i++) { const y = .08 + (i + 1) * (h - .14) / (np + 1); ys.push(y); k.box(est === 'geladeira' ? m('#e8f0f0', { op: .5, r: .1 }) : casca, w - 2 * t, .018, d - t - .05, 0, y, -.02); }
+        const hh = (h - .14) / (np + 1);
+        ys.forEach((y, i) => { const tp = lista.length ? lista[i % lista.length] : null; if (tp && (r() < .85 || i === 1)) recheio(k, tp, w - 2 * t, d - .05, y + .018, hh - .02, r, o.sem); });
+      }
+      k.fim(g);
+      if (mancha) { const p = pl(g, w * .7, Math.min(1.2, h * .5), decalSangue((o.sem || 301) + 7, 2), (r() - .5) * w * .2, h * .55, -d / 2 + t + .008); }
+      // luz de dentro da geladeira (acende quando abre)
+      let luzG = null; if (est === 'geladeira') { luzG = m('#ffffff', { unico: true, e: '#e8f4ff', ei: 0 }); const p = pl(g, w * .5, .03, luzG, 0, h - .06, -d / 2 + .08); p.rotation.x = PI / 2; }
+      // portas
+      const np2 = o.portas || (w > .75 ? 2 : 1), pw = w / np2, folhas = [];
+      const porta = est === 'madeira' ? casca : sujo(cor, { me: est === 'hospital' || est === 'geladeira' ? .12 : .45, r: .5, tex: 'metal_sujo' });
+      for (let i = 0; i < np2; i++) {
+        const esq = np2 === 1 ? o.lado !== 'd' : i === 0, sx = esq ? 1 : -1, piv = G(); piv.position.set(esq ? -w / 2 + i * pw : -w / 2 + (i + 1) * pw, .08, d / 2 - .012); g.add(piv);
+        const kp = kit(), ph = h - .1;
+        if (o.vidro) { [[.03, ph, sx * .015], [.03, ph, sx * (pw - .017)]].forEach(([a, b, x]) => kp.box(porta, a, b, .02, x, 0, 0)); kp.box(porta, pw - .006, .035, .02, sx * pw / 2, 0, 0); kp.box(porta, pw - .006, .035, .02, sx * pw / 2, ph - .035, 0); kp.plano(m('#cfe4ea', { op: .2, r: .05, me: .2 }), pw - .06, ph - .07, sx * pw / 2, ph / 2, 0); }
+        else { kp.box(porta, pw - .006, ph, .022, sx * pw / 2, 0, 0);
+          if (est === 'metal' || est === 'eletrico') for (let v = 0; v < 5; v++) kp.box(m('#141414'), pw * .5, .012, .005, sx * pw / 2, ph * (est === 'eletrico' ? .08 : .82) + v * .03, .012);
+          if (est === 'madeira') { kp.box(porta, pw - .1, ph * .4, .01, sx * pw / 2, ph * .08, .015); kp.box(porta, pw - .1, ph * .38, .01, sx * pw / 2, ph * .55, .015); } }
+        if (est === 'geladeira') kp.box(metal('#b8b8b8'), .03, .5, .04, sx * (pw - .07), ph * .45, .035); else kp.box(metal('#a8a8a8'), .022, .14, .03, sx * (pw - .06), ph * .48, .03);
+        if (est === 'eletrico') { kp.box(m('#1a1a1a'), .04, .06, .02, sx * (pw - .06), ph * .62, .025); }
+        // dobradiças
+        [.12, ph - .16].forEach(y => kp.cyl(metal('#7a7a7a'), .008, .008, .08, 0, y, .005, 6));
+        kp.fim(piv);
+        if (est === 'eletrico' || o.txt) { const et = pl(piv, Math.min(.3, pw * .6), Math.min(.3, pw * .6) * .5, etiqueta(o.txt || 'PERIGO\nALTA TENSÃO'), sx * pw / 2, ph * .72, .0125); }
+        if (est === 'hospital' && !o.vidro && i === 0 && o.cruz !== 0) { const c = pl(piv, .12, .12, uma('cruzArm', () => cmat(64, 64, (x, W, H) => { x.fillStyle = '#e8e8e0'; x.fillRect(0, 0, W, H); x.fillStyle = '#c0201a'; x.fillRect(24, 8, 16, 48); x.fillRect(8, 24, 48, 16); }, { r: .5 })), sx * pw / 2, ph * .75, .0125); }
+        folhas.push([piv, esq ? -1 : 1]);
+      }
+      const ang = o.ang || 1.75;
+      const pos = k2 => { folhas.forEach(([p, s], i) => { p.rotation.y = s * k2 * (ang - i * .12); }); if (luzG) luzG.emissiveIntensity = k2 * .9; };
+      if (o.int === 'abrir') abre(g, pos, 1.3); else pos(o.aberta ? 1 : 0);
+      return g;
+    };
+
+    // arquivo de aço com gavetas; a gaveta "gav" (0 = a de baixo) abre e mostra as pastas
+    P.p1_gaveteiro = o => {
+      const g = G(), n = o.n || 4, w = o.w || .5, h = o.h || 1.32, d = .62, r = rng(o.sem || 311), k = kit(), cor = sujo(o.c || '#7a838a', { me: .5, r: .45 }), gi = o.gav ?? (n - 2), gh = (h - .06) / n;
+      k.box(cor, w, h, .02, 0, 0, -d / 2 + .01); [-1, 1].forEach(s => k.box(cor, .02, h, d, s * (w / 2 - .01), 0, 0)); k.box(cor, w, .02, d, 0, h - .02, 0); k.box(m('#1a1a1a'), w, .06, d, 0, 0, 0);
+      k.box(m('#202224'), w - .04, gh, .005, 0, .06 + gi * gh, -d / 2 + .03);
+      for (let i = 0; i < n; i++) { if (i === gi) continue; const y = .06 + i * gh; k.box(cor, w - .025, gh - .012, .02, 0, y + .006, d / 2 - .01); k.box(metal('#c8c8c8'), .14, .02, .03, 0, y + gh * .62, d / 2 + .01); k.box(m('#e8e4d4'), .08, .035, .004, 0, y + gh * .78, d / 2 + .002); }
+      k.fim(g);
+      const gv = G(); g.add(gv); const k2 = kit(), y = .06 + gi * gh, dd = d - .08;
+      k2.box(cor, w - .025, gh - .012, .02, 0, y + .006, d / 2 - .01); k2.box(metal('#c8c8c8'), .14, .02, .03, 0, y + gh * .62, d / 2 + .01); k2.box(m('#e8e4d4'), .08, .035, .004, 0, y + gh * .78, d / 2 + .002);
+      k2.box(cor, w - .06, .01, dd, 0, y + .02, d / 2 - .02 - dd / 2); [-1, 1].forEach(s => k2.box(cor, .01, gh * .7, dd, s * (w / 2 - .035), y + .02, d / 2 - .02 - dd / 2)); k2.box(cor, w - .06, gh * .7, .01, 0, y + .02, -d / 2 + .06);
+      for (let i = 0; i < 16; i++) { const z = d / 2 - .06 - i * (dd - .06) / 16, ab = i === 5 ? .28 : 0; k2.boxc(m(['#c8b078', '#b89a5a', '#d8c898', '#7a8a9a'][Math.floor(r() * 4)], { r: .9 }), w - .1, gh * .62 + r() * .03, .008, 0, y + .03 + gh * .32, z, ab, 0, 0); if (r() < .4) k2.box(m('#e8e4d8', { r: .95 }), .05, .02, .002, -w / 2 + .1 + r() * (w - .25), y + .03 + gh * .64, z + .003); }
+      k2.fim(gv);
+      const pos = k3 => { gv.position.z = k3 * dd * .82; };
+      if (o.int === 'abrir') abre(g, pos, 1.6); else pos(o.aberta ? 1 : 0);
+      return g;
+    };
+
+    // cabo (ou feixe de cabos) ligado nas duas pontas. pts: pontos locais [[x,y,z],...]; n: cabos no feixe; esp: raio;
+    // ta / tb: o que tem em cada ponta: prensa (bucha num painel), caixa (caixa de passagem), piso (tampa no chão), teto (placa no forro), nada
+    P.p1_cabo = o => {
+      const g = G(), pts = (o.pts || [[0, 0, 0], [1, 0, 0]]).map(p => V(...p)), n = o.n || 1, R = o.esp || .028, k = kit(), r = rng(o.sem || 321);
+      const cores = [m(o.c || '#141414', { r: .75 }), m(o.c2 || '#1e1e1e', { r: .8 }), m('#3a1a10', { r: .8 })];
+      const ini = pts[0], fim = pts[pts.length - 1], dir = fim.clone().sub(ini); dir.y = 0; if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0); dir.normalize(); const lado = V(-dir.z, 0, dir.x);
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * R * 2.3, ps = pts.map((p, j) => { const q = p.clone().addScaledVector(lado, off * (j === 0 || j === pts.length - 1 ? .5 : 1)); if (j > 0 && j < pts.length - 1) { q.x += (r() - .5) * .04; q.z += (r() - .5) * .04; if (q.y < R * 1.2) q.y = R * (1 + (i % 2) * 1.1); } return q; });
+        k.add(cores[i % 3 === 2 && n > 2 ? 2 : i % 2], new T.TubeGeometry(new T.CatmullRomCurve3(ps), Math.max(16, pts.length * 12), R * (.85 + r() * .3), 7));
+      }
+      const RB = R * (1 + n * .55), aco = metal('#6a6e72'), escuro = m('#2a2c2e', { me: .5, r: .45 });
+      const ponta = (tipo, p, viz) => {
+        const tg = p.clone().sub(viz).normalize(), a = [p.x, p.y, p.z];
+        if (tipo === 'prensa') { const b = p.clone().addScaledVector(tg, -.07); haste(k, escuro, a, [b.x, b.y, b.z], RB * 1.25, 10); const c2 = p.clone().addScaledVector(tg, .01); haste(k, aco, a, [c2.x, c2.y, c2.z], RB * 1.6, 10); }
+        else if (tipo === 'caixa') { k.boxc(sujo('#6a6e66', { me: .4 }), Math.max(.16, RB * 4), Math.max(.14, RB * 3.4), .09, p.x, p.y, p.z, 0, Math.atan2(tg.x, tg.z), 0); }
+        else if (tipo === 'piso') { k.box(escuro, Math.max(.24, RB * 5), .025, Math.max(.24, RB * 5), p.x, 0, p.z); for (let q = 0; q < 4; q++) k.cyl(aco, .01, .01, .03, p.x + (q % 2 - .5) * Math.max(.18, RB * 4), 0, p.z + (Math.floor(q / 2) - .5) * Math.max(.18, RB * 4), 6); haste(k, escuro, [p.x, 0, p.z], [p.x, .07, p.z], RB * 1.2, 10); }
+        else if (tipo === 'teto') { k.box(escuro, Math.max(.22, RB * 4.5), .03, Math.max(.22, RB * 4.5), p.x, ALT - .03, p.z); haste(k, escuro, [p.x, ALT - .03, p.z], [p.x, ALT - .12, p.z], RB * 1.2, 10); }
+      };
+      ponta(o.ta || 'prensa', ini, pts[1]); ponta(o.tb || 'prensa', fim, pts[pts.length - 2]);
+      // braçadeiras nos pontos do meio que encostam em parede/chão
+      (o.presos || []).forEach(j => { const p = pts[j]; if (p) k.toro(aco, RB * 1.15, .006, p.x, p.y, p.z, 0, 0, 0, 4, 10); });
+      return k.fim(g);
+    };
+    // canaleta no chão (corre em x, comprimento l): calha rebaixada com cabos dentro e tampa de grelha em parte do caminho
+    P.p1_canaleta = o => {
+      const g = G(), l = o.l || 4, w = o.w || .36, r = rng(o.sem || 331), k = kit(), aco = metal('#4a4c50'), fundo = m('#0c0c0d', { r: .95 });
+      k.box(fundo, l, .004, w, 0, 0, 0); [-1, 1].forEach(s => k.box(aco, l, .018, .04, 0, 0, s * (w / 2 + .02)));
+      for (let i = 0; i < (o.n || 4); i++) { const z = -w / 2 + .06 + i * (w - .12) / Math.max(1, (o.n || 4) - 1), pts = []; for (let j = 0; j <= 6; j++) pts.push(V(-l / 2 + j * l / 6, .012, z + (r() - .5) * .02)); k.add(m(i % 3 === 2 ? '#3a1a10' : '#141414', { r: .8 }), new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, .012 + r() * .008, 6)); }
+      const gr = uma('grelhaCan', () => { const mt = cmat(64, 64, (x, W, H) => { x.clearRect(0, 0, W, H); x.fillStyle = '#5a5e62'; for (let i = 0; i < 8; i++) x.fillRect(0, i * 8, W, 3); x.fillRect(0, 0, 4, H); x.fillRect(W - 4, 0, 4, H); }, { r: .5, me: .6, transp: true, alphaTest: .4 }); mt.map.wrapS = mt.map.wrapT = T.RepeatWrapping; return mt; });
+      const ab = o.aberta ?? .3, Lt = l * (1 - ab), geo = new T.PlaneGeometry(Lt, w + .02); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Lt / .5, uv.getY(i) * (w + .02) / .5); geo.rotateX(-PI / 2); geo.translate(-l / 2 + Lt / 2, .02, 0); k.add(gr, geo);
+      if (ab > 0) { const tp = new T.PlaneGeometry(.5, w + .02); const u2 = tp.attributes.uv; for (let i = 0; i < u2.count; i++) u2.setXY(i, u2.getX(i), u2.getY(i) * (w + .02) / .5); tp.rotateX(-PI / 2); tp.rotateY(.5); tp.translate(l / 2 - .4, .025, w * .9); k.add(gr, tp); }
+      return k.fim(g);
+    };
+    // as peças da biblioteca que deixavam cabos soltos no chão, agora com o cabo preso nas duas pontas
+    const semCabos = f => o => { const orig = P.cabos_chao; P.cabos_chao = () => G(); try { return f(o); } finally { P.cabos_chao = orig; } };
+    // eletroduto da traseira até o forro (peça encostada na parede: z = fundo)
+    function eletroduto(pai, x, y0, z, n = 1) { const k = kit(), aco = metal('#6a6e72'), esc = m('#2a2c2e', { me: .5, r: .45 }); for (let i = 0; i < n; i++) { const xx = x + i * .07; k.cyl(aco, .022, .022, ALT - y0, xx, y0, z, 8); for (let y = y0 + .5; y < ALT - .2; y += .9) k.box(aco, .07, .025, .04, xx, y, z - .02); k.box(esc, .1, .1, .07, xx, y0 - .05, z + .01); k.box(esc, .16, .03, .12, xx, ALT - .03, z); } k.fim(pai); }
+    P.p1_console = o => { const g = semCabos(P.console_tela)(o); eletroduto(g, -(o.w || 1.1) / 2 + .18, 1.6, -.33, 2); return g; };
+    P.p1_baterias = o => {
+      const g = semCabos(P.baterias)(o), n = o.n || 5, k = kit(), verm = m('#8a1a14', { r: .7 }), preto = m('#141414', { r: .75 });
+      // em série: o + de uma no - da próxima
+      for (let i = 0; i < n - 1; i++) { const x0 = (i - (n - 1) / 2) * .34; k.tubo(i % 2 ? verm : preto, [[x0 + .08, .66, 0], [x0 + .17, .74, 0], [x0 + .26, .66, 0]], .012, 8, 5); }
+      const xa = -(n - 1) / 2 * .34 - .08, xb = (n - 1) / 2 * .34 + .08;
+      if (o.saida === 'piso') { [[xa, verm], [xb, preto]].forEach(([x, mt]) => k.tubo(mt, [[x, .66, 0], [x, .8, -.1], [x, .5, -.3], [x, .02, -.36]], .02, 12, 6)); k.box(m('#2a2c2e', { me: .5 }), xb - xa + .3, .025, .3, 0, 0, -.38); }
+      else { [[xa, verm], [xb, preto]].forEach(([x, mt]) => k.tubo(mt, [[x, .66, 0], [x, .9, -.08], [x * .3, 1.0, -.2], [0, 1.05, -.2]], .02, 12, 6)); eletroduto(g, 0, 1.05, -.2, 1); }
+      return k.fim(g);
+    };
+    P.p1_estacao = o => { const g = semCabos(P.estacao_audio)(o), k = kit(); k.tubo(m('#141414', { r: .75 }), [[.3, .76, -.3], [.36, .6, -.37], [.38, .2, -.37], [.4, .02, -.42]], .012, 12, 5); k.box(m('#2a2c2e', { me: .5 }), .2, .025, .16, .4, 0, -.44); return k.fim(g); };
+
+    /* ---------- CN 02 · gaiola de servidores: alambrado com moldura de tubo e portão que abre ---------- */
+    // w: largura total (corre em x), h: altura; porta: x do centro do portão; pw: largura da folha; placa: texto da placa no alambrado
+    P.p1_gaiola = o => {
+      const g = G(), w = o.w || 6, h = o.h || 2.8, pv = o.porta, pw = o.pw || 1.4, k = kit(), tubo = metal('#7a7e82'), poste = metal('#5e6266'), r = rng(o.sem || 341);
+      // tela de arame: losangos de ~7 cm com o arame grosso (para não sumir de longe nos mipmaps) e um véu cinza bem leve atrás
+      const cv = uma('elos3', () => { const [c, x] = tela(128, 128); x.clearRect(0, 0, 128, 128); x.lineCap = 'round'; x.lineJoin = 'round'; const d = () => { x.beginPath(); x.moveTo(0, 64); x.lineTo(64, 0); x.lineTo(128, 64); x.lineTo(64, 128); x.closePath(); x.stroke(); }; x.strokeStyle = '#6a6e72'; x.lineWidth = 16; d(); x.strokeStyle = '#c4c8cc'; x.lineWidth = 11; d(); x.strokeStyle = 'rgba(255,255,255,.6)'; x.lineWidth = 3; d(); return c; });
+      const veu = uma('veuAlamb', () => m('#8a9096', { op: .07, r: .6, lado: 2 }));
+      const malha = (L, H) => { const tx = texCanvas(cv, [L / .1, H / .1]); tx.anisotropy = 8; const mt = m('#c0c4c8', { unico: true, mapa: tx, me: .7, r: .35, lado: 2 }); mt.alphaMap = tx; mt.alphaTest = .3; return mt; };
+      const trechos = pv === undefined ? [[-w / 2, w / 2]] : [[-w / 2, pv - pw / 2 - .06], [pv + pw / 2 + .06, w / 2]];
+      // cada trecho: postes (com tampa), travessas de cima, do meio e de baixo, barra de tensão e a tela de arame
+      trechos.forEach(([a, b], ti) => {
+        if (b - a < .1) return; const kt = kit(), L = b - a, nv = Math.max(1, Math.round(L / 2.4));
+        for (let i = 0; i <= nv; i++) { const x = a + i * L / nv; kt.cyl(poste, .038, .038, h, x, 0, 0, 10); kt.sph(poste, .045, x, h, 0, 1, .6, 1, 8); kt.cyl(m('#2a2a2a', { r: .6 }), .06, .06, .03, x, 0, 0, 10); }
+        [h - .06, h * .5, .1].forEach(y => kt.cylc(tubo, .022, .022, L, (a + b) / 2, y, 0, 0, 0, PI / 2, 8));
+        // mão-francesa nas pontas
+        [[a, 1], [b, -1]].forEach(([x, s]) => { if (Math.abs(x) > w / 2 - .01 || pv === undefined) return; haste(kt, tubo, [x, h * .5, 0], [x + s * 1.1, .12, 0], .016, 6); });
+        for (let i = 0; i < nv; i++) { const x0 = a + i * L / nv, x1 = a + (i + 1) * L / nv; kt.plano(malha(x1 - x0 - .08, h - .2), x1 - x0 - .08, h - .2, (x0 + x1) / 2, .1 + (h - .2) / 2, 0); kt.plano(veu, x1 - x0 - .08, h - .2, (x0 + x1) / 2, .1 + (h - .2) / 2, -.01); }
+        kt.fim(g);
+      });
+      if (pv !== undefined) {
+        const xa = pv - pw / 2 - .06, xb = pv + pw / 2 + .06;
+        // postes do portão (mais grossos; cada um numa malha própria, para a colisão não fechar o vão) e a verga por cima
+        [xa, xb].forEach(x => { const kp = kit(); kp.cyl(poste, .05, .05, h + .1, x, 0, 0, 12); kp.sph(poste, .058, x, h + .1, 0, 1, .6, 1, 8); kp.cyl(m('#2a2a2a', { r: .6 }), .075, .075, .03, x, 0, 0, 10); kp.fim(g); });
+        const kv = kit(); kv.cylc(tubo, .03, .03, xb - xa, pv, h + .02, 0, 0, 0, PI / 2, 8); kv.fim(g);
+        // leitor de cartão no poste do trinco, com o LED (vermelho fechado, verde aberto)
+        const kl = kit(); kl.box(m('#1a1c1e', { r: .4 }), .09, .15, .04, xb + .08, 1.18, .05); kl.box(m('#2a2c2e', { r: .5 }), .07, .04, .005, xb + .08, 1.27, .071); kl.fim(g);
+        const led = m('#ffffff', { unico: true, e: '#ff2a1a', ei: 1.6 }); const lp = pl(g, .025, .025, led, xb + .08, 1.21, .072);
+        // a folha: dobradiça no poste da esquerda, abre para dentro da gaiola (-z)
+        const dob = G(); dob.position.set(xa + .055, 0, 0); g.add(dob); const folha = G(); dob.add(folha); folha.userData.folha = true;
+        const kf = kit(), fw = pw + .02, fh = h - .2;
+        [0, fw].forEach(x => kf.cyl(tubo, .024, .024, fh, x, .08, 0, 8)); [.08, .08 + fh].forEach(y => kf.cylc(tubo, .024, .024, fw, fw / 2, y, 0, 0, 0, PI / 2, 8)); kf.cylc(tubo, .018, .018, fw, fw / 2, .08 + fh * .5, 0, 0, 0, PI / 2, 8);
+        haste(kf, tubo, [.02, .1, 0], [fw - .02, .08 + fh * .5 - .02, 0], .014, 6);
+        kf.box(sujo('#4a4e52', { me: .55, r: .45 }), fw - .04, .3, .006, fw / 2, .1, .012);   // chapa de chute
+        kf.box(m('#c8a020', { r: .5, me: .3 }), fw - .04, .03, .008, fw / 2, .4, .014);
+        // dobradiças (duas) e o trinco com o cadeado
+        [.35, fh - .15].forEach(y => { kf.cyl(metal('#3a3a3a'), .032, .032, .12, -.035, y, 0, 10); kf.box(metal('#3a3a3a'), .07, .06, .015, -.005, y + .03, .03); });
+        kf.box(metal('#5a5a5a'), .16, .05, .03, fw - .02, 1.05, .04); kf.cylc(metal('#8a8a8a'), .012, .012, .18, fw + .02, 1.075, .06, 0, 0, PI / 2, 6);
+        kf.fim(folha);
+        const tela2 = malha(fw - .06, fh - .38); pl(folha, fw - .06, fh - .38, tela2, fw / 2, .4 + (fh - .38) / 2, 0); pl(folha, fw - .06, fh - .38, veu, fw / 2, .4 + (fh - .38) / 2, -.01);
+        const plc = pl(folha, .44, .22, etiqueta('MANTENHA\nFECHADO'), fw / 2, 1.55, .02); const kpar = kit(); [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([a, b]) => kpar.sph(metal('#999'), .009, fw / 2 + a * .2, 1.55 + b * .09, .024, 1, 1, 1, 6)); kpar.fim(folha);
+        // cadeado (pendurado no trinco quando fechado; aberto, fica na alça do poste)
+        const cad = G(); g.add(cad); const kc = kit(); kc.box(m('#b8902a', { me: .8, r: .3 }), .06, .07, .03, 0, -.08, 0); kc.toro(metal('#c8c8c8'), .022, .006, 0, 0, 0, 0, 0, 0, 5, 12, PI); kc.fim(cad);
+        const ang = o.ang || 1.75;
+        const pos = k2 => { dob.rotation.y = k2 * ang; led.emissive.set(k2 > .5 ? '#2aff5a' : '#ff2a1a'); cad.position.set(k2 > .02 ? xb + .1 : xa + .055 + fw + .02, 1.05, k2 > .02 ? .09 : .07); cad.rotation.z = k2 > .02 ? .4 : 0; };
+        if (o.int === 'abrir') abre(g, pos, .9); else pos(o.aberto ? 1 : 0);
+      }
+      // placa presa no alambrado por quatro abraçadeiras (x da placa: placaX)
+      if (o.placa) { const px = o.placaX ?? (pv !== undefined ? pv + pw / 2 + 1.0 : 0), pwid = o.placaW || 1.2, phh = pwid * .32;
+        const mt = etiqueta(o.placa); const p = pl(g, pwid, phh, mt, px, o.placaY || 1.75, .03); const kb = kit(); kb.box(m('#e8c020', { r: .6 }), pwid + .02, phh + .02, .012, px, (o.placaY || 1.75) - phh / 2 - .01, .02);
+        [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([a, b]) => kb.toro(m('#1a1a1a', { r: .7 }), .02, .004, px + a * (pwid / 2 - .06), (o.placaY || 1.75) + b * (phh / 2 - .04), .015, 0, PI / 2, 0, 4, 8)); kb.fim(g);
+        const p2 = pl(g, pwid, phh, mt, px, o.placaY || 1.75, .006); p2.rotation.y = PI; }
+      return k.fim(g);
+    };
+
+    /* ---------- CN 02 · parede de impressões coladas com fita (nítida de perto) ---------- */
+    // folhas A4 em geometria (cada folha um plano com a sua arte num atlas de 2048 px), fita crepe nas pontas e sombra
+    const atlasImpressos = () => uma('atlasImp', () => {
+      const W = 2048, H = 2048, C = 8, L = 5, cw = W / C, ch = Math.floor(cw * 1.414), r = rng(613), SIM = '◇△⊗∴§¶ΣΩ#%&@ΔΞ∵⊕▽◈⌘';
+      const mt = cmat(W, H, (x) => {
+        x.fillStyle = '#f2f0ea'; x.fillRect(0, 0, W, H);
+        for (let i = 0; i < C; i++) for (let j = 0; j < L; j++) {
+          const x0 = i * cw, y0 = j * ch, tom = r(); x.fillStyle = tom < .2 ? '#ebe5d0' : tom < .3 ? '#f6f4ee' : '#f1efe8'; x.fillRect(x0, y0, cw, ch);
+          // amarelado nas bordas e marcas de dobra
+          const gb = x.createLinearGradient(x0, y0, x0 + cw, y0 + ch); gb.addColorStop(0, 'rgba(160,130,70,.10)'); gb.addColorStop(.5, 'rgba(160,130,70,0)'); gb.addColorStop(1, 'rgba(140,110,60,.14)'); x.fillStyle = gb; x.fillRect(x0, y0, cw, ch);
+          if (r() < .4) { x.fillStyle = 'rgba(120,100,70,.12)'; x.fillRect(x0, y0 + ch * (.3 + r() * .4), cw, 2); }
+          // cabeçalho e as linhas de símbolos em fonte de impressora (monoespaçada, nítida)
+          x.fillStyle = '#1c1c1e'; x.font = 'bold 15px "Courier New", monospace'; x.textBaseline = 'top';
+          x.fillText('>> ' + String(Math.floor(r() * 9000) + 1000) + '  ' + SIM[Math.floor(r() * SIM.length)] + SIM[Math.floor(r() * SIM.length)], x0 + 16, y0 + 14);
+          x.fillRect(x0 + 16, y0 + 36, cw - 32, 1.5);
+          const tam = 12 + Math.floor(r() * 3), nl = Math.floor((ch - 70) / (tam + 4)); x.font = `${tam}px "Courier New", monospace`;
+          for (let l = 0; l < nl; l++) { if (r() < .06) continue; let s = ''; const nc = Math.floor((cw - 32) / (tam * .62)) - Math.floor(r() * 4); for (let c = 0; c < nc; c++) s += r() < .14 ? ' ' : SIM[Math.floor(r() * SIM.length)]; x.fillStyle = `rgba(20,20,22,${.72 + r() * .25})`; x.fillText(s, x0 + 16, y0 + 46 + l * (tam + 4)); }
+          // toner falhando em algumas
+          if (r() < .3) { x.fillStyle = 'rgba(242,240,234,.75)'; x.fillRect(x0 + 10 + r() * cw * .6, y0 + 40, 10 + r() * 30, ch - 60); }
+          // caneta vermelha: círculos e sublinhados
+          if (r() < .45) { x.strokeStyle = 'rgba(190,24,20,.9)'; x.lineWidth = 3; x.beginPath(); x.ellipse(x0 + cw * (.3 + r() * .4), y0 + ch * (.25 + r() * .5), 26 + r() * 20, 10 + r() * 6, (r() - .5) * .3, 0, 7); x.stroke(); if (r() < .5) { x.beginPath(); x.moveTo(x0 + 20, y0 + ch * .8); x.lineTo(x0 + cw * .7, y0 + ch * .8 + 3); x.stroke(); } }
+          if (r() < .12) { x.fillStyle = 'rgba(110,10,10,.5)'; x.beginPath(); x.ellipse(x0 + cw * r(), y0 + ch * r(), 14 + r() * 20, 10 + r() * 14, r(), 0, 7); x.fill(); }
+          // borda da folha
+          x.strokeStyle = 'rgba(90,80,60,.35)'; x.lineWidth = 2; x.strokeRect(x0 + 1, y0 + 1, cw - 2, ch - 2);
+        }
+      }, { r: .9 });
+      mt.map.anisotropy = 8; mt.map.generateMipmaps = true; mt.map.minFilter = T.LinearMipmapLinearFilter; mt.map.magFilter = T.LinearFilter;
+      mt.userData.cel = [C, L, cw / W, ch / H];
+      return mt;
+    });
+    P.p1_mural_impressos = o => {
+      const g = G(), w = o.w || 4, h = o.h || 2.2, y = o.y ?? .5, r = rng(o.sem || 61), at = atlasImpressos(), [C, L, uw, vh] = at.userData.cel;
+      const fw = .21, fh = .297, folhas = [], sombras = [], fitas = [];
+      const fitaM = uma('fitaCrepe', () => cmat(64, 32, (x, W, H) => { x.fillStyle = 'rgba(226,212,160,.92)'; x.fillRect(0, 0, W, H); for (let i = 0; i < 60; i++) { x.fillStyle = `rgba(150,130,80,${Math.random() * .2})`; x.fillRect(Math.random() * W, Math.random() * H, 2, 1); } x.clearRect(0, 0, 2, H); x.clearRect(W - 2, 0, 2, H); }, { r: .85, transp: true }));
+      const sombraM = uma('sombraFolha', () => m('#000000', { op: .35, r: 1 }));
+      // grade solta: colunas e linhas com sobreposição, algumas falhas e folhas tortas
+      const nx = Math.ceil(w / (fw * .92)), ny = Math.ceil(h / (fh * .9));
+      let z = 0;
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        if (r() < .06) continue;
+        const cx = -w / 2 + fw / 2 + i * (w - fw) / Math.max(1, nx - 1) + (r() - .5) * .05, cy0 = y + fh / 2 + j * (h - fh) / Math.max(1, ny - 1) + (r() - .5) * .05, a = (r() - .5) * .14;
+        const cel = Math.floor(r() * C * L), cu = (cel % C) * uw, cv0 = 1 - (Math.floor(cel / C) + 1) * vh;
+        z += .0009; const zz = .012 + z % .02;
+        const geo = new T.PlaneGeometry(fw, fh, 1, 2), uv = geo.attributes.uv; for (let q = 0; q < uv.count; q++) uv.setXY(q, cu + uv.getX(q) * uw, cv0 + uv.getY(q) * vh);
+        const ps = geo.attributes.position; if (r() < .35) for (let q = 0; q < ps.count; q++) if (ps.getY(q) < -fh / 4) ps.setZ(q, .012 + r() * .01);   // ponta de baixo descolando
+        geo.rotateZ(a); geo.translate(cx, cy0, zz); folhas.push(geo);
+        sombras.push(new T.PlaneGeometry(fw, fh).rotateZ(a).translate(cx + .006, cy0 - .008, zz - .0005));
+        const nf = r() < .5 ? 2 : 1; for (let f = 0; f < nf; f++) { const fx = nf === 1 ? 0 : (f ? .07 : -.07), fg = new T.PlaneGeometry(.075, .028).rotateZ(a + (r() - .5) * .3); const c = Math.cos(a), s = Math.sin(a); fg.translate(cx + fx * c - (fh / 2) * -s * 1, cy0 + fx * s + (fh / 2) * c, zz + .0015); fitas.push(fg); }
+      }
+      const mf = juntar(folhas, at); mf.receiveShadow = true; g.add(mf); g.add(juntar(sombras, sombraM)); g.add(juntar(fitas, fitaM));
+      return g;
+    };
+
+    /* ---------- peças com interação própria (as antigas ganham a resposta) ---------- */
+    // tampa de vidro do freezer de sorvete (abrir: a tampa da esquerda corre para a direita)
+    const freezer0 = P.p1_freezer_sorvete;
+    P.p1_freezer_sorvete = o => {
+      const g = freezer0(o), w = o.w || 1.6, d = .72, h = .86, tampa = G(); g.add(tampa); const k = kit(), vid = m('#d4ecf4', { op: .3, r: .04, me: .2 });
+      k.box(vid, w / 2 + .04, .012, d - .06, -w / 4 + .02, h + .02, 0); k.box(metal('#9a9a9a'), .03, .03, d - .1, -w / 2 + .1, h + .03, 0); k.fim(tampa);
+      if (o.int === 'abrir') abre(g, k2 => { tampa.position.x = k2 * (w / 2 - .06); }, 1.6);
+      return g;
+    };
+    // gravador de rolo: tocar acelera os rolos e mexe os VU por uns segundos
+    const gravador0 = P.p1_gravador_rolo;
+    P.p1_gravador_rolo = o => {
+      const g = gravador0(o); let ate = 0, tt = 0; const rolos = g.children.filter(c => c.isGroup);
+      anim.push((dt, t) => { tt = t; if (t < ate) rolos.forEach(rr => { rr.rotation.z -= dt * 7; }); });
+      g.userData.aoInter = (v, inst, ev) => { if (ev) ate = tt + 8; };
+      return g;
+    };
+    // cadeira de dentista: "Acionar o pedal" faz o encosto deitar de uma vez e voltar
+    const odonto0 = P.p1_cadeira_odonto;
+    P.p1_cadeira_odonto = o => {
+      const g = odonto0(o), enc = g.children.find(c => c.isGroup && Math.abs(c.position.z + .22) < .01); let t0 = -99, tt = 0;
+      anim.push((dt, t) => { tt = t; const e = t - t0; if (enc && e >= 0 && e < 6) { const k2 = e < 1 ? e : e < 4 ? 1 : 1 - (e - 4) / 2; enc.rotation.x = -.12 - Math.min(1, k2) * .95; } });
+      g.userData.aoInter = (v, inst, ev) => { if (ev) t0 = tt; };
+      return g;
+    };
+    // classificadora: "Ligar a classificadora" acelera a esteira e corta a tirinha impressa
+    const classif0 = P.p1_classificadora;
+    P.p1_classificadora = o => {
+      const g = classif0(o); let ate = 0, tt = 0; const fita = g.children.find(c => c.isMesh && c.geometry.parameters && Math.abs(c.geometry.parameters.width - .12) < .001);
+      anim.push((dt, t) => { tt = t; if (fita) fita.scale.y = t < ate ? 1 + Math.min(1, (t - ate + 8) / 8) * .8 : 1; });
+      g.userData.aoInter = (v, inst, ev) => { if (ev) ate = tt + 8; };
+      return g;
+    };
+    // TV de tubo: o Mestre passa um vídeo no telão (o plano da tela)
+    const tv0 = P.p1_tv_carrinho;
+    P.p1_tv_carrinho = o => { const g = tv0(o); g.userData.tela = g.children.find(c => c.isMesh && c.geometry.parameters && Math.abs(c.geometry.parameters.width - .46) < .001) || null; return g; };
+    // armário de remédios: as duas portas de vidro abrem
+    const vidro0 = P.p1_armario_vidro;
+    P.p1_armario_vidro = o => {
+      const g = vidro0({ ...o, aberta: o.int === 'abrir' ? 0 : o.aberta }); if (o.int !== 'abrir') return g;
+      const ps = g.children.filter(c => c.isGroup && Math.abs(Math.abs(c.position.x) - (o.w || 1.0) / 2) < .01);
+      abre(g, k2 => ps.forEach(p => { p.rotation.y = Math.sign(p.position.x) * k2 * 1.6; }), 1.4);
+      return g;
+    };
+    // armário de vestiário: a porta "porta" abre (abrir)
+    const vest0 = P.p1_armario_vestiario;
+    P.p1_armario_vestiario = o => {
+      if (o.int !== 'abrir') return vest0(o);
+      const g = vest0({ ...o, aberta: o.porta ?? 0 }), p = g.children[g.children.length - 1];
+      abre(g, k2 => { p.rotation.y = -k2 * 1.9; }, 1.4);
+      return g;
+    };
+    // câmara de compressão: a porta abre (abrir)
+    const camara0 = P.p1_camara_compressao;
+    P.p1_camara_compressao = o => {
+      const g = camara0({ ...o, aberta: o.int === 'abrir' ? 0 : o.aberta }); if (o.int !== 'abrir') return g;
+      const p = g.children.find(c => c.isGroup && Math.abs(c.position.x - .48) < .01);
+      if (p) abre(g, k2 => { p.rotation.y = -k2 * 1.5; }, .9);
+      return g;
+    };
+    // armário de primeiros socorros: a portinha abre e mostra gaze, esparadrapo e frascos
+    const socorro0 = P.p1_quadro_socorro;
+    P.p1_quadro_socorro = o => {
+      if (o.int !== 'abrir') return socorro0(o);
+      const g = G(), k = kit(), y = o.y ?? 1.2, br = m('#e4e4dc', { r: .5 });
+      k.box(br, .5, .6, .02, 0, y, .01); [-1, 1].forEach(s => k.box(br, .02, .6, .16, s * .24, y, .08)); k.box(br, .5, .02, .16, 0, y, .08); k.box(br, .5, .02, .16, 0, y + .58, .08); k.box(br, .46, .015, .14, 0, y + .29, .08);
+      k.box(m('#f0f0ea', { r: .95 }), .12, .08, .08, -.12, y + .02, .07); k.cyl(m('#e8e4d8', { r: .8 }), .04, .04, .05, .02, y + .02, .07, 10); k.cyl(m('#7a4a18', { r: .3, op: .8 }), .025, .025, .12, .14, y + .02, .07, 8); k.box(m('#c8c8c0', { r: .7 }), .16, .1, .06, -.08, y + .31, .07); k.cyl(m('#2a4a7a', { r: .3 }), .022, .022, .1, .12, y + .31, .07, 8);
+      k.fim(g);
+      const piv = G(); piv.position.set(-.25, y, .165); g.add(piv); const kp = kit(); kp.box(br, .5, .6, .015, .25, 0, 0); kp.box(m('#c8c8c0'), .015, .1, .02, .46, .28, .015); kp.fim(piv);
+      pl(piv, .2, .2, uma('cruzArm', () => cmat(64, 64, (x, W, H) => { x.fillStyle = '#e8e8e0'; x.fillRect(0, 0, W, H); x.fillStyle = '#c0201a'; x.fillRect(24, 8, 16, 48); x.fillRect(8, 24, 48, 16); }, { r: .5 })), .25, .4, .009);
+      abre(g, k2 => { piv.rotation.y = -k2 * 1.8; }, 1.6);
+      return g;
+    };
+    // cortina do leito: abrir recolhe o pano para a ponta do trilho (fechada: estendida)
+    P.p1_cortina_int = o => {
+      const g = G(), l = o.l || 2.6, y0 = .3, y1 = ALT - .4, k = kit(), aco = metal('#9a9ea2');
+      const pano = uma('cortina' + (o.c || ''), () => cmat(256, 256, (x, W, H) => { x.fillStyle = o.c || '#9fb8ac'; x.fillRect(0, 0, W, H); for (let i = 0; i < W; i += 16) { x.fillStyle = 'rgba(0,0,0,.08)'; x.fillRect(i, 0, 6, H); }
+        const rr = rng(31); for (let i = 0; i < 6; i++) { const gr = x.createRadialGradient(rr() * W, H * (.5 + rr() * .5), 2, rr() * W, H * (.6 + rr() * .4), 50); gr.addColorStop(0, 'rgba(90,60,20,.3)'); gr.addColorStop(1, 'rgba(90,60,20,0)'); x.fillStyle = gr; x.fillRect(0, 0, W, H); }
+        x.fillStyle = 'rgba(110,8,8,.6)'; for (let i = 0; i < 4; i++) { x.beginPath(); x.ellipse(rr() * W, H * (.55 + rr() * .4), 4 + rr() * 12, 8 + rr() * 26, 0, 0, 7); x.fill(); } }, { r: .95, lado: 2 }));
+      k.box(aco, l, .03, .05, 0, ALT - .35, 0); [-l / 2 + .1, l / 2 - .1].forEach(u => k.cyl(aco, .008, .008, .35, u, ALT - .35, 0, 4)); k.fim(g);
+      const nx = Math.max(6, Math.round(l * 10)), geo = new T.PlaneGeometry(l, y1 - y0, nx, 2), ps = geo.attributes.position;
+      for (let i = 0; i < ps.count; i++) { const x = ps.getX(i); ps.setZ(i, .07 * Math.sin(x * 9)); } geo.computeVertexNormals(); geo.translate(l / 2, (y0 + y1) / 2, 0);
+      const piv = G(); piv.position.x = -l / 2; g.add(piv); const me = new T.Mesh(guardar(geo), pano); piv.add(me);
+      const pos = k2 => { piv.scale.x = 1 - k2 * .85; piv.scale.z = 1 + k2 * 1.6; };
+      if (o.int === 'abrir') abre(g, pos, 1.1); else pos(o.aberta ?? 0);
+      return g;
+    };
+    // canos de parede da biblioteca: o coletor de cima agora faz a curva e entra na parede nas duas pontas (flange)
+    P.p1_canos_parede = o => {
+      const g = P.canos_parede(o), w = o.w || 2.4, R = (o.raio || .14) * 1.4, k = kit(), mt = m(o.c || '#5a3a2a', { tex: 'ferrugem', me: .55, r: .5 }), fl = metal('#3a3a3a');
+      [-1, 1].forEach(s2 => { const x = s2 * (w / 2 + .2); k.sph(mt, R, x, ALT - .45, 0, 1, 1, 1, 12); k.cylc(mt, R, R, .24, x, ALT - .45, -.12, PI / 2, 0, 0, 12); k.cylc(fl, R * 1.6, R * 1.6, .03, x, ALT - .45, -.23, PI / 2, 0, 0, 14); });
+      return k.fim(g);
+    };
   });
 })();
 
@@ -4534,7 +4891,11 @@
    Refeitório, lavanderia, cozinha, banheiro coletivo, dormitório, fichário, estufa, ginásio, cinema,
    corredor acústico, enfermaria, caldeiras, capela, interrogatório, câmara fria, ateliê, rádio, música e
    a sala de estar da Zona Neutra. Tudo genérico: textos, cores e códigos vêm do arquivo de cenas.
-   Geometria leve (malhas juntadas) e texturas de canvas de até 512 px, guardadas para o site liberar. */
+   Geometria leve (malhas juntadas) e texturas de canvas de até 512 px, guardadas para o site liberar.
+   Rodada 2 (interações, interacoes3d.js): armários, gavetas, caixas de parede, geladeira, lavadora e baú que abrem;
+   fliperama de verdade (jogar: partida de ~20 s na tela de tubo, jogos inventados); TV de tubo, projetor e facho,
+   telão (vídeo do Mestre), console de rádio, gravador e chuveiros que ligam; telefone, rádio, sineta, piano e
+   registro que tocam; portão de correr; cabos e canos sempre ligados nas duas pontas. */
 (() => {
   'use strict';
   const NS = window.ACF3D = window.ACF3D || {};
@@ -4834,6 +5195,9 @@
         const tor = [], ralo = [];
         for (let i = 0; i < n; i++) { const x = -w / 2 + (i + .5) * w / n; tor.push(tuboEixo(.014, .014, .16, x, y0 + .38, -.17, 'z', 8), cil(.012, .01, .05, x, y0 + .33, -.1, 8), ret(.09, .015, .015, x, y0 + .44, -.24)); ralo.push(new T.CircleGeometry(.04, 10).rotateX(-PI / 2).translate(x, y0 + .045, 0)); }
         addJ(g, tor, metal('#b8bcc0')); addJ(g, ralo, m('#111'));
+        const agua = G(); g.add(agua); const aM = memo('agua_torn', () => m('#cfe4f0', { op: .45, r: .05 }));
+        for (let i = 0; i < n; i += 3) { const x = -w / 2 + (i + .5) * w / n; agua.add(malha(cil(.006, .009, .285, x, y0 + .05, -.1, 6), aM)); }
+        g.userData.aoInter = (v) => { agua.visible = !!v; };
         const cab = []; for (let i = 0; i < 8; i++) { const x = -w / 2 + r() * w; cab.push(curva([[x, y0 + .045, 0], [x + .04, y0 + .05, .05 + r() * .08], [x - .03, y0 + .046, .1 + r() * .08]], .003, 6, 3)); } addJ(g, cab, m('#0e0a08'));
         if (o.espelho !== false) {
           const esp = memo('espelho', () => m('#7a8a90', { me: .55, r: .12 })), tri = memo('espelho_tri', () => cmat(128, 160, (x, W, H) => { const rr = rng(4); const gr = x.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#9aaab0'); gr.addColorStop(1, '#5a6a70'); x.fillStyle = gr; x.fillRect(0, 0, W, H); x.strokeStyle = 'rgba(255,255,255,.7)'; x.lineWidth = 1.2; for (let k = 0; k < 9; k++) { x.beginPath(); x.moveTo(W * .62, H * .38); let px = W * .62, py = H * .38; const a = rr() * PI * 2; for (let s = 0; s < 5; s++) { px += Math.cos(a + (rr() - .5)) * 14; py += Math.sin(a + (rr() - .5)) * 14; x.lineTo(px, py); } x.stroke(); } x.fillStyle = 'rgba(120,10,6,.5)'; x.beginPath(); x.arc(W * .62, H * .38, 5, 0, 7); x.fill(); }, { me: .5, r: .15 }));
@@ -4897,17 +5261,28 @@
         const pm = malha(ret(w - .03, h - .1, .02, (w - .03) / 2, .08, 0), corpo); pv.add(pm);
         pv.add(malha(plano(w - .04, h - .12, (w - .03) / 2, .08 + (h - .1) / 2, .011), porta));
         pv.add(malha(ret(.03, .14, .03, w - .1, .9, .02), metal('#aaa'))); pv.add(malha(ret(.05, .07, .02, w - .1, .82, .035), metal('#8a8a7a')));
-        if (o.aberto) { pv.rotation.y = -(o.aberto === 1 ? 1.1 : o.aberto); g.add(malha(plano(.38, .9, 0, 1.05, 0), memo('macacao_cabide', () => cmat(64, 128, (x, W, H) => { x.clearRect(0, 0, W, H); x.fillStyle = '#d06420'; x.fillRect(W * .2, 6, W * .6, H - 6); x.fillRect(W * .05, 6, W * .9, H * .3); x.fillStyle = 'rgba(0,0,0,.2)'; x.fillRect(W * .49, 6, 2, H); }, { lado: 1, alfa: .5 })))); }
+        // dentro: macacão no cabide, prateleira com caixa e botas no fundo (aparece quando a porta abre)
+        g.add(malha(tuboEixo(.01, .01, w - .04, 0, 1.5, -.05, 'x', 6), metal('#9a9a96')));
+        g.add(juntar([ret(.16, .1, .2, -.12, 1.58, -.05), ret(.12, .14, .26, -.14, .08, 0), ret(.12, .14, .26, .02, .08, .02, 0, .2, 0)], m('#1e1c1a', { r: .8 })));
+        { g.add(malha(plano(.38, .9, 0, 1.0, -.05), memo('macacao_cabide', () => cmat(64, 128, (x, W, H) => { x.clearRect(0, 0, W, H); x.fillStyle = '#d06420'; x.fillRect(W * .2, 6, W * .6, H - 6); x.fillRect(W * .05, 6, W * .9, H * .3); x.fillStyle = 'rgba(0,0,0,.2)'; x.fillRect(W * .49, 6, 2, H); }, { lado: 1, alfa: .5 })))); }
+        const ab0 = o.aberto ? (o.aberto === 1 ? 1.1 : o.aberto) : 0;
+        g.userData.aoInter = estado(k => { pv.rotation.y = -(ab0 + (1.85 - ab0) * k); }, 1.6);
         return g;
       },
       // criado-mudo de madeira com gaveta, copo, livro e despertador
       p2_criado(o) {
         const g = G(), r = rng(o.sem || 29);
-        g.add(malha(ret(.45, .56, .4, 0, 0, 0), MADEIRA(o.c || '#5a4632')));
-        g.add(juntar([ret(.4, .005, .01, 0, .38, .2), cil(.015, .015, .02, 0, .3, .205, 6, PI / 2)], m('#1a120a')));
+        const madC = MADEIRA(o.c || '#5a4632');
+        g.add(juntar([ret(.45, .36, .4, 0, 0, 0), ret(.45, .06, .4, 0, .5, 0), ret(.02, .14, .4, -.215, .36, 0), ret(.02, .14, .4, .215, .36, 0), ret(.41, .14, .02, 0, .36, -.19)], madC));
+        g.add(malha(ret(.4, .12, .01, 0, .37, -.17), m('#0c0a08')));
+        const gv = G(); g.add(gv);
+        gv.add(juntar([ret(.4, .13, .02, 0, .365, .19), ret(.37, .01, .34, 0, .37, .01), ret(.01, .08, .34, -.18, .37, .01), ret(.01, .08, .34, .18, .37, .01), ret(.37, .08, .01, 0, .37, -.16)], madC));
+        gv.add(malha(cil(.015, .015, .02, 0, .43, .205, 6, PI / 2), m('#1a120a')));
+        gv.add(juntar([ret(.15, .004, .21, -.06, .38, .02, 0, .3, 0), ret(.14, .004, .2, -.05, .384, .03, 0, -.2, 0)], m('#e8e2d0', { r: .95 }))); gv.add(malha(cil(.008, .008, .13, .1, .384, 0, 6, 0, 0, PI / 2), m('#2a3a8a')));
         const it = []; if (r() < .7) it.push(cil(.035, .03, .1, -.1 + r() * .05, .56, .05, 10)); it.push(ret(.15, .03, .21, .08, .56, -.05, 0, r() - .5, 0)); if (r() < .5) it.push(ret(.15, .025, .2, .08, .59, -.05, 0, r() - .5, 0));
         addJ(g, it, m(['#5a2a2a', '#2a3a5a', '#3a4a2a'][Math.floor(r() * 3)], { r: .7 }));
         if (o.relogio !== false) g.add(malha(cil(.05, .05, .04, -.1, .56, -.1, 12, PI / 2), m('#8a2a2a', { me: .3 })));
+        g.userData.aoInter = estado(k => { gv.position.z = k * .26; }, 1.6);
         return g;
       },
 
@@ -5028,10 +5403,14 @@
       p2_cortina_hospital(o) {
         const g = G(), w = o.w || 2.4, ab = o.ab ?? .55, yt = 2.5, r = rng(o.sem || 41);
         g.add(juntar([ret(w, .03, .05, 0, yt, 0), ret(.015, ALT - yt, .015, -w / 2 + .1, yt, 0), ret(.015, ALT - yt, .015, w / 2 - .1, yt, 0)], metal('#b8bcc0')));
-        const cw = Math.max(.4, w * ab), geo = new T.PlaneGeometry(cw, yt - .28, 24, 1), pos = geo.attributes.position;
+        const cw = w - .1, geo = new T.PlaneGeometry(cw, yt - .28, 32, 1), pos = geo.attributes.position;
         for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) * 14) * .05);
-        geo.computeVertexNormals(); geo.translate(-w / 2 + cw / 2, .28 + (yt - .28) / 2, 0);
-        g.add(malha(geo, memo('cortina_h' + (o.c || ''), () => cmat(256, 256, (x, W, H) => { const rr = rng(12); x.fillStyle = o.c || '#9fb8a8'; x.fillRect(0, 0, W, H); for (let i = 0; i < W; i += 10) { x.fillStyle = 'rgba(0,0,0,.08)'; x.fillRect(i, 0, 4, H); } gasto(x, W, H, rr, 200, .2); x.fillStyle = 'rgba(80,60,30,.3)'; x.fillRect(0, H - 30, W, 30); x.fillStyle = 'rgba(110,12,8,.5)'; x.beginPath(); x.ellipse(W * .7, H * .75, 14, 26, .2, 0, 7); x.fill(); escorrer(x, W * .66, H * .75, 12, 4, 'rgba(110,12,8,.5)', rr, 30); }, { lado: 1, r: .95 }))));
+        geo.computeVertexNormals(); geo.translate(cw / 2, .28 + (yt - .28) / 2, 0);
+        const pano = G(); pano.position.x = -w / 2 + .05; g.add(pano);
+        const kmin = .45 / cw, fech = Math.max(kmin, ab); pano.scale.x = fech;
+        g.userData.aoInter = (v, inst) => { alvoC = v ? kmin : Math.max(fech, .92); if (inst) pano.scale.x = alvoC; };
+        let alvoC = fech; anim.push(dt => { const d = alvoC - pano.scale.x; if (Math.abs(d) > .001) pano.scale.x += Math.sign(d) * Math.min(Math.abs(d), dt * .9); });
+        pano.add(malha(geo, memo('cortina_h' + (o.c || ''), () => cmat(256, 256, (x, W, H) => { const rr = rng(12); x.fillStyle = o.c || '#9fb8a8'; x.fillRect(0, 0, W, H); for (let i = 0; i < W; i += 10) { x.fillStyle = 'rgba(0,0,0,.08)'; x.fillRect(i, 0, 4, H); } gasto(x, W, H, rr, 200, .2); x.fillStyle = 'rgba(80,60,30,.3)'; x.fillRect(0, H - 30, W, 30); x.fillStyle = 'rgba(110,12,8,.5)'; x.beginPath(); x.ellipse(W * .7, H * .75, 14, 26, .2, 0, 7); x.fill(); escorrer(x, W * .66, H * .75, 12, 4, 'rgba(110,12,8,.5)', rr, 30); }, { lado: 1, r: .95 }))));
         return g;
       },
 
@@ -5049,7 +5428,13 @@
         g.add(malha(ret(.7, .6, .14, 0, .35, R - .04), m('#1a1614', { me: .6, r: .5 })));
         const fogo = cmat(64, 64, (x, W) => { const gr = x.createRadialGradient(W / 2, W * .7, 2, W / 2, W * .6, W * .6); gr.addColorStop(0, '#fff2b0'); gr.addColorStop(.35, '#ff8a20'); gr.addColorStop(1, '#2a0800'); x.fillStyle = gr; x.fillRect(0, 0, W, W); x.fillStyle = '#100604'; for (let i = 0; i < 5; i++) x.fillRect(i * 13 + 4, 0, 4, W); }, { brilho: 1.4 });
         g.add(malha(plano(.5, .34, 0, .62, R + .035), fogo));
-        anim.push((dt, t) => { fogo.emissiveIntensity = 1.1 + Math.sin(t * 7) * .2 + Math.sin(t * 17 + 1) * .15; });
+        const pf = G(); pf.position.set(-.27, .43, R + .05); g.add(pf);
+        pf.add(juntar([ret(.54, .38, .03, .27, 0, 0), ret(.06, .1, .05, .48, .14, .02)], m('#1e1a18', { me: .6, r: .5 })));
+        const vg = []; for (let k = 0; k < 4; k++) vg.push(ret(.36, .018, .01, .27, .1 + k * .05, .016)); pf.add(juntar(vg, m('#ff6a10', { unico: true, e: '#ff5a10', ei: 1.2 })));
+        let aberta = 0;
+        anim.push((dt, t) => { brilho(fogo, (.75 + Math.sin(t * 7) * .15 + Math.sin(t * 17 + 1) * .1) * (.5 + aberta * .7)); });
+        const setP = estado(k => { pf.rotation.y = -k * 1.7; aberta = k; }, 1.4);
+        g.userData.aoInter = (v, inst) => setP(v, inst);
         if (o.luz !== 0) luz(g, '#ff7a20', o.luz ?? .8, 4.5, 0, .6, R + .5, 'vela');
         // manômetros
         const mostr = memo('mostrador', () => cmat(128, 128, (x, W) => { x.fillStyle = '#e8e2d0'; x.beginPath(); x.arc(W / 2, W / 2, W / 2, 0, 7); x.fill(); x.strokeStyle = '#111'; x.lineWidth = 2; for (let k = 0; k <= 10; k++) { const a = PI * .75 + k / 10 * PI * 1.5; x.beginPath(); x.moveTo(W / 2 + Math.cos(a) * W * .38, W / 2 + Math.sin(a) * W * .38); x.lineTo(W / 2 + Math.cos(a) * W * .46, W / 2 + Math.sin(a) * W * .46); x.stroke(); } x.strokeStyle = '#b01010'; x.lineWidth = 6; x.beginPath(); x.arc(W / 2, W / 2, W * .42, PI * 1.9, PI * 2.25); x.stroke(); x.fillStyle = '#111'; x.font = 'bold 14px Arial'; x.textAlign = 'center'; x.fillText('kgf/cm²', W / 2, W * .75); }, { r: .4 }));
@@ -5068,7 +5453,7 @@
       },
       // painel de manômetros num coletor de canos (parede); os ponteiros tremem
       p2_manometros(o) {
-        const g = G(), w = o.w || 1.8, n = o.n || 5, y = o.y ?? 1.5, r = rng(o.sem || 45);
+        const g = G(), w = o.w || 1.8, n = o.n || 5, y = o.y ?? 1.5, r = rng(o.sem || 45), pts = [];
         g.add(juntar([tuboEixo(.06, .06, w, 0, y, .02, 'x', 10), ...Array.from({ length: n }, (_, k) => cil(.025, .025, .3, -w / 2 + (k + .5) * w / n, y, .02, 6))], m('#5a3a2a', { me: .5, r: .5 })));
         const mostr = memo('mostrador', () => cmat(128, 128, (x, W) => { x.fillStyle = '#e8e2d0'; x.beginPath(); x.arc(W / 2, W / 2, W / 2, 0, 7); x.fill(); x.strokeStyle = '#111'; x.lineWidth = 2; for (let k = 0; k <= 10; k++) { const a = PI * .75 + k / 10 * PI * 1.5; x.beginPath(); x.moveTo(W / 2 + Math.cos(a) * W * .38, W / 2 + Math.sin(a) * W * .38); x.lineTo(W / 2 + Math.cos(a) * W * .46, W / 2 + Math.sin(a) * W * .46); x.stroke(); } x.strokeStyle = '#b01010'; x.lineWidth = 6; x.beginPath(); x.arc(W / 2, W / 2, W * .42, PI * 1.9, PI * 2.25); x.stroke(); x.fillStyle = '#111'; x.font = 'bold 14px Arial'; x.textAlign = 'center'; x.fillText('kgf/cm²', W / 2, W * .75); }, { r: .4 }));
         for (let k = 0; k < n; k++) {
@@ -5077,7 +5462,15 @@
           const pt = malha(ret(.005, .065, .004, 0, 0, 0), m('#111')); pt.position.set(x, gy, .094); g.add(pt);
           const f = r() * 9, base = -1.3 + r() * 2; anim.push((dt, t) => { pt.rotation.z = base + Math.sin(t * .3 + f) * .25 + Math.sin(t * 11 + f) * .05; });
           if (k % 2) g.add(juntar([anel(.07, .012, x, y - .2, .1, PI * 2, 0, 0, 0, 4, 14), ret(.14, .015, .015, x, y - .21, .1)], m('#a01a14', { me: .4 })));
+          pts.push(pt);
         }
+        // registro grande na ponta do coletor
+        const vol = G(); vol.position.set(w / 2 + .12, y, .16); g.add(vol);
+        g.add(malha(tuboEixo(.03, .03, .16, w / 2 + .12, y, .08, 'z', 8), metal('#7a7a72')));
+        vol.add(juntar([anel(.14, .016, 0, 0, 0, PI * 2, 0, 0, 0, 5, 20), ...[0, 1, 2].map(k => ret(.28, .016, .016, 0, -.008, 0, 0, 0, k * PI / 3)), cil(.03, .03, .04, 0, -.02, 0, 10, PI / 2)], m('#a01a14', { me: .4, r: .5 })));
+        let gira = -1;
+        anim.push(dt => { if (gira < 0) return; gira += dt; vol.rotation.z = -Math.min(gira, 2.2) * 3; const s2 = Math.max(0, 1 - Math.abs(gira - 2) / 1.5); pts.forEach((p, i) => { p.rotation.z += Math.sin(gira * 30 + i) * .08 * s2; }); if (gira > 4) gira = -1; });
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') gira = 0; };
         return g;
       },
 
@@ -5110,9 +5503,11 @@
         const car = memo('carretel', () => cmat(64, 64, (x, W) => { x.clearRect(0, 0, W, W); x.fillStyle = '#c8ccd0'; x.beginPath(); x.arc(W / 2, W / 2, W / 2, 0, 7); x.fill(); x.fillStyle = '#4a3020'; x.beginPath(); x.arc(W / 2, W / 2, W * .36, 0, 7); x.fill(); x.fillStyle = '#c8ccd0'; x.beginPath(); x.arc(W / 2, W / 2, W * .12, 0, 7); x.fill(); x.fillStyle = 'rgba(0,0,0,.7)'; for (let k = 0; k < 3; k++) { const a = k / 3 * PI * 2; x.beginPath(); x.arc(W / 2 + Math.cos(a) * W * .24, W / 2 + Math.sin(a) * W * .24, W * .07, 0, 7); x.fill(); } }, { transp: 1, me: .4, r: .4 }));
         const rolos = [-.14, .14].map(dx => { const p = malha(new T.CircleGeometry(.11, 20).rotateX(-PI / 2), car); p.position.set(dx, .145, -.04); g.add(p); return p; });
         g.add(juntar([ret(.3, .02, .004, 0, .14, .07), cil(.012, .012, .03, -.14, .13, -.04, 8), cil(.012, .012, .03, .14, .13, -.04, 8)], m('#2a1a10')));
-        anim.push(dt => { rolos[0].rotation.y += dt * 1.6; rolos[1].rotation.y += dt * 1.1; });
+        let gr1 = 1;
+        anim.push(dt => { rolos[0].rotation.y += dt * 1.6 * gr1; rolos[1].rotation.y += dt * 1.1 * gr1; });
         const rec = malha(new T.SphereGeometry(.012, 8, 6), emis('#ff2010', 2)); rec.position.set(.2, .14, .14); g.add(rec);
-        anim.push((dt, t) => { rec.material.emissiveIntensity = Math.sin(t * 4) > 0 ? 2 : .2; });
+        anim.push((dt, t) => { brilho(rec.material, gr1 ? (Math.sin(t * 4) > 0 ? 1 : .1) : .02); });
+        g.userData.aoInter = (v) => { gr1 = v ? 1 : 0; };
         g.add(juntar([cil(.05, .06, .015, -.45, 0, .1, 12), cil(.008, .008, .2, -.45, .015, .1, 6), esf(.035, -.45, .25, .1, 1, 1.3, 1, 10)], m('#1a1a1a', { me: .5, r: .4 })));
         g.add(malha(curva([[-.45, .01, .1], [-.35, .004, .2], [-.28, .004, .05], [-.25, .06, 0]], .005, 10, 4), m('#111')));
         return g;
@@ -5189,12 +5584,14 @@
         // osciloscópio animado
         const [c, x] = tela(128, 64), tt = texCanvas(c), om = m('#000', { unico: true, mapa: tt, e: '#ffffff', ei: 1 }); om.emissiveMap = tt;
         g.add(malha(ret(.36, .28, .3, w / 2 - .35, ty + .05, .14), m('#3a3e3a', { me: .4 }))); g.add(malha(plano(.28, .18, w / 2 - .35, ty + .19, .295), om));
-        let ult = 0, fase = 0; anim.push((dt, t) => { if (t - ult < .08) return; ult = t; fase += .5; x.fillStyle = '#021006'; x.fillRect(0, 0, 128, 64); x.strokeStyle = 'rgba(80,255,140,.25)'; for (let i = 0; i < 128; i += 16) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 64); x.stroke(); } x.strokeStyle = '#6aff9a'; x.lineWidth = 2; x.beginPath(); for (let i = 0; i < 128; i++) { const a = o.ativo ? Math.sin(i * .2 + fase) * 12 * (Math.sin(t * 1.3) > .4 ? 1 : .2) + (Math.random() - .5) * 6 : (Math.random() - .5) * 3; x.lineTo(i, 32 + a); } x.stroke(); tt.needsUpdate = true; });
+        let ult = 0, fase = 0, ligR = 1; anim.push((dt, t) => { if (!ligR || t - ult < .08) return; ult = t; fase += .5; x.fillStyle = '#021006'; x.fillRect(0, 0, 128, 64); x.strokeStyle = 'rgba(80,255,140,.25)'; for (let i = 0; i < 128; i += 16) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 64); x.stroke(); } x.strokeStyle = '#6aff9a'; x.lineWidth = 2; x.beginPath(); for (let i = 0; i < 128; i++) { const a = o.ativo ? Math.sin(i * .2 + fase) * 12 * (Math.sin(t * 1.3) > .4 ? 1 : .2) + (Math.random() - .5) * 6 : (Math.random() - .5) * 3; x.lineTo(i, 32 + a); } x.stroke(); tt.needsUpdate = true; });
         // fones, microfone, caderno de registro
         g.add(juntar([anel(.09, .01, -.3, ty + .1, .15, PI, 0, 0, 0, 4, 12), cil(.045, .045, .03, -.39, ty + .05, .15, 12), cil(.045, .045, .03, -.21, ty + .05, .15, 12)], m('#1a1a1a', { r: .5 })));
         g.add(juntar([cil(.06, .07, .02, .4, ty + .05, .12, 12), cil(.008, .008, .22, .4, ty + .07, .12, 6), cil(.03, .03, .1, .4, ty + .29, .1, 10, .5)], metal('#8a8a84')));
         g.add(malha(ret(.3, .015, .22, -.9, ty + .05, .15, 0, .2, 0), memo('caderno', () => cmat(128, 96, (x, W, H) => { x.fillStyle = '#e8e2d0'; x.fillRect(0, 0, W, H); x.fillStyle = 'rgba(30,30,60,.6)'; for (let i = 10; i < H; i += 8) x.fillRect(6, i, W * (.4 + Math.random() * .5), 1.5); x.fillStyle = '#222'; x.fillRect(W / 2 - 1, 0, 2, H); }, { r: .9 }))));
-        if (o.ativo) { const led = malha(new T.SphereGeometry(.015, 8, 6), emis('#40ff60', 2)); led.position.set(-w / 2 + .1 + uw * .5, ty + .05 + .58, -d / 2 + .37); g.add(led); anim.push((dt, t) => { led.material.emissiveIntensity = Math.sin(t * 9) > .2 ? 2.4 : .2; }); if (o.luz !== 0) luz(g, '#ffb040', o.luz ?? .5, 3, 0, ty + .6, .2); }
+        let led = null;
+        if (o.ativo) { led = malha(new T.SphereGeometry(.015, 8, 6), emis('#40ff60', 2)); led.position.set(-w / 2 + .1 + uw * .5, ty + .05 + .58, -d / 2 + .37); g.add(led); anim.push((dt, t) => { brilho(led.material, ligR ? (Math.sin(t * 9) > .2 ? 1.2 : .1) : .02); }); if (o.luz !== 0) luz(g, '#ffb040', o.luz ?? .5, 3, 0, ty + .6, .2); }
+        g.userData.aoInter = (v) => { ligR = v ? 1 : 0; brilho(frente, v ? 1 : .08); brilho(om, v ? 1 : .02); if (!v) { x.fillStyle = '#010201'; x.fillRect(0, 0, 128, 64); tt.needsUpdate = true; } g.userData._lig = ligR; };
         return g;
       },
 
@@ -5211,6 +5608,12 @@
         const lat = []; [-1, 1].forEach(s => lat.push(ret(.18, .015, .04, s * .62, 1.0, .06), cil(.035, .03, .03, s * .7, 1.015, .1, 8))); addJ(g, lat, m('#a8862a', { me: .8, r: .3 }));
         const vel = []; [-1, 1].forEach(s => vel.push(cil(.014, .014, .1 + (s > 0 ? .04 : 0), s * .7, 1.045, .1, 8))); addJ(g, vel, m('#e8e0c8', { r: .8 }));
         g.add(juntar([ret(.04, .02, .1, -.08, .03, .14), ret(.04, .02, .1, .08, .03, .14)], m('#a8862a', { me: .8, r: .3 })));
+        // teclas soltas que descem quando alguém toca
+        const tq = [], tqM = memo('tecla_solta', () => m('#ece6d4', { r: .4 }));
+        for (let k = 0; k < 10; k++) { const pv2 = G(); pv2.position.set(-.3 + k * .0262 * 2.2, .765, .15); g.add(pv2); pv2.add(malha(ret(.024, .006, .14, 0, 0, .07), tqM)); tq.push(pv2); }
+        let toca = -1;
+        anim.push(dt => { if (toca < 0) return; toca += dt; tq.forEach((p, i) => { const f = (toca * 3.2 + i * .37 * (i % 3 + 1)) % 2.6; p.rotation.x = f < .35 && toca < 3.2 ? .09 : 0; }); if (toca > 3.6) { toca = -1; tq.forEach(p => { p.rotation.x = 0; }); } });
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') toca = 0; };
         if (o.banco !== false) { const bc = []; bc.push(ret(.8, .07, .36, 0, .44, .78)); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => bc.push(ret(.05, .44, .05, a * .34, 0, .78 + b * .14))); addJ(g, bc, mad); }
         return g;
       },
@@ -5307,10 +5710,722 @@
       },
     });
 
+    /* ---------------- fliperama: artes e jogos (todos inventados) ---------------- */
+    const FL_PERFIL = [[-.40, 0], [.30, 0], [.30, .80], [.42, .86], [.42, .94], [.16, 1.04], [.10, 1.06], [0, 1.52], [.16, 1.56], [.20, 1.80], [-.40, 1.80]];
+    const FLIP = [
+      { nome: 'ASTRO PATRULHA', e: 'nave', c1: '#2a5cff', c2: '#0a0a3a', c3: '#ff3a3a', lam: '#14143a', tm: '#2a6aff', tc: '#ffe040' },
+      { nome: 'LABIRINTO 9', e: 'labirinto', c1: '#ffcc00', c2: '#3a1a00', c3: '#00e0ff', lam: '#2a1a08', tm: '#ffcc00', tc: '#ff4fd0' },
+      { nome: 'TURBO NOITE', e: 'estrada', c1: '#ff2a8a', c2: '#1a0a2a', c3: '#40ffe0', lam: '#1a0a1a', tm: '#ff2a8a', tc: '#40ffe0' },
+      { nome: 'TIJOLAÇO', e: 'tijolos', c1: '#30d040', c2: '#0a2a10', c3: '#ff8a20', lam: '#0e1e10', tm: '#30d040', tc: '#ffffff' },
+      { nome: 'SALTO ALTO', e: 'salto', c1: '#ff7a10', c2: '#2a1004', c3: '#7ad0ff', lam: '#2a1206', tm: '#ff7a10', tc: '#ffe8a0' },
+    ];
+    const SPR = {
+      nave: ['...33...', '...33...', '..3113..', '.311113.', '33111133', '3.2..2.3', '..2..2..', '........'],
+      inimigo: ['........', '..1111..', '.122221.', '11111111', '1.1.1.1.', '.111111.', '..1..1..', '........'],
+      bolha: ['1..11..1', '.111111.', '.113311.', '11132111', '.111111.', '.111111.', '1..11..1', '........'],
+      robo: ['.333333.', '33111133', '31211213', '31111113', '31122113', '33111133', '.3.33.3.', '.3....3.'],
+      carro: ['..2222..', '.233332.', '.211112.', '22111122', '21111112', '33.11.33', '33....33', '........'],
+      heroi: ['..222...', '..333...', '..333...', '.11111..', '3.111.3.', '..1.1...', '..1.1...', '.22.22..'],
+    };
+    function spr(x, nome, cx, cy, sc, c1, c2, c3 = '#ffffff') {
+      const p = SPR[nome]; if (!p) return; const n = p.length;
+      for (let i = 0; i < n; i++) for (let k = 0; k < 8; k++) { const ch = p[i][k]; if (ch === '.') continue; x.fillStyle = ch === '1' ? c1 : ch === '2' ? c2 : c3; x.fillRect(Math.round(cx - 4 * sc + k * sc), Math.round(cy - 4 * sc + i * sc), sc, sc); }
+    }
+    const rrect = (x, a, b, w, h, rr) => { x.moveTo(a + rr, b); x.lineTo(a + w - rr, b); x.quadraticCurveTo(a + w, b, a + w, b + rr); x.lineTo(a + w, b + h - rr); x.quadraticCurveTo(a + w, b + h, a + w - rr, b + h); x.lineTo(a + rr, b + h); x.quadraticCurveTo(a, b + h, a, b + h - rr); x.lineTo(a, b + rr); x.quadraticCurveTo(a, b, a + rr, b); x.closePath(); };
+    const tri = (v, p) => { const k = ((v % (2 * p)) + 2 * p) % (2 * p); return k < p ? k : 2 * p - k; };
+    function flEmblema(x, J, cx, cy, R, r) {
+      x.save(); x.translate(cx, cy);
+      if (J.e === 'nave') {
+        x.fillStyle = J.c3; x.beginPath(); x.arc(R * .4, -R * .3, R * .75, 0, 7); x.fill(); x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.arc(R * .6, -R * .4, R * .6, 0, 7); x.fill();
+        for (let i = 0; i < 36; i++) { x.fillStyle = '#fff'; x.fillRect((r() - .5) * R * 3, (r() - .5) * R * 3.4, 2, 2); }
+        x.fillStyle = '#e8e8f0'; x.beginPath(); x.moveTo(0, -R); x.lineTo(R * .5, R * .6); x.lineTo(0, R * .35); x.lineTo(-R * .5, R * .6); x.closePath(); x.fill();
+        x.fillStyle = J.c1; x.fillRect(-R * .08, -R * .45, R * .16, R * .55); x.fillStyle = '#ffb020'; x.beginPath(); x.moveTo(-R * .2, R * .45); x.lineTo(0, R * 1.15); x.lineTo(R * .2, R * .45); x.fill();
+      } else if (J.e === 'labirinto') {
+        x.strokeStyle = J.c1; x.lineWidth = 7; x.lineCap = 'square'; x.beginPath();
+        [[-1, -1, 1, -1], [1, -1, 1, .2], [-1, -1, -1, 1], [-1, 1, .4, 1], [-.5, -.5, .5, -.5], [-.5, -.5, -.5, .5], [0, 0, .6, 0], [.6, 0, .6, .6]].forEach(([a, b, c, d]) => { x.moveTo(a * R, b * R); x.lineTo(c * R, d * R); }); x.stroke();
+        x.fillStyle = '#fff'; for (let i = -3; i <= 3; i++) x.fillRect(i * R * .25 - 2, R * .75 - 2, 4, 4);
+        spr(x, 'robo', -R * .2, R * .25, 5, J.c3, '#111', J.c1); spr(x, 'bolha', R * .5, -R * .75, 4, J.c3, '#fff', '#fff');
+      } else if (J.e === 'estrada') {
+        x.fillStyle = '#2a2a3a'; x.beginPath(); x.moveTo(-R * .15, -R); x.lineTo(R * .15, -R); x.lineTo(R * 1.1, R * 1.2); x.lineTo(-R * 1.1, R * 1.2); x.fill();
+        x.fillStyle = J.c3; for (let i = 0; i < 6; i++) { const t = i / 6, y = -R + t * t * R * 2.2; x.fillRect(-2 - t * 5, y, 4 + t * 10, 4 + t * 10); }
+        x.fillStyle = J.c1; x.beginPath(); x.arc(0, -R * 1.25, R * .45, PI, 0); x.fill(); spr(x, 'carro', 0, R * .7, 6, J.c1, J.c3, '#111');
+      } else if (J.e === 'tijolos') {
+        for (let rI = 0; rI < 5; rI++) for (let c = -2; c < 2; c++) { if ((rI * 5 + c + 9) % 7 === 0) continue; x.fillStyle = [J.c1, J.c3, '#e8e8e0', '#ff4040', '#4080ff'][rI]; x.fillRect(c * R * .5 + 2, -R + rI * R * .28, R * .46, R * .22); }
+        x.fillStyle = '#fff'; x.beginPath(); x.arc(R * .2, R * .4, R * .12, 0, 7); x.fill(); x.fillStyle = J.c3; x.fillRect(-R * .5, R * .9, R, R * .14);
+      } else {
+        x.fillStyle = J.c3; x.beginPath(); x.moveTo(-R * 1.3, R); x.lineTo(-R * .3, -R * .6); x.lineTo(R * .3, R * .1); x.lineTo(R * .8, -R * .3); x.lineTo(R * 1.4, R); x.fill();
+        x.fillStyle = '#fff'; x.beginPath(); x.moveTo(-R * .45, -R * .35); x.lineTo(-R * .3, -R * .6); x.lineTo(-R * .12, -R * .3); x.fill();
+        x.fillStyle = J.c1; x.fillRect(-R, R * .55, R * .6, R * .12); x.fillRect(R * .2, R * .2, R * .6, R * .12); spr(x, 'heroi', R * .4, -R * .1, 5, J.c1, '#3a2010', '#f0c8a0');
+      }
+      x.restore();
+    }
+    function flLado(J, s, queb) {
+      return cmat(192, 420, (x, W, H) => {
+        const r = rng(J.nome.length * 7 + (s > 0 ? 1 : 2) + (queb ? 5 : 0));
+        const P2 = ([z, y]) => [(s > 0 ? (.42 - z) : (z + .40)) / .82 * W, (1 - y / 1.8) * H];
+        const caminho = () => { x.beginPath(); FL_PERFIL.forEach((p, i) => { const [a, b] = P2(p); if (i) x.lineTo(a, b); else x.moveTo(a, b); }); x.closePath(); };
+        const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, J.c2); gr.addColorStop(.7, J.lam); gr.addColorStop(1, '#050505'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+        x.save(); x.translate(W / 2, H * .62); x.rotate(s > 0 ? .55 : -.55); [J.c1, J.c3, J.c1].forEach((c, i) => { x.globalAlpha = .85 - i * .2; x.fillStyle = c; x.fillRect(-W, -46 + i * 28, W * 2, 15 - i * 3); }); x.restore(); x.globalAlpha = 1;
+        flEmblema(x, J, W * (s > 0 ? .62 : .38), H * .22, W * .2, r);
+        x.save(); x.translate(W * (s > 0 ? .3 : .7), H * .66); x.rotate(-PI / 2); escrever(x, J.nome, 0, 0, 40, J.tc, H * .55, '900', 'Impact, "Arial Black", sans-serif'); x.restore();
+        x.save(); caminho(); x.clip();
+        for (let i = 0; i < 300; i++) { const k = Math.floor(r() * FL_PERFIL.length), [a1, b1] = P2(FL_PERFIL[k]), [a2, b2] = P2(FL_PERFIL[(k + 1) % FL_PERFIL.length]), f = r(); x.fillStyle = r() < .55 ? 'rgba(18,12,8,.8)' : 'rgba(210,200,180,.5)'; x.fillRect(a1 + (a2 - a1) * f + (r() - .5) * 16, b1 + (b2 - b1) * f + (r() - .5) * 16, 1 + r() * 4, 1 + r() * 3); }
+        x.strokeStyle = 'rgba(230,230,230,.16)'; x.lineWidth = 1; for (let i = 0; i < 30; i++) { const px = r() * W, py = r() * H; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (r() - .5) * 60, py + (r() - .5) * 18); x.stroke(); }
+        if (queb) { x.fillStyle = 'rgba(8,6,4,.5)'; for (let i = 0; i < 14; i++) { x.beginPath(); x.ellipse(r() * W, r() * H, 6 + r() * 22, 4 + r() * 12, r() * 3, 0, 7); x.fill(); } }
+        x.restore();
+        x.globalCompositeOperation = 'destination-in'; caminho(); x.fillStyle = '#000'; x.fill(); x.globalCompositeOperation = 'source-over';
+      }, { alfa: .5, r: .5 });
+    }
+    function flPainel(J) {
+      return cmat(256, 112, (x, W, H) => {
+        const r = rng(J.nome.length), gr = x.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, J.c2); gr.addColorStop(1, '#0a0a0a'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+        x.globalAlpha = .6; x.fillStyle = J.c1; x.fillRect(0, H * .84, W, 6); x.fillRect(0, H * .92, W, 3); x.globalAlpha = 1;
+        x.strokeStyle = J.tc; x.lineWidth = 3; x.beginPath(); x.arc(W * .239, H * .536, 22, 0, 7); x.stroke();
+        x.fillStyle = J.tc; [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([a, b]) => { const cx = W * .239 + a * 31, cy = H * .536 + b * 31; x.beginPath(); x.moveTo(cx + a * 6, cy + b * 6); x.lineTo(cx - b * 5 - a * 2, cy + a * 5 - b * 2); x.lineTo(cx + b * 5 - a * 2, cy - a * 5 - b * 2); x.fill(); });
+        [[.565, .6], [.68, .5], [.795, .6]].forEach(([u, v]) => { x.strokeStyle = '#ddd'; x.lineWidth = 2; x.beginPath(); x.arc(W * u, H * v, 13, 0, 7); x.stroke(); });
+        escrever(x, '1P', W * .435, H * .3, 10, '#ddd'); escrever(x, '2P', W * .565, H * .3, 10, '#ddd'); escrever(x, J.nome, W * .83, H * .16, 13, J.tc, W * .3, '900');
+        gasto(x, W, H, r, 160, .32);
+      }, { r: .5 });
+    }
+    function flMoldura(J, fw, fh) {
+      return cmat(256, 196, (x, W, H) => {
+        x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, W, H); x.strokeStyle = J.c1; x.lineWidth = 3; x.strokeRect(5, 5, W - 10, H - 10); x.strokeStyle = J.c3; x.lineWidth = 1.5; x.strokeRect(10, 10, W - 20, H - 20);
+        x.fillStyle = J.tc; x.font = 'bold 9px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('1 OU 2 JOGADORES', W / 2, 17); x.fillText('INSIRA A FICHA E APERTE START', W / 2, H - 16);
+        const hw = W * fw, hh = H * fh; x.globalCompositeOperation = 'destination-out'; x.beginPath(); rrect(x, (W - hw) / 2, (H - hh) / 2, hw, hh, 12); x.fill(); x.globalCompositeOperation = 'source-over';
+      }, { alfa: .5, r: .4 });
+    }
+    function flLetreiro(J, queb) {
+      return cmat(512, 128, (x, W, H) => {
+        const r = rng(J.nome.length * 3), gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, J.c2); gr.addColorStop(1, '#000'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+        for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(255,255,255,${r() * .6})`; x.fillRect(r() * W, r() * H, 2, 2); }
+        let t = 66; x.font = `900 ${t}px Impact, "Arial Black", sans-serif`; while (x.measureText(J.nome).width > W * .72 && t > 20) { t -= 2; x.font = `900 ${t}px Impact, "Arial Black", sans-serif`; }
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round'; x.lineWidth = 9; x.strokeStyle = J.c3; x.strokeText(J.nome, W / 2, H * .53);
+        const g2 = x.createLinearGradient(0, H * .25, 0, H * .8); g2.addColorStop(0, '#ffffff'); g2.addColorStop(.5, J.tc); g2.addColorStop(1, J.c1); x.fillStyle = g2; x.fillText(J.nome, W / 2, H * .53);
+        const sp = { nave: 'nave', labirinto: 'robo', estrada: 'carro', tijolos: 'bolha', salto: 'heroi' }[J.e];
+        spr(x, sp, 36, H * .5, 6, J.c1, J.c3); spr(x, J.e === 'nave' ? 'inimigo' : 'bolha', W - 36, H * .5, 6, J.c3, J.c1);
+        if (queb) { x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, 0, W, H); x.strokeStyle = 'rgba(255,255,255,.6)'; x.lineWidth = 2; x.beginPath(); x.moveTo(W * .6, 0); x.lineTo(W * .64, H * .4); x.lineTo(W * .58, H * .7); x.lineTo(W * .62, H); x.stroke(); }
+      }, { brilho: 1.3, r: .3 });
+    }
+    // uma cena do jogo no tempo s (a mesma serve para a demonstração e para a partida)
+    function flJogo(x, J, s) {
+      const W = 160, H = 120;
+      if (J.e === 'nave') {
+        for (let i = 0; i < 30; i++) { x.fillStyle = i % 3 ? '#556' : '#fff'; x.fillRect((i * 37) % W, (i * 53 + s * 18 * (1 + i % 3)) % H, 1, 1); }
+        const ox = Math.sin(s * .9) * 22, oy = 16 + (s * 1.5) % 16;
+        for (let a = 0; a < 4; a++) for (let c = 0; c < 7; c++) { const id = a * 7 + c; if (((id * 7) % 29) < s * 1.6) continue; spr(x, a < 2 ? 'inimigo' : 'bolha', W / 2 - 48 + c * 16 + ox, oy + a * 11, 1, a % 2 ? J.c3 : J.c1, '#fff'); }
+        const px = W / 2 + Math.sin(s * 1.7) * 52; spr(x, 'nave', px, H - 10, 1, J.c1, J.c3);
+        x.fillStyle = '#ffee40'; x.fillRect(px - .5, H - 20 - ((s * 140) % 90), 1, 4); x.fillStyle = J.c3; x.fillRect(W / 2 + Math.sin(s * 2.3) * 40, 40 + ((s * 70) % 70), 1, 3);
+        x.fillStyle = J.c1; for (let k = 0; k < 4; k++) x.fillRect(20 + k * 38, H - 24, 12, 4);
+      } else if (J.e === 'labirinto') {
+        x.strokeStyle = J.c1; x.lineWidth = 2; x.strokeRect(4, 12, W - 8, H - 16);
+        [[22, 26, 40, 10], [98, 26, 40, 10], [22, 50, 26, 18], [112, 50, 26, 18], [62, 48, 36, 24], [22, 86, 40, 10], [98, 86, 40, 10]].forEach(([a, b, c, d]) => x.strokeRect(a, b, c, d));
+        const per = [[12, 18], [148, 18], [148, 108], [12, 108]], seg = [136, 90, 136, 90], tot = 452, p = (s * 46) % tot, lap = Math.floor(s * 46 / tot);
+        const em = q => { let k = 0, qq = ((q % tot) + tot) % tot; while (qq > seg[k]) { qq -= seg[k]; k++; } const [a, b] = per[k], [c, d] = per[(k + 1) % 4], f = qq / seg[k]; return [a + (c - a) * f, b + (d - b) * f]; };
+        x.fillStyle = '#fff'; for (let q = 0; q < tot; q += 9) if (q > p || lap > 0 && q > p) { const [a, b] = em(q); x.fillRect(a - .5, b - .5, 2, 2); }
+        for (let i = 0; i < 9; i++) { x.fillRect(56 + i * 6, 42, 1.5, 1.5); x.fillRect(56 + i * 6, 78, 1.5, 1.5); }
+        const [hx, hy] = em(p); spr(x, 'robo', hx, hy, 1, J.c3, '#111', J.c1);
+        const [e1x, e1y] = em(p - 60 - Math.sin(s) * 10); spr(x, 'bolha', e1x, e1y, 1, '#ff4040', '#fff', '#fff'); const [e2x, e2y] = em(tot - (s * 38) % tot); spr(x, 'bolha', e2x, e2y, 1, J.tc, '#fff', '#fff');
+      } else if (J.e === 'estrada') {
+        const hy = 46; const gs = x.createLinearGradient(0, 0, 0, hy); gs.addColorStop(0, '#0a0018'); gs.addColorStop(1, J.c1); x.fillStyle = gs; x.fillRect(0, 0, W, hy);
+        x.fillStyle = '#100818'; x.beginPath(); x.moveTo(0, hy); for (let i = 0; i <= 16; i++) x.lineTo(i * 10, hy - 6 - ((i * 7) % 5) * 3); x.lineTo(W, hy); x.fill();
+        for (let y = hy; y < H; y += 2) { const t = (y - hy) / (H - hy), hw = 6 + t * 74, cx = W / 2 + Math.sin(s * .6) * 22 * (1 - t), lado = Math.floor(3 / (t + .06) + s * 14) % 2; x.fillStyle = lado ? '#0a2a14' : '#082010'; x.fillRect(0, y, W, 2); x.fillStyle = lado ? '#3a3a44' : '#34343e'; x.fillRect(cx - hw, y, hw * 2, 2); x.fillStyle = lado ? '#fff' : J.c1; x.fillRect(cx - hw - 3 * t - 1, y, 3 * t + 1, 2); x.fillRect(cx + hw, y, 3 * t + 1, 2); if (lado) { x.fillStyle = '#ddd'; x.fillRect(cx - 1, y, 2 * t + 1, 2); } }
+        [0, .5].forEach((o2, k) => { const z = (s * .35 + o2) % 1, y = hy + z * z * (H - hy), t = (y - hy) / (H - hy), cx = W / 2 + Math.sin(s * .6) * 22 * (1 - t) + (k ? 1 : -1) * t * 30; if (z > .1) spr(x, 'carro', cx, y, Math.max(1, Math.round(t * 2)), k ? J.c3 : '#e8e840', '#fff', '#111'); });
+        spr(x, 'carro', W / 2 + Math.sin(s * 1.3) * 30, H - 12, 2, J.c1, J.c3, '#111');
+        x.fillStyle = J.c3; x.font = 'bold 8px monospace'; x.textAlign = 'right'; x.fillText(`${180 + Math.floor(Math.sin(s) * 40 + s * 3)} KM/H`, W - 4, H - 4); x.textAlign = 'center';
+      } else if (J.e === 'tijolos') {
+        for (let a = 0; a < 6; a++) for (let c = 0; c < 10; c++) { const id = a * 10 + c; if (((id * 11) % 61) < s * 3) continue; x.fillStyle = ['#ff4040', J.c3, '#e8e840', J.c1, '#4080ff', '#c040ff'][a]; x.fillRect(5 + c * 15, 16 + a * 6, 14, 5); }
+        const bx2 = 6 + tri(s * 74, W - 12), by2 = 54 + tri(s * 58, H - 66); x.fillStyle = '#fff'; x.fillRect(bx2 - 1.5, by2 - 1.5, 3, 3);
+        const pdx = Math.max(14, Math.min(W - 14, bx2)); x.fillStyle = J.c1; x.fillRect(pdx - 12, H - 8, 24, 3); x.strokeStyle = '#888'; x.strokeRect(1, 12, W - 2, H - 12);
+      } else {
+        const gs = x.createLinearGradient(0, 0, 0, H); gs.addColorStop(0, '#102040'); gs.addColorStop(1, J.c3); x.fillStyle = gs; x.fillRect(0, 0, W, H);
+        x.fillStyle = '#ffe080'; x.beginPath(); x.arc(126, 28, 10, 0, 7); x.fill();
+        x.fillStyle = '#1a3a2a'; x.beginPath(); x.moveTo(0, 90); for (let i = 0; i <= 8; i++) x.lineTo(i * 20 - (s * 6) % 20, 70 + ((i * 13) % 3) * 8); x.lineTo(W, 90); x.fill();
+        x.fillStyle = '#5a3010'; x.fillRect(0, H - 14, W, 14); x.fillStyle = '#3a8a2a'; x.fillRect(0, H - 14, W, 3); x.fillStyle = '#3a1a08'; for (let i = 0; i < 10; i++) x.fillRect(((i * 20 - s * 40) % 200 + 200) % 200 - 20, H - 9, 6, 3);
+        for (let k = 0; k < 5; k++) { const px = ((k * 47 - s * 40) % 220 + 220) % 220 - 30, py = 72 - (k % 3) * 14; x.fillStyle = J.c1; x.fillRect(px, py, 24, 4); x.fillStyle = '#ffe040'; if ((k + Math.floor(s)) % 2) x.fillRect(px + 10, py - 8, 3, 3); }
+        const pul = Math.abs(Math.sin(s * 3)); spr(x, 'heroi', 40, H - 18 - pul * 32, 1, J.c1, '#3a2010', '#f0c8a0'); spr(x, 'bolha', ((200 - s * 30) % 200 + 200) % 200 - 20, H - 18, 1, '#a02020', '#fff', '#fff');
+      }
+    }
+    function flTela(x, J, partida, tl, st) {
+      const W = 160, H = 120, pts = q => Math.floor(q * q * 41 + q * 130) * 10;
+      x.fillStyle = '#000'; x.fillRect(0, 0, W, H); x.textAlign = 'center'; x.textBaseline = 'middle';
+      if (partida >= 0) {
+        if (partida < 17) {
+          flJogo(x, J, partida + 2);
+          x.fillStyle = '#fff'; x.font = 'bold 8px monospace'; x.textAlign = 'left'; x.fillText('1P ' + String(pts(partida)).padStart(6, '0'), 3, 6);
+          x.textAlign = 'right'; x.fillStyle = J.c3; x.fillText('▲'.repeat(partida < 6 ? 3 : partida < 12 ? 2 : 1), W - 3, 6); x.textAlign = 'center';
+          if (partida < 1.6) { x.fillStyle = J.tc; x.font = 'bold 14px monospace'; x.fillText('PRONTO!', W / 2, H / 2); }
+          if (Math.abs(partida - 6) < .4 || Math.abs(partida - 12) < .4) { x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(0, 0, W, H); }
+        } else {
+          flJogo(x, J, 19); x.fillStyle = 'rgba(0,0,0,.65)'; x.fillRect(0, 0, W, H);
+          if (Math.floor(partida * 3) % 2 === 0) { x.fillStyle = '#ff3030'; x.font = 'bold 20px monospace'; x.fillText('GAME OVER', W / 2, H * .42); }
+          x.fillStyle = '#fff'; x.font = 'bold 9px monospace'; x.fillText('PONTOS ' + String(pts(17)).padStart(6, '0'), W / 2, H * .64);
+        }
+      } else {
+        const c = tl % 18;
+        if (c < 6) {
+          const pal = J.nome.split(' '); x.font = 'bold 17px monospace';
+          pal.forEach((p2, i) => { x.fillStyle = J.c3; x.fillText(p2, W / 2 + 1, 30 + i * 19 + 1); x.fillStyle = [J.tc, J.c1, '#fff'][(Math.floor(tl * 4) + i) % 3]; x.fillText(p2, W / 2, 30 + i * 19); });
+          spr(x, { nave: 'nave', labirinto: 'robo', estrada: 'carro', tijolos: 'bolha', salto: 'heroi' }[J.e], 18, 34, 2, J.c1, J.c3); spr(x, 'bolha', W - 18, 34, 2, J.c3, '#fff');
+          x.font = 'bold 9px monospace'; x.fillStyle = '#fff';
+          if (st.chama && c > 3) x.fillText(`OLÁ, ${st.nomes[Math.floor(tl / 18) % st.nomes.length]}! VAMOS JOGAR?`, W / 2, 82); else if (Math.floor(tl * 2) % 2) x.fillText('INSIRA A FICHA', W / 2, 82);
+          x.fillStyle = J.c1; x.font = 'bold 8px monospace'; x.fillText('RECORDE ' + String(98760).padStart(6, '0'), W / 2, 100); x.fillStyle = '#888'; x.fillText('1 FICHA = 1 JOGO', W / 2, 112);
+        } else if (c < 12) {
+          flJogo(x, J, c - 6 + Math.floor(tl / 18) % 5 * 3); x.fillStyle = J.tc; x.font = 'bold 9px monospace'; if (Math.floor(tl * 2) % 2) x.fillText('DEMONSTRAÇÃO', W / 2, H - 6);
+        } else {
+          x.fillStyle = J.tc; x.font = 'bold 12px monospace'; x.fillText('RECORDES', W / 2, 14);
+          const sc = [98760, 75320, 51200, 32010, 12880];
+          x.font = 'bold 9px monospace'; sc.forEach((v, i) => { x.fillStyle = [J.c1, J.c3, '#fff', '#aaa', '#888'][i]; x.textAlign = 'left'; x.fillText(`${i + 1}º ${st.nomes[i % st.nomes.length]}`, 22, 34 + i * 15); x.textAlign = 'right'; x.fillText(String(v).padStart(6, '0'), W - 20, 34 + i * 15); });
+          x.textAlign = 'center';
+        }
+      }
+      x.fillStyle = 'rgba(0,0,0,.28)'; for (let y = 0; y < H; y += 2) x.fillRect(0, y, W, 1);
+      const vg = x.createRadialGradient(W / 2, H / 2, H * .4, W / 2, H / 2, W * .7); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+    }
+    // tela da TV de tubo: videogame (atração) | texto | estatica
+    function tvTela(x, modo, t, o) {
+      const W = 160, H = 120; x.textAlign = 'center'; x.textBaseline = 'middle';
+      if (modo === 'videogame') {
+        const gs = x.createLinearGradient(0, 0, 0, H); gs.addColorStop(0, '#1a1040'); gs.addColorStop(1, '#402060'); x.fillStyle = gs; x.fillRect(0, 0, W, H);
+        x.fillStyle = '#0c0820'; x.fillRect(20, 40, 30, 50); x.fillRect(110, 34, 34, 56); for (let k = 0; k < 4; k++) { x.fillRect(20 + k * 8, 34, 5, 6); x.fillRect(110 + k * 9, 28, 5, 6); }
+        x.fillStyle = '#2a6a2a'; x.fillRect(0, 90, W, 30); x.fillStyle = '#5a3a1a'; for (let i = 0; i < 9; i++) x.fillRect(((i * 22 - t * 25) % 200 + 200) % 200 - 20, 96, 12, 4);
+        spr(x, 'heroi', 40 + tri(t * 18, 70), 82, 1, '#c03020', '#5a3010', '#f0c8a0');
+        x.font = 'bold 15px monospace'; x.fillStyle = '#ffd040'; x.fillText(o.titulo || 'AVENTURA', W / 2, 22);
+        x.font = 'bold 9px monospace'; x.fillStyle = '#fff'; if (Math.floor(t * 2) % 2) x.fillText(o.txt || 'APERTE START', W / 2, 62);
+      } else if (modo === 'texto') {
+        x.fillStyle = '#020403'; x.fillRect(0, 0, W, H); x.font = 'bold 16px monospace'; x.fillStyle = o.cor || '#7fe3d6';
+        const L = String(o.txt || '').split('\n'); L.forEach((l, i) => x.fillText(l, W / 2 + (Math.random() < .03 ? 2 : 0), H / 2 + (i - (L.length - 1) / 2) * 18));
+        x.fillStyle = 'rgba(255,255,255,.06)'; x.fillRect(0, (t * 40) % H, W, 10);
+      } else {
+        for (let i = 0; i < 700; i++) { const v = Math.floor(Math.random() * 220); x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(Math.random() * W, Math.random() * H, 3, 2); }
+      }
+      x.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < H; y += 2) x.fillRect(0, y, W, 1);
+    }
+
+    /* ================================================================
+       RODADA 2 · INTERAÇÕES (interacoes3d.js): peças que respondem ao E
+       ================================================================ */
+    const CINE = {};   // o telão e o projetor do cinema conversam por aqui (os dois ficam na mesma sala)
+    // estado animado de 0 a 1 (porta abrindo, gaveta saindo): pose(k) desenha a peça no ponto k
+    function estado(pose, vel = 1.8, k0 = 0) {
+      let alvo = k0, atual = k0; pose(k0);
+      anim.push(dt => { if (atual === alvo) return; atual += Math.sign(alvo - atual) * Math.min(Math.abs(alvo - atual), dt * vel); pose(atual); });
+      return (v, inst) => { alvo = v ? 1 : 0; if (inst) { atual = alvo; pose(atual); } };
+    }
+    // brilho pelo multiplicador (o 3D reescreve a intensidade a cada quadro a partir da base e do multiplicador)
+    function brilho(mat, k) { if (!mat) return; if (mat.userData.base0 === undefined) mat.userData.base0 = mat.emissiveIntensity; mat.userData.mult = k; mat.emissiveIntensity = mat.userData.base0 * k; }
+    // tela de canvas que brilha (pixel: letra grossa de tubo, sem borrar)
+    function telaViva(W, H, ei = 1.1, pixel = true) {
+      const [c, x] = tela(W, H), t = texCanvas(c);
+      if (pixel) { t.magFilter = T.NearestFilter; t.minFilter = T.LinearFilter; t.generateMipmaps = false; }
+      const mt = m('#000000', { unico: true, mapa: t, e: '#ffffff', ei }); mt.emissiveMap = t;
+      return { mt, x, t, W, H };
+    }
+    // plano levemente abaulado (vidro de tubo); continua sendo PlaneGeometry
+    function planoCRT(w, h, bojo = .012) { const g = new T.PlaneGeometry(w, h, 8, 6), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const u = p.getX(i) / (w / 2), v = p.getY(i) / (h / 2); p.setZ(i, bojo * (1 - .5 * u * u - .5 * v * v)); } g.computeVertexNormals(); return g; }
+    const placaTxt = (txt, fundo, cor, W = 256, H = 64, tam = 30) => memo('ptxt' + txt + fundo + cor + W + H, () => cmat(W, H, (x, w, h) => { x.fillStyle = fundo; x.fillRect(0, 0, w, h); x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 3; x.strokeRect(3, 3, w - 6, h - 6); const L = String(txt).split('\n'); L.forEach((l, i) => escrever(x, l, w / 2, h / 2 + (i - (L.length - 1) / 2) * tam * 1.1, tam, cor, w * .9)); gasto(x, w, h, rng(txt.length + 3), 60, .2); }, { r: .6 }));
+
+    // conteúdo das prateleiras: materiais por tipo (três por tipo) e o que vai em cada prateleira
+    const RECHEIO = {
+      papeis: () => [m('#c8a868', { r: .9 }), m('#2a3a5a', { r: .7 }), m('#e8e2d0', { r: .95 })],
+      partituras: () => [m('#d8ccb0', { r: .95 }), m('#3a2418', { r: .7 }), m('#ece6d4', { r: .95 })],
+      frascos: () => [m('#5a2e10', { r: .15, me: .1, op: .88 }), m('#e4e4dc', { r: .4 }), m('#a02020', { r: .5 })],
+      mantimentos: () => [m('#9a9a90', { me: .6, r: .4 }), papelao(), m('#c8b890', { tex: 'carpete_velho', r: 1 })],
+      produtos: () => [m('#2a6aa8', { r: .4 }), m('#e8e8e0', { r: .4 }), m('#c8a020', { r: .4 })],
+      panelas: () => [INOX(), m('#5a5a58', { me: .6, r: .4 }), m('#8a8a86', { me: .7, r: .35 })],
+      fitas: () => [m('#1a1a1a', { r: .5 }), m('#e8e2d0', { r: .8 }), m('#8a8a8a', { me: .6 })],
+      ferramentas: () => [m('#a02018', { me: .4, r: .5 }), metal('#9a9a96'), m('#c8a020', { me: .3, r: .5 })],
+      roupas: () => [m('#c8641e', { tex: 'carpete_velho', r: 1 }), m('#151515', { r: .8 }), metal('#9a9a96')],
+      mancha: () => [m('#3a3a36', { r: .8 }), m('#d8d0c0', { r: .9 }), m('#6a1010', { r: .4 })],
+      tecidos: () => [m('#7a1a2a', { tex: 'carpete_velho', r: 1 }), m('#2a3a5a', { tex: 'carpete_velho', r: 1 }), m('#c8b890', { tex: 'carpete_velho', r: 1 })],
+      vazio: () => [m('#333'), m('#333'), m('#333')],
+    };
+    function prateleira(B, tipo, x0, x1, y, d, r) {
+      let x = x0 + .02;
+      while (x < x1 - .07) {
+        let e = .1;
+        switch (tipo) {
+          case 'papeis': case 'partituras': { if (r() < .25) { e = .26; B[2].push(ret(.24, .03 + r() * .07, d * .7, x + .12, y, 0, 0, (r() - .5) * .3, 0)); } else { e = .025 + r() * .05; B[r() < .55 ? 0 : 1].push(ret(e, .2 + r() * .1, d * .75, x + e / 2, y, 0, 0, 0, r() < .12 ? -.2 : 0)); } break; }
+          case 'frascos': { const rr = .022 + r() * .028, h = .07 + r() * .13; e = rr * 2 + .015; if (r() < .12) B[0].push(tuboEixo(rr, rr, h, x + rr, y + rr, (r() - .5) * d * .3, 'z', 8)); else { const z = (r() - .5) * d * .4; B[r() < .6 ? 0 : 1].push(cil(rr, rr, h, x + rr, y, z, 8)); B[2].push(cil(rr * .6, rr * .6, .02, x + rr, y + h, z, 6)); } break; }
+          case 'mantimentos': { if (r() < .5) { const rr = .04; e = .09; const k = 1 + Math.floor(r() * 3); for (let i = 0; i < k; i++) B[0].push(cil(rr, rr, .11, x + rr, y + i * .11, 0, 10)); } else { e = .14 + r() * .1; B[r() < .5 ? 1 : 2].push(ret(e - .01, .15 + r() * .15, d * .6, x + e / 2, y, 0)); } break; }
+          case 'produtos': { e = .1 + r() * .04; const h = .18 + r() * .1; B[Math.floor(r() * 3)].push(ret(e - .02, h, .07, x + e / 2, y, (r() - .5) * .1), cil(.015, .015, .04, x + e / 2, y + h, 0, 6)); break; }
+          case 'panelas': { const rr = .09 + r() * .05, h = .12 + r() * .08; e = rr * 2 + .03; B[0].push(cil(rr, rr * .95, h, x + rr, y, 0, 14)); if (r() < .6) B[2].push(cil(rr + .005, rr + .005, .015, x + rr, y + h, 0, 14)); break; }
+          case 'fitas': { const k = 3 + Math.floor(r() * 4); for (let i = 0; i < k; i++) B[i % 2].push(ret(.11, .018, .07, x + .06, y + i * .019, 0, 0, (r() - .5) * .2, 0)); e = .13; break; }
+          case 'tecidos': { e = .11; B[Math.floor(r() * 3)].push(tuboEixo(.05, .05, d * .85, x + .05, y + .05, 0, 'z', 10)); if (r() < .4) { B[Math.floor(r() * 3)].push(tuboEixo(.05, .05, d * .85, x + .05, y + .15, 0, 'z', 10)); } break; }
+          case 'ferramentas': { if (r() < .4) { e = .36; B[0].push(ret(.34, .16, .18, x + .17, y, 0), ret(.2, .03, .02, x + .17, y + .2, 0)); } else { e = .14; B[2].push(cil(.06, .06, .12, x + .06, y, 0, 12)); } break; }
+          default: return;
+        }
+        x += e + .01 + (r() < .12 ? .1 : 0);
+      }
+    }
+    const maoSangue = () => memo('mao_sangue', () => cmat(128, 128, (x, W) => { x.clearRect(0, 0, W, W); const rr = rng(77); x.fillStyle = 'rgba(110,8,6,.85)'; x.beginPath(); x.ellipse(W * .5, W * .58, W * .17, W * .2, 0, 0, 7); x.fill(); [[-.14, -.2, .2], [-.05, -.26, .24], [.05, -.26, .24], [.14, -.2, .2], [.22, .02, .14]].forEach(([a, b, l]) => { x.save(); x.translate(W * (.5 + a), W * (.5 + b)); x.rotate(a * 1.4); x.fillRect(-W * .035, -W * l / 2, W * .07, W * l); x.restore(); }); escorrer(x, W * .35, W * .72, W * .3, 6, 'rgba(110,8,6,.8)', rr, 40); }, { transp: 1, decal: 1 }));
+
+    Object.assign(P, {
+      /* ================= armários, gavetas e caixas que abrem ================= */
+      // armário com porta(s) que abrem (abrir) e o conteúdo dentro. tipo: papeis | frascos | mantimentos | produtos |
+      // panelas | fitas | ferramentas | roupas | partituras | mancha | vazio. vidro:1 portas de vidro; y: preso na parede
+      p2_armario_int(o) {
+        const g = G(), w = o.w || 1.0, h = o.h || 1.9, d = o.d || .5, y0 = o.y ?? 0, np = o.portas ?? (w > .75 ? 2 : 1), r = rng(o.sem || 61), tipo = o.tipo || 'papeis';
+        const cor = o.c || '#59656e', corpo = o.madeira ? MADEIRA(cor) : sujo(cor, 'metal_sujo', { me: .5, r: .5, rep: [1, 2] }), ch = .02, rod = o.y ? ch : .08;
+        g.add(juntar([ret(w, h, ch, 0, y0, -d / 2 + ch / 2), ret(ch, h, d, -w / 2 + ch / 2, y0, 0), ret(ch, h, d, w / 2 - ch / 2, y0, 0), ret(w, ch, d, 0, y0 + h - ch, 0), ret(w, rod, d, 0, y0, 0)], corpo));
+        g.add(malha(plano(w - .05, h - .1, 0, y0 + h / 2, -d / 2 + .022), m(o.fundo || '#2a2a26', { r: .9 })));
+        const ns = o.prat ?? Math.max(1, Math.round(h / .42) - 1), B = [[], [], []], mats = (RECHEIO[tipo] || RECHEIO.papeis)();
+        const base = y0 + rod, alto = y0 + h - ch, passo = (alto - base) / (ns + 1), pr = [];
+        for (let k = 0; k <= ns; k++) {
+          const yy = base + k * passo; if (k) pr.push(ret(w - .05, .02, d - .05, 0, yy - .02, 0));
+          if (tipo !== 'roupas' && !(tipo === 'mancha' && k > 1) && !(o.vazias && o.vazias.includes(k))) prateleira(B, tipo === 'mancha' ? 'produtos' : tipo, -w / 2 + .03, w / 2 - .03, yy, d - .1, r);
+        }
+        if (tipo === 'roupas') {
+          pr.length = 0; pr.push(ret(w - .05, .02, d - .05, 0, alto - .3, 0));
+          B[2].push(tuboEixo(.012, .012, w - .05, 0, alto - .38, 0, 'x', 6));
+          const nr = Math.max(1, Math.round(w / .32)); for (let k = 0; k < nr; k++) { const x = -w / 2 + (k + .5) * w / nr; B[k % 3 === 2 ? 1 : 0].push(ret(.36, .95, .07, x, alto - 1.36, 0, 0, (r() - .5) * .3, 0), ret(.08, .5, .06, x - .16, alto - .9, 0, 0, 0, .15)); B[2].push(anel(.05, .006, x, alto - .36, 0, PI, 0, 0, 0, 3, 8)); }
+          B[1].push(ret(.12, .14, .26, -w * .2, base, 0), ret(.12, .14, .26, -w * .2 + .14, base, .02, 0, .2, 0));
+        }
+        addJ(g, pr, corpo);
+        if (tipo === 'mancha' || o.mancha) { g.add(malha(plano(.32, .32, w * .12, y0 + h * .55, -d / 2 + .025), maoSangue())); g.add(malha(plano(.3, .3, -w * .2, y0 + h * .3, -d / 2 + .025, 0, 0, .6), maoSangue())); }
+        B.forEach((l, i) => addJ(g, l, mats[i]));
+        // portas (dobradiça na lateral; abrem para fora)
+        const folhas = [], fw = np === 1 ? w - .01 : (w - .01) / 2 - .004;
+        const txt = o.txt || '', vid = !!o.vidro;
+        const pmF = txt => vid ? null : memo('arm_porta' + cor + txt + (o.madeira ? 1 : 0) + (o.grelha ? 1 : 0), () => cmat(128, 256, (x, W, H) => {
+          const rr = rng(txt.length + 11); x.fillStyle = cor; x.fillRect(0, 0, W, H); gasto(x, W, H, rr, 220, .28);
+          if (o.grelha) { x.fillStyle = 'rgba(0,0,0,.55)'; for (let i = 0; i < 6; i++) x.fillRect(W * .22, 16 + i * 9, W * .56, 4); for (let i = 0; i < 4; i++) x.fillRect(W * .22, H - 50 + i * 9, W * .56, 4); }
+          x.strokeStyle = 'rgba(0,0,0,.25)'; x.lineWidth = 3; x.strokeRect(8, 8, W - 16, H - 16);
+          if (txt) { x.fillStyle = '#e8e2cc'; x.fillRect(W * .14, H * .3, W * .72, H * .14); x.strokeStyle = '#222'; x.lineWidth = 2; x.strokeRect(W * .14, H * .3, W * .72, H * .14); txt.split('\n').forEach((l, i, L) => escrever(x, l, W / 2, H * .37 + (i - (L.length - 1) / 2) * 16, 15, '#1a1a1a', W * .66)); }
+          x.fillStyle = 'rgba(20,10,5,.3)'; x.fillRect(W * .8, H * .5, 5, 22);
+        }, { r: o.madeira ? .75 : .55, me: o.madeira ? 0 : .3 }));
+        const vidro = vid ? memo('vidro_arm', () => m('#b8ccd4', { op: .22, r: .05, me: .3 })) : null;
+        for (let k = 0; k < np; k++) {
+          const s = np === 1 ? (o.dir ? 1 : -1) : (k ? 1 : -1);
+          const dob = G(); dob.position.set(s * (w / 2 - .005), y0 + rod * .5, d / 2 + .012); g.add(dob);
+          const cx = -s * fw / 2, fh = h - rod * .5 - .01;
+          if (vid) {
+            dob.add(juntar([ret(fw, .05, .025, cx, 0, 0), ret(fw, .05, .025, cx, fh - .05, 0), ret(.05, fh, .025, cx - fw / 2 + .025, 0, 0), ret(.05, fh, .025, cx + fw / 2 - .025, 0, 0)], corpo));
+            dob.add(malha(plano(fw - .1, fh - .1, cx, fh / 2, 0), vidro));
+            if (txt && k === 0) dob.add(malha(plano(fw * .7, .09, cx, fh * .82, .014), placaTxt(txt, '#f0ece0', '#1a1a1a', 256, 48, 26)));
+          } else {
+            dob.add(malha(ret(fw, fh, .022, cx, 0, 0), corpo));
+            dob.add(malha(plano(fw - .02, fh - .02, cx, fh / 2, .0115), pmF(k === 0 ? txt : '')));
+          }
+          dob.add(malha(ret(.025, .2, .03, -s * (fw - .06), fh * .48, .025), metal('#b0b0a8')));
+          folhas.push({ dob, s });
+        }
+        const ab0 = o.entreaberta ? .25 : 0;
+        const pose = k => folhas.forEach(f => { f.dob.rotation.y = f.s * (ab0 + k * (1.75 - ab0)); });
+        g.userData.aoInter = estado(pose, 1.6);
+        return g;
+      },
+      // gaveteiro / arquivo de aço (abrir: a gaveta 'gav' sai com o que tem dentro). tipo: pastas | fichas | talheres | aviamentos | fitas | papeis
+      p2_gaveteiro_int(o) {
+        const g = G(), w = o.w || .5, h = o.h || 1.32, d = o.d || .62, n = o.n || 4, gi = Math.min(n - 1, o.gav ?? 0), r = rng(o.sem || 63), tipo = o.tipo || 'pastas';
+        const cor = o.c || '#6e767c', corpo = o.madeira ? MADEIRA(cor) : sujo(cor, 'metal_sujo', { me: .5, r: .45 });
+        const gh = (h - .06) / n, topo = h - .03;
+        const yS = topo - (gi + 1) * gh;
+        // corpo oco no lugar da gaveta que sai (para ver o fundo escuro quando ela abre)
+        g.add(juntar([ret(w, yS, d - .02, 0, 0, -.01), ret(w, h - yS - gh, d - .02, 0, yS + gh, -.01), ret(.02, gh, d - .02, -w / 2 + .01, yS, -.01), ret(.02, gh, d - .02, w / 2 - .01, yS, -.01), ret(w - .04, gh, .02, 0, yS, -d / 2 + .01)], corpo));
+        g.add(malha(ret(w - .04, gh - .02, .01, 0, yS + .01, -d / 2 + .03), m('#0c0c0c')));
+        const fr = [], px = [], et = [], etM = memo('etq_gav', () => cmat(64, 32, (x, W, H) => { x.fillStyle = '#e8e2cc'; x.fillRect(0, 0, W, H); x.fillStyle = '#333'; x.fillRect(6, H / 2 - 1, W - 12, 2); x.fillRect(6, H / 2 + 6, W * .5, 2); }, { r: .9 }));
+        for (let k = 0; k < n; k++) { if (k === gi) continue; const yy = topo - (k + 1) * gh; fr.push(ret(w - .02, gh - .012, .02, 0, yy + .006, d / 2 - .01)); px.push(ret(w * .32, .022, .03, 0, yy + gh * .55, d / 2 + .01)); et.push(plano(.1, .045, 0, yy + gh * .8, d / 2 + .0015)); }
+        addJ(g, fr, corpo); addJ(g, px, metal('#b8b8b0')); addJ(g, et, etM);
+        const gv = G(); gv.position.set(0, yS, 0); g.add(gv);
+        const dd = d - .08, z0 = d / 2 - .02, hi = Math.min(gh * .75, .3);
+        gv.add(juntar([ret(w - .02, gh - .012, .02, 0, .006, d / 2 - .01), ret(w - .07, .012, dd, 0, .02, z0 - dd / 2), ret(.012, hi, dd, -w / 2 + .04, .02, z0 - dd / 2), ret(.012, hi, dd, w / 2 - .04, .02, z0 - dd / 2), ret(w - .07, hi, .012, 0, .02, z0 - dd)], corpo));
+        gv.add(malha(ret(w * .32, .022, .03, 0, gh * .55, d / 2 + .01), metal('#b8b8b0'))); gv.add(malha(plano(.1, .045, 0, gh * .8, d / 2 + .0015), etM));
+        const A = [], Bq = [], C = [], wi = w - .1;
+        if (tipo === 'pastas' || tipo === 'fichas' || tipo === 'papeis') {
+          const nn = Math.floor(dd / (tipo === 'fichas' ? .022 : .035));
+          for (let i = 0; i < nn; i++) { const z = z0 - .03 - i * dd / nn, inc = (r() - .5) * .25; if (tipo === 'fichas') { (i % 6 ? C : A).push(ret(wi * .9, hi * .85, .004, 0, .03, z, inc)); if (i % 9 === 3) Bq.push(ret(.05, .04, .004, -wi * .3, .03 + hi * .85, z - .002, inc)); } else { (i % 3 ? A : Bq).push(ret(wi, hi * (.85 + r() * .1), .006, 0, .03, z, inc)); if (r() < .4) C.push(ret(.08, .03, .007, -wi / 2 + .05 + r() * wi * .7, .03 + hi * .9, z, inc)); } }
+        } else if (tipo === 'talheres' || tipo === 'aviamentos') {
+          for (let i = 0; i < 18; i++) { const x = (r() - .5) * wi * .9, z = z0 - .05 - r() * (dd - .1); if (tipo === 'talheres') (i % 3 ? A : Bq).push(ret(.02, .008, .18, x, .035, z, 0, (r() - .5) * .4, 0)); else (i % 3 ? A : C).push(cil(.022, .022, .04, x, .035, z, 8)); }
+        } else if (tipo === 'fitas') { for (let i = 0; i < 12; i++) (i % 2 ? A : Bq).push(ret(.11, .018, .07, (i % 3 - 1) * .13, .035 + Math.floor(i / 3) * .02, z0 - .1 - (i % 4) * .08, 0, (r() - .5) * .2, 0)); }
+        const mats = tipo === 'talheres' ? [metal('#c0c4c8'), m('#3a2a1a'), m('#222')] : tipo === 'aviamentos' ? [m('#a02a2a', { r: .6 }), m('#2a4a8a'), m('#d8c070', { r: .6 })] : tipo === 'fitas' ? RECHEIO.fitas() : [m('#c8a868', { r: .9 }), m('#8a3a2a', { r: .8 }), m('#e8e2d0', { r: .95 })];
+        addJ(gv, A, mats[0]); addJ(gv, Bq, mats[1]); addJ(gv, C, mats[2]);
+        g.userData.aoInter = estado(k => { gv.position.z = k * dd * .8; }, 1.5);
+        return g;
+      },
+      // caixa de parede com porta (abrir): quadro de força (disjuntores, conduíte até o forro), primeiros socorros ou chaves
+      p2_caixa_parede_int(o) {
+        const g = G(), tipo = o.tipo || 'disjuntores', w = o.w || (tipo === 'chaves' ? .5 : .6), h = o.h || (tipo === 'socorros' ? .6 : .8), d = o.d || .16, y = o.y ?? 1.25, r = rng(o.sem || 65);
+        const cor = o.c || (tipo === 'socorros' ? '#e4e4dc' : tipo === 'chaves' ? '#5a4a3a' : '#7a8288'), corpo = tipo === 'chaves' ? MADEIRA(cor) : sujo(cor, 'metal_sujo', { me: .45, r: .5 });
+        g.add(juntar([ret(w, h, .015, 0, y, -d / 2 + .008), ret(.015, h, d, -w / 2 + .008, y, 0), ret(.015, h, d, w / 2 - .008, y, 0), ret(w, .015, d, 0, y + h - .015, 0), ret(w, .015, d, 0, y, 0)], corpo));
+        g.add(malha(plano(w - .03, h - .03, 0, y + h / 2, -d / 2 + .017), m(tipo === 'socorros' ? '#d8d8d0' : '#2a2c2e', { r: .8 })));
+        const A = [], Bq = [], C = [];
+        if (tipo === 'disjuntores') {
+          for (let fl = 0; fl < 3; fl++) { const yy = y + .14 + fl * (h - .25) / 3; A.push(ret(w - .12, .03, .03, 0, yy + .1, -d / 2 + .03)); for (let k = 0; k < 8; k++) { const x = -w / 2 + .08 + k * (w - .16) / 8 + .02; A.push(ret(.034, .1, .06, x, yy, -d / 2 + .05)); Bq.push(ret(.012, .03, .02, x, yy + .035 + (r() < .2 ? -.02 : 0), -d / 2 + .085)); } }
+          for (let k = 0; k < 6; k++) { const x = -w / 2 + .1 + k * (w - .2) / 5; C.push(curva([[x, y + .2 + (k % 3) * (h - .25) / 3, -d / 2 + .04], [x * .5, y + h - .12, -d / 2 + .05], [x * .2, y + h - .02, -d / 2 + .06], [x * .1, ALT, -d / 2 + .06]], .006, 10, 4)); }
+          g.add(juntar([cil(.035, .035, ALT - y - h, 0, y + h, -d / 2 + .06, 10), cil(.05, .05, .03, 0, ALT - .03, -d / 2 + .06, 10)], metal('#7a7e80')));
+        } else if (tipo === 'socorros') {
+          const yy = y + h * .48; A.push(ret(w - .04, .015, d - .03, 0, yy, 0));
+          for (let k = 0; k < 4; k++) Bq.push(cil(.025, .025, .09 + r() * .06, -w / 2 + .08 + k * .12, y + .02, 0, 8)); A.push(ret(.16, .07, .1, w * .2, y + .02, 0)); for (let k = 0; k < 3; k++) C.push(tuboEixo(.035, .035, .07, -w / 2 + .1 + k * .1, yy + .05, 0, 'x', 10)); A.push(ret(.14, .12, .05, w * .22, yy + .015, 0));
+        } else {
+          for (let fl = 0; fl < 3; fl++) for (let k = 0; k < 5; k++) { const x = -w / 2 + .07 + k * (w - .14) / 4, yy = y + h - .15 - fl * (h - .2) / 3; C.push(cil(.004, .004, .04, x, yy, -d / 2 + .04, 5, PI / 2)); if (r() < .75) { A.push(anel(.015, .003, x, yy - .02, -d / 2 + .06, PI * 2, 0, 0, 0, 3, 10), ret(.012, .05, .003, x, yy - .085, -d / 2 + .06)); Bq.push(ret(.03, .045, .003, x + .02, yy - .1, -d / 2 + .062, 0, 0, .2)); } }
+        }
+        addJ(g, A, tipo === 'socorros' ? m('#f0f0ea', { r: .6 }) : tipo === 'chaves' ? metal('#b89a50') : m('#1a1a1a', { r: .5 })); addJ(g, Bq, tipo === 'socorros' ? m('#7a3a20', { r: .2, op: .9 }) : tipo === 'chaves' ? m('#e8dcb0', { r: .9 }) : m('#e8e8e0')); addJ(g, C, tipo === 'socorros' ? m('#f4f0e4', { r: .9 }) : tipo === 'chaves' ? metal('#888') : m('#2a2a2a'));
+        const txt = o.txt || (tipo === 'socorros' ? 'PRIMEIROS SOCORROS' : tipo === 'chaves' ? 'CHAVES' : 'PERIGO\nALTA TENSÃO');
+        const pt = memo('cxp' + tipo + txt + cor, () => cmat(128, 160, (x, W, H) => {
+          const rr = rng(txt.length); x.fillStyle = cor; x.fillRect(0, 0, W, H); gasto(x, W, H, rr, 160, .25);
+          if (tipo === 'socorros') { x.fillStyle = '#c01818'; x.fillRect(W * .4, H * .2, W * .2, H * .44); x.fillRect(W * .22, H * .34, W * .56, H * .16); escrever(x, txt, W / 2, H * .82, 13, '#c01818', W * .9); }
+          else if (tipo === 'chaves') { escrever(x, txt, W / 2, H * .3, 22, '#e8dcb0', W * .8); x.strokeStyle = 'rgba(0,0,0,.3)'; x.lineWidth = 4; x.strokeRect(10, 10, W - 20, H - 20); }
+          else { x.fillStyle = '#e8c020'; x.beginPath(); x.moveTo(W / 2, H * .12); x.lineTo(W * .82, H * .55); x.lineTo(W * .18, H * .55); x.closePath(); x.fill(); x.strokeStyle = '#111'; x.lineWidth = 4; x.stroke(); escrever(x, '⚡', W / 2, H * .4, 30, '#111'); txt.split('\n').forEach((l, i) => escrever(x, l, W / 2, H * .7 + i * 16, 14, '#111', W * .9)); }
+        }, { r: .5, me: tipo === 'chaves' ? 0 : .3 }));
+        const dob = G(); dob.position.set(-w / 2, y, d / 2 + .008); g.add(dob);
+        dob.add(malha(ret(w, h, .015, w / 2, 0, 0), corpo)); dob.add(malha(plano(w - .02, h - .02, w / 2, h / 2, .0085), pt));
+        dob.add(malha(ret(.02, .08, .025, w - .05, h * .5, .015), metal('#b0b0a8')));
+        g.userData.aoInter = estado(k => { dob.rotation.y = -k * 1.9; }, 1.8);
+        return g;
+      },
+      // geladeira (abrir): a luz de dentro acende e mostra as prateleiras; conteudo: comida | vazia | frascos
+      p2_geladeira_int(o) {
+        const g = G(), w = o.w || .76, h = o.h || 1.85, d = o.d || .72, r = rng(o.sem || 67), cor = o.c || '#e4e2d8';
+        const corpo = sujo(cor, 'metal_sujo', { me: .15, r: .35 });
+        g.add(juntar([ret(w, h, .03, 0, 0, -d / 2 + .015), ret(.03, h, d, -w / 2 + .015, 0, 0), ret(.03, h, d, w / 2 - .015, 0, 0), ret(w, .04, d, 0, h - .04, 0), ret(w, .1, d, 0, 0, 0), ret(w - .04, .03, d - .04, 0, h * .7, 0)], corpo));
+        const forro = m('#f2f2ea', { unico: true, e: '#fff6dc', ei: .7, r: .5 }); g.add(malha(new T.BoxGeometry(w - .06, h * .7 - .14, d - .06).translate(0, .1 + (h * .7 - .14) / 2, 0).scale(1, 1, 1), forro));
+        g.children[g.children.length - 1].material.side = T.BackSide;
+        const pv = [], A = [], Bq = [], C = [];
+        [.45, .8, 1.1].forEach(yy => pv.push(ret(w - .07, .012, d - .1, 0, yy, 0)));
+        if (o.conteudo !== 'vazia') {
+          [.1, .45, .8, 1.1].forEach((yy, k) => { let x = -w / 2 + .06; while (x < w / 2 - .1) { const t = r(); if (t < .35) { A.push(cil(.035, .035, .2, x + .035, yy + .012, -.1, 10)); x += .08; } else if (t < .6) { Bq.push(ret(.18, .08, .22, x + .09, yy + .012, (r() - .5) * .1)); C.push(ret(.19, .01, .23, x + .09, yy + .092, 0)); x += .2; } else if (t < .8) { C.push(cil(.05, .05, .1, x + .05, yy + .012, .05, 12)); x += .12; } else x += .1; } });
+          if (o.conteudo === 'frascos') { A.length = 0; for (let k = 0; k < 10; k++) A.push(cil(.02, .02, .09, -w / 2 + .08 + (k % 5) * .13, .45 + .012 + Math.floor(k / 5) * .35, (r() - .5) * .2, 8)); }
+        }
+        addJ(g, pv, m('#d8e8ec', { op: .5, r: .1 })); addJ(g, A, m('#4a7a3a', { r: .2, op: .85 })); addJ(g, Bq, m('#d8d0c0', { r: .7 })); addJ(g, C, m('#8a3a2a', { r: .5 }));
+        // porta de cima (congelador) fixa e porta de baixo que abre
+        g.add(malha(ret(w - .01, h * .3 - .05, .05, 0, h * .7 + .01, d / 2 + .02), corpo)); g.add(malha(ret(.03, .25, .04, w / 2 - .07, h * .78, d / 2 + .06), metal('#b8b8b0')));
+        const dob = G(); dob.position.set(w / 2 - .005, .1, d / 2 + .02); g.add(dob);
+        const fh = h * .7 - .11; dob.add(malha(ret(w - .01, fh, .05, -(w - .01) / 2, 0, 0), corpo)); dob.add(malha(ret(.03, .45, .04, -(w - .07), fh * .62, .04), metal('#b8b8b0')));
+        const pp = []; [.25, .65, 1.0].forEach(yy => { pp.push(ret(w - .1, .012, .1, -(w - .01) / 2, yy, -.075), ret(w - .1, .05, .012, -(w - .01) / 2, yy, -.125)); }); addJ(dob, pp, m('#e8e8e0', { r: .5 }));
+        const gar = []; for (let k = 0; k < 4; k++) gar.push(cil(.03, .03, .22, -.12 - k * .13, .262, -.08, 10)); addJ(dob, gar, m('#2a5a8a', { r: .2, op: .85 }));
+        g.userData.aoInter = estado(k => { dob.rotation.y = k * 1.7; brilho(forro, .03 + k * .97); }, 1.6);
+        return g;
+      },
+      // lavadora industrial de porta frontal (abrir): o tambor gira com o macacão laranja (código); aberta, ele para
+      p2_lavadora(o) {
+        const g = G(), w = o.w || 1.1, h = o.h || 1.32, d = o.d || .9, R = .3, yc = .62, r = rng(o.sem || 69);
+        const inox = memo('lav_inox', () => sujo('#b0b4b4', 'metal_sujo', { me: .55, r: .4 })), esc = m('#2a2c2e', { me: .4, r: .5 });
+        g.add(juntar([ret(w, h, .02, 0, 0, -d / 2 + .01), ret(.02, h, d, -w / 2 + .01, 0, 0), ret(.02, h, d, w / 2 - .01, 0, 0), ret(w, .02, d, 0, h - .02, 0), ret(w, .04, d, 0, 0, 0)], esc));
+        const fr = new T.Shape(); fr.moveTo(-w / 2, 0); fr.lineTo(w / 2, 0); fr.lineTo(w / 2, h - .2); fr.lineTo(-w / 2, h - .2); fr.closePath();
+        const furo = new T.Path(); furo.absarc(0, yc, R + .02, 0, PI * 2, true); fr.holes.push(furo);
+        g.add(malha(new T.ShapeGeometry(fr, 24).translate(0, 0, d / 2 + .001), inox));
+        g.add(malha(new T.CylinderGeometry(R + .02, R + .02, .35, 24, 1, true).rotateX(PI / 2).translate(0, yc, d / 2 - .175), m('#151618', { me: .5, r: .45, lado: 2 })));
+        const tambor = G(); tambor.position.set(0, yc, d / 2 - .33); g.add(tambor);
+        tambor.add(malha(new T.CircleGeometry(R, 20), memo('tambor_fundo', () => cmat(64, 64, (x, W) => { x.fillStyle = '#5a5e60'; x.fillRect(0, 0, W, W); x.fillStyle = '#1a1c1e'; for (let i = 0; i < 40; i++) { x.beginPath(); x.arc(4 + (i * 13) % W, 4 + Math.floor(i * 13 / W) * 10 % W, 2, 0, 7); x.fill(); } }, { me: .5, r: .4 }))));
+        const roupa = m(o.roupa || '#c8641e', { tex: 'carpete_velho', r: 1 });
+        tambor.add(juntar([esf(.2, .03, -.08, .12, 1.2, .7, .6, 10), esf(.13, -.12, .06, .1, 1, .8, .5, 8), esf(.11, .14, .08, .14, 1, .7, .6, 8)], roupa));
+        if (o.txt) tambor.add(malha(plano(.16, .06, .02, -.05, .25, 0, 0, .3), placaTxt(o.txt, '#e8e2cc', '#1a1a1a', 128, 48, 26)));
+        // painel de cima: visor de tempo aceso e botões
+        g.add(malha(ret(w, .2, .2, 0, h - .2, d / 2 - .1), inox));
+        const vis = telaViva(64, 24, 1.2, true); g.add(malha(plano(.18, .07, -w * .25, h - .1, d / 2 + .001), vis.mt));
+        const bt = []; for (let k = 0; k < 3; k++) bt.push(cil(.025, .025, .02, w * .05 + k * .1, h - .1, d / 2, 10, PI / 2)); addJ(g, bt, m('#1a1a1a'));
+        g.add(malha(plano(.26, .06, w * .28, h - .16, d / 2 + .001), placaTxt(o.txt ? 'LAVAGEM' : 'SECAGEM', '#2a2c2e', '#d8d8d0', 128, 32, 18)));
+        // porta redonda (dobradiça à esquerda)
+        const dob = G(); dob.position.set(-R - .05, yc, d / 2 + .01); g.add(dob);
+        dob.add(malha(new T.TorusGeometry(R + .01, .045, 8, 28).translate(R + .05, 0, .02), m('#8a8e90', { me: .7, r: .3 })));
+        dob.add(malha(new T.CircleGeometry(R - .02, 24).translate(R + .05, 0, .03), m('#9fc8d8', { op: .3, r: .05, me: .3 })));
+        dob.add(malha(ret(.06, .14, .05, 2 * R + .08, -.07, .03), m('#1a1a1a')));
+        const v = o.v ?? 3; let gira = 1, tempo = 120 + Math.floor(r() * 420), acc = 0;
+        anim.push(dt => { tambor.rotation.z += dt * v * gira; acc += dt; if (acc > 1) { acc = 0; if (gira > .5) tempo = Math.max(0, tempo - 1); const x = vis.x; x.fillStyle = '#100800'; x.fillRect(0, 0, 64, 24); x.fillStyle = gira > .5 ? '#ff8a20' : '#5a3010'; x.font = 'bold 18px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(`${Math.floor(tempo / 60)}:${String(tempo % 60).padStart(2, '0')}`, 32, 13); vis.t.needsUpdate = true; } });
+        g.userData.aoInter = estado(k => { dob.rotation.y = -k * 1.85; gira = 1 - k; }, 1.4);
+        return g;
+      },
+      // baú / caixa com tampa (abrir): pé de cama, caixa térmica, caixa de ferramentas. tipo: roupas | gelo | ferramentas
+      p2_bau_int(o) {
+        const g = G(), w = o.w || .8, h = o.h || .45, d = o.d || .45, r = rng(o.sem || 71), tipo = o.tipo || 'roupas';
+        const cor = o.c || (tipo === 'gelo' ? '#d8dcd8' : '#3a4a3a'), corpo = tipo === 'gelo' ? m(cor, { r: .7 }) : sujo(cor, 'metal_sujo', { me: .4, r: .55 });
+        g.add(juntar([ret(w, .03, d, 0, 0, 0), ret(w, h, .03, 0, 0, -d / 2 + .015), ret(w, h, .03, 0, 0, d / 2 - .015), ret(.03, h, d, -w / 2 + .015, 0, 0), ret(.03, h, d, w / 2 - .015, 0, 0)], corpo));
+        g.add(malha(plano(w - .06, d - .06, 0, .035, 0, -PI / 2), m('#1a1a18')));
+        const A = [], Bq = [];
+        if (tipo === 'gelo') { for (let k = 0; k < 14; k++) A.push(ret(.08 + r() * .05, .06, .08, (r() - .5) * (w - .15), .03 + r() * (h - .15), (r() - .5) * (d - .15), r(), r(), r())); Bq.push(ret(w * .35, .1, d * .5, -w * .15, .1, 0, 0, .2, 0)); }
+        else if (tipo === 'ferramentas') { for (let k = 0; k < 6; k++) A.push(ret(.24, .025, .04, (r() - .5) * (w - .3), .04 + k * .03, (r() - .5) * (d - .15), 0, r() * 3, 0)); Bq.push(ret(.18, .08, .1, w * .2, .04, 0)); }
+        else { for (let k = 0; k < 4; k++) A.push(ret(w - .12, .05, d - .12, 0, .04 + k * .055, 0, 0, (r() - .5) * .1, 0)); Bq.push(ret(.14, .1, .2, w * .25, .26, 0)); }
+        addJ(g, A, tipo === 'gelo' ? m('#dceef4', { op: .7, r: .05 }) : tipo === 'ferramentas' ? metal('#9a9a96') : m('#c8641e', { tex: 'carpete_velho', r: 1 })); addJ(g, Bq, tipo === 'gelo' ? m('#8a1a14', { r: .3, op: .9 }) : m('#2a2a26'));
+        const dob = G(); dob.position.set(0, h, -d / 2); g.add(dob);
+        dob.add(malha(ret(w + .02, .04, d + .02, 0, 0, d / 2), corpo));
+        const fe = []; [-1, 1].forEach(s => fe.push(ret(.06, .1, .02, s * w * .3, -.08, d + .015))); fe.push(ret(.14, .025, .04, 0, .04, d / 2)); addJ(dob, fe, metal('#8a8a80'));
+        if (o.txt) dob.add(malha(plano(w * .5, .1, 0, .041, d / 2, -PI / 2), placaTxt(o.txt, '#e8e2cc', '#1a1a1a', 256, 64, 30)));
+        g.userData.aoInter = estado(k => { dob.rotation.x = -k * 1.6; }, 1.6);
+        return g;
+      },
+
+      /* ================= fliperama de verdade ================= */
+      // laterais recortadas com arte e perfil em T, letreiro aceso, moldura e tela de tubo com modo de atração,
+      // painel com manche e botões, porta de fichas com as fendas acesas, cantos gastos. jogo: 0 a 4 (jogos
+      // inventados); quebrada:1 = fora de serviço; nomes: a tabela de recordes; jogar = partida de ~20 s na tela
+      p2_fliperama(o) {
+        const g = G(), j = ((o.jogo ?? 0) % FLIP.length + FLIP.length) % FLIP.length, J = FLIP[j], w = .66, T2 = .024, wi = w - 2 * T2, r = rng(o.sem || 73), queb = !!o.quebrada;
+        const lam = memo('fl_lam' + J.lam, () => m(J.lam, { r: .55, me: .1 })), tm = memo('fl_tm' + J.tm, () => m(J.tm, { r: .35, me: .2 }));
+        // laterais: perfil extrudado (a borda é o perfil em T, as faces são laminado)
+        const sh = new T.Shape(); FL_PERFIL.forEach(([z, y], i) => i ? sh.lineTo(z, y) : sh.moveTo(z, y)); sh.closePath();
+        [1, -1].forEach(s => {
+          const ge = new T.ExtrudeGeometry(sh, { depth: T2, bevelEnabled: false, curveSegments: 4 }); ge.rotateY(-PI / 2); ge.translate(s > 0 ? w / 2 : -w / 2 + T2, 0, 0);
+          g.add(new T.Mesh(guardar(ge), [lam, tm]));
+          const art = memo('fl_lado' + j + s + (queb ? 'q' : ''), () => flLado(J, s, queb));
+          const pa = malha(plano(.82, 1.8, 0, 0, 0), art); pa.rotation.y = s * PI / 2; pa.position.set(s * (w / 2 + .0015), .9, .01); g.add(pa);
+        });
+        // corpo entre as laterais: fundo, tampo, rodapé, faixa sob o painel, frente do painel, faixa sob o letreiro
+        const seg = (z1, y1, z2, y2, esp = .02, mat = lam) => { const L = Math.hypot(z2 - z1, y2 - y1), a = Math.atan2(y2 - y1, z2 - z1); const me = malha(new T.BoxGeometry(wi, esp, L), mat); me.position.set(0, (y1 + y2) / 2, (z1 + z2) / 2); me.rotation.x = -a; g.add(me); return me; };
+        g.add(juntar([ret(wi, 1.8, .02, 0, 0, -.39), ret(wi, .02, .6, 0, 1.78, -.1)], m('#1a1614', { tex: 'madeira_velha', r: .9 })));
+        seg(.30, 0, .30, .80); seg(.30, .80, .42, .86); seg(.42, .86, .42, .94, .025, m('#151515', { r: .6 })); seg(0, 1.52, .16, 1.56, .02, m('#151515'));
+        // porta de fichas com as duas fendas acesas
+        g.add(malha(ret(.3, .36, .015, 0, .3, .31), metal('#7a7a72'))); g.add(malha(plano(.29, .35, 0, .48, .318), memo('fl_porta', () => cmat(128, 160, (x, W, H) => { const rr = rng(9); x.fillStyle = '#8a8a82'; x.fillRect(0, 0, W, H); gasto(x, W, H, rr, 160, .3); x.strokeStyle = '#3a3a36'; x.lineWidth = 4; x.strokeRect(4, 4, W - 8, H - 8); [.3, .7].forEach(f => { x.fillStyle = '#2a2a26'; x.fillRect(W * f - 18, H * .18, 36, 50); x.fillStyle = '#111'; x.fillRect(W * f - 3, H * .24, 6, 22); x.fillStyle = '#c8c0a0'; x.font = 'bold 11px Arial'; x.textAlign = 'center'; x.fillText('FICHA', W * f, H * .58); x.fillStyle = '#3a3a36'; x.beginPath(); x.arc(W * f, H * .72, 9, 0, 7); x.fill(); }); x.fillStyle = '#2a2a26'; x.fillRect(W * .44, H * .85, 14, 6); }, { me: .5, r: .4 }))));
+        const fenda = emis(queb ? '#401008' : '#ff5a10', queb ? .4 : 1.8), fendas = [];
+        [-.058, .058].forEach(dx => { const f = malha(plano(.03, .045, dx, .555, .319), fenda); g.add(f); fendas.push(f); });
+        // painel de controle inclinado: arte, manche, botões, start
+        const pc = G(); pc.position.set(0, .99, .29); pc.rotation.x = Math.atan2(.10, .26); g.add(pc);
+        const Lp = Math.hypot(.26, .10);
+        pc.add(malha(new T.BoxGeometry(wi, .03, Lp).translate(0, -.015, 0), lam));
+        pc.add(malha(plano(wi, Lp, 0, .0005, 0, -PI / 2), memo('fl_painel' + j, () => flPainel(J))));
+        pc.add(juntar([cil(.035, .04, .012, -.16, 0, .01, 14), cil(.007, .007, .085, -.16, .01, .01, 6)], m('#151515', { me: .4 })));
+        const bola = malha(esf(.022, 0, 0, 0, 1, 1, 1, 12), m(J.c3, { r: .3 })); bola.position.set(-.16, .1, .01); pc.add(bola);
+        const bot = [], botM = [J.c1, J.c3, '#e8e8e0'].map(c => emis(c, .5));
+        [[.0, .03], [.07, .0], [.14, .03]].forEach(([bx2, bz]) => { if (queb && bx2 === .07) return; bot.push(cil(.02, .02, .012, bx2 + .02, 0, bz, 14)); });
+        const botG = juntar(bot.length ? bot : [cil(.001, .001, .001)], botM[0]); pc.add(botG);
+        pc.add(juntar([cil(.012, .012, .01, -.04, 0, -.1, 10), cil(.012, .012, .01, .04, 0, -.1, 10)], botM[2]));
+        // moldura e tela de tubo (atrás da moldura vazada), vidro por cima
+        const tg = G(); tg.position.set(0, 1.29, .05); tg.rotation.x = -Math.atan2(.10, .46); g.add(tg);
+        const sw = .46, sh2 = .345;
+        const tv = queb ? null : telaViva(160, 120, 1.15);
+        const crt = new T.Mesh(guardar(planoCRT(sw, sh2, .012)), queb ? memo('fl_queb', () => cmat(160, 120, (x, W, H) => { const rr = rng(3); x.fillStyle = '#0c0e0e'; x.fillRect(0, 0, W, H); x.strokeStyle = 'rgba(200,220,220,.5)'; x.lineWidth = 1; for (let k = 0; k < 8; k++) { x.beginPath(); x.moveTo(W * .3, H * .4); let px = W * .3, py = H * .4; const a = rr() * 7; for (let s = 0; s < 6; s++) { px += Math.cos(a + (rr() - .5)) * 12; py += Math.sin(a + (rr() - .5)) * 12; x.lineTo(px, py); } x.stroke(); } }, { r: .2, me: .3 })) : tv.mt);
+        crt.position.z = -.004; tg.add(crt);
+        tg.add(malha(new T.BoxGeometry(wi, .47, .02).translate(0, 0, -.03), m('#0a0a0a')));
+        tg.add(malha(plano(wi, .47, 0, 0, .012), memo('fl_mold' + j, () => flMoldura(J, sw / wi, sh2 / .47))));
+        tg.add(malha(plano(sw, sh2, 0, 0, .014), memo('fl_vidro', () => m('#ffffff', { op: .07, r: .04, me: .6 }))));
+        if (queb) tg.add(malha(plano(.24, .15, .04, -.02, .016, 0, 0, -.12), memo('fl_aviso', () => cmat(128, 80, (x, W, H) => { x.fillStyle = '#ece6d0'; x.fillRect(0, 0, W, H); x.fillStyle = 'rgba(200,190,150,.6)'; x.fillRect(0, 0, 22, 10); x.fillRect(W - 22, 0, 22, 10); escrever(x, 'FORA DE', W / 2, H * .38, 20, '#a01010', W * .9, '900'); escrever(x, 'SERVIÇO', W / 2, H * .68, 20, '#a01010', W * .9, '900'); }, { r: .9 }))));
+        // letreiro aceso (caixa de luz) com a arte do título
+        g.add(malha(new T.BoxGeometry(wi, .24, .16).translate(0, 1.68, .1), m('#111')));
+        const let1 = memo('fl_let' + j + (queb ? 'q' : ''), () => flLetreiro(J, queb)), lm = malha(plano(wi, .23, 0, 0, 0), let1); lm.position.set(0, 1.68, .182); lm.rotation.x = -Math.atan2(.04, .24); g.add(lm);
+        g.add(malha(ret(wi, .012, .04, 0, 1.79, .17), metal('#8a8a84'))); g.add(malha(ret(wi, .012, .04, 0, 1.565, .17), metal('#8a8a84')));
+        g.add(malha(plano(wi * .7, .05, 0, 1.522, .085, PI / 2), memo('fl_grade', () => cmat(64, 16, (x, W, H) => { x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, W, H); x.fillStyle = '#2a2a2a'; for (let i = 2; i < W; i += 4) x.fillRect(i, 2, 2, H - 4); }, { r: .8 }))));
+        // fio de força: sai do fundo e vai até a tomada (parede) ou à caixa de piso (ilha)
+        const piso = o.cabo === 'chao';
+        if (piso) { g.add(malha(curva([[.2, .16, -.39], [.21, .06, -.405], [.22, .012, -.41]], .007, 8, 4), m('#111'))); g.add(malha(ret(.09, .012, .05, .22, 0, -.405), metal('#6a6a64'))); }
+        else { g.add(malha(curva([[.2, .16, -.39], [.22, .05, -.41], [.24, .02, -.418], [.25, .2, -.418], [.25, .3, -.42]], .007, 14, 4), m('#111'))); g.add(juntar([ret(.08, .12, .015, .25, .24, -.4325)], m('#e8e4d8', { r: .5 }))); }
+        // estado: atração, partida, game over
+        const st = { nomes: o.nomes || ['AAA', 'MAX', 'ZEN', 'BOB', 'JOE'], chama: !!o.chama };
+        let partida = -1, acc = 0, tl = (o.sem || 1) * 3.7;
+        if (tv) anim.push(dt => { tl += dt; if (partida >= 0) { partida += dt; if (partida > 20.5) partida = -1; } acc += dt; if (acc < .1) return; acc = 0; flTela(tv.x, J, partida, tl, st); tv.t.needsUpdate = true; });
+        if (queb) { const lmM = let1; anim.push((dt, t) => { const k = Math.sin(t * 7.3) > .3 || Math.sin(t * 23) > .9 ? .15 : 1; brilho(lmM, k); }); }
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'jogar' && !queb) partida = 0; };
+        return g;
+      },
+
+      /* ================= televisão de tubo ================= */
+      // TV de tubo (ligar). base: videogame (rack com o console, os controles com fio e o filtro de linha na tomada) |
+      // carrinho | movel. tela: videogame | texto (txt, cor) | estatica
+      p2_tv_crt(o) {
+        const g = G(), base = o.base || 'movel', r = rng(o.sem || 75), modo = o.tela || (base === 'videogame' ? 'videogame' : o.txt ? 'texto' : 'estatica');
+        const mad = MADEIRA(o.cm || '#4a3420'), hb = base === 'carrinho' ? .78 : .52;
+        if (base === 'carrinho') { g.add(juntar([ret(.8, .04, .5, 0, .74, 0), ret(.8, .04, .5, 0, .28, 0), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => cil(.012, .012, .74, a * .37, .04, b * .22, 6))], metal('#5a5a58'))); g.add(juntar([[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => esf(.025, a * .37, .025, b * .22, 1, 1, 1, 6))), m('#111')); }
+        else {
+          g.add(juntar([ret(1.0, .03, .46, 0, hb - .03, 0), ret(1.0, .03, .46, 0, .06, 0), ret(.03, hb - .06, .46, -.485, .06, 0), ret(.03, hb - .06, .46, .485, .06, 0), ret(.03, hb - .06, .44, 0, .06, 0), ret(1.0, hb - .06, .02, 0, .06, -.22), ret(1.0, .06, .44, 0, 0, 0)], mad));
+          const vh = []; for (let k = 0; k < 7; k++) vh.push(ret(.03, .2, .11, -.44 + k * .045, .09, .04, 0, 0, k === 5 ? .3 : 0)); addJ(g, vh, m('#1a1a1a', { r: .5 }));
+          g.add(malha(plano(.4, .2, -.3, .2, .133, 0, 0, 0), memo('tv_vhs', () => cmat(128, 64, (x, W, H) => { x.fillStyle = '#121212'; x.fillRect(0, 0, W, H); const rr = rng(4); for (let k = 0; k < 9; k++) { x.fillStyle = ['#d8d0b0', '#c84020', '#2a6aa8', '#e8e8e0'][k % 4]; x.fillRect(4 + k * 14, H * .2, 10, H * .6); x.fillStyle = '#111'; x.fillRect(5 + k * 14, H * .3 + rr() * 10, 8, 2); } }, { r: .7 }))));
+        }
+        // aparelho
+        const yt = hb, cab = m(o.c || '#2a2826', { r: .45, me: .1 });
+        g.add(juntar([ret(.64, .5, .3, 0, yt, .07), ret(.5, .4, .2, 0, yt + .05, -.15)], cab));
+        g.add(malha(plano(.62, .48, 0, yt + .25, .221), memo('tv_frente' + (o.c || ''), () => cmat(128, 100, (x, W, H) => { x.fillStyle = o.c || '#2a2826'; x.fillRect(0, 0, W, H); x.fillStyle = '#0a0a0a'; x.beginPath(); x.roundRect ? x.roundRect(8, 8, W * .74, H - 16, 12) : x.rect(8, 8, W * .74, H - 16); x.fill(); x.fillStyle = '#111'; for (let k = 0; k < 6; k++) x.fillRect(W * .84, 14 + k * 5, W * .12, 2); x.fillStyle = '#8a8a84'; x.beginPath(); x.arc(W * .9, H * .55, 5, 0, 7); x.fill(); x.beginPath(); x.arc(W * .9, H * .72, 5, 0, 7); x.fill(); gasto(x, W, H, rng(2), 80, .2); }, { r: .5 }))));
+        const tv = telaViva(160, 120, 1.0);
+        const scr = new T.Mesh(guardar(planoCRT(.42, .32, .015)), tv.mt); scr.position.set(-.045, yt + .25, .223); g.add(scr);
+        const led = emis('#ff2010', 1.5); g.add(malha(new T.CircleGeometry(.008, 8).translate(.27, yt + .08, .223), led));
+        g.add(juntar([cil(.025, .03, .03, .05, yt + .5, -.05, 8), cil(.004, .002, .5, .05, yt + .52, -.05, 4, 0, 0, .5), cil(.004, .002, .5, .05, yt + .52, -.05, 4, 0, 0, -.6)], metal('#8a8a84')));
+        // videogame: console, cartucho, controles com fio; filtro de linha e tomada na parede
+        const fios = [], cabo = m('#111', { r: .7 });
+        if (base === 'videogame') {
+          const cx = .26, cyy = hb - .13;
+          g.add(juntar([ret(.3, .08, .22, cx, cyy - .06, .02), ret(.1, .06, .02, cx, cyy + .02, -.02)], m('#2a2a2a', { r: .5 }))); g.add(malha(ret(.08, .02, .1, cx + .02, cyy + .02, .02), m('#7a2a1a')));
+          g.add(malha(ret(.04, .01, .01, cx - .1, cyy - .02, .135), emis('#ff3010', 1.2)));
+          [[.2, .5, .1], [-.15, .62, -.3]].forEach(([x2, z2, a]) => { const c = G(); c.position.set(x2, 0, z2); c.rotation.y = a; g.add(c); c.add(juntar([ret(.14, .025, .07, 0, 0, 0)], m('#2a2a2a'))); c.add(juntar([ret(.025, .006, .008, -.04, .025, 0), ret(.008, .006, .025, -.04, .025, 0), cil(.009, .009, .006, .03, .025, .01, 8), cil(.009, .009, .006, .05, .025, -.01, 8)], m('#a01818'))); });
+          fios.push(curva([[cx - .05, cyy - .03, .13], [.12, .05, .3], [.2, .015, .42], [.2, .015, .47]], .004, 14, 4), curva([[cx + .05, cyy - .03, .13], [.0, .03, .35], [-.12, .015, .55], [-.14, .015, .59]], .004, 14, 4));
+        }
+        // energia: TV (e console) → filtro de linha no chão, ao lado do rack → tomada na parede de trás
+        g.add(juntar([ret(.07, .04, .3, .66, 0, 0)], m('#e8e4d8', { r: .5 }))); g.add(malha(ret(.012, .01, .012, .66, .04, .1), emis('#ff3010', 1.0)));
+        g.add(juntar([ret(.08, .12, .015, .66, .2, -.2525)], m('#e8e4d8', { r: .5 })));
+        fios.push(curva([[.2, yt + .12, -.24], [.42, yt + .04, -.22], [.55, .35, -.14], [.6, .03, -.04], [.63, .03, -.01]], .005, 16, 4), curva([[.66, .02, -.15], [.66, .02, -.235], [.66, .19, -.245]], .005, 10, 4));
+        if (base === 'videogame') fios.push(curva([[.36, hb - .16, -.08], [.5, hb - .18, -.12], [.58, .2, -.06], [.64, .03, .06]], .004, 14, 4));
+        addJ(g, fios, cabo);
+        let ligado = 1, acc = 0, tl = r() * 9, desl = -1;
+        anim.push(dt => { tl += dt; if (desl >= 0) desl += dt; acc += dt; if (acc < .1) return; acc = 0; const x = tv.x;
+          if (!ligado) { x.fillStyle = '#000'; x.fillRect(0, 0, 160, 120); if (desl >= 0 && desl < .5) { const k = 1 - desl / .5; x.fillStyle = `rgba(230,240,255,${k})`; x.fillRect(80 - 60 * k, 59, 120 * k + 2, 2); } tv.t.needsUpdate = true; return; }
+          tvTela(x, modo, tl, o); tv.t.needsUpdate = true; });
+        g.userData.aoInter = (v, inst) => { ligado = v ? 1 : 0; desl = inst || v ? -1 : 0; brilho(tv.mt, v ? 1 : (inst ? .02 : .6)); brilho(led, v ? 1 : .05); if (!v && !inst) setTimeout(() => brilho(tv.mt, .02), 600); g.userData._lig = ligado; };
+        return g;
+      },
+
+      /* ================= cinema ================= */
+      // telão: moldura preta, máscara e a tela (o plano onde o Mestre passa o vídeo); sem vídeo, a luz do projetor tremula
+      p2_telao(o) {
+        const g = G(), w = o.w || 5.6, h = o.h || w * 9 / 16, y = o.y ?? .75, r = rng(o.sem || 77), yb = o.palco || 0;
+        g.add(juntar([ret(w + .7, h + .7, .06, 0, y - .35, -.01)], m('#060606', { r: 1 })));
+        g.add(juntar([ret(w + .3, .12, .1, 0, y - .14, .02), ret(w + .3, .12, .1, 0, y + h + .02, .02), ret(.12, h + .28, .1, -w / 2 - .09, y - .14, .02), ret(.12, h + .28, .1, w / 2 + .09, y - .14, .02)], m('#121212', { r: .9 })));
+        const tv = telaViva(256, 144, .9, false);
+        const plano2 = new T.Mesh(guardar(new T.PlaneGeometry(w, h)), tv.mt); plano2.position.set(0, y + h / 2, .072); g.add(plano2);
+        g.userData.tela = plano2;
+        // caixas de som nos cantos de baixo
+        [-1, 1].forEach(s => { g.add(juntar([ret(.6, .9, .45, s * (w / 2 + .75), yb, .2)], m('#141414', { r: .8 }))); g.add(juntar([cil(.18, .18, .02, s * (w / 2 + .75), yb + .55, .43, 16, PI / 2), cil(.08, .08, .02, s * (w / 2 + .75), yb + .2, .43, 12, PI / 2)], m('#2a2a2a', { r: .6 }))); });
+        let acc = 0, luzP = 1;
+        CINE.telao = v => { luzP = v ? 1 : 0; brilho(tv.mt, v ? 1 : .05); };
+        if (CINE.proj === 0) CINE.telao(0);
+        anim.push((dt, t) => { acc += dt; if (acc < .12) return; acc = 0; const x = tv.x, W = 256, H = 144; if (!luzP) { x.fillStyle = '#050505'; x.fillRect(0, 0, W, H); tv.t.needsUpdate = true; return; } const v = 150 + r() * 50; x.fillStyle = `rgb(${v},${v * .96},${v * .88})`; x.fillRect(0, 0, W, H); const gr = x.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, W * .65); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = gr; x.fillRect(0, 0, W, H); x.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 4; i++) x.fillRect(r() * W, 0, 1, H); for (let i = 0; i < 14; i++) { x.fillStyle = r() < .5 ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.5)'; x.fillRect(r() * W, r() * H, 1 + r() * 2, 1 + r() * 2); } if (Math.sin(t * .9) > .6) { x.fillStyle = 'rgba(20,16,12,.55)'; x.beginPath(); x.arc(W * .82, H * .2, 7, 0, 7); x.fill(); } tv.t.needsUpdate = true; });
+        return g;
+      },
+      // projetor de cinema num pedestal alto (ligar): carretéis girando, lente acesa e o facho até a tela.
+      // l = distância até a tela (para +z), alvo = altura do centro da tela, tw/th = tamanho da tela
+      p2_projetor(o) {
+        const g = G(), hp = o.hp || 1.95, L = o.l || 15, tw = o.tw || 5.6, th = o.th || 3.15, ya = o.alvo ?? 2.32, r = rng(o.sem || 79);
+        const ferro = m('#2a2c2e', { me: .55, r: .45 }), corpo = sujo('#3a3e3a', 'metal_sujo', { me: .5, r: .45 });
+        // pedestal: base pesada, coluna e mesa
+        g.add(juntar([ret(.8, .08, .8, 0, 0, 0), cil(.08, .1, hp - .3, 0, .08, 0, 12), ret(.7, .06, .9, 0, hp - .26, 0), ret(.06, .2, .06, -.3, hp - .46, -.38), ret(.06, .2, .06, .3, hp - .46, .38)], ferro));
+        g.add(malha(ret(.36, .38, .62, 0, hp - .2, -.02), corpo));
+        g.add(juntar([tuboEixo(.075, .09, .2, 0, hp, .38, 'z', 16)], metal('#1a1a1a')));
+        const lente = emis('#fff4d8', 2.2); g.add(malha(new T.CircleGeometry(.066, 16).translate(0, hp, .481), lente));
+        g.add(juntar([ret(.04, .16, .3, .2, hp - .1, -.05), ret(.12, .08, .12, -.14, hp + .18, -.25)], ferro));
+        const car = memo('carretel_cine', () => cmat(128, 128, (x, W) => { x.clearRect(0, 0, W, W); x.fillStyle = '#9aa0a4'; x.beginPath(); x.arc(W / 2, W / 2, W / 2 - 1, 0, 7); x.fill(); x.fillStyle = '#2a1e14'; x.beginPath(); x.arc(W / 2, W / 2, W * .4, 0, 7); x.fill(); x.fillStyle = '#9aa0a4'; for (let k = 0; k < 6; k++) { x.save(); x.translate(W / 2, W / 2); x.rotate(k * PI / 3); x.fillRect(-3, 0, 6, W * .42); x.restore(); } x.beginPath(); x.arc(W / 2, W / 2, W * .1, 0, 7); x.fill(); x.fillStyle = '#111'; x.beginPath(); x.arc(W / 2, W / 2, W * .04, 0, 7); x.fill(); }, { transp: 1, alfa: .3, me: .5, r: .4, lado: 1 }));
+        const rolos = [[.3, -.32], [.36, .2]].map(([yy, z]) => { const p = malha(new T.CircleGeometry(.24, 24).rotateY(PI / 2), car); p.position.set(.2, hp + yy, z); g.add(p); return p; });
+        g.add(juntar([tuboEixo(.015, .015, .1, .16, hp + .3, -.32, 'x', 6), tuboEixo(.015, .015, .1, .16, hp + .36, .2, 'x', 6), ret(.03, .36, .03, .19, hp, -.32), ret(.03, .4, .03, .19, hp, .2)], ferro));
+        g.add(malha(curva([[.2, hp + .3, -.08], [.21, hp + .12, -.05], [.22, hp - .05, .05], [.21, hp + .14, .2], [.2, hp + .36, .44]], .006, 16, 3), m('#2a1a10')));
+        const lz = luz(g, '#fff0d0', .5, 3, 0, hp, .7);
+        let lig = 1;
+        anim.push(dt => { if (!lig) return; rolos[0].rotation.x += dt * 2.4; rolos[1].rotation.x += dt * 1.9; });
+        g.userData.aoInter = (v, inst) => { lig = v ? 1 : 0; brilho(lente, v ? 1 : .03); g.userData._lig = lig; CINE.proj = lig; if (CINE.telao) CINE.telao(lig); if (CINE.facho) CINE.facho(lig); };
+        CINE.proj = 1;
+        return g;
+      },
+      // facho do projetor (peça à parte, sem colisão): mesma posição e rotação do projetor; acende e apaga com ele
+      p2_facho(o) {
+        const g = G(), hp = o.hp || 1.95, L = o.l || 15, tw = o.tw || 5.6, th = o.th || 3.15, ya = o.alvo ?? 2.32, r = rng(o.sem || 85);
+        // facho: do vidro da lente até o retângulo da tela
+        const z0 = .48, a0 = [[-.05, -.04], [.05, -.04], [.05, .04], [-.05, .04]], a1 = [[-tw / 2, -th / 2], [tw / 2, -th / 2], [tw / 2, th / 2], [-tw / 2, th / 2]];
+        const pos = [], uv = [];
+        for (let k = 0; k < 4; k++) { const k2 = (k + 1) % 4, p1 = [a0[k][0], hp + a0[k][1], z0], p2 = [a0[k2][0], hp + a0[k2][1], z0], p3 = [a1[k2][0], ya + a1[k2][1], L], p4 = [a1[k][0], ya + a1[k][1], L]; pos.push(...p1, ...p2, ...p3, ...p1, ...p3, ...p4); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); }
+        const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); bg.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); bg.computeVertexNormals();
+        const fm = cmat(32, 128, (x, W, H) => { const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(255,248,225,1)'); gr.addColorStop(.25, 'rgba(255,248,225,.6)'); gr.addColorStop(1, 'rgba(255,248,225,.28)'); x.fillStyle = gr; x.fillRect(0, 0, W, H); }, { transp: 1, lado: 1 });
+        fm.blending = T.AdditiveBlending; fm.opacity = .5;
+        // o facho brilha sozinho (a sala é escura: sem isso a luz do ambiente o deixaria preto)
+        fm.color = new T.Color('#000000'); fm.emissive = new T.Color('#fff4dc'); fm.emissiveMap = fm.map; fm.emissiveIntensity = 1;
+        // a textura vai de v=0 (lente) a v=1 (tela): o gradiente do canvas está de cima para baixo
+        fm.map.flipY = false; fm.map.needsUpdate = true;
+        const facho = new T.Mesh(guardar(bg), fm); g.add(facho);
+        anim.push((dt, t) => { if (facho.visible) fm.opacity = .48 + Math.sin(t * 23) * .02 + (r() < .02 ? .04 : 0); });
+        CINE.facho = v => { facho.visible = !!v; };
+        if (CINE.proj === 0) facho.visible = false;
+        return g;
+      },
+
+      /* ================= aparelhos que tocam ================= */
+      // telefone de disco (tocar): o fone treme no gancho por uns segundos. parede:1 = preso na parede (y)
+      p2_telefone(o) {
+        const g = G(), parede = !!o.parede, y = parede ? (o.y ?? 1.35) : 0, mt = m(o.c || '#151515', { r: .3, me: .2 });
+        const corpo = G(); g.add(corpo);
+        if (parede) { corpo.position.set(0, y, .06); corpo.rotation.x = PI / 2; g.add(malha(ret(.2, .26, .02, 0, y - .13, .01), m('#3a2a1a', { tex: 'madeira_velha' }))); }
+        corpo.add(juntar([ret(.2, .07, .22, 0, 0, 0), ret(.16, .03, .18, 0, .07, 0)], mt));
+        const disco = malha(new T.CircleGeometry(.065, 20).rotateX(-PI / 2 + .3).translate(0, .09, .045), memo('disco_tel', () => cmat(64, 64, (x, W) => { x.fillStyle = '#d8d0b8'; x.beginPath(); x.arc(W / 2, W / 2, W / 2, 0, 7); x.fill(); x.fillStyle = '#151515'; for (let k = 0; k < 10; k++) { const a = -PI * .7 + k * PI * .14; x.beginPath(); x.arc(W / 2 + Math.cos(a) * W * .34, W / 2 + Math.sin(a) * W * .34, 5, 0, 7); x.fill(); } x.fillStyle = '#e8e0c8'; x.beginPath(); x.arc(W / 2, W / 2, W * .16, 0, 7); x.fill(); }, { r: .5 }))); corpo.add(disco);
+        const fone = G(); fone.position.set(0, .12, -.04); corpo.add(fone);
+        fone.add(juntar([tuboEixo(.022, .022, .2, 0, 0, 0, 'x', 8), esf(.038, -.11, -.01, 0, 1, .7, 1.1, 10), esf(.038, .11, -.01, 0, 1, .7, 1.1, 10)], mt));
+        corpo.add(malha(curva([[.1, .1, -.04], [.16, .05, .0], [.14, .02, .1], [.08, .01, .14], [.04, .03, .11]], .006, 18, 4), mt));
+        let toca = -1;
+        anim.push(dt => { if (toca < 0) return; toca += dt; const on = toca < 3.2 && (toca % 1.4) < .9; fone.position.y = .12 + (on ? Math.abs(Math.sin(toca * 70)) * .012 : 0); fone.rotation.z = on ? Math.sin(toca * 55) * .05 : 0; corpo.rotation.z = on ? Math.sin(toca * 80) * .01 : 0; if (toca > 3.4) { toca = -1; fone.position.y = .12; fone.rotation.z = 0; corpo.rotation.z = 0; } });
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') toca = 0; };
+        return g;
+      },
+      // rádio portátil de fita (tocar): os alto-falantes pulsam e o mostrador acende por uns segundos
+      p2_radio_portatil(o) {
+        const g = G(), cor = o.c || '#2a2a2c', r = rng(o.sem || 81), corpo = m(cor, { r: .45, me: .25 });
+        g.add(juntar([ret(.52, .26, .14, 0, .01, 0), ret(.5, .02, .12, 0, 0, 0)], corpo));
+        g.add(juntar([ret(.02, .08, .02, -.2, .27, 0), ret(.02, .08, .02, .2, .27, 0), tuboEixo(.012, .012, .42, 0, .35, 0, 'x', 6)], m('#151515')));
+        g.add(malha(cil(.004, .003, .5, .2, .27, -.05, 4, 0, 0, -.9), metal('#aaa')));
+        const fr = memo('radio_frente' + cor, () => cmat(256, 128, (x, W, H) => { x.fillStyle = cor; x.fillRect(0, 0, W, H); [.17, .83].forEach(f => { x.fillStyle = '#111'; x.beginPath(); x.arc(W * f, H * .55, H * .38, 0, 7); x.fill(); x.fillStyle = '#2a2a2a'; for (let i = -40; i < 40; i += 5) for (let k = -40; k < 40; k += 5) if (i * i + k * k < 1300) x.fillRect(W * f + i, H * .55 + k, 2, 2); }); x.fillStyle = '#0a0a0a'; x.fillRect(W * .36, H * .45, W * .28, H * .4); x.fillStyle = '#3a3a3a'; x.fillRect(W * .39, H * .5, W * .22, H * .28); x.fillStyle = '#ddd'; for (let k = 0; k < 5; k++) x.fillRect(W * .37 + k * 13, H * .88, 10, 6); gasto(x, W, H, rng(6), 80, .2); }, { r: .5 }));
+        g.add(malha(plano(.5, .25, 0, .135, .0705), fr));
+        const mostr = emis('#ffb040', .25); g.add(malha(plano(.13, .035, 0, .235, .071), mostr));
+        const cones = [-.0875, .0875].map(dx => { const c = malha(new T.CircleGeometry(.06, 16), m('#1a1a1a', { r: .6 })); c.position.set(dx * 1.9, .1225, .072); g.add(c); return c; });
+        let toca = -1;
+        anim.push((dt, t) => { if (toca < 0) return; toca += dt; const k = 1 + Math.abs(Math.sin(t * 18)) * .18 * (toca < 5 ? 1 : 0); cones.forEach(c => c.scale.set(k, k, 1)); brilho(mostr, toca < 5 ? 6 + Math.sin(t * 40) * 1.2 : 1); if (toca > 5.2) { toca = -1; cones.forEach(c => c.scale.set(1, 1, 1)); brilho(mostr, 1); } });
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') toca = 0; };
+        return g;
+      },
+      // sineta de bronze num suporte de madeira (tocar): balança e vai parando
+      p2_sineta(o) {
+        const g = G(), hs = o.h || 1.25, mad = MADEIRA(o.c || '#3a2814');
+        g.add(juntar([ret(.6, .05, .36, 0, 0, 0), ret(.05, hs, .05, -.25, .05, 0), ret(.05, hs, .05, .25, .05, 0), ret(.6, .06, .07, 0, hs + .05, 0)], mad));
+        const piv = G(); piv.position.set(0, hs + .04, 0); g.add(piv);
+        const perf = [[0, 0], [.04, 0], [.06, -.03], [.07, -.1], [.09, -.18], [.13, -.24], [.135, -.26], [0, -.26]].map(([a, b]) => new T.Vector2(a, b));
+        piv.add(malha(new T.LatheGeometry(perf, 18), m('#a8822a', { me: .8, r: .3, lado: 2 })));
+        piv.add(juntar([cil(.012, .012, .1, 0, -.22, 0, 6), esf(.025, 0, -.23, 0, 1, 1, 1, 8)], m('#5a4a2a', { me: .7 })));
+        const cord = malha(curva([[.07, -.12, 0], [.1, -.4, .02], [.12, -.7, .04]], .006, 10, 4), m('#c8a010', { r: 1 })); piv.add(cord);
+        let toca = -1;
+        anim.push(dt => { if (toca < 0) return; toca += dt; piv.rotation.z = Math.sin(toca * 7) * .45 * Math.exp(-toca * .9); if (toca > 5) { toca = -1; piv.rotation.z = 0; } });
+        g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') toca = 0; };
+        return g;
+      },
+
+      /* ================= água: chuveiros ================= */
+      // fileira de chuveiros (ligar): canos que sobem até o coletor e entram no forro, registros e a água caindo
+      p2_chuveiros(o) {
+        const g = G(), n = o.n || 6, esp = o.esp || 2.0, yc = ALT - .3, cano = metal('#9aa0a4'), xs = Array.from({ length: n }, (_, k) => (k - (n - 1) / 2) * esp), L = (n - 1) * esp;
+        const geos = [tuboEixo(.03, .03, L + .1, 0, yc, .05, 'x', 10)];
+        [-1, 1].forEach(s => geos.push(cil(.03, .03, ALT - yc, s * (L / 2 + .05), yc, .05, 10), cil(.06, .06, .02, s * (L / 2 + .05), ALT - .02, .05, 12), esf(.034, s * (L / 2 + .05), yc, .05, 1, 1, 1, 8)));
+        xs.forEach(x => { geos.push(cil(.02, .02, yc - 1.1, x, 1.1, .05, 8), cil(.04, .04, .03, x, 1.08, .05, 10), tuboEixo(.016, .016, .3, x, 2.1, .2, 'z', 8), cil(.07, .04, .05, x, 2.03, .36, 14), esf(.025, x, 2.1, .05, 1, 1, 1, 8)); for (let h = .6; h < yc; h += 1.1) geos.push(ret(.06, .03, .06, x, h, .02)); });
+        addJ(g, geos, cano);
+        const reg = []; xs.forEach(x => { reg.push(anel(.05, .008, x, 1.2, .1, PI * 2, 0, 0, 0, 4, 14), tuboEixo(.008, .008, .1, x, 1.2, .1, 'x', 4), tuboEixo(.008, .008, .1, x, 1.2, .1, 'z', 4)); }); addJ(g, reg, m('#a01a14', { me: .4, r: .5 }));
+        const aguaM = cmat(32, 128, (x, W, H) => { x.clearRect(0, 0, W, H); for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(200,225,240,${.25 + Math.random() * .4})`; x.fillRect(Math.random() * W, 0, 1 + Math.random() * 2, H); } }, { transp: 1, lado: 1 });
+        aguaM.map.wrapT = T.RepeatWrapping; aguaM.map.repeat.set(1, 3);
+        const jatos = G(); g.add(jatos);
+        xs.forEach(x => { [0, PI / 2].forEach(a => jatos.add(malha(plano(.22, 2.0, x, 1.02, .36, 0, a), aguaM))); });
+        anim.push(dt => { if (jatos.visible) aguaM.map.offset.y += dt * 2.6; });
+        g.userData.aoInter = (v, inst) => { jatos.visible = !!v; };
+        return g;
+      },
+
+      /* ================= portão de correr ================= */
+      // portão de grade de correr (abrir): a folha da esquerda corre por trás da da direita; fechado, bloqueia a passagem
+      p2_portao_correr(o) {
+        const g = G(), w = o.w || 6, h = o.h || 3, r = rng(o.sem || 83), lw = w / 2 + .05;
+        const fe = FERRO('#3a3e40'), gr = memo('grade_portao', () => { const mt = cmat(128, 128, (x, W, H) => { x.clearRect(0, 0, W, H); x.strokeStyle = '#4a4e50'; x.lineWidth = 5; for (let i = -W; i < W * 2; i += 22) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + H, H); x.stroke(); x.beginPath(); x.moveTo(i + H, 0); x.lineTo(i, H); x.stroke(); } }, { alfa: .4, lado: 1, me: .6, r: .4 }); mt.map.wrapS = mt.map.wrapT = T.RepeatWrapping; mt.map.repeat.set(lw / .8, h / .8); return mt; });
+        g.add(juntar([ret(w + .3, .12, .16, 0, h + .02, 0), ret(w + .3, .03, .1, 0, 0, 0), ret(.14, h + .14, .14, -w / 2 - .07, 0, 0), ret(.14, h + .14, .14, w / 2 + .07, 0, 0), ret(.06, ALT - h - .14, .06, -w / 4, h + .14, 0), ret(.06, ALT - h - .14, .06, w / 4, h + .14, 0)], fe));
+        const folha = (x0, z0) => { const f = G(); f.position.set(x0, 0, z0); g.add(f); f.add(malha(plano(lw - .08, h - .1, 0, h / 2, 0), gr)); f.add(juntar([ret(lw, .07, .05, 0, h - .08, 0), ret(lw, .07, .05, 0, .03, 0), ret(.07, h - .02, .05, -lw / 2, .02, 0), ret(.07, h - .02, .05, lw / 2, .02, 0), ret(.05, h - .1, .03, 0, .05, 0), ...[-1, 1].map(s => cil(.04, .04, .03, s * lw * .35, h - .05, 0, 10, PI / 2))], fe)); return f; };
+        const fd = folha(w / 4, .08), fl = folha(-w / 4, -.02);
+        fl.userData.folha = true;
+        fd.add(malha(plano(1.2, .3, 0, 1.6, .03), placaTxt(o.txt || 'PLATAFORMA', '#e8c547', '#111', 256, 64, 34)));
+        fl.add(malha(ret(.05, .18, .08, lw / 2 - .1, 1.1, .03), metal('#9a9a90')));
+        g.userData.aoInter = estado(k => { fl.position.x = -w / 4 + k * (w / 2 - .12); }, .45);
+        return g;
+      },
+
+      /* ================= cabos e canos ligados nas duas pontas ================= */
+      // cabo ou mangueira: pts em metros na sala (item em x=0, z=0, r=0); pontas a/b: tomada | caixa | piso | teto | plugue | nada
+      // na/nb: para onde a tomada olha ([nx, nz], para dentro da sala)
+      p2_cabo(o) {
+        const g = G(), pts = (o.pts || [[0, .02, 0], [1, .02, 0]]).map(p => new T.Vector3(...p)), R = o.raio || .012, mt = m(o.c || '#111', { r: .7 });
+        g.add(malha(new T.TubeGeometry(new T.CatmullRomCurve3(pts), Math.max(12, pts.length * 8), R, 5), mt));
+        const pontas = [];
+        [[o.a, pts[0], o.na], [o.b, pts[pts.length - 1], o.nb]].forEach(([tp, p, nn]) => {
+          if (!tp || tp === 'nada') return;
+          const a = nn ? Math.atan2(nn[0], nn[1]) : 0, mk = (geo) => { geo.rotateY(a); geo.translate(p.x, 0, p.z); pontas.push(geo); };
+          if (tp === 'tomada') { mk(ret(.08, .12, .015, 0, p.y - .06, -.0075)); mk(ret(.035, .04, .04, 0, p.y - .02, .02)); }
+          else if (tp === 'caixa') mk(ret(.14, .14, .1, 0, p.y - .07, -.05));
+          else if (tp === 'piso') mk(ret(.22, .04, .22, 0, 0, 0));
+          else if (tp === 'teto') mk(cil(.05, .06, .04, 0, ALT - .04, 0, 10));
+          else if (tp === 'plugue') mk(ret(.05, .06, .06, 0, p.y - .03, 0));
+        });
+        addJ(g, pontas, m('#d8d4c8', { r: .5 }));
+        return g;
+      },
+      // canos de parede: sobem do chão (flange) até o coletor e entram no forro pelas duas pontas
+      p2_canos_parede(o) {
+        const g = G(), n = o.n || 3, w = o.w || 2, R = o.raio || .07, yh = o.yh ?? ALT - .5, mt = sujo(o.c || '#5a3a2a', 'ferrugem', { me: .55, r: .5 }), geos = [];
+        const xs = Array.from({ length: n }, (_, k) => n === 1 ? 0 : -w / 2 + k * w / (n - 1));
+        xs.forEach(x => { geos.push(cil(R, R, yh, x, 0, R + .02, 12), cil(R + .04, R + .04, .03, x, 0, R + .02, 12)); for (let h = .5; h < yh; h += .9) geos.push(cil(R + .02, R + .02, .05, x, h, R + .02, 12)); });
+        geos.push(tuboEixo(R * 1.3, R * 1.3, w + .3, 0, yh, R + .02, 'x', 12));
+        [-1, 1].forEach(s => geos.push(esf(R * 1.35, s * (w / 2 + .15), yh, R + .02, 1, 1, 1, 10), cil(R * 1.3, R * 1.3, ALT - yh, s * (w / 2 + .15), yh, R + .02, 12), cil(R * 1.3 + .05, R * 1.3 + .05, .03, s * (w / 2 + .15), ALT - .03, R + .02, 12)));
+        addJ(g, geos, mt);
+        const ab = []; xs.forEach(x => { for (let h = 1; h < yh; h += 1.4) ab.push(ret(R * 2 + .06, .03, .03, x, h, .015)); }); addJ(g, ab, FERRO('#2a2a2a'));
+        if (o.vazamento) { const v = P.vapor_sobe({ y: 1.2 }); v.position.set(xs[Math.floor(n / 2)] + .05, 0, R + .1); g.add(v); }
+        return g;
+      },
+    });
+
   });
   (NS.semColisao = NS.semColisao || new Set());
   ['p2_duto', 'p2_luz_gaiola', 'p2_rastro_sangue', 'p2_bandeja_caida', 'p2_painel_espuma', 'p2_cortina_hospital', 'p2_manometros', 'p2_espelho_falso',
-   'p2_parede_fichas', 'p2_rolo_filme', 'p2_varal', 'p2_gravador_rolo', 'p2_pesos_chao', 'p2_canos_teto'].forEach(t => NS.semColisao.add(t));
+   'p2_parede_fichas', 'p2_rolo_filme', 'p2_varal', 'p2_gravador_rolo', 'p2_pesos_chao', 'p2_canos_teto',
+   'p2_cabo', 'p2_facho', 'p2_caixa_parede_int', 'p2_chuveiros', 'p2_telefone', 'p2_radio_portatil', 'p2_canos_parede'].forEach(t => NS.semColisao.add(t));
 })();
 
 /* ===================== 3º andar · sala de 20 m ===================== */
@@ -5513,8 +6628,9 @@
         if (r() < .7) pl(g, .32, .1, rotulo(o.txt ? o.txt[i % o.txt.length] : 'Q-' + String(10 + i).padStart(2, '0'), .32, .1), x - .05, 1.85, d / 2 + .005);
         if (i % 3 === 1) { const ad = pl(g, .2, .18, m('#ffffff', { unico: true, mapa: textoTex('⚡', { w: 64, h: 64, cor: '#141210', fundo: '#f1c40f', tam: 44 }) }), x - .05, .7, d / 2 + .005); }
       }
-      if (o.aberto != null) { const x = -w / 2 + (o.aberto + .5) * cw, p = G(); p.position.set(x - cw / 2 + .02, .1, d / 2); p.rotation.y = -1.9; g.add(p); p.add(juntar([ret(cw - .05, h - .2, .03, (cw - .05) / 2, 0, 0)], mt)); const cab = []; for (let k = 0; k < 7; k++) cab.push(tubo([[x - .2 + k * .06, 1.7, d / 2 - .1], [x - .2 + k * .07 + (r() - .5) * .3, 1.0, d / 2 + .3], [x - .3 + r() * .5, .02, d / 2 + .5 + r() * .5]], .015, 10, 4)); g.add(juntar(cab, m(['#8a1a1a', '#1a1a1a', '#1a3a8a'][0], { r: .6 }))); }
-      anim.push((dt, t) => lamps.forEach(([s, f]) => { s.material.emissiveIntensity = Math.sin(t * 2 + f) > -.6 ? 1.5 : .2; }));
+      if (o.aberto != null) { const x = -w / 2 + (o.aberto + .5) * cw, p = G(); p.position.set(x - cw / 2 + .02, .1, d / 2); p.rotation.y = -1.9; g.add(p); p.add(juntar([ret(cw - .05, h - .2, .03, (cw - .05) / 2, 0, 0)], mt)); const cab = []; for (let k = 0; k < 7; k++) cab.push(tubo([[x - .2 + k * .06, 1.7, d / 2 - .1], [x - .2 + k * .07 + (r() - .5) * .3, 1.0, d / 2 + .3], [x - .3 + r() * .5, .03, d / 2 + .4 + r() * .4], [x - .2 + k * .06, .03, d / 2 + .12], [x - .2 + k * .06, .15, d / 2 - .1]], .015, 14, 4)); g.add(juntar(cab, m(['#8a1a1a', '#1a1a1a', '#1a3a8a'][0], { r: .6 }))); }
+      let lig = 1; g.userData.aoInter = v => { lig = v ? 1 : 0; };   // ligar: as lâmpadas do painel apagam
+      anim.push((dt, t) => lamps.forEach(([s, f]) => { const k = Math.sin(t * 2 + f) > -.6 ? 1 : .13; s.material.emissiveIntensity = 1.5 * k * lig; s.material.userData.mult = k * lig; }));
       return g;
     };
     // cano vertical do chão ao forro: flanges, um volante e um manômetro
@@ -5523,7 +6639,13 @@
       const gs = [cil(R, R, ALT, 0, 0, 0, 16), cil(R * 1.6, R * 1.6, .06, 0, 0, 0, 16)];
       [.9, 2.4, ALT - .3].forEach(y => gs.push(cil(R + .06, R + .06, .08, 0, y, 0, 16)));
       g.add(juntar(gs, mt));
-      if (o.volante !== 0) { g.add(juntar([cilC(.06, .06, .3, 0, 1.4, R + .14, 10, PI / 2), tor(.26, .025, 0, 1.4, R + .3, 0, 0, 0, 20), ...[0, 1, 2, 3].map(i => barra([0, 1.4, R + .3], [Math.cos(i * PI / 2) * .26, 1.4 + Math.sin(i * PI / 2) * .26, R + .3], .015))], m(o.cv || '#a01a12', { me: .4, r: .5 }))); }
+      if (o.volante !== 0) {
+        g.add(juntar([cilC(.06, .06, .3, 0, 1.4, R + .14, 10, PI / 2)], m(o.cv || '#a01a12', { me: .4, r: .5 })));
+        const vo = G(); vo.position.set(0, 1.4, R + .3); g.add(vo);
+        vo.add(juntar([tor(.26, .025, 0, 0, 0, 0, 0, 0, 20), ...[0, 1, 2, 3].map(i => barra([0, 0, 0], [Math.cos(i * PI / 2) * .26, Math.sin(i * PI / 2) * .26, 0], .015))], m(o.cv || '#a01a12', { me: .4, r: .5 })));
+        // abrir: o volante dá duas voltas e meia
+        const a = animador(v => { vo.rotation.z = -suave(v) * TAU * 2.5; }, .45); g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      }
       if (o.manometro !== 0) { const p = G(); p.position.set(R + .02, 1.75, 0); p.rotation.y = PI / 2; g.add(p); mesh(p, cilC(.02, .02, .14, 0, -.12, 0, 6), metal()); const pt = mostrador(p, .09, 0, 0, .05, 2, 'bar'); anim.push((dt, t) => { pt.rotation.z = -1.9 - Math.sin(t * 7) * .06 - (Math.sin(t * .7) > .9 ? .4 : 0); }); }
       return g;
     };
@@ -5546,7 +6668,14 @@
       const led = cmat(64, 256, (x, w, hh) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, hh); for (let y = 6; y < hh; y += 11) for (let k = 0; k < 4; k++) { const v = Math.random(); x.fillStyle = v < .55 ? '#30ff70' : v < .62 ? '#ffb020' : v < .64 ? '#ff2a1a' : '#0a2a12'; x.fillRect(6 + k * 14, y, 6, 4); } }, { brilho: 1.6, rep: [1, 1] });
       led.map.wrapT = T.RepeatWrapping;
       for (let i = 0; i < n; i++) { const x = -W / 2 + (i + .5) * rw;
-        if (i === o.aberto) { const p = G(); p.position.set(x - rw / 2 + .03, .05, d / 2 + .01); p.rotation.y = -2.0; g.add(p); pl(p, rw - .06, h - .1, fr, (rw - .06) / 2, (h - .1) / 2, 0).material.side = T.DoubleSide; const fs = []; for (let k = 0; k < 9; k++) fs.push(tubo([[x - .2 + k * .05, 1.6 - k * .1, d / 2 - .1], [x + (r() - .5) * .4, .8, d / 2 + .25], [x - .5 + r() * 1.0, .02, d / 2 + .4 + r() * .6]], .012, 10, 4)); g.add(juntar(fs, m('#2a5a9a', { r: .6 }))); }
+        if (i === o.aberto) { const p = G(); p.position.set(x - rw / 2 + .03, .05, d / 2 + .01); p.rotation.y = -2.0; g.add(p); pl(p, rw - .06, h - .1, fr, (rw - .06) / 2, (h - .1) / 2, 0).material.side = T.DoubleSide; const fs = []; for (let k = 0; k < 9; k++) fs.push(tubo([[x - .2 + k * .05, 1.6 - k * .1, d / 2 - .1], [x + (r() - .5) * .4, .8, d / 2 + .25], [x - .5 + r() * 1.0, .03, d / 2 + .4 + r() * .5], [x - .2 + k * .04, .03, d / 2 + .1], [x - .2 + k * .04, .2, d / 2 - .1]], .012, 14, 4)); g.add(juntar(fs, m('#2a5a9a', { r: .6 }))); }
+        else if (i === o.porta) {
+          // porta que abre (abrir): por dentro, as gavetas de servidor e o feixe de cabos
+          const p = G(); p.position.set(x - rw / 2 + .03, .05, d / 2 + .01); g.add(p); const fp = pl(p, rw - .06, h - .1, fr, (rw - .06) / 2, (h - .1) / 2, 0); fp.material.side = T.DoubleSide;
+          const dn = cmat(128, 256, (x2, W, H) => { x2.fillStyle = '#08090b'; x2.fillRect(0, 0, W, H); for (let y = 8; y < H - 8; y += 14) { x2.fillStyle = '#2a2e34'; x2.fillRect(6, y, W - 12, 10); x2.fillStyle = Math.random() < .7 ? '#30ff70' : '#ffb020'; x2.fillRect(W - 22, y + 3, 5, 4); } }, { brilho: .6 });
+          pl(g, rw - .1, h - .2, dn, x, .1 + (h - .2) / 2, d / 2 - .04);
+          const a = animador(v => { p.rotation.y = -suave(v) * 1.9; }, 1.4); g.userData.aoInter = (v, inst) => a.ir(v, inst);
+        }
         else pl(g, rw - .06, h - .1, fr, x, .05 + (h - .1) / 2, d / 2 + .006);
         if (i !== o.morto) pl(g, .07, 1.6, led, x + rw / 2 - .1, .3 + .8, d / 2 + .009);
         if (cods[i]) pl(g, .34, .08, rotulo(cods[i], .34, .08, '#0c140c', '#d8f0d8'), x, 1.98, d / 2 + .01);
@@ -5563,7 +6692,9 @@
       pl(g, w - .2, h - .4, al, 0, .12 + h / 2, d / 2 + .005);
       const pas = []; const nf = Math.max(1, Math.round(w / 1.2));
       for (let i = 0; i < nf; i++) { const x = -w / 2 + (i + .5) * w / nf; mesh(g, cilC(.48, .48, .06, x, h + .15, 0, 20, 0, 0, 0, true), metal('#3a3e42')); const p = G(); p.position.set(x, h + .16, 0); g.add(p); p.add(juntar([0, 1, 2, 3, 4].map(k => tf(ret(.38, .01, .12, .2, 0, 0, .3, 0, 0), 0, 0, 0, 0, k * TAU / 5, 0)), metal('#5a5e62'))); pas.push(p); const gr = cmat(64, 64, (x2, W2) => { x2.clearRect(0, 0, W2, W2); x2.strokeStyle = '#1a1a1a'; x2.lineWidth = 3; for (let k = 4; k < 32; k += 6) { x2.beginPath(); x2.arc(32, 32, k, 0, TAU); x2.stroke(); } }, { transp: true }); chao(g, .96, .96, gr, x, h + .19, 0); }
-      anim.push(dt => pas.forEach((p, i) => { p.rotation.y += dt * (9 + i * 2); }));
+      let vel = 1, alvo = 1;
+      g.userData.aoInter = (v, inst) => { alvo = v ? 1 : 0; if (inst) vel = alvo; };   // ligar: os ventiladores param e voltam devagar
+      anim.push(dt => { vel += (alvo - vel) * Math.min(1, dt * .6); pas.forEach((p, i) => { p.rotation.y += dt * (9 + i * 2) * vel; }); });
       g.add(juntar([cilC(.06, .06, d, w / 2 - .25, .5, 0, 10, PI / 2), cilC(.06, .06, d, w / 2 - .45, .5, 0, 10, PI / 2), ret(.5, .14, .14, w / 2 - .35, .45, d / 2 + .05)], m('#dfeef8', { r: .3, e: '#9ac8e8', ei: .15 })));
       pl(g, .7, .18, rotulo(o.txt || 'CH-02', .7, .18), -w / 2 + .5, h - .25, d / 2 + .006);
       return g;
@@ -5660,7 +6791,7 @@
       g.add(juntar([ret(w + .1, .08, d + .1, 0, h, 0)], mt));
       const pv = G(); pv.position.set(-w / 2 + .12 + .02, 0, d / 2 - .04); pv.rotation.y = -1.2; g.add(pv); pv.add(juntar([ret(pw - .04, h - .2, .05, (pw - .04) / 2, .02, 0)], mt));
       const ms = P.mesa_metal({ w: Math.min(2, w - .6), d: .7, c: '#4a4e52' }); ms.position.set(0, 0, -d / 2 + .45); g.add(ms);
-      const tl = P.console_tela({ w: 1.0, cor: o.cor || '#40ff80', sem: o.sem }); tl.position.set(-w / 4, .78, -d / 2 + .3); tl.scale.setScalar(.6); g.add(tl);
+      const tl = semCabos(() => P.console_tela({ w: 1.0, cor: o.cor || '#40ff80', sem: o.sem })); tl.position.set(-w / 4, .78, -d / 2 + .3); tl.scale.setScalar(.6); g.add(tl);
       const cd = P.cadeira({ c: '#2a2a2a' }); cd.position.set(.2, 0, -d / 2 + 1.1); cd.rotation.y = PI + .5; g.add(cd);
       if (o.luz !== 0) { const lb = sf(g, .05, m('#ffffff', { unico: true, e: o.lc || '#fff0c8', ei: 1.6 }), 0, h - .1, 0, 8); luz(g, o.lc || '#fff0c8', o.i ?? .7, 5, 0, h - .3, 0, o.pisca); }
       if (o.txt) pl(g, 1.4, .26, rotulo(o.txt, 1.4, .26, '#141210', '#d8b018'), 0, h - .25, d / 2 + .05).rotation.y = 0;
@@ -5699,6 +6830,12 @@
       const hf = o.garfo ?? .1; g.add(juntar([ret(.1, .05, 1.1, -.25, hf, 1.25), ret(.1, .05, 1.1, .25, hf, 1.25), ret(.8, .5, .06, 0, hf, .74)], metal('#2a2a2a')));
       g.add(juntar([ret(.45, .06, .35, 0, .4, -.55), ret(.45, .5, .06, 0, .46, -.72)], m('#2a2a2a', { r: .6 })));
       if (o.carga) { const pl2 = P.a3_palete({ carga: o.carga, n: 1, sem: o.sem }); pl2.position.set(0, hf + .05, 1.3); g.add(pl2); }
+      // ligar: o giroflex âmbar gira e os faróis acendem
+      const gf = brilhoMat('#ffa020', 1.6), fa = brilhoMat('#fff4d8', 1.4); multi(gf, .04); multi(fa, .04);
+      g.add(juntar([cil(.07, .07, .12, .35, 2.25, -.9, 12)], gf)); g.add(juntar([cil(.09, .07, .04, .35, 2.25, -.9, 12)], m('#141414')));
+      g.add(juntar([cilC(.06, .06, .05, -.42, 1.95, .32, 12, PI / 2), cilC(.06, .06, .05, .42, 1.95, .32, 12, PI / 2)], fa));
+      let lig = 0; g.userData.aoInter = v => { lig = v ? 1 : 0; multi(fa, lig ? 1 : .04); };
+      anim.push((dt, t) => { multi(gf, lig ? (Math.sin(t * 9) > .2 ? 1 : .15) : .04); });
       return g;
     };
     // bancos de uma guarita: mesa de vigia com monitores pequenos de câmera, garrafa térmica e quadro de chaves
@@ -5710,9 +6847,462 @@
       g.add(juntar([cil(.07, .07, .3, w / 2 - .3, .79, .15, 12)], m('#8a1a12', { r: .4, me: .3 })));
       return g;
     };
+
+    /* ================= INTERAÇÕES (rodada 2) ================= */
+    // anima de 0 a 1 (abre/fecha) e chama f(atual) a cada mudança; ir(v, inst) muda o alvo
+    function animador(f, vel = 1.8) {
+      const s = { alvo: 0, atual: 0 };
+      s.ir = (v, inst) => { s.alvo = v ? 1 : 0; if (inst) { s.atual = s.alvo; f(s.atual); } };
+      anim.push(dt => { if (s.atual === s.alvo) return; s.atual += Math.sign(s.alvo - s.atual) * Math.min(Math.abs(s.alvo - s.atual), dt * vel); f(s.atual); });
+      return s;
+    }
+    const suave = x => x * x * (3 - 2 * x);
+    // tira os cabos soltos que algumas peças da biblioteca jogam no chão (aqui os cabos vão de ponta a ponta)
+    const semCabos = f => { const orig = P.cabos_chao; P.cabos_chao = () => G(); try { return f(); } finally { P.cabos_chao = orig; } };
+    // material só desta peça que acende e apaga (o site multiplica o brilho por userData.mult a cada quadro)
+    const brilhoMat = (cor, ei = 1.6, base = '#ffffff') => m(base, { unico: true, e: cor, ei });
+    const multi = (mt, v) => { mt.userData.mult = v; };
+    // cilindro afunilado de a até b (raio r1 em a, r2 em b)
+    function segC(a, b, r1, r2, s = 10) {
+      const p1 = V(...a), p2 = V(...b), d = p2.clone().sub(p1), L = Math.max(.001, d.length());
+      const g = new T.CylinderGeometry(r2, r1, L, s, 1);
+      g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize())));
+      const c = p1.add(p2).multiplyScalar(.5); g.translate(c.x, c.y, c.z); return g;
+    }
+    // anel (vinco do tecido) em volta de um membro, no ponto p, com o eixo na direção d
+    function anel(p, d, R, r, sx = 1) {
+      const g = new T.TorusGeometry(R, r, 3, 10); g.scale(sx, 1, 1);
+      g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(V(0, 0, 1), V(...d).normalize())));
+      g.translate(p[0], p[1], p[2]); return g;
+    }
+    const comM = (geo, M4) => { geo.applyMatrix4(M4); return geo; };
+
+    /* ---------- cabos ligados de ponta a ponta ---------- */
+    // o item fica no centro da sala (x 0, z 0, r 0) e "pts" são pontos da sala: [x, y, z] (y 0 = no chão).
+    // Pontas: caixa de passagem (parede, máquina) ou tampa de piso; nas travessias longas, um protetor de cabos.
+    P.p3_cabos = o => {
+      const g = G(), p0 = (o.pts || []).map(p => V(p[0], p[1], p[2])), n = o.n || 3, R = o.raio || .022, r = rng(o.sem || 31);
+      if (p0.length < 2) return g;
+      const pts = [p0[0]];
+      for (let i = 1; i < p0.length - 1; i++) {
+        const a = p0[i - 1], b = p0[i], c = p0[i + 1], da = a.clone().sub(b), dc = c.clone().sub(b);
+        const ra = Math.min(.22, da.length() * .4), rc = Math.min(.22, dc.length() * .4);
+        pts.push(b.clone().add(da.normalize().multiplyScalar(ra)), b.clone().add(dc.normalize().multiplyScalar(rc)));
+      }
+      pts.push(p0[p0.length - 1]);
+      let L = 0; for (let i = 1; i < pts.length; i++) L += pts[i].distanceTo(pts[i - 1]);
+      const cores = o.cores || [o.c || '#141414'], porCor = {};
+      for (let k = 0; k < n; k++) {
+        const off = (k - (n - 1) / 2) * R * 2.3; let perp = V(1, 0, 0);
+        const q = pts.map((p, i) => {
+          const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], t = V(b.x - a.x, 0, b.z - a.z);
+          if (t.lengthSq() > 1e-6) { t.normalize(); perp = V(-t.z, 0, t.x); }
+          return V(p.x + perp.x * off, p.y < .06 ? R : p.y, p.z + perp.z * off);
+        });
+        const geo = new T.TubeGeometry(new T.CatmullRomCurve3(q, false, 'centripetal'), Math.max(16, Math.round(L * 5)), R * (.85 + r() * .3), 5);
+        const c = cores[k % cores.length]; (porCor[c] = porCor[c] || []).push(geo);
+      }
+      Object.entries(porCor).forEach(([c, gs]) => g.add(juntar(gs, m(c, { r: .75 }))));
+      const cx = [], tampa = [];
+      [[0, 1, o.ini], [p0.length - 1, p0.length - 2, o.fim]].forEach(([i, j, tipo]) => {
+        if (tipo === 0) return;
+        const p = p0[i], d = p.clone().sub(p0[j]), ang = Math.atan2(d.x, d.z);
+        if (p.y < .06) { tampa.push(ret(.34, .03, .34, p.x, 0, p.z, 0, ang), cil(.06, .06, .05, p.x, .02, p.z, 10)); }
+        else cx.push(ret(.2, .16, .12, p.x, p.y - .08, p.z, 0, ang), cilC(.035, .035, .06, p.x - Math.sin(ang) * .08, p.y, p.z - Math.cos(ang) * .08, 8, PI / 2, ang, 0));
+      });
+      if (cx.length) g.add(juntar(cx, sujo('#4a4e52')));
+      if (tampa.length) g.add(juntar(tampa, metal('#3a3c3e')));
+      // protetor de cabos amarelo e preto nas travessias de chão com mais de 2,4 m
+      if (o.prot !== 0) {
+        const z = zebra(256, 32), pr = [];
+        for (let i = 1; i < p0.length; i++) { const a = p0[i - 1], b = p0[i]; if (a.y > .06 || b.y > .06) continue; const d = b.clone().sub(a), l = d.length(); if (l < 2.4) continue;
+          const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, ang = Math.atan2(d.x, d.z);
+          pr.push(tf(new T.BoxGeometry(.36, .055, 1.1), mx, .028, mz, 0, ang, 0)); }
+        if (pr.length) g.add(juntar(pr, z));
+      }
+      return g;
+    };
+
+    /* ---------- trajes de proteção: macacão com capuz e viseira larga, luvas, botas e fita nos punhos ---------- */
+    function panoTraje(cor, sujeira) {
+      // tecido: dobras verticais, vincos onde o tecido amontoa, sujeira na barra
+      const r = rng(cor.length * 13 + (sujeira ? 7 : 3));
+      return cmat(256, 512, (x, W, H) => {
+        x.fillStyle = cor; x.fillRect(0, 0, W, H);
+        for (let i = 0; i < 50; i++) { const px = r() * W, lw = 4 + r() * 16, gr = x.createLinearGradient(px - lw, 0, px + lw, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, `rgba(50,36,0,${.1 + r() * .18})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(px - lw, r() * H, lw * 2, 60 + r() * 240); }
+        for (let i = 0; i < 34; i++) { const px = r() * W, y0 = r() * H; x.strokeStyle = `rgba(255,250,215,${.1 + r() * .14})`; x.lineWidth = 1.5; x.beginPath(); x.moveTo(px, y0); x.quadraticCurveTo(px + (r() - .5) * 22, y0 + 40, px + (r() - .5) * 12, y0 + 80 + r() * 90); x.stroke(); }
+        for (let i = 0; i < 22; i++) { const y0 = r() * H; x.strokeStyle = `rgba(40,28,0,${.14 + r() * .16})`; x.lineWidth = 2 + r() * 3; x.beginPath(); x.moveTo(r() * W * .3, y0); x.bezierCurveTo(W * .3, y0 + (r() - .5) * 18, W * .7, y0 + (r() - .5) * 18, W * (.7 + r() * .3), y0 + (r() - .5) * 10); x.stroke(); }
+        const gs = x.createLinearGradient(0, H * .68, 0, H); gs.addColorStop(0, 'rgba(40,30,10,0)'); gs.addColorStop(1, `rgba(40,30,10,${sujeira ? .6 : .32})`); x.fillStyle = gs; x.fillRect(0, H * .68, W, H * .32);
+        if (sujeira) for (let i = 0; i < 18; i++) { x.fillStyle = `rgba(${r() < .5 ? '80,40,12' : '30,20,10'},${.15 + r() * .3})`; x.beginPath(); x.ellipse(r() * W, r() * H, 6 + r() * 30, 8 + r() * 44, r() * 3, 0, TAU); x.fill(); }
+      }, { r: .66, me: .04 });
+    }
+    function matsTraje(cor, tipo, sujeira) {
+      const eletrico = tipo === 'eletrico';
+      const et = cmat(128, 96, (x, W, H) => {
+        x.fillStyle = '#f2efe6'; x.fillRect(0, 0, W, H); x.strokeStyle = '#111'; x.lineWidth = 4; x.strokeRect(2, 2, W - 4, H - 4);
+        x.fillStyle = '#f1c40f'; x.beginPath(); x.moveTo(30, 12); x.lineTo(54, 56); x.lineTo(6, 56); x.closePath(); x.fill(); x.stroke();
+        x.fillStyle = '#111'; x.font = 'bold 26px Arial'; x.textAlign = 'center'; x.fillText(eletrico ? '⚡' : '☣', 30, 50);
+        x.font = 'bold 13px Arial'; x.textAlign = 'left'; x.fillText(eletrico ? 'ISOLAMENTO' : 'PROTEÇÃO', 60, 28); x.fillText(eletrico ? 'ELÉTRICO' : 'QUÍMICA', 60, 46);
+        x.font = 'bold 11px Arial'; x.fillText(eletrico ? 'CLASSE 2' : 'NÍVEL A', 60, 62); x.fillStyle = '#c0221a'; x.fillRect(6, 70, W - 12, 16);
+        x.fillStyle = '#fff'; x.font = 'bold 11px Arial'; x.textAlign = 'center'; x.fillText('TAMANHO ÚNICO', W / 2, 82);
+      }, { r: .7 });
+      return {
+        pano: panoTraje(cor, sujeira), pano2: m('#' + new T.Color(cor).multiplyScalar(.62).getHexString(), { r: .85, me: .02 }),
+        borr: m(eletrico ? '#1a1a1a' : '#1d2a1c', { r: .55, me: .05 }), bota: m('#121212', { r: .5, me: .05 }),
+        fita: m(eletrico ? '#2a2a2a' : '#9a9a94', { r: .5, me: .3 }), escuro: m('#141414', { r: .5, me: .4 }),
+        visor: m(eletrico ? '#2a3a20' : '#1c2a30', { r: .06, me: .6, op: sujeira ? .95 : .82 }), etq: et,
+      };
+    }
+    // o traje pendurado: a origem é o gancho do cabide; o traje cai para -y, frente em +z
+    function montarTraje(M, cheio, vr = 0) {
+      // vr: variação da pose (0 ou 1): capuz caído para o lado, uma manga mais para a frente
+      const g = G(), k = cheio ? 1.17 : 1, dz = cheio ? .82 : .5, rr = rng(7 + vr * 11 + (cheio ? 5 : 0));
+      const pano = [], pano2 = [], borr = [], bota = [], fita = [], esc = [];
+      const tor = (d, a = .35) => [d[0] + (rr() - .5) * a, d[1], d[2] + (rr() - .5) * a];
+      // capuz: vazio, ele murcha e tomba para a frente (ou para o lado); a viseira larga acompanha
+      const inc = cheio ? .1 : .6, lado = vr ? (cheio ? .18 : .5) : (cheio ? -.06 : -.12);
+      const Mh = new T.Matrix4().compose(V(vr && !cheio ? .04 : 0, cheio ? -.03 : -.09, cheio ? .02 : .07), new T.Quaternion().setFromEuler(new T.Euler(inc, 0, lado)), V(cheio ? 1 : 1.07, cheio ? 1 : .9, cheio ? .95 : .6));
+      pano.push(comM(tf(new T.SphereGeometry(.155 * k, 12, 8), 0, 0, 0, 0, 0, 0, 1, 1.12, 1), Mh));
+      const vis = comM(new T.CylinderGeometry(.159 * k, .159 * k, .17, 16, 1, true, -.85, 1.7), Mh);
+      [-1, 1].forEach(s => fita.push(comM(tf(new T.CylinderGeometry(.163 * k, .163 * k, .02, 16, 1, true, -.92, 1.84), 0, s * .092, 0), Mh)));
+      // pescoço, ombros, tronco folgado (mais largo embaixo, onde o tecido cai), assento
+      pano.push(segC([0, -.13, 0], [0, -.21, 0], .1 * k, .115 * k, 12));
+      pano.push(esf(.245 * k, 0, -.25, 0, 1, .3, dz, 12), tf(new T.CylinderGeometry(.2 * k, .23 * k, .62, 14), 0, -.56, 0, 0, 0, 0, 1, 1, dz), esf(.23 * k, 0, -.86, 0, 1, .34, dz, 12));
+      pano2.push(tf(new T.TorusGeometry(.215 * k, .009, 3, 18), 0, -.74, 0, PI / 2 + .05, 0, .04, 1, dz, 1));
+      // dobras diagonais no peito e na barriga (o tecido vazio afunda)
+      if (!cheio) [[-.08, -.45, .5], [.1, -.62, -.6], [-.05, -.78, .35]].forEach(([x, y, a]) => pano2.push(tf(new T.BoxGeometry(.16, .012, .012), x, y, .205 * k * dz + .002, 0, 0, a)));
+      // zíper com aba e etiqueta de aviso no peito
+      const zf = .205 * k * dz;
+      esc.push(ret(.016, .56, .012, 0, -.82, zf + .004), ret(.026, .05, .02, 0, -.32, zf + .012));
+      pano2.push(ret(.05, .56, .012, .032, -.82, zf + .001));
+      // mangas caídas (uma um pouco à frente na outra pose), um vinco no cotovelo, fita no punho e luva de borracha
+      [-1, 1].forEach(s => {
+        const fr = vr && s > 0 ? .1 : 0;
+        const sh = [s * .25 * k, -.27, 0], el = [s * .28 * k, -.56, (cheio ? .04 : .02) + fr * .6], cu = [s * (.29 + (vr ? .01 : -.01)) * k, -.82, (cheio ? .06 : .035) + fr];
+        pano.push(segC(sh, el, .072 * k, .064 * k), segC(el, cu, .064 * k, .073 * k), esf(.075 * k, sh[0], sh[1], 0, 1, 1, cheio ? 1 : .8, 8));
+        const d1 = [el[0] - sh[0], el[1] - sh[1], el[2] - sh[2]];
+        pano2.push(anel(el, tor(d1, .6), .068 * k, .007));
+        fita.push(segC([cu[0], cu[1] + .04, cu[2]], [cu[0], cu[1] - .04, cu[2]], .077 * k, .077 * k, 12));
+        const gy = cu[1] - .04, gz = cu[2];
+        borr.push(segC([cu[0], gy, gz], [cu[0], gy - .12, gz], .062, .055), ret(.03, .11, .088, cu[0], gy - .23, gz));
+        for (let f = 0; f < 4; f++) { const fz = gz - .03 + f * .02; borr.push(segC([cu[0], gy - .225, fz], [cu[0] - s * .006, gy - .3 + (f === 0 || f === 3 ? .012 : 0), fz + .004], .011, .009, 6)); }
+        borr.push(segC([cu[0] - s * .012, gy - .15, gz + .045], [cu[0] - s * .016, gy - .22, gz + .06], .013, .011, 6));
+      });
+      // pernas largas, dois vincos tortos (joelho e acima da bota), fita no tornozelo e bota de borracha embutida
+      [-1, 1].forEach(s => {
+        const hp = [s * .1 * k, -.86, 0], kn = [s * .108 * k, -1.2, cheio ? .02 : .015], an = [s * .1 * k, -1.5, 0];
+        pano.push(segC(hp, kn, .104 * k, .098 * k), segC(kn, an, .098 * k, .094 * k));
+        pano2.push(anel([kn[0], -1.2, kn[2] * .6], tor([0, 1, 0], .5), .1 * k, .007, 1.02), anel([kn[0], -1.41, 0], tor([0, 1, 0], .4), .095 * k, .007, 1.02));
+        fita.push(segC([an[0], an[1] + .035, 0], [an[0], an[1] - .035, 0], .097 * k, .097 * k, 12));
+        bota.push(segC([an[0], -1.5, 0], [an[0], -1.78, .01], .086, .09, 12), ret(.118, .09, .27, an[0], -1.86, .07), esf(.059, an[0], -1.8, .195, 1, .8, 1, 10));
+        esc.push(ret(.126, .028, .29, an[0], -1.88, .07));
+      });
+      g.add(juntar(pano, M.pano)); g.add(juntar(pano2, M.pano2)); g.add(juntar(borr, M.borr)); g.add(juntar(bota, M.bota)); g.add(juntar(fita, M.fita)); g.add(juntar(esc, M.escuro));
+      g.add(new T.Mesh(guardar(vis), M.visor));
+      const et = pl(g, .12, .09, M.etq, -.1 * k, -.4, zf + .012); et.rotation.y = -.15;
+      g.traverse(x => { if (x.isMesh) x.castShadow = true; });
+      return g;
+    }
+    // cabide de arame (gancho em cima da barra, que corre ao longo de x)
+    const geoCabide = () => { const gs = [tf(new T.TorusGeometry(.03, .005, 4, 12, PI * 1.25), 0, .0, 0, 0, PI / 2, -.3), barra([0, -.03, .0], [0, -.1, 0], .005, 5)];
+      gs.push(barra([0, -.1, 0], [-.21, -.19, 0], .008, 5), barra([0, -.1, 0], [.21, -.19, 0], .008, 5), barra([-.21, -.19, 0], [.21, -.19, 0], .006, 5)); return gs; };
+
+    // arara de parede com trajes VESTÍVEIS (vazios): a parede em z 0, barra a 0,36 m dela; prateleira com caixas,
+    // bandeja de borracha no chão e etiqueta. aoInter(v): mostra só v trajes (o cabide do traje que saiu balança).
+    P.p3_traje_arara = o => {
+      const g = G(), n = o.n || 5, esp = o.esp || .62, L = n * esp + .3, yR = o.yr ?? 2.05, zR = .36, tipo = o.tipo || 'hazmat', r = rng(o.sem || 41);
+      const cor = o.c || (tipo === 'eletrico' ? '#c86a1e' : '#d8c22a'), M = matsTraje(cor, tipo, false);
+      const est = [], xs = [-L / 2 + .05, L / 2 - .05]; if (n > 5) xs.push(0);
+      xs.forEach(x => est.push(ret(.08, .34, .02, x, yR - .2, .01), ret(.04, .04, zR + .03, x, yR - .02, zR / 2), ret(.08, .3, .02, x, yR + .1, .01), ret(.035, .035, .34, x, yR + .3, .17, -.0)));
+      est.push(cilC(.02, .02, L, 0, yR, zR, 10, 0, 0, PI / 2), ret(L, .03, .38, 0, yR + .33, .19), ret(L, .06, .015, 0, yR + .3, .38));
+      g.add(juntar(est, metal('#7a7e82')));
+      // caixas na prateleira e bandeja das botas
+      const cx = [], nb = Math.max(2, Math.round(L / 1.1)); for (let i = 0; i < nb; i++) cx.push(ret(.42 + r() * .1, .24 + r() * .08, .3, -L / 2 + .4 + i * (L - .8) / Math.max(1, nb - 1), yR + .36, .18, 0, (r() - .5) * .2));
+      g.add(juntar(cx, m('#8a7050', { tex: 'concreto_sujo', r: .9 })));
+      const rots = ['LUVAS', 'FITA', 'BOTAS', 'FILTROS', 'LUVAS'];
+      for (let i = 0; i < nb; i++) pl(g, .3, .09, rotulo(rots[i % rots.length], .3, .09, '#141210', '#e8e0c8'), -L / 2 + .4 + i * (L - .8) / Math.max(1, nb - 1), yR + .48, .335);
+      g.add(juntar([ret(L, .02, .62, 0, 0, .36), ret(L, .04, .02, 0, 0, .67), ret(L, .04, .02, 0, 0, .05)], m('#1a1c1c', { r: .8 })));
+      pl(g, Math.min(L * .6, 2.6), .1, rotulo(o.txt || (tipo === 'eletrico' ? 'TRAJE DE ISOLAMENTO ELÉTRICO' : 'TRAJE HAZMAT · TAMANHO ÚNICO'), Math.min(L * .6, 2.6), .1, '#141210', '#d8b018'), 0, yR + .27, .39);
+      // cabides e trajes (a malha do traje é uma só, repetida)
+      const gc = geoCabide(), mc = metal('#2a2c2e'), bases = [montarTraje(M, false, 0), montarTraje(M, false, 1)], cabides = [], trajes = [];
+      for (let i = 0; i < n; i++) {
+        const cb = G(); cb.position.set(-L / 2 + .15 + esp * (i + .5), yR, zR); g.add(cb);
+        if (i === 0) cb.add(juntar(gc.map(x => x), mc)); else cb.add(cabides[0].children[0].clone());
+        const t = bases[(i * 7 + 3) % 5 < 2 ? 1 : 0].clone(); t.rotation.y = (r() - .5) * .5; t.position.z = (r() - .5) * .04; t.scale.set(.96 + r() * .08, 1, 1); cb.add(t);
+        cabides.push(cb); trajes.push(t);
+      }
+      let ult = n; const bal = cabides.map(() => 0);
+      g.userData.aoInter = (v, inst) => {
+        const q = Math.max(0, Math.min(n, Math.round(v)));
+        trajes.forEach((t, i) => { t.visible = i < q; });
+        if (!inst && q < ult) for (let i = q; i < ult; i++) bal[i] = 1;
+        ult = q;
+      };
+      anim.push((dt, t) => cabides.forEach((c, i) => { if (bal[i] <= 0) return; bal[i] = Math.max(0, bal[i] - dt * .3); c.rotation.z = Math.sin(t * 6 + i) * .3 * bal[i]; c.rotation.x = Math.cos(t * 4.4 + i) * .15 * bal[i]; }));
+      return g;
+    };
+    // fileira de trajes CHEIOS (o que está dentro não tem forma e se mexe): não se vestem
+    P.p3_trajes_cheios = o => {
+      const g = G(), n = o.n || 6, esp = o.esp || .7, L = n * esp + .3, yR = o.yr ?? 1.96, zR = .4, r = rng(o.sem || 43);
+      const M = matsTraje(o.c || '#c8b228', 'hazmat', true);
+      const est = [], xs = [-L / 2 + .05, L / 2 - .05]; for (let x = -L / 2 + 2; x < L / 2 - 1; x += 2) xs.push(x);
+      xs.forEach(x => est.push(ret(.1, .4, .025, x, yR - .25, .012), ret(.05, .05, zR + .03, x, yR - .03, zR / 2)));
+      est.push(cilC(.025, .025, L, 0, yR, zR, 10, 0, 0, PI / 2));
+      g.add(juntar(est, metal('#4a4c4e')));
+      const gc = juntar(geoCabide(), metal('#2a2c2e'));
+      const vA = montarTraje(M, true, 0), vB = montarTraje(M, true, 1); vB.scale.set(.95, 1.04, 1.06);
+      const mBol = M.pano, bolhas = [], corpos = [];
+      for (let i = 0; i < n; i++) {
+        const cb = G(); cb.position.set(-L / 2 + .15 + esp * (i + .5), yR, zR); g.add(cb); cb.add(i ? gc.clone() : gc);
+        const tt = (r() < .5 ? vB : vA).clone(); tt.rotation.y = (r() - .5) * .6; tt.position.z = (r() - .5) * .06; cb.add(tt);
+        // volumes sem forma por baixo do tecido
+        for (let b = 0; b < 2; b++) { const e = new T.Mesh(guardar(new T.SphereGeometry(.09 + r() * .05, 8, 6)), mBol); const bx0 = (r() - .5) * .22, by0 = -.45 - r() * .8; e.position.set(bx0, by0, .12 + r() * .04); tt.add(e); bolhas.push([e, bx0, by0, r() * 9, .5 + r()]); }
+        corpos.push([cb, r() * 9]);
+      }
+      anim.push((dt, t) => {
+        bolhas.forEach(([e, x0, y0, f, v]) => { e.position.x = x0 + Math.sin(t * .6 * v + f) * .05; e.position.y = y0 + Math.sin(t * .4 * v + f * 2) * .12; const s = 1 + Math.sin(t * 1.3 + f) * .25; e.scale.set(s, 1.2 / s, s); });
+        corpos.forEach(([c, f]) => { const tr = Math.sin(t * .23 + f) > .985 ? Math.sin(t * 40) * .04 : 0; c.rotation.z = Math.sin(t * .35 + f) * .02 + tr; c.rotation.x = Math.sin(t * .27 + f * 2) * .015; });
+      });
+      return g;
+    };
+    // banco de vestiário com um traje dobrado, a máscara de capuz e um par de botas embaixo
+    P.p3_banco_trajes = o => {
+      const g = G(), L = o.l || 2.0, cor = o.c || '#d8c22a', M = matsTraje(cor, o.tipo || 'hazmat', false), mad = m('#7a6a5a', { tex: 'madeira', r: .8 });
+      const ab = []; for (let i = 0; i < 3; i++) ab.push(ret(L, .035, .11, 0, .43, -.13 + i * .13)); g.add(juntar(ab, mad));
+      const pe = []; [-L / 2 + .15, L / 2 - .15].forEach(x => pe.push(ret(.05, .43, .05, x, 0, -.15), ret(.05, .43, .05, x, 0, .15), ret(.05, .05, .34, x, .12, 0))); pe.push(ret(L - .3, .04, .04, 0, .12, 0)); g.add(juntar(pe, metal('#4a4e52')));
+      // traje dobrado: camadas com vincos e a etiqueta por cima
+      const db = []; for (let i = 0; i < 4; i++) db.push(ret(.42 - i * .015, .045, .32 - i * .01, -L / 4 + (i % 2) * .01, .465 + i * .045, 0, 0, (i % 2 - .5) * .06));
+      g.add(juntar(db, M.pano)); pl(g, .12, .09, M.etq, -L / 4, .65, 0).rotation.x = -PI / 2;
+      // capuz com viseira deitado no banco
+      const cp = G(); cp.position.set(L / 4 - .1, .465, 0); cp.rotation.set(-1.2, .5, 0); g.add(cp);
+      cp.add(juntar([esf(.15, 0, .12, 0, 1, 1.1, .8, 14)], M.pano)); const vv = new T.Mesh(guardar(new T.CylinderGeometry(.153, .153, .16, 16, 1, true, -.85, 1.7).translate(0, .12, 0).scale(1, 1, .82)), M.visor); cp.add(vv);
+      // rolo de fita e as botas
+      g.add(juntar([tf(new T.TorusGeometry(.05, .025, 6, 14), L / 2 - .25, .5, .05, PI / 2, 0, 0)], M.fita));
+      g.add(juntar([ret(.12, .3, .14, -.12, 0, .3), ret(.12, .09, .28, -.12, 0, .37), ret(.12, .3, .14, .06, 0, .32, 0, .3), ret(.12, .09, .28, .06, 0, .38, 0, .3)], M.bota));
+      return g;
+    };
+
+    /* ---------- armários de vestiário com portas que abrem (com coisas dentro) ---------- */
+    // n portas de w; "abre": quais portas abrem (padrão: todas até 4, ou a do meio); frente em +z
+    P.p3_armario_portas = o => {
+      const g = G(), n = o.n || 3, w = o.w || .5, h = o.h || 1.9, d = .5, r = rng(o.sem || 23);
+      const abre = o.abre || (n <= 4 ? [...Array(n).keys()] : [Math.floor(n / 2)]);
+      const cor = m(o.c || '#59656e', { me: .55, r: .45, tex: 'metal', rep: [1, 3] }), dentro = m('#2a2e32', { me: .35, r: .7 }), esc = m('#161616', { r: .6 });
+      const corpo = [], interno = [], frisos = [], macs = [];
+      const txt = i => (Array.isArray(o.txt) ? o.txt[i] : o.txt) || '';
+      const folhas = [];
+      for (let i = 0; i < n; i++) {
+        const x = (i - (n - 1) / 2) * w;
+        if (!abre.includes(i)) {
+          corpo.push(ret(w - .02, h, d, x, 0, 0));
+          for (let k = 0; k < 5; k++) frisos.push(ret(w * .6, .015, .012, x, h - .22 - k * .05, d / 2));
+          macs.push(ret(.03, .15, .04, x + w * .3, h * .5, d / 2 + .01));
+          if (txt(i)) pl(g, w * .7, .12, m('#ffffff', { unico: true, mapa: textoTex(txt(i), { w: 256, h: 48, cor: '#f2f2f2', fundo: 'rgba(0,0,0,0)', tam: 30, fonte: 'Impact, Arial Black, sans-serif' }), r: .8 }), x, h * .74, d / 2 + .008).material.transparent = true;
+          continue;
+        }
+        // armário que abre: caixa oca, prateleira e o que ficou lá dentro
+        corpo.push(ret(.015, h, d, x - w / 2 + .0175, 0, 0), ret(.015, h, d, x + w / 2 - .0175, 0, 0), ret(w - .02, .02, d, x, h - .02, 0), ret(w - .02, .05, d, x, 0, 0));
+        interno.push(ret(w - .04, h - .06, .015, x, .04, -d / 2 + .01), ret(w - .05, .018, d - .05, x, h - .42, -.01), ret(.015, .03, d - .06, x, h - .55, -.01));
+        const tipo = r();
+        if (tipo < .4) { // casaco pendurado no gancho
+          macs.push(ret(.015, .06, .06, x, h - .5, -.12));
+          const cs = G(); cs.position.set(x, h - .52, -.08); g.add(cs); cs.add(juntar([ret(.34, .72, .1, 0, -.72, 0), segC([-.17, -.05, 0], [-.19, -.62, .02], .045, .04), segC([.17, -.05, 0], [.19, -.62, .02], .045, .04)], m(r() < .5 ? '#3a3e36' : '#e4e2da', { r: .9 })));
+        } else if (tipo < .7) { // botas e um frasco
+          interno.push(ret(.11, .28, .13, x - .1, .05, -.05), ret(.11, .08, .26, x - .1, .05, .02), ret(.11, .28, .13, x + .07, .05, -.08), ret(.11, .08, .26, x + .07, .05, -.01));
+          macs.push(cil(.04, .04, .18, x + .1, h - .4, -.05, 10));
+        } else { // papéis e uma mancha de mão por dentro da porta
+          interno.push(ret(.3, .04, .22, x, h - .4, -.04, 0, .2), ret(.28, .03, .2, x + .02, h - .36, -.05, 0, -.1));
+        }
+        if (r() < .5) { const cp = new T.Mesh(guardar(new T.SphereGeometry(.15, 12, 8, 0, TAU, 0, PI / 2)), m('#c8a018', { r: .5, me: .2 })); cp.position.set(x, h - .4, -.05); g.add(cp); }
+        // a porta, na dobradiça da esquerda
+        const dob = G(); dob.position.set(x - w / 2 + .01, 0, d / 2); g.add(dob);
+        dob.add(juntar([ret(w - .03, h - .02, .02, (w - .03) / 2, .01, .01)], cor));
+        const fr = []; for (let k = 0; k < 5; k++) fr.push(ret(w * .6, .015, .012, (w - .03) / 2, h - .22 - k * .05, .025)); dob.add(juntar(fr, esc));
+        dob.add(juntar([ret(.03, .15, .04, w * .8, h * .5, .035)], metal('#aaa')));
+        if (txt(i)) { const tp = pl(dob, w * .7, .12, m('#ffffff', { unico: true, mapa: textoTex(txt(i), { w: 256, h: 48, cor: '#f2f2f2', fundo: 'rgba(0,0,0,0)', tam: 30, fonte: 'Impact, Arial Black, sans-serif' }), r: .8 }), (w - .03) / 2, h * .74, .022); tp.material.transparent = true; }
+        if (o.mancha !== 0 && tipo >= .7) { const mm = cmat(128, 128, (x2, W) => { x2.clearRect(0, 0, W, W); x2.fillStyle = 'rgba(80,8,6,.85)'; x2.beginPath(); x2.ellipse(64, 80, 22, 20, 0, 0, TAU); x2.fill(); for (let f = 0; f < 4; f++) { x2.beginPath(); x2.ellipse(42 + f * 14, 46, 5, 16, 0, 0, TAU); x2.fill(); } x2.beginPath(); x2.ellipse(92, 70, 6, 14, -.6, 0, TAU); x2.fill(); }, { transp: true }); decal(mm); const pm = pl(dob, .2, .2, mm, (w - .03) / 2, h * .55, -.002); pm.rotation.y = PI; }
+        folhas.push(dob);
+      }
+      if (corpo.length) g.add(juntar(corpo, cor));
+      if (interno.length) g.add(juntar(interno, dentro));
+      if (frisos.length) g.add(juntar(frisos, esc));
+      if (macs.length) g.add(juntar(macs, metal('#9a9a9a')));
+      const a = animador(v => folhas.forEach((f, i) => { f.rotation.y = -suave(Math.min(1, v * (1 + i * .15))) * 1.75; }), 1.4);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- quadro elétrico com porta (disjuntores, conduítes até o forro) ---------- */
+    P.p3_quadro_porta = o => {
+      const g = G(), w = o.w || .9, h = o.h || 1.9, d = o.d || .5, y0 = o.y0 || 0, mt = sujo(o.c || '#4a4e52'), r = rng(o.sem || 29);
+      g.add(juntar([ret(w, h, .03, 0, y0, -d / 2 + .015), ret(.03, h, d, -w / 2 + .015, y0, 0), ret(.03, h, d, w / 2 - .015, y0, 0), ret(w, .03, d, 0, y0 + h - .03, 0), ret(w, .05, d, 0, y0, 0)], mt));
+      // conduítes do teto do quadro até o forro (os cabos chegam por cima)
+      const cd = []; for (let k = 0; k < 3; k++) { const x = -w / 3 + k * w / 3; cd.push(cil(.032, .032, ALT - (y0 + h), x, y0 + h, -d / 4, 8)); for (let y = y0 + h + .4; y < ALT - .1; y += .8) cd.push(cil(.042, .042, .05, x, y, -d / 4, 8)); }
+      if (y0 > .05) cd.push(cil(.03, .03, y0, 0, 0, -d / 4, 8));
+      g.add(juntar(cd, metal('#6a6e72')));
+      const pn = cmat(256, 512, (x, W, H) => {
+        x.fillStyle = '#c8c6be'; x.fillRect(0, 0, W, H);
+        x.fillStyle = '#2a2a2a'; x.fillRect(20, 20, W - 40, 60); x.fillStyle = '#b01a12'; x.fillRect(W / 2 - 18, 30, 36, 40);
+        const rows = Math.max(3, Math.round(H / 90));
+        for (let rr = 0; rr < rows; rr++) { const y = 110 + rr * ((H - 150) / rows); x.fillStyle = '#4a4a4a'; x.fillRect(16, y - 6, W - 32, 6);
+          for (let c = 0; c < 8; c++) { x.fillStyle = '#1a1a1a'; x.fillRect(22 + c * 27, y, 22, 44); x.fillStyle = r() < .15 ? '#c0221a' : '#e8e8e2'; x.fillRect(28 + c * 27, y + (r() < .3 ? 24 : 8), 10, 12); x.fillStyle = '#fff'; x.fillRect(22 + c * 27, y + 48, 22, 8); } }
+        x.strokeStyle = '#1a1a1a'; x.lineWidth = 3; for (let k = 0; k < 9; k++) { x.beginPath(); x.moveTo(30 + k * 24, 0); x.quadraticCurveTo(20 + k * 25, 60, 30 + k * 24, 100); x.stroke(); }
+        for (let i = 0; i < 30; i++) { x.fillStyle = `rgba(50,30,10,${r() * .2})`; x.fillRect(r() * W, r() * H, 6, 6); }
+      }, { r: .7 });
+      pl(g, w - .1, h - .12, pn, 0, y0 + h / 2, -d / 2 + .035);
+      let fa = null; if (o.centelhas) { fa = P.centelhas({ sem: o.sem, raio: .25 }); fa.position.set(0, y0 + h * .7, -d / 4); fa.visible = false; g.add(fa); }
+      // a porta (dobradiça à esquerda), com adesivo de perigo, etiqueta e esquema colado por dentro
+      const dob = G(); dob.position.set(-w / 2, y0, d / 2); g.add(dob);
+      dob.add(juntar([ret(w - .01, h - .02, .025, (w - .01) / 2, .01, .0125)], mt));
+      dob.add(juntar([ret(.03, .16, .04, w - .1, h * .5, .04), ret(.06, .03, .03, w - .1, h * .5 + .17, .03)], metal('#9a9a9a')));
+      pl(dob, Math.min(.36, w * .45), Math.min(.32, w * .4), m('#ffffff', { unico: true, mapa: textoTex('⚡', { w: 128, h: 128, cor: '#141210', fundo: '#f1c40f', tam: 90 }), r: .8 }), w / 2, h * .72, .027);
+      pl(dob, Math.min(.6, w * .7), .1, rotulo(o.txt || 'PERIGO · ALTA TENSÃO', Math.min(.6, w * .7), .1, '#f2f2f2', '#b01a12'), w / 2, h * .58, .027);
+      const esq = cmat(128, 160, (x, W, H) => { x.fillStyle = '#ece6d4'; x.fillRect(0, 0, W, H); x.strokeStyle = '#222'; x.lineWidth = 2; for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo(10 + r() * 30, 12 + i * 12); x.lineTo(60 + r() * 60, 12 + i * 12); x.stroke(); } x.strokeRect(70, 20, 40, 60); }, { r: .9 });
+      const ep = pl(dob, w * .5, w * .62, esq, w / 2, h * .55, -.002); ep.rotation.y = PI;
+      const a = animador(v => { dob.rotation.y = -suave(v) * 1.85; if (fa) fa.visible = v > .3; }, 1.3);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- arquivo de aço / caixa de ferramentas com gaveta que abre ---------- */
+    P.p3_gaveteiro = o => {
+      const g = G(), fer = o.tipo === 'ferramentas', w = o.w || (fer ? .9 : .5), h = o.h || (fer ? 1.0 : 1.32), d = fer ? .5 : .62, n = o.n || (fer ? 6 : 4), r = rng(o.sem || 37);
+      const mt = m(o.c || (fer ? '#9a1e18' : '#7d868e'), { me: .5, r: .42 }), gi = Math.min(n - 1, o.gav ?? 0), dh = (h - .06) / n;
+      const yi = i => .03 + (n - 1 - i) * dh;
+      const cp = [ret(.02, h, d, -w / 2 + .01, 0, 0), ret(.02, h, d, w / 2 - .01, 0, 0), ret(w, .03, d, 0, h - .03, 0), ret(w, .03, d, 0, 0, 0), ret(w, h, .02, 0, 0, -d / 2 + .01)];
+      const fr = [], pux = [];
+      for (let i = 0; i < n; i++) { if (i === gi) continue; cp.push(ret(w - .04, dh - .012, d - .04, 0, yi(i) + .006, 0)); pux.push(ret(w * (fer ? .7 : .3), .02, .03, 0, yi(i) + dh * .55, d / 2 + .01)); if (!fer) fr.push(ret(.12, .05, .005, 0, yi(i) + dh * .75, d / 2 + .003)); }
+      g.add(juntar(cp, mt)); g.add(juntar(pux, metal('#c8c8c8'))); if (fr.length) g.add(juntar(fr, m('#e8e4d8')));
+      if (fer) g.add(juntar([cilC(.05, .05, .05, -w / 2 + .1, .03, d / 2 - .1, 10, 0, 0, PI / 2), cilC(.05, .05, .05, w / 2 - .1, .03, d / 2 - .1, 10, 0, 0, PI / 2)], m('#141414')));
+      // a gaveta que abre e o que tem dentro (pastas, ou ferramentas na espuma)
+      const gv = G(); gv.position.set(0, yi(gi), 0); g.add(gv);
+      gv.add(juntar([ret(w - .04, dh - .012, .02, 0, .006, d / 2 - .01), ret(w - .06, .015, d - .06, 0, .02, -.01), ret(.015, dh * .7, d - .06, -w / 2 + .035, .02, -.01), ret(.015, dh * .7, d - .06, w / 2 - .035, .02, -.01), ret(w - .06, dh * .7, .015, 0, .02, -d / 2 + .04)], mt));
+      gv.add(juntar([ret(w * (fer ? .7 : .3), .02, .03, 0, dh * .55, d / 2 + .01)], metal('#c8c8c8')));
+      if (fer) {
+        gv.add(juntar([ret(w - .08, .02, d - .1, 0, .035, -.01)], m('#1a1a1a', { r: .95 })));
+        gv.add(juntar([ret(.3, .015, .04, -.2, .056, -.1, 0, .2), ret(.25, .015, .03, .15, .056, .05, 0, -.1), cilC(.015, .015, .22, .05, .065, -.12, 6, 0, 0, PI / 2), ret(.06, .03, .05, -.05, .056, .1)], metal('#9aa0a6')));
+      } else {
+        const ps = []; for (let k = 0; k < 9; k++) ps.push(ret(w - .1, dh * .62 - (k % 3) * .02, .008, 0, .03, -d / 2 + .1 + k * (d - .2) / 9, -.1 + r() * .2, 0, 0));
+        gv.add(juntar(ps, m('#d8c890', { r: .9 })));
+        const tb = []; for (let k = 0; k < 9; k++) tb.push(ret(.06, .03, .009, -w / 2 + .09 + (k % 4) * .1, dh * .62 + .02, -d / 2 + .1 + k * (d - .2) / 9)); gv.add(juntar(tb, m('#c8a038')));
+      }
+      const curso = d - .14;
+      const a = animador(v => { gv.position.z = suave(v) * curso; }, 1.8);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- registro (válvula de gaveta) num cano da parede, do chão ao forro ---------- */
+    P.p3_registro = o => {
+      const g = G(), R = o.raio || .09, zc = R + .06, yv = o.yv || 1.15, mt = m(o.c || '#5a3a2a', { tex: 'ferrugem', me: .5, r: .45 });
+      const gs = [cil(R, R, ALT, 0, 0, zc, 14)];
+      [.25, yv - .3, yv + .3, ALT - .3].forEach(y => gs.push(cil(R + .045, R + .045, .06, 0, y, zc, 14)));
+      gs.push(esf(R * 1.7, 0, yv, zc, 1, 1.25, 1, 14), cilC(.055, .055, .26, 0, yv, zc + R * 1.6 + .1, 10, PI / 2));
+      g.add(juntar(gs, mt));
+      g.add(juntar([.6, 2.4, ALT - .5].map(y => ret(.06, .05, zc + .02, 0, y, zc / 2)).concat([.6, 2.4, ALT - .5].map(y => tf(new T.TorusGeometry(R + .015, .012, 4, 14, PI), 0, y + .025, zc, PI / 2, 0, PI))), metal('#3a3a3a')));
+      // volante e a haste (sobe quando abre)
+      const vol = G(); vol.position.set(0, yv, zc + R * 1.6 + .25); g.add(vol);
+      vol.add(juntar([tf(new T.TorusGeometry(.2, .022, 6, 22), 0, 0, 0), ...[0, 1, 2, 3, 4].map(i => barra([0, 0, 0], [Math.cos(i * TAU / 5) * .2, Math.sin(i * TAU / 5) * .2, 0], .014, 5)), cilC(.04, .04, .06, 0, 0, 0, 10, PI / 2)], m(o.cv || '#a01a12', { me: .4, r: .5 })));
+      const has = new T.Mesh(guardar(cilC(.018, .018, .22, 0, 0, -.06, 8, PI / 2)), metal('#b8b0a0')); vol.add(has);
+      const pp = G(); pp.position.set(0, yv + .5, zc + R + .02); g.add(pp); mesh(pp, cilC(.015, .015, .12, 0, -.06, -.04, 6), metal());
+      const ag = mostrador(pp, .085, 0, 0, .03, .4, o.un || 'bar');
+      pl(g, .28, .07, rotulo(o.txt || 'REGISTRO', .28, .07), 0, yv - .42, zc + R + .05);
+      const a = animador(v => { const s = suave(v); vol.rotation.z = -s * TAU * 2.5; vol.position.z = zc + R * 1.6 + .25 + s * .08; ag.rotation.z = -(.4 + s * 1.7); }, .45);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- chave de alavanca na parede (liga/desliga), com lâmpada de estado ---------- */
+    P.p3_alavanca = o => {
+      const g = G(), y = o.y ?? 1.2, mt = sujo(o.c || '#5a6066');
+      g.add(juntar([ret(.42, .6, .2, 0, y, .1), ret(.46, .05, .22, 0, y + .6, .11)], mt));
+      g.add(juntar([cil(.03, .03, y, .14, 0, .06, 8), cil(.03, .03, ALT - y - .65, .14, y + .65, .06, 8)], metal('#6a6e72')));
+      pl(g, .36, .09, rotulo(o.txt || 'ILUMINAÇÃO', .36, .09, '#141210', '#e8e0c8'), 0, y + .48, .203);
+      pl(g, .2, .18, m('#ffffff', { unico: true, mapa: textoTex('⚡', { w: 64, h: 64, cor: '#141210', fundo: '#f1c40f', tam: 44 }) }), 0, y + .22, .203);
+      const lamp = brilhoMat('#40ff60', 1.4); sf(g, .035, lamp, -.13, y + .48, .215, 10);
+      const piv = G(); piv.position.set(.235, y + .3, .1); g.add(piv);
+      piv.add(juntar([cilC(.035, .035, .05, 0, 0, 0, 10, 0, 0, PI / 2)], metal('#3a3a3a')));
+      piv.add(juntar([ret(.025, .34, .025, .03, 0, 0), cilC(.03, .03, .14, .03, .36, .04, 10, PI / 2)], m('#b01a12', { r: .5 })));
+      const a = animador(v => { piv.rotation.x = .9 - suave(v) * 1.8; multi(lamp, 1); lamp.emissive.set(v > .5 ? '#40ff60' : '#ff2a1a'); }, 2.4);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- botoeira de parada de emergência no pedestal (aperta; nada para) ---------- */
+    P.p3_botoeira = o => {
+      const g = G(), am = amarelo();
+      g.add(juntar([ret(.3, .02, .3, 0, 0, 0), cil(.04, .04, 1.0, 0, .02, 0, 10), ret(.24, .24, .18, 0, 1.0, 0)], am));
+      const btn = G(); btn.position.set(0, 1.12, .09); g.add(btn);
+      btn.add(juntar([cilC(.035, .035, .05, 0, 0, .02, 12, PI / 2), tf(new T.SphereGeometry(.065, 14, 8, 0, TAU, 0, PI / 2), 0, 0, .045, PI / 2, 0, 0, 1, .55, 1)], m('#c0181a', { r: .35 })));
+      g.add(juntar([tf(new T.TorusGeometry(.055, .012, 6, 16), 0, 1.12, .095)], m('#141414')));
+      pl(g, .3, .07, rotulo(o.txt || 'PARADA DE EMERGÊNCIA', .3, .07, '#f2f2f2', '#b01a12'), 0, .93, .1);
+      const bc = brilhoMat('#ffb020', 1.6); multi(bc, .05); g.add(juntar([cil(.045, .045, .08, 0, 1.24, 0, 12)], bc));
+      let ate = 0, tAgora = 0;
+      g.userData.aoInter = (v, inst, ev) => { if (ev === 'tocar') ate = tAgora + 4; };
+      anim.push((dt, t) => { tAgora = t; const on = t < ate; btn.position.z = .09 - (on && ate - t > 2.6 ? .03 : 0); multi(bc, on ? (Math.sin(t * 14) > 0 ? 1 : .1) : .05); });
+      return g;
+    };
+
+    /* ---------- geladeira que abre (luz de dentro acende) ---------- */
+    P.p3_geladeira = o => {
+      const g = G(), w = o.w || .8, h = o.h || 1.85, d = .7, r = rng(o.sem || 47), mt = m(o.c || '#d8d4c8', { r: .35, me: .15 }), inn = m('#dcdfd8', { r: .45 });
+      g.add(juntar([ret(w, h, .03, 0, 0, -d / 2 + .015), ret(.03, h, d, -w / 2 + .015, 0, 0), ret(.03, h, d, w / 2 - .015, 0, 0), ret(w, .04, d, 0, h - .04, 0), ret(w, .1, d, 0, 0, 0)], mt));
+      const pr = []; [.45, .85, 1.25].forEach(y => pr.push(ret(w - .08, .012, d - .1, 0, y, -.03))); pr.push(ret(w - .08, .2, d - .12, 0, .12, -.03)); g.add(juntar(pr, m('#b8c8c8', { op: .55, r: .1 })));
+      g.add(juntar([ret(w - .06, h - .16, .01, 0, .1, -d / 2 + .035)], inn));
+      // comida estragada, garrafas, um pote
+      g.add(juntar([cil(.035, .035, .26, -.22, .462, -.15, 10), cil(.035, .035, .22, -.13, .462, -.18, 10), cil(.05, .05, .12, .15, .862, -.1, 12)], m('#6a7a5a', { op: .8, r: .1 })));
+      g.add(juntar([esf(.08, .1, .5, -.05, 1.3, .5, 1, 10), esf(.06, -.15, .9, -.1, 1, .7, 1.3, 10), esf(.07, .2, 1.3, -.12, 1.4, .6, 1, 10), ret(.3, .04, .22, -.05, 1.262, -.05)], m('#3a3a1e', { r: .9 })));
+      const mofo = cmat(128, 128, (x, W) => { x.clearRect(0, 0, W, W); for (let i = 0; i < 26; i++) { x.fillStyle = `rgba(${r() < .5 ? '40,60,20' : '20,30,10'},${.3 + r() * .4})`; x.beginPath(); x.arc(r() * W, r() * W, 3 + r() * 14, 0, TAU); x.fill(); } }, { transp: true });
+      decal(mofo); pl(g, w - .1, .8, mofo, 0, .9, -d / 2 + .042);
+      const luzI = brilhoMat('#fff2d0', 1.4); multi(luzI, 0); pl(g, .2, .05, luzI, 0, h - .1, -.1).rotation.x = PI / 2;
+      // porta com prateleiras por dentro e o puxador
+      const dob = G(); dob.position.set(-w / 2, 0, d / 2); g.add(dob);
+      dob.add(juntar([ret(w - .01, h - .04, .06, (w - .01) / 2, .02, .03)], mt));
+      dob.add(juntar([ret(w - .12, .02, .1, (w - .01) / 2, .5, -.05), ret(w - .12, .02, .1, (w - .01) / 2, 1.0, -.05), ret(w - .12, .08, .01, (w - .01) / 2, .5, -.1), ret(w - .12, .08, .01, (w - .01) / 2, 1.0, -.1)], inn));
+      dob.add(juntar([cil(.025, .025, .18, .2, .52, -.05, 8), cil(.025, .025, .14, .32, .52, -.05, 8)], m('#5a4a2a', { op: .8 })));
+      dob.add(juntar([ret(.03, .5, .04, w - .08, .95, .08)], metal('#b8b8b8')));
+      const a = animador(v => { dob.rotation.y = -suave(v) * 1.9; multi(luzI, v > .08 ? 1 : 0); }, 1.4);
+      g.userData.aoInter = (v, inst) => a.ir(v, inst);
+      return g;
+    };
+
+    /* ---------- ventilador de mesa que liga e desliga (fio até a tomada da parede) ---------- */
+    P.p3_ventilador_mesa = o => {
+      const g = G(), mt = m(o.c || '#2a2a2a', { r: .5, me: .3 }), hm = o.mesa ?? .76, pa = o.parede ?? .38;
+      g.add(juntar([cil(.09, .11, .03, 0, 0, 0, 14), cil(.014, .014, .26, 0, .03, 0, 6)], mt));
+      const cab = G(); cab.position.set(0, .3, 0); g.add(cab);
+      cab.add(juntar([cilC(.055, .05, .14, 0, 0, -.05, 12, PI / 2)], mt));
+      const gr = []; for (let k = 1; k <= 3; k++) gr.push(tf(new T.TorusGeometry(.055 * k, .004, 4, 22), 0, 0, .06)); gr.push(tf(new T.TorusGeometry(.17, .006, 4, 24), 0, 0, .04)); for (let k = 0; k < 8; k++) gr.push(barra([0, 0, .07], [Math.cos(k * PI / 4) * .17, Math.sin(k * PI / 4) * .17, .04], .003, 3));
+      cab.add(juntar(gr, metal('#9aa0a6')));
+      const pas = G(); pas.position.set(0, 0, .04); cab.add(pas);
+      pas.add(juntar([0, 1, 2].map(k => tf(new T.BoxGeometry(.06, .15, .006), Math.cos(k * TAU / 3 + PI / 2) * .08, Math.sin(k * TAU / 3 + PI / 2) * .08, 0, .3, 0, k * TAU / 3)), m('#b8c0c4', { r: .4, me: .2, lado: 2 })));
+      g.add(juntar([tubo([[0, .02, -.08], [0, .01, -.3], [0, -.05, -pa + .1], [0, -hm * .5, -pa + .02], [0, -hm + .3, -pa + .02]], .006, 20, 4), ret(.08, .12, .04, 0, -hm + .26, -pa + .02)], m('#141414')));
+      let vel = 0, alvo = 1;
+      g.userData.aoInter = (v, inst) => { alvo = v ? 1 : 0; if (inst) vel = alvo; };
+      anim.push((dt, t) => { vel += (alvo - vel) * Math.min(1, dt * .8); pas.rotation.z += dt * 22 * vel; cab.rotation.y = Math.sin(t * .5) * .6 * vel; });
+      return g;
+    };
+
+    /* ---------- peças da biblioteca sem os cabos soltos no chão, e com cabo ligado ---------- */
+    // console: o conduíte sai da lateral, embaixo, e entra numa caixa de passagem na parede (nada sobe na frente das placas)
+    P.p3_console = o => {
+      const g = semCabos(() => P.console_tela(o)), w = o.w || 1.1;
+      g.add(juntar([tubo([[-w / 2 + .02, .25, -.15], [-w / 2 - .1, .2, -.18], [-w / 2 - .2, .24, -.3]], .028, 12, 6), ret(.2, .24, .08, -w / 2 - .22, .16, -.33), ret(.06, .03, .06, -w / 2 - .22, .4, -.33)], metal('#5a5e62')));
+      return g;
+    };
+    // baterias: cabos dos bornes até a canaleta da parede, que sobe até o forro
+    P.p3_baterias = o => {
+      const g = semCabos(() => P.baterias(o)), n = o.n || 5, Wb = n * .34 + .2, cb = [];
+      for (let i = 0; i < n; i++) { const x0 = (i - (n - 1) / 2) * .34; [-1, 1].forEach(s => cb.push(tubo([[x0 + s * .08, .66, 0], [x0 + s * .08, .85, -.06], [x0 + s * .05, 1.12, -.18]], .012, 10, 5))); }
+      g.add(juntar(cb, m('#141414', { r: .7 })));
+      g.add(juntar([ret(Wb, .1, .08, 0, 1.1, -.2), ret(.1, ALT - 1.2, .08, Wb / 2 - .05, 1.2, -.2)], metal('#6a6e72')));
+      return g;
+    };
+    P.p3_gerador = o => semCabos(() => P.a3_gerador(o));
+    P.p3_solda = o => semCabos(() => P.a3_solda(o));
   });
   const SC = (NS.semColisao = NS.semColisao || new Set());
-  ['p3_viga_teto', 'p3_bandeja_cabos', 'p3_duto', 'p3_ponte_rolante', 'p3_marca_chao', 'p3_lampada_gaiola', 'p3_luminaria_galpao', 'p3_rastro', 'p3_unhas', 'p3_corneta'].forEach(t => SC.add(t));
+  ['p3_viga_teto', 'p3_bandeja_cabos', 'p3_duto', 'p3_ponte_rolante', 'p3_marca_chao', 'p3_lampada_gaiola', 'p3_luminaria_galpao', 'p3_rastro', 'p3_unhas', 'p3_corneta', 'p3_cabos'].forEach(t => SC.add(t));
 })();
 
 /* ===================== 4º andar · sala de 20 m ===================== */
@@ -5975,6 +7565,7 @@
       add(q, [ret(W, H, .12, 0, 0, -L / 2 + .25), ret(1.2, .9, 1.0, 0, .12, -L / 2 + 1.0), ret(.7, .5, .5, 0, H, -L / 2 + .9)], casco);
       add(q, [ret(W + .1, .08, .12, 0, H, -.4 + (L - 1.2) / 2), ret(W + .1, .08, .1, 0, H, -L / 2 + .25)].concat([-1, 1].map(s => ret(.12, .08, L - 1.2, s * (W / 2 + .03), H, -.4))), aco);
       const rampa = G(); rampa.position.set(0, .1, L / 2 - 1.0); rampa.rotation.x = 1.25; q.add(rampa);
+      if (o.int) vaiVem(g, k => { rampa.rotation.x = .1 + 1.15 * suave(k); }, .5);
       add(rampa, [ret(W - .1, 1.9, .1, 0, 0, 0)].concat([0, 1, 2, 3, 4, 5].map(i => ret(W - .2, .05, .05, 0, .2 + i * .28, .06))), aco);
       [-1, 1].forEach(s => add(q, [barra([s * (W / 2 - .3), H, -L / 2 + .6], [s * (W / 2 - .3), H + .5, -L / 2 + .6], .03), barra([s * (W / 2 - .3), H + .5, -L / 2 + .6], [s * (W / 2 - .3), H + .55, -L / 2 + 1.3], .03)], metal('#2a2a28')));
       q.rotation.z = o.incl ?? .07; q.position.y = -.18;
@@ -6000,8 +7591,10 @@
     P.p4_porteira = o => {
       const g = G(), wg = o.w || 3.0, asa = o.asa ?? 2.5, ab = (o.aberta || 0) * Math.PI / 180, mad = m(o.c || '#6a5638', { tex: 'madeira_velha', r: .9 }), arame = metal('#6a6a64');
       add(g, [cil(.11, .13, 1.7, -wg / 2 - .1, 0, 0, 8), cil(.11, .13, 1.7, wg / 2 + .1, 0, 0, 8)], mad);
-      const p = G(); p.position.set(-wg / 2, 0, 0); p.rotation.y = -ab; g.add(p);
-      add(p, [0, 1, 2, 3, 4].map(i => ret(wg, .1, .05, wg / 2, .25 + i * .28, 0)).concat([ret(.1, 1.3, .06, .1, .2, 0), ret(.1, 1.3, .06, wg - .1, .2, 0), ret(.08, 1.6, .05, wg / 2, .25, .02, 0, 0, 1.08)]), mad);
+      const p = G(); p.position.set(-wg / 2, 0, 0); p.rotation.y = o.int ? 0 : -ab; g.add(p);
+      const folha = add(p, [0, 1, 2, 3, 4].map(i => ret(wg, .1, .05, wg / 2, .25 + i * .28, 0)).concat([ret(.1, 1.3, .06, .1, .2, 0), ret(.1, 1.3, .06, wg - .1, .2, 0), ret(.08, 1.6, .05, wg / 2, .25, .02, 0, 0, 1.08)]), mad);
+      // interativa: a folha marcada sai da colisão fixa; fechada, o motor bloqueia o vão
+      if (o.int) { folha.userData.folha = true; const abre = (o.abre ?? 100) * Math.PI / 180; vaiVem(g, k => { p.rotation.y = -abre * suave(k); }, .9); }
       [-1, 1].forEach(s => { const x0 = s * (wg / 2 + .1); const post = [], fios = []; for (let k = 1; k <= Math.round(asa / 2.4); k++) post.push(cil(.06, .07, 1.35, x0 + s * k * 2.4, 0, 0, 6, 0, 0, (k % 2 ? .04 : -.03))); [.35, .65, .95, 1.25].forEach(yy => fios.push(barra([x0, yy, 0], [x0 + s * asa, yy - .03, 0], .006, 3))); add(g, post, mad); add(g, fios, arame); });
       return g;
     };
@@ -6060,18 +7653,21 @@
         else if (est === 'igreja') { x.strokeStyle = 'rgba(0,0,0,.4)'; x.lineWidth = 2; for (let i = 0; i < W; i += 21) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); } x.fillStyle = '#1a1a1a'; [.15, .5, .85].forEach(f => x.fillRect(0, H * f, W, 9)); }
         else { x.strokeStyle = 'rgba(0,0,0,.3)'; x.lineWidth = 3; x.strokeRect(W * .12, H * .06, W * .76, H * .4); x.strokeRect(W * .12, H * .52, W * .76, H * .42); }
       }, { r: est === 'metal' ? .45 : .7, me: est === 'metal' ? .5 : 0 });
-      const ab = (o.aberta || 0) * Math.PI / 180, dob = G(); dob.position.set(-w / 2, .12, 0); dob.rotation.y = -ab; g.add(dob);
+      const ab = (o.aberta || 0) * Math.PI / 180, dob = G(); dob.position.set(-w / 2, .12, 0); dob.rotation.y = o.int ? 0 : -ab; g.add(dob);
       const f = new T.Mesh(guardar(new T.BoxGeometry(w, h - .02, .05)), folha); f.position.set(w / 2, h / 2, 0); dob.add(f);
       add(dob, [esf(.035, w - .1, 1.0, .05), esf(.035, w - .1, 1.0, -.05)], metal(est === 'metal' ? '#9a9a9a' : '#c9a227'));
       // luz do "outro lado": vaza por baixo; se aberta, preenche o vão
       const vaz = m('#000000', { unico: true, e: cor, ei: 2 }); pl(g, w - .04, .025, vaz, 0, .135, .03); const v2 = pl(g, w - .04, .025, vaz, 0, .135, -.03); v2.rotation.y = Math.PI;
       const chao = m('#000000', { unico: true, e: cor, ei: .9, op: .35 }); chao.depthWrite = false; const cp = pl(g, w + .2, .9, chao, 0, .125, .5); cp.rotation.x = -Math.PI / 2;
-      if (ab > 0) { const mt = canvasMat(64, 128, (x, W, H) => { const gr = x.createLinearGradient(0, H, 0, 0); gr.addColorStop(0, cor); gr.addColorStop(1, '#000000'); x.fillStyle = gr; x.fillRect(0, 0, W, H); }, { brilho: 1.4 }); pl(g, w, h, mt, 0, .12 + h / 2, -.01).rotation.y = Math.PI; pl(g, w, h, mt, 0, .12 + h / 2, -.012); }
+      let vao = null, vaoM = null;
+      if (ab > 0 || o.int) { vaoM = canvasMat(64, 128, (x, W, H) => { const gr = x.createLinearGradient(0, H, 0, 0); gr.addColorStop(0, cor); gr.addColorStop(1, '#000000'); x.fillStyle = gr; x.fillRect(0, 0, W, H); }, { brilho: 1.4 }); vaoM.userData.ei0 = 1.4; vao = G(); g.add(vao); pl(vao, w, h, vaoM, 0, .12 + h / 2, -.01).rotation.y = Math.PI; pl(vao, w, h, vaoM, 0, .12 + h / 2, -.012); }
       if (o.txt) { const pm = m('#ffffff', { unico: true, mapa: textoTex(o.txt, { w: 512, h: 112, cor: '#2a1d08', fundo: '#b08d3a', tam: 70, fonte: 'Georgia, serif' }), me: .55, r: .35 }); pl(g, .76, .17, pm, 0, h + .28, .105); pl(g, .76, .17, pm, 0, h + .28, -.105).rotation.y = Math.PI; }
       add(g, [barra([0, h + .36, 0], [0, h + .62, .22], .012), cil(.08, .03, .08, 0, h + .55, .22, 10)], metal('#2a2a2a'));
       const lamp = new T.Mesh(guardar(new T.SphereGeometry(.045, 10, 8)), m('#000000', { unico: true, e: cor, ei: o.apagada ? .05 : 2.2 })); lamp.position.set(0, h + .52, .22); g.add(lamp);
       if (o.pisca) { const f2 = r() * 9; anim.push((dt, t) => { const on = !(Math.sin(t * 2.1 + f2) > .93 || Math.sin(t * 17 + f2) > .985); lamp.material.emissiveIntensity = on ? 2.2 : .1; vaz.emissiveIntensity = on ? 2 : .4; }); }
       if (o.luz) luz(g, cor, o.i ?? .5, 4, 0, .6, .7);
+      // interativa: a folha gira na dobradiça; aberta, o vão acende e a luz da porta liga
+      if (o.int) { const abre = (o.aberta || 78) * Math.PI / 180; vaiVem(g, k => { const s = suave(k); dob.rotation.y = -abre * s; if (vao) { vao.visible = s > .02; acender(vaoM, s); } chao.opacity = .35 + s * .4; g.userData._lig = s > .1 ? 1 : 0; }, 1.1); }
       return g;
     };
 
@@ -6081,16 +7677,19 @@
       const g = G(), w = o.w || 1.2, h = o.h || 2.3, d = o.d || .7, r = rng(o.sem || 4301), cas = m(o.c || '#55625a', { tex: 'metal_sujo', me: .35, r: .55 }), preto = m('#151515', { r: .5 });
       add(g, [ret(w, h, d, 0, 0, 0), ret(w + .04, .06, d + .04, 0, h, 0), ret(w + .04, .1, d + .04, 0, 0, 0)], cas);
       add(g, [ret(w - .16, .5, .02, 0, 1.1, d / 2)], preto);
-      add(g, Array.from({ length: 6 }, (_, i) => cil(.05, .05, .32, -w / 2 + .2 + i * (w - .4) / 5, 1.16, d / 2 - .12, 10)), m('#000000', { unico: true, e: '#ff8a30', ei: 1.4, op: .85 }));
+      const valv = mLuz('#ff8a30', 1.4, .85); add(g, Array.from({ length: 6 }, (_, i) => cil(.05, .05, .32, -w / 2 + .2 + i * (w - .4) / 5, 1.16, d / 2 - .12, 10)), valv);
       add(g, [plano(w - .16, .5, 0, 1.35, d / 2 + .012)], vidro('#e8d8c0', .15));
       const mostr = canvasMat(128, 128, (x, W, H) => { x.fillStyle = '#e8dcb8'; x.fillRect(0, 0, W, H); x.strokeStyle = '#222'; x.lineWidth = 2; x.beginPath(); x.arc(W / 2, H * .85, W * .4, Math.PI * 1.15, Math.PI * 1.85); x.stroke(); for (let i = 0; i <= 10; i++) { const a = Math.PI * (1.15 + i * .07); x.beginPath(); x.moveTo(W / 2 + Math.cos(a) * W * .4, H * .85 + Math.sin(a) * W * .4); x.lineTo(W / 2 + Math.cos(a) * W * .33, H * .85 + Math.sin(a) * W * .33); x.stroke(); } x.fillStyle = '#c01010'; x.fillRect(W * .7, H * .3, 14, 6); }, { brilho: .5 });
+      mostr.userData.ei0 = .5;
       const ag = [];
       for (let i = 0; i < 3; i++) { const cx = -w / 2 + .22 + i * (w - .44) / 2; pl(g, .26, .26, mostr, cx, 1.85, d / 2 + .012); const ag1 = new T.Mesh(guardar(new T.BoxGeometry(.006, .1, .004)), preto); ag1.geometry.translate(0, .05, 0); ag1.position.set(cx, 1.75, d / 2 + .016); g.add(ag1); ag.push([ag1, r() * 9]); }
       add(g, [0, 1, 2, 3].map(i => cil(.07, .07, .05, -w / 2 + .2 + i * (w - .4) / 3, .7, d / 2, 16, Math.PI / 2)).concat([0, 1, 2, 3, 4, 5].map(i => cil(.025, .025, .04, -w / 2 + .18 + i * (w - .36) / 5, .45, d / 2, 8, Math.PI / 2))), m('#1a1a1a', { r: .4 }));
       add(g, Array.from({ length: 8 }, (_, i) => ret(w - .2, .015, .01, 0, .15 + i * .03, d / 2)), m('#2a2a2a'));
       if (o.txt) pl(g, .5, .12, m('#ffffff', { unico: true, mapa: textoTex(o.txt, { w: 512, h: 120, cor: '#1a1a1a', fundo: '#c8b070', tam: 54 }), me: .5, r: .4 }), 0, 2.1, d / 2 + .012);
-      const lamp = new T.Mesh(guardar(new T.SphereGeometry(.03, 8, 6)), m('#000000', { unico: true, e: '#ff3020', ei: 2 })); lamp.position.set(w / 2 - .12, 2.12, d / 2); g.add(lamp);
-      anim.push((dt, t) => { ag.forEach(([a, f]) => { a.rotation.z = Math.sin(t * 3 + f) * .5 + Math.sin(t * 17 + f) * .08; }); lamp.material.emissiveIntensity = Math.sin(t * 4) > 0 ? 2 : .2; });
+      const lampM = mLuz('#ff3020', 2), lamp = new T.Mesh(guardar(new T.SphereGeometry(.03, 8, 6)), lampM); lamp.position.set(w / 2 - .12, 2.12, d / 2); g.add(lamp);
+      let lig = 1;
+      g.userData.aoInter = v => { lig = v ? 1 : 0; acender(valv, lig ? 1 : .02); acender(mostr, lig ? 1 : .05); };
+      anim.push((dt, t) => { ag.forEach(([a, f]) => { a.rotation.z = lig ? Math.sin(t * 3 + f) * .5 + Math.sin(t * 17 + f) * .08 : -.62; }); acender(lampM, lig ? (Math.sin(t * 4) > 0 ? 1 : .1) : 0); });
       return g;
     };
     // bobina de sintonia gigante dentro de uma gaiola de tela
@@ -6127,7 +7726,10 @@
       add(g, [cil(.035, .03, .09, .95, .77, .3, 12)], m('#c8b070', { me: .7, r: .3 }));
       const folha = canvasMat(256, 340, (x, W, H) => { x.fillStyle = '#ece4cc'; x.fillRect(0, 0, W, H); x.fillStyle = '#2a2a3a'; x.font = '20px Courier New, monospace'; for (let i = 0; i < 13; i++) x.fillText(Array.from({ length: 4 }, () => String(Math.floor(r() * 90 + 10))).join(' '), 18, 30 + i * 24); }, { r: .9 });
       pl(g, .21, .28, folha, -.15, .776, .02).rotation.x = -Math.PI / 2;
-      anim.push(dt => { rolos.forEach((rl, i) => { rl.rotation.y += dt * (i ? 1.6 : 1.2); }); });
+      let fita = 0;
+      g.userData.aoInter = (v, inst, ev) => { if (ev && !inst) fita = 9; };
+      dial.userData.ei0 = 1.2;
+      anim.push((dt, t) => { const k = fita > 0 ? 7 : 1; if (fita > 0) { fita -= dt; acender(dial, Math.sin(t * 15) > -.4 ? 1.5 : .5); if (fita <= 0) acender(dial, 1); } rolos.forEach((rl, i) => { rl.rotation.y += dt * k * (i ? 1.6 : 1.2); }); });
       return g;
     };
     // mapa grande de parede (mundo / URSS / a Membrana): papel envelhecido, marcas, alfinetes e barbante
@@ -6247,6 +7849,11 @@
       add(g, [ret(.7, .9, .6, 0, 0, 0), ret(.75, .5, .35, 0, .95, -.15), ret(.75, .45, .35, 0, 1.45, -.15), cil(.3, .3, .35, 0, 1.75, -.15, 16, Math.PI / 2)], esm);
       add(g, [ret(.8, .04, .7, 0, .9, .05), ret(.01, .5, .02, 0, .94, .02), ret(.06, .3, .06, 0, 1.1, .02)], aco);
       add(g, [ret(.5, .02, .4, 0, .94, .1)], canvasMat(64, 64, (x, W, H) => { x.fillStyle = '#c8ccd0'; x.fillRect(0, 0, W, H); x.fillStyle = 'rgba(110,0,0,.6)'; for (let i = 0; i < 12; i++) x.fillRect(Math.random() * W, Math.random() * H, 4 + Math.random() * 10, 2 + Math.random() * 5); }, { r: .3, me: .6 }));
+      // lâmina dentada que corre quando a máquina está ligada; lâmpada verde no painel
+      const lam = canvasMat(16, 128, (x, W, H) => { x.fillStyle = '#d8dce0'; x.fillRect(0, 0, W, H); x.fillStyle = '#5a5e62'; for (let i = 0; i < H; i += 8) { x.beginPath(); x.moveTo(W, i); x.lineTo(W * .4, i + 4); x.lineTo(W, i + 8); x.fill(); } x.fillStyle = 'rgba(110,0,0,.5)'; x.fillRect(0, H * .3, W, 10); }, { r: .25, me: .7, rep: [1, 2] });
+      pl(g, .014, .42, lam, 0, 1.15, .031); const led = mLuz('#40ff60', 1.6); add(g, [cil(.014, .014, .012, .26, 1.3, .03, 8, Math.PI / 2)], led);
+      let lig = 1; g.userData.aoInter = v => { lig = v ? 1 : 0; acender(led, lig); };
+      anim.push(dt => { if (lig) lam.map.offset.y = (lam.map.offset.y + dt * 9) % 1; });
       return g;
     };
     // câmara fria (caixa de painéis, porta pesada entreaberta, luz azul por dentro, cortina de tiras)
@@ -6324,7 +7931,8 @@
         x.fillStyle = '#f2f2f2'; x.fillRect(0, H * .82, W, H * .18); x.fillStyle = '#101820'; x.font = 'bold 14px Arial'; x.fillText(o.txt || 'FIM DO CALENDÁRIO MAIA?', 8, H * .93); x.fillStyle = '#ffffff'; x.font = 'bold 12px Arial'; x.fillText('20/12/2012', W - 80, 16);
         x.fillStyle = 'rgba(255,255,255,.05)'; for (let i = 0; i < H; i += 3) x.fillRect(0, i, W, 1);
       }, { brilho: 1.1 });
-      pl(g, .64, .48, tvM, 0, .84, .265);
+      const telaTV = pl(g, .64, .48, tvM, 0, .84, .265), apagada = m('#07090a', { r: .12, me: .3 });
+      g.userData.aoInter = v => { telaTV.material = v ? tvM : apagada; g.userData._lig = v ? 1 : 0; };
       pl(g, .2, .05, m('#000000', { unico: true, mapa: textoTex('23:59', { w: 128, h: 32, cor: '#40ff70', fundo: '#030803', tam: 26 }), e: '#ffffff', ei: .9 }), .5, .43, .232);
       const fotos = [0, 1, 2].map(k => fotoRaspada((o.sem || 1) * 10 + k)), mold = m('#c8a860', { me: .5, r: .4 });
       const fp = [[-1.1, .95], [-1.0, 1.4], [1.15, .95], [1.05, 1.85], [-1.15, 1.85], [1.0, 1.4], [.0, 1.58]];
@@ -6353,8 +7961,14 @@
       const g = G(), mad = m(o.c || '#5a3a1e', { tex: 'madeira_velha', r: .5 }), lat = metal('#b08d3a'), nx = 5, ny = 6;
       add(g, [ret(1.2, 1.15, .5, 0, .35, 0), ret(1.26, .04, .54, 0, 1.5, 0)].concat([[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => ret(.06, .35, .06, a * .55, 0, b * .2))), mad);
       const fr = [], pux = [], ab = o.aberta ?? 7;
-      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const k = i * ny + j, z = k === ab ? .35 : .255, x = -.48 + i * .24, y = .4 + j * .18; fr.push(ret(.22, .16, .02, x, y, z)); pux.push(ret(.07, .025, .02, x, y + .1, z + .015), cil(.012, .012, .02, x, y + .05, z + .02, 6, Math.PI / 2)); if (k === ab) { fr.push(ret(.2, .1, .38, x, y + .01, z - .2)); add(g, Array.from({ length: 12 }, (_, q) => ret(.18, .12, .004, x, y + .02, z - .35 + q * .025, (q % 3 - 1) * .05)), m('#ece6d4', { r: .9 })); } }
-      add(g, fr, m('#6a4628', { tex: 'madeira_velha', r: .45 })); add(g, pux, lat);
+      const gav = G(); g.add(gav); const frM = m('#6a4628', { tex: 'madeira_velha', r: .45 });
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const k = i * ny + j, x = -.48 + i * .24, y = .4 + j * .18; if (k !== ab) { fr.push(ret(.22, .16, .02, x, y, .255)); pux.push(ret(.07, .025, .02, x, y + .1, .27), cil(.012, .012, .02, x, y + .05, .275, 6, Math.PI / 2)); continue; }
+        // a gaveta que corre (fechada em z .255; o fichário interativo começa fechado e anima, o outro fica puxado)
+        add(g, [ret(.2, .14, .005, x, y + .01, .252)], m('#0e0a06', { r: 1 }));
+        add(gav, [ret(.22, .16, .02, x, y, .255), ret(.2, .1, .38, x, y + .01, .055)], frM); add(gav, [ret(.07, .025, .02, x, y + .1, .27), cil(.012, .012, .02, x, y + .05, .275, 6, Math.PI / 2)], lat);
+        add(gav, Array.from({ length: 12 }, (_, q) => ret(.18, .12, .004, x, y + .02, -.095 + q * .025, (q % 3 - 1) * .05)), m('#ece6d4', { r: .9 })); }
+      add(g, fr, frM); add(g, pux, lat);
+      if (o.int) vaiVem(g, k => { gav.position.z = .3 * suave(k); }, 1.8); else gav.position.z = .095;
       return g;
     };
 
@@ -6503,6 +8117,7 @@
       anim.push((dt, t) => ch.forEach((p, i) => { p.scale.y = .8 + Math.sin(t * 9 + i * 2) * .15 + Math.sin(t * 23 + i) * .08; }));
       add(g, [cil(.04, .05, .25, -.8, 1.4, .1, 8), cil(.04, .05, .25, .8, 1.4, .1, 8), ret(.3, .35, .15, 0, 1.4, .05)], metal('#a8883a'));
       if (o.luz) luz(g, '#ff9a4a', o.i ?? 1.1, 7, 0, .8, .8, 'vela');
+      g.userData.aoInter = v => { ch.forEach(p => { p.visible = !!v; }); g.userData._lig = v ? 1 : 0; };
       return g;
     };
 
@@ -6579,6 +8194,17 @@
       const NOMES = ['HIRUDO', 'SANGUIS', 'OPIUM', 'MERCUR.', 'CAMPH.', 'SAL', 'ACET.', 'LAUD.', 'ARSEN.', 'FERRUM', 'MYRRHA', 'ALOE'];
       const fr = canvasMat(512, 256, (x, W, H) => { x.fillStyle = '#4a2c18'; x.fillRect(0, 0, W, H); const nx = 8, ny = 6; for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const px = i * W / nx, py = j * H / ny; x.strokeStyle = '#1a0c06'; x.lineWidth = 3; x.strokeRect(px + 3, py + 3, W / nx - 6, H / ny - 6); x.fillStyle = '#e8e0c8'; x.fillRect(px + 10, py + 8, W / nx - 20, 14); x.fillStyle = '#2a1a0a'; x.font = 'bold 10px Georgia'; x.textAlign = 'center'; x.fillText(NOMES[Math.floor(r() * NOMES.length)], px + W / nx / 2, py + 19); x.fillStyle = '#b08d3a'; x.beginPath(); x.arc(px + W / nx / 2, py + H / ny * .68, 4, 0, 7); x.fill(); } sujar(x, W, H, r, 900, .08); }, { r: .55 });
       pl(g, w - .1, 1.05, fr, 0, .6, .252);
+      if (o.int) {   // a gavetinha (coluna 3, linha 4) sai de verdade: vão escuro atrás, ervas e um pote de sanguessugas dentro
+        const cw = (w - .1) / 8, chh = 1.05 / 6, gx = -(w - .1) / 2 + 3.5 * cw, gy = .6 + 1.05 / 2 - 4.5 * chh;
+        add(g, [ret(cw - .02, chh - .02, .006, gx, gy - chh / 2 + .01, .254)], m('#0c0806', { r: 1 }));
+        const gv = G(); g.add(gv);
+        const fm = canvasMat(96, 64, (x, W2, H2) => { x.fillStyle = '#4a2c18'; x.fillRect(0, 0, W2, H2); x.strokeStyle = '#1a0c06'; x.lineWidth = 4; x.strokeRect(2, 2, W2 - 4, H2 - 4); x.fillStyle = '#e8e0c8'; x.fillRect(12, 9, W2 - 24, 18); x.fillStyle = '#2a1a0a'; x.font = 'bold 13px Georgia'; x.textAlign = 'center'; x.fillText('HIRUDO', W2 / 2, 23); x.fillStyle = '#b08d3a'; x.beginPath(); x.arc(W2 / 2, H2 * .7, 5, 0, 7); x.fill(); }, { r: .55 });
+        add(gv, [ret(cw - .03, .012, .3, gx, gy - chh / 2 + .02, .1), ret(.01, chh * .6, .3, gx - cw / 2 + .02, gy - chh / 2 + .02, .1), ret(.01, chh * .6, .3, gx + cw / 2 - .02, gy - chh / 2 + .02, .1)], mad);
+        const fr2 = new T.Mesh(guardar(new T.BoxGeometry(cw - .01, chh - .01, .02)), fm); fr2.position.set(gx, gy, .262); gv.add(fr2);
+        add(gv, [esf(.05, gx - .04, gy - chh / 2 + .045, .14, 1.2, .5, 1.6, 8)], m('#5a5a2a', { r: 1 }));
+        add(gv, [cil(.03, .03, .08, gx + .06, gy - chh / 2 + .03, .08, 10)], m('#3a2a1a', { op: .7, r: .1 }));
+        vaiVem(g, k => { gv.position.z = .26 * suave(k); }, 1.8);
+      }
       const pot = [], vid = []; for (let k = 0; k < 2; k++) for (let i = 0; i < Math.floor(w / .26); i++) { const x0 = -w / 2 + .16 + i * .26, y0 = 1.2 + k * .57; (r() < .5 ? pot : vid).push(cil(.08, .08, .18 + r() * .14, x0, y0, -.05, 12)); }
       add(g, pot, m('#ece6d8', { r: .3 })); add(g, vid, m('#7a4a1a', { op: .6, r: .1 }));
       return g;
@@ -6592,11 +8218,12 @@
       const fr = canvasMat(512, 384, (x, W, H) => { x.fillStyle = '#c8ccb0'; x.fillRect(0, 0, W, H); x.strokeStyle = 'rgba(40,40,30,.4)'; x.lineWidth = 2; for (let i = 1; i < 4; i++) { x.beginPath(); x.moveTo(i * W / 4, 0); x.lineTo(i * W / 4, H); x.stroke(); } x.fillStyle = '#1a1a1a'; x.font = 'bold 13px Arial'; for (let i = 0; i < 8; i++) { x.fillStyle = '#e8e8d8'; x.fillRect(12 + (i % 4) * W / 4, 8 + Math.floor(i / 4) * 170, 90, 16); x.fillStyle = '#1a1a1a'; x.fillText(['МОЩНОСТЬ', 'ДАВЛЕНИЕ', 'РАСХОД', 'ТЕМП.', 'УРОВЕНЬ', 'СУЗ', 'АЗ', 'ГЦН'][i], 16 + (i % 4) * W / 4, 21 + Math.floor(i / 4) * 170); } for (let i = 0; i < 8; i++) { const cx = W / 8 + (i % 4) * W / 4, cy = 80 + Math.floor(i / 4) * 170; x.fillStyle = '#f2f0e0'; x.beginPath(); x.arc(cx, cy, 34, 0, 7); x.fill(); x.strokeStyle = '#222'; x.lineWidth = 2; x.stroke(); for (let k = 0; k <= 10; k++) { const a = Math.PI * (.75 + k * .15); x.beginPath(); x.moveTo(cx + Math.cos(a) * 30, cy + Math.sin(a) * 30); x.lineTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 24); x.stroke(); } x.fillStyle = '#c01010'; x.beginPath(); x.arc(cx, cy, 30, Math.PI * 2.05, Math.PI * 2.25); x.lineTo(cx, cy); x.fill(); } for (let i = 0; i < 4; i++) { x.fillStyle = '#f0ece0'; x.fillRect(16 + i * W / 4, 125, 96, 30); x.strokeStyle = '#2050a0'; x.beginPath(); for (let k = 0; k < 96; k += 3) x.lineTo(16 + i * W / 4 + k, 140 + Math.sin(k * .3 + i) * 8 + (r() - .5) * 6); x.stroke(); } sujar(x, W, H, r, 700, .06); }, { r: .5, brilho: .25 });
       pl(g, w - .1, h - 1.1, fr, 0, 1.0 + (h - 1.1) / 2, .102);
       const ags = []; for (let i = 0; i < 8; i++) { const u = (i % 4 + .5) / 4, v = (80 + Math.floor(i / 4) * 170) / 384, a = new T.Mesh(guardar(new T.BoxGeometry(.008, .085, .004)), preto); a.geometry.translate(0, .04, 0); a.position.set(-w / 2 + .05 + u * (w - .1), 1.0 + (h - 1.1) * (1 - v), .108); g.add(a); ags.push([a, r() * 9, -.6 + r() * 1.2]); }
-      const on = m('#000000', { unico: true, e: '#ffe070', ei: 1.8 }), off = m('#2a2a20', { r: .5 }), lamps = [];
+      const on = mLuz('#ffe070', 1.8), off = m('#2a2a20', { r: .5 }), lamps = []; let lig = 1;
+      g.userData.aoInter = v => { lig = v ? 1 : 0; acender(on, lig ? 1 : .02); fr.emissiveIntensity = lig ? .25 : .01; fr.color.setScalar(lig ? 1 : .62); };
       for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { const lp = new T.Mesh(guardar(new T.PlaneGeometry(.12, .07)), r() < .5 ? on : off); lp.position.set(-w / 2 + .3 + i * (w - .6) / 5, h - .25 - j * .1, .102); g.add(lp); lamps.push([lp, r() * 9, r() < .25]); }
       add(g, Array.from({ length: Math.floor(w / .18) * 2 }, (_, i) => cil(.025, .025, .04, -w / 2 + .15 + (i >> 1) * .18, .93 + (i & 1) * .12, .3 - (i & 1) * .05, 8, -1.2)), preto);
       add(g, Array.from({ length: Math.floor(w / .3) }, (_, i) => ret(.06, .03, .1, -w / 2 + .2 + i * .3, .98, .42, -.35)), m(['#c01010', '#20a040', '#e0c020'][Math.floor(r() * 3)], { r: .4 }));
-      anim.push((dt, t) => { ags.forEach(([a, f, b]) => { a.rotation.z = b + Math.sin(t * 6 + f) * .06 + Math.sin(t * 31 + f) * .03; }); lamps.forEach(([l, f, pisca]) => { if (pisca) l.material = Math.sin(t * 5 + f) > 0 ? on : off; }); });
+      anim.push((dt, t) => { ags.forEach(([a, f, b]) => { a.rotation.z = lig ? b + Math.sin(t * 6 + f) * .06 + Math.sin(t * 31 + f) * .03 : -.9; }); if (lig) lamps.forEach(([l, f, pisca]) => { if (pisca) l.material = Math.sin(t * 5 + f) > 0 ? on : off; }); });
       return g;
     };
 
@@ -6644,9 +8271,494 @@
       if (o.km) pl(g, .5, .22, m('#ffffff', { unico: true, mapa: textoTex(o.km, { w: 256, h: 110, cor: '#111', fundo: '#e8e2d0', tam: 52 }) }), o.kmx || 0, 1.7, .205);
       return g;
     };
+
+    /* ================= rodada 2: peças que respondem às interações (motor interacoes3d.js) ================= */
+    const suave = k => k * k * (3 - 2 * k);
+    // vai e volta entre 0 (fechado/desligado) e 1 (aberto/ligado) com animação; f(k) aplica a pose
+    function vaiVem(g, f, vel = 1.6, k0 = 0) {
+      let alvo = k0, at = k0; f(at);
+      g.userData.aoInter = (v, inst) => { alvo = v ? 1 : 0; if (inst) { at = alvo; f(at); } };
+      anim.push(dt => { if (at === alvo) return; at += Math.sign(alvo - at) * Math.min(Math.abs(alvo - at), dt * vel); f(at); });
+    }
+    // material que acende e apaga com a peça (o laço de luz da sala multiplica o brilho por userData.mult)
+    const mLuz = (cor, ei = 1.4, op) => { const p = { unico: true, e: cor, ei }; if (op !== undefined) p.op = op; const mt = m('#000000', p); mt.userData.ei0 = ei; return mt; };
+    const acender = (mt, k) => { if (mt.userData.ei0 === undefined) mt.userData.ei0 = mt.emissiveIntensity; mt.userData.mult = k; mt.emissiveIntensity = mt.userData.ei0 * k; };
+    // tremida curta quando alguém usa (telefone tocando, máquina batendo): guarda o tempo da cena
+    function tremor(g, q, dur = 3, amp = 1) {
+      let tt = 0, t0 = -1;
+      g.userData.aoInter = (v, inst, ev) => { if (ev && !inst) t0 = tt; };
+      anim.push((dt, t) => {
+        tt = t; if (t0 < 0) return; const e = t - t0;
+        if (e > dur) { t0 = -1; q.position.set(0, 0, 0); q.rotation.set(0, 0, 0); return; }
+        const a = amp * (1 - e / dur) * (Math.sin(e * 9) > -.3 ? 1 : .15);
+        q.position.x = Math.sin(t * 71) * .004 * a; q.position.y = Math.abs(Math.sin(t * 37)) * .006 * a; q.rotation.z = Math.sin(t * 53) * .035 * a; q.rotation.x = Math.sin(t * 41) * .02 * a;
+      });
+    }
+
+    // qualquer peça da biblioteca que treme quando "toca" (telefone, máquina de escrever, orelhão)
+    P.p4_vivo = o => {
+      const g = G(), f = P[o.base], q = f ? f({ ...o }) : G(); g.add(q);
+      tremor(g, q, o.dur || 3, o.amp ?? 1);
+      return g;
+    };
+
+    // armário de portas que abrem (madeira, aço ou de remédios), com o que tem dentro
+    P.p4_armario = o => {
+      const g = G(), w = o.w || 1.0, h = o.h || 2.0, d = o.d || .55, est = o.estilo || 'madeira', r = rng(o.sem || 6001);
+      const np = o.portas || (w < .75 ? 1 : 2), e = .025, pe = est === 'madeira' ? .1 : .05;
+      const corpo = est === 'metal' ? m(o.c || '#6a7078', { tex: 'metal_sujo', me: .45, r: .5 }) : est === 'remedio' ? m(o.c || '#e2e0d8', { r: .35, me: .1 }) : m(o.c || '#5a3a24', { tex: 'madeira_velha', r: .6 });
+      const escuro = m(est === 'remedio' ? '#bcbcb4' : '#16120e', { r: .9 });
+      const cx = [ret(e, h - pe, d, -w / 2 + e / 2, pe, 0), ret(e, h - pe, d, w / 2 - e / 2, pe, 0), ret(w, e, d, 0, h - e, 0), ret(w - 2 * e, e, d - .02, 0, pe, -.01)];
+      if (est === 'madeira') { cx.push(ret(w + .06, .06, d + .05, 0, h, .005), ret(w - .02, pe, .02, 0, 0, d / 2 - .03)); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => cx.push(ret(.06, pe, .06, a * (w / 2 - .05), 0, b * (d / 2 - .05)))); }
+      else cx.push(ret(w, pe, d - .03, 0, 0, -.015));
+      add(g, cx, corpo);
+      add(g, [ret(w - 2 * e, h - pe - e, .012, 0, pe, -d / 2 + .008)], escuro);
+      // o que tem dentro
+      const dentro = o.dentro || 'roupas', y0 = pe + e, y1 = h - e, Lw = w - 2 * e - .02, D = d - .1, cores = {};
+      const P2 = (cor, geo) => (cores[cor] = cores[cor] || []).push(geo);
+      const prat = (ys) => add(g, ys.map(y => ret(Lw + .01, .02, D + .04, 0, y, -.02)), est === 'madeira' ? corpo : m(est === 'remedio' ? '#f2f2ec' : '#7a8088', { me: .4, r: .5 }));
+      const TONS = ['#3a3a44', '#5a4a3a', '#2a2a2a', '#6a5a48', '#4a5a6a', '#7a3a2a', '#8a8070', '#3a4a3a'];
+      if (dentro === 'roupas' || dentro === 'casacos') {
+        add(g, [cil(.012, .012, Lw, 0, y1 - .12, 0, 8, 0, 0, Math.PI / 2)], metal('#9a9a9a'));
+        const nR = Math.max(2, Math.floor(Lw / .12));
+        for (let k = 0; k < nR; k++) { if (r() < .15) continue; const x = -Lw / 2 + .07 + k * (Lw - .14) / Math.max(1, nR - 1), len = (dentro === 'casacos' ? .95 : .6) + r() * .35, c = TONS[Math.floor(r() * TONS.length)];
+          P2('#8a8a8a', barra([x, y1 - .12, 0], [x, y1 - .2, 0], .006, 4)); P2(c, ret(.07, .07, Math.min(.44, D), x, y1 - .26, 0)); P2(c, ret(.045, len, Math.min(.4, D - .04), x, y1 - .22 - len, 0, 0, 0, (r() - .5) * .08)); }
+        for (let k = 0; k < 3; k++) { const x = -Lw / 2 + .15 + k * Lw / 3; P2('#1a1410', ret(.1, .08, .26, x, y0, .05, 0, (r() - .5) * .5)); P2('#1a1410', ret(.1, .08, .26, x + .11, y0, .05, 0, (r() - .5) * .5)); }
+      } else if (dentro === 'bolsas') {
+        const ym = h * .5; prat([ym]);
+        add(g, [cil(.012, .012, Lw, 0, y1 - .12, 0, 8, 0, 0, Math.PI / 2)], metal('#9a9a9a'));
+        for (let k = 0; k < 4; k++) { const x = -Lw / 2 + .15 + k * (Lw - .3) / 3, c = TONS[(k * 3) % TONS.length]; P2(c, ret(.06, .55 + r() * .3, Math.min(.42, D), x, y1 - .3 - (.55 + r() * .3), 0)); P2('#8a8a8a', barra([x, y1 - .12, 0], [x, y1 - .26, 0], .006, 4)); }
+        for (let k = 0; k < 3; k++) { const x = -Lw / 2 + .2 + k * (Lw - .4) / 2; P2(['#5a3a24', '#2a2a2a', '#6a5a3a'][k], esf(.16, x, ym + .14, 0, 1, .75, .8, 10)); }
+        P2('#3a2a1a', ret(Lw * .6, .3, D * .8, -Lw * .15, y0, 0)); P2('#2a3a4a', ret(Lw * .3, .4, D * .7, Lw * .32, y0, 0));
+      } else {
+        const nS = Math.max(2, Math.floor((h - pe - .25) / .42)), ys = Array.from({ length: nS }, (_, i) => y0 + (i + 1) * (y1 - y0) / (nS + 1));
+        prat(ys);
+        [y0].concat(ys).forEach((yb, j) => { let x = -Lw / 2 + .05;
+          while (x < Lw / 2 - .08) {
+            const q = r(); let lw = .08;
+            if (dentro === 'louca') { if (q < .45) { lw = .24; for (let s = 0; s < 4 + Math.floor(r() * 6); s++) P2('#ece8e0', cil(.1, .09, .015, x + .12, yb + .02 + s * .016, -.02, 16)); } else if (q < .8) { lw = .1; P2(['#d8d4c8', '#6a8aa0', '#c8b088'][j % 3], cil(.04, .035, .09, x + .05, yb + .02, .05, 10)); } else { lw = .14; P2('#d8e8e8', cil(.06, .06, .2, x + .07, yb + .02, -.05, 12)); } }
+            else if (dentro === 'frascos' || dentro === 'remedios') { if (q < .6) { lw = .07 + r() * .04; P2(['#7a4a1a', '#3a5a2a', '#e8e4dc', '#2a4a7a', '#8a1a1a'][Math.floor(r() * 5)], cil(lw * .45, lw * .45, .12 + r() * .14, x + lw / 2, yb + .02, (r() - .5) * .15, 10)); } else { lw = .12 + r() * .08; P2(r() < .5 ? '#f2f0e8' : '#c8d8e8', ret(lw - .01, .08 + r() * .1, .12 + r() * .1, x + lw / 2, yb + .02, (r() - .5) * .1)); } }
+            else if (dentro === 'ferramentas') { if (q < .3) { lw = .42; P2('#a82a1a', ret(.4, .2, .2, x + .21, yb + .02, 0)); P2('#1a1a1a', ret(.24, .03, .03, x + .21, yb + .25, 0)); } else if (q < .65) { lw = .18; P2('#7a7e82', cil(.08, .08, .18, x + .09, yb + .02, (r() - .5) * .1, 14)); P2('#c8a830', cil(.081, .081, .02, x + .09, yb + .12, 0, 14)); } else if (q < .85) { lw = .1; P2('#2a4a2a', cil(.035, .04, .22, x + .05, yb + .02, .05, 8)); } else { lw = .25; P2('#8a6a3a', new T.TorusGeometry(.08, .025, 6, 14).rotateX(Math.PI / 2).translate(x + .12, yb + .05, 0)); } }
+            else { lw = .045 + r() * .02; if (q < .1) { x += .1; continue; } P2(['#2a3a6a', '#6a1a1a', '#1a1a1a', '#3a5a3a', '#a8865a'][Math.floor(r() * 5)], ret(lw - .006, .26 + r() * .06, Math.min(.3, D), x + lw / 2, yb + .02, 0, 0, 0, q > .93 ? .3 : 0)); }
+            x += lw + .01;
+          } });
+      }
+      if (o.sangue) { P2('#3a0606', ret(Lw * .7, .004, D * .6, -Lw * .1, y0 + .002, .04)); P2('#4a0808', ret(.004, .5, .14, -Lw / 2 + .003, y0 + .2, .1)); }
+      Object.entries(cores).forEach(([c, gs]) => add(g, gs, m(c, { r: .75 })));
+      // portas
+      const dw = (w - .006) / np, hh = h - pe - .012, porta = est === 'metal' ? m(o.c || '#6a7078', { tex: 'metal_sujo', me: .45, r: .45 }) : corpo;
+      const filete = est === 'madeira' ? m(o.c2 || '#3e2616', { tex: 'madeira_velha', r: .55 }) : escuro, portas = [];
+      for (let i = 0; i < np; i++) {
+        const s = np === 1 ? (o.lado || -1) : (i === 0 ? -1 : 1), dob = G(); dob.position.set(s * (w / 2 - .002), pe + .006, d / 2 + .013); g.add(dob);
+        const xc = -s * dw / 2, ge = [], gd = [];
+        if (est === 'remedio') { ge.push(ret(dw - .006, hh * .42, .022, xc, 0, 0), ret(dw - .006, .06, .022, xc, hh - .06, 0), ret(.06, hh * .58, .022, xc - (dw / 2 - .033), hh * .42, 0), ret(.06, hh * .58, .022, xc + (dw / 2 - .033), hh * .42, 0)); add(dob, [plano(dw - .12, hh * .58 - .06, xc, hh * .71 - .03, 0)], vidro('#d8ecf0', .25)); }
+        else ge.push(ret(dw - .006, hh, .022, xc, 0, 0));
+        if (est === 'madeira') { const m0 = .07; gd.push(ret(dw - 2 * m0, .045, .012, xc, m0, .016), ret(dw - 2 * m0, .045, .012, xc, hh - m0 - .045, .016), ret(dw - 2 * m0, .045, .012, xc, hh * .55, .016), ret(.045, hh - 2 * m0, .012, xc - (dw / 2 - m0 - .022), m0, .016), ret(.045, hh - 2 * m0, .012, xc + (dw / 2 - m0 - .022), m0, .016)); }
+        if (est === 'metal') for (let k = 0; k < 6; k++) [hh - .18 - k * .035, .14 + k * .035].forEach(y => gd.push(ret(dw * .5, .012, .006, xc, y, .012)));
+        add(dob, ge, porta); if (gd.length) add(dob, gd, filete);
+        const hx = -s * (dw - .06);
+        if (est === 'madeira') add(dob, [esf(.022, hx, hh * .5, .035, 1, 1, .8, 8)], metal('#b8943a'));
+        else add(dob, [ret(.022, .16, .025, hx, hh * .5 - .08, .022)].concat(est === 'metal' ? [cil(.014, .014, .02, hx, hh * .5 + .14, .02, 8, Math.PI / 2)] : []), metal('#a8acb0'));
+        if (est === 'remedio' && i === 0) { const cr = canvasMat(64, 64, (x, W2, H2) => { x.fillStyle = '#f4f2ea'; x.fillRect(0, 0, W2, H2); x.fillStyle = '#b81414'; x.fillRect(24, 8, 16, 48); x.fillRect(8, 24, 48, 16); }); pl(dob, .12, .12, cr, xc, hh * .25, .012); }
+        portas.push([dob, s]);
+      }
+      const A = (o.abre ?? 105) * Math.PI / 180;
+      vaiVem(g, k => { const a = A * suave(k); portas.forEach(([dob, s]) => { dob.rotation.y = s < 0 ? -a : a; }); }, 1.4);
+      return g;
+    };
+
+    // fileira de armários de vestiário (aço), um deles abre: jaleco, sacola, sapatos
+    P.p4_armarios = o => {
+      const g = G(), n = o.n || 5, lw = o.lw || .42, h = o.h || 1.85, d = o.d || .5, W = n * lw, k0 = Math.min(n - 1, o.abre ?? Math.floor(n / 2)), r = rng(o.sem || 6011);
+      const aco = m(o.c || '#5a6a7a', { tex: 'metal_sujo', me: .45, r: .45 }), escuro = m('#15171a', { r: .9 }), cromo = metal('#a8acb0');
+      const est = []; for (let i = 0; i <= n; i++) est.push(ret(.02, h - .08, d, -W / 2 + i * lw, .08, 0));
+      est.push(ret(W + .02, .03, d, 0, h - .03, 0), ret(W, .08, d - .04, 0, 0, -.02), ret(W + .02, .08, .02, 0, h - .1, d / 2 - .01));
+      add(g, est, aco); add(g, [ret(W, h - .1, .01, 0, .08, -d / 2 + .01)], escuro);
+      add(g, [ret(lw - .02, .015, d - .04, -W / 2 + (k0 + .5) * lw, h - .42, -.01)], aco);
+      // números no friso de cima
+      const num = canvasMat(64 * n, 32, (x, W2, H2) => { x.fillStyle = '#d8d4c8'; x.fillRect(0, 0, W2, H2); x.fillStyle = '#1a1a1a'; x.font = 'bold 20px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; for (let i = 0; i < n; i++) x.fillText(String((o.num0 || 11) + i), 32 + i * 64, H2 / 2 + 1); });
+      pl(g, W - .04, .06, num, 0, h - .06, d / 2 + .002);
+      const fech = [], gr = [], pux = [];
+      for (let i = 0; i < n; i++) { const xc = -W / 2 + (i + .5) * lw; if (i !== k0) fech.push(ret(lw - .014, h - .2, .02, xc, .09, d / 2 - .002)); const alvo = i === k0 ? null : gr; if (alvo) { for (let k = 0; k < 5; k++) [h - .35 - k * .035, .2 + k * .035].forEach(y => alvo.push(ret(lw * .5, .012, .006, xc, y, d / 2 + .009))); pux.push(ret(.02, .12, .025, xc + lw / 2 - .07, h * .5, d / 2 + .012)); } }
+      add(g, fech, aco); add(g, gr, escuro); add(g, pux, cromo);
+      if (n > 2) { const ic = (k0 + 2) % n, xc = -W / 2 + (ic + .5) * lw + lw / 2 - .07; add(g, [ret(.05, .06, .025, xc, h * .5 - .12, d / 2 + .02), new T.TorusGeometry(.018, .005, 5, 10, Math.PI).translate(xc, h * .5 - .06, d / 2 + .02)], metal('#c8a840')); }
+      // o aberto: jaleco no gancho, sacola, sapatos
+      const xa = -W / 2 + (k0 + .5) * lw;
+      add(g, [ret(.05, .95, .34, xa, h - 1.4, -.02, 0, 0, .03), ret(.07, .08, .38, xa, h - .5, -.02)], m(o.roupa || '#e8e6de', { r: .9 }));
+      add(g, [barra([xa, h - .43, -.02], [xa, h - .5, -.02], .006, 4)], cromo);
+      add(g, [esf(.13, xa, .27, 0, 1.1, 1, .9, 10)], m('#3a3a40', { r: .8 })); add(g, [ret(.1, .08, .24, xa - .06, .09, .08, 0, .3), ret(.1, .08, .24, xa + .07, .09, .06, 0, -.2)], m('#1a1410', { r: .5 }));
+      const dob = G(); dob.position.set(xa - lw / 2 + .007, .09, d / 2 + .01); g.add(dob);
+      add(dob, [ret(lw - .014, h - .2, .02, lw / 2 - .007, 0, 0)], aco);
+      add(dob, Array.from({ length: 10 }, (_, k) => ret(lw * .5, .012, .006, lw / 2, k < 5 ? h - .44 - k * .035 : .11 + (k - 5) * .035, .011)), escuro);
+      add(dob, [ret(.02, .12, .025, lw - .07, h * .5 - .09, .014)], cromo);
+      vaiVem(g, k => { dob.rotation.y = -1.9 * suave(k); }, 1.8);
+      return g;
+    };
+
+    // arquivo de aço com gavetas; uma delas corre para fora com as pastas suspensas
+    P.p4_gaveteiro = o => {
+      const g = G(), w = o.w || .48, d = o.d || .62, h = o.h || 1.32, n = o.n || 4, gi = Math.min(n - 1, o.gav ?? 0), r = rng(o.sem || 6021);
+      const aco = m(o.c || '#8a929a', { tex: 'metal_sujo', me: .5, r: .45 }), escuro = m('#101112', { r: .95 }), cromo = metal('#c8ccd0');
+      add(g, [ret(.02, h, d, -w / 2 + .01, 0, 0), ret(.02, h, d, w / 2 - .01, 0, 0), ret(w, .02, d, 0, h - .02, 0), ret(w, .05, d - .03, 0, 0, -.015), ret(w, h, .015, 0, 0, -d / 2 + .0075)], aco);
+      const dh = (h - .07) / n, ETQ = o.etq || ['A – F', 'G – L', 'M – R', 'S – Z', '1980', '1990'];
+      const yv = i => .05 + (n - 1 - i) * dh;
+      const fr = [], ph = [];
+      for (let i = 0; i < n; i++) { if (i === gi) continue; const y = yv(i); fr.push(ret(w - .03, dh - .012, .02, 0, y + .006, d / 2 - .005)); ph.push(cil(.009, .009, .14, 0, y + dh * .45, d / 2 + .03, 6, 0, 0, Math.PI / 2), ret(.012, .02, .03, -.07, y + dh * .45, d / 2 + .015), ret(.012, .02, .03, .07, y + dh * .45, d / 2 + .015), ret(.12, .045, .006, 0, y + dh * .72, d / 2 + .007)); }
+      add(g, fr, aco); add(g, ph, cromo);
+      let etA = null;
+      for (let i = 0; i < n; i++) { const y = yv(i), et = m('#ffffff', { unico: true, mapa: textoTex(ETQ[i % ETQ.length], { w: 128, h: 48, cor: '#1a1a1a', fundo: '#ece6d4', tam: 28 }), r: .9 }); if (i === gi) etA = et; else pl(g, .1, .036, et, 0, y + dh * .72 + .0225, d / 2 + .011); }
+      add(g, [ret(w - .04, dh - .02, .01, 0, yv(gi) + .01, d / 2 - .03)], escuro);
+      // a gaveta que abre
+      const gv = G(); g.add(gv); const y = yv(gi), L = d - .08;
+      add(gv, [ret(w - .03, dh - .012, .02, 0, y + .006, d / 2 - .005), ret(.012, dh * .75, L, -w / 2 + .03, y + .02, d / 2 - .015 - L / 2), ret(.012, dh * .75, L, w / 2 - .03, y + .02, d / 2 - .015 - L / 2), ret(w - .06, .01, L, 0, y + .02, d / 2 - .015 - L / 2), ret(w - .06, dh * .75, .01, 0, y + .02, d / 2 - .015 - L)], aco);
+      add(gv, [cil(.009, .009, .14, 0, y + dh * .45, d / 2 + .03, 6, 0, 0, Math.PI / 2), ret(.012, .02, .03, -.07, y + dh * .45, d / 2 + .015), ret(.012, .02, .03, .07, y + dh * .45, d / 2 + .015), ret(.12, .045, .006, 0, y + dh * .72, d / 2 + .007)], cromo);
+      pl(gv, .1, .036, etA, 0, y + dh * .72 + .0225, d / 2 + .011);
+      const pastas = [], abas = [], papel = [];
+      for (let k = 0; k < 11; k++) { const zz = d / 2 - .06 - k * (L - .06) / 11, tc = r(); pastas.push(ret(w - .09, dh * .62, .006, (r() - .5) * .01, y + .04, zz, (r() - .5) * .12)); abas.push(ret(.07, .03, .007, -w / 2 + .08 + ((k * 3) % 5) * .07, y + .04 + dh * .62, zz)); if (tc < .35) papel.push(ret(w - .14, .05 + r() * .06, .003, (r() - .5) * .04, y + .04 + dh * .62 - .01, zz + .006, (r() - .5) * .3, 0, (r() - .5) * .3)); }
+      add(gv, pastas, m('#b89a5a', { r: .9 })); add(gv, abas, m('#c8402a', { r: .7 })); add(gv, papel, m('#ece8dc', { r: .9 }));
+      if (o.sangue) add(gv, [ret(.12, .004, .09, .05, y + .045 + dh * .62, d / 2 - .1)], m('#4a0808', { r: .3 }));
+      vaiVem(g, k => { gv.position.z = .42 * suave(k); }, 1.9);
+      return g;
+    };
+
+    // geladeira (soviética arredondada ou brasileira de duas portas): a porta abre, a luz de dentro acende
+    P.p4_geladeira = o => {
+      const est = o.estilo || 'br', g = G(), r = rng(o.sem || 6031), sov = est === 'sov';
+      const w = o.w || (sov ? .62 : .7), d = o.d || (sov ? .64 : .7), h = o.h || (sov ? 1.5 : 1.75), pe = .06, e = .035, dp = .07;
+      const esm = m(o.c || (sov ? '#e2dcc4' : '#ecebe6'), { r: .28, me: .12 }), liner = m('#d6d8d2', { r: .45 }), borr = m('#2a2a28', { r: .8 }), cromo = metal('#d0d4d8'), vid = vidro('#e8f4f4', .35);
+      const zi = -dp / 2, Di = d - dp;
+      add(g, [ret(e, h - pe, Di, -w / 2 + e / 2, pe, zi), ret(e, h - pe, Di, w / 2 - e / 2, pe, zi), ret(w, e, Di, 0, h - e, zi), ret(w, e, Di, 0, pe, zi), ret(w, h - pe, e, 0, pe, -d / 2 + e / 2)], esm);
+      add(g, [ret(w - .04, pe, d - .1, 0, 0, -.04)], borr);
+      if (sov) add(g, [cil(.05, .05, w, 0, h - .02, d / 2 - dp - .02, 12, 0, 0, Math.PI / 2), ret(w, .05, Di - .06, 0, h - .02, zi - .03)], esm);
+      add(g, [ret(w - 2 * e, h - pe - 2 * e, .006, 0, pe + e, -d / 2 + e + .003), ret(.006, h - pe - 2 * e, Di - e, -w / 2 + e + .003, pe + e, zi + e / 2), ret(.006, h - pe - 2 * e, Di - e, w / 2 - e - .003, pe + e, zi + e / 2)], liner);
+      const yf = sov ? h - .34 : h - .5;   // congelador em cima
+      add(g, [ret(w - 2 * e, .03, Di - e, 0, yf, zi + e / 2)], sov ? liner : esm);
+      if (sov) add(g, [ret(w * .55, .2, Di * .6, 0, yf + .04, zi)], m('#e8eef0', { r: .3 }));
+      const ys = sov ? [.45, .8] : [.5, .85, 1.08];
+      add(g, ys.map(y => ret(w - 2 * e - .01, .008, Di - e - .1, 0, y, zi - .03)), vid);
+      add(g, [ret(w - 2 * e - .02, .16, Di * .6, 0, pe + e + .005, zi - .05)], vidro('#e8f0f0', .3));
+      const lamp = mLuz('#f2f8ff', 1.6), lp = pl(g, .14, .05, lamp, 0, yf - .006, zi - .05); lp.rotation.x = Math.PI / 2;
+      // o que tem dentro
+      const C = {}, P2 = (c, ge) => (C[c] = C[c] || []).push(ge), din = o.dentro || (sov ? 'comida' : 'copa');
+      const lx = (f) => -w / 2 + e + .05 + f * (w - 2 * e - .1);
+      if (din === 'comida') {
+        [0, .33, .62].forEach((f, k) => { P2('#7a8a3a', cil(.045, .045, .14, lx(f), ys[0] + .01, zi - .06, 12)); P2('#b8b0a0', cil(.047, .047, .02, lx(f), ys[0] + .15, zi - .06, 12)); });
+        P2('#f2f0ea', cil(.035, .035, .2, lx(.9), ys[0] + .01, zi - .02, 10)); P2('#f2f0ea', cil(.035, .035, .2, lx(.78), ys[0] + .01, zi + .04, 10));
+        P2('#8a4a2a', cil(.035, .035, .34, lx(.4), ys[1] + .045, zi - .03, 10, 0, 0, Math.PI / 2)); P2('#d8c8a0', ret(.26, .07, .14, lx(.75), ys[1] + .01, zi - .02, 0, .3));
+        for (let k = 0; k < 6; k++) P2('#f0e8d8', esf(.022, lx(.1) + (k % 3) * .05, pe + e + .03, zi + .02 + Math.floor(k / 3) * .05, 1, 1.25, 1, 8));
+      } else if (din === 'copa') {
+        P2('#e8eef0', ret(.18, .07, .14, lx(.2), ys[0] + .01, zi - .04)); P2('#2a6ab8', ret(.185, .015, .145, lx(.2), ys[0] + .08, zi - .04)); P2('#e8eef0', ret(.18, .07, .14, lx(.2), ys[0] + .095, zi - .04)); P2('#c83a2a', ret(.185, .015, .145, lx(.2), ys[0] + .165, zi - .04));
+        P2('#e8e8e0', ret(.07, .2, .07, lx(.75), ys[0] + .01, zi - .02)); P2('#2a5ab8', ret(.072, .03, .072, lx(.75), ys[0] + .2, zi - .02));
+        P2('#3a8ad8', cil(.04, .04, .28, lx(.9), ys[1] + .01, zi + .02, 10)); P2('#c81818', esf(.04, lx(.3), ys[1] + .05, zi, 1, .95, 1, 10)); P2('#e8c84a', cil(.03, .03, .14, lx(.5), ys[1] + .01, zi - .05, 10));
+      } else if (din === 'ceia') {
+        P2('#d8d4c8', cil(.17, .15, .02, lx(.45), ys[0] + .01, zi - .06, 18)); P2('#7a3a1a', esf(.12, lx(.45), ys[0] + .08, zi - .06, 1.3, .6, .9, 12));
+        [.82, .95].forEach(f => { P2('#3a1a0a', cil(.05, .05, .3, lx(f), pe + e + .03, zi + .03, 10)); P2('#c81818', cil(.051, .051, .07, lx(f), pe + e + .15, zi + .03, 10)); });
+        P2('#e8c040', cil(.09, .1, .07, lx(.3), ys[1] + .01, zi - .04, 16)); P2('#6a3a10', cil(.08, .09, .015, lx(.3), ys[1] + .08, zi - .04, 16)); P2('#2a5a9a', ret(.2, .12, .14, lx(.8), ys[1] + .01, zi - .04));
+      }
+      Object.entries(C).forEach(([c, gs]) => add(g, gs, m(c, { r: .5 })));
+      // a porta (a de baixo, na brasileira; a de cima fica fechada)
+      const hd = (sov ? h - pe : yf - pe) - .012, dob = G(); dob.position.set(-w / 2, pe + .006, d / 2); g.add(dob);
+      const fo = [ret(w, hd, dp, w / 2, 0, -dp / 2)];
+      if (sov) fo.push(cil(.035, .035, w, w / 2, hd - .03, -dp / 2, 10, 0, 0, Math.PI / 2));
+      add(dob, fo, esm);
+      add(dob, [ret(w - .05, hd - .05, .012, w / 2, .025, -dp - .006)], liner);
+      add(dob, [ret(w - .02, .02, .012, w / 2, .01, -dp - .004), ret(w - .02, .02, .012, w / 2, hd - .03, -dp - .004), ret(.02, hd - .04, .012, .02, .02, -dp - .004), ret(.02, hd - .04, .012, w - .02, .02, -dp - .004)], borr);
+      const bins = []; [.25, .55, .85].forEach(fy => bins.push(ret(w - .1, .05, .06, w / 2, hd * fy, -dp - .04))); add(dob, bins, vid);
+      const garr = []; for (let k = 0; k < 4; k++) garr.push(cil(.028, .028, .2, .12 + k * .13, hd * .25 + .005, -dp - .04, 8)); add(dob, garr, m(sov ? '#e8e4dc' : '#2a8a3a', { r: .3, op: .85 }));
+      if (sov) add(dob, [ret(.04, .22, .04, w - .05, hd * .55, .02), ret(.12, .03, .05, w - .1, hd * .55 + .2, .03)], cromo);
+      else { add(dob, [ret(.03, .5, .04, w - .05, hd - .65, .025)], cromo); const bil = canvasMat(64, 80, (x, W2, H2) => { x.fillStyle = '#f4f0dc'; x.fillRect(0, 0, W2, H2); x.strokeStyle = 'rgba(30,40,90,.6)'; x.lineWidth = 2; for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(8, 14 + i * 11); x.lineTo(14 + r() * 40, 14 + i * 11); x.stroke(); } }); const b1 = pl(dob, .09, .11, bil, w * .35, hd * .72, .0015); b1.rotation.z = .08; add(dob, [cil(.012, .012, .008, w * .35, hd * .72 + .045, .002, 8, Math.PI / 2)], m('#c82a2a', { r: .4 })); }
+      if (!sov) { add(g, [ret(w, h - yf - .015, dp, 0, yf + .006, d / 2 - dp / 2)], esm); add(g, [ret(.03, .2, .04, w / 2 - .05, yf + .06, d / 2 + .02)], cromo); }
+      vaiVem(g, k => { const s = suave(k); dob.rotation.y = -1.85 * s; acender(lamp, s > .03 ? 1 : 0); }, 1.4);
+      return g;
+    };
+
+    // freezer horizontal de açougue: a tampa levanta, o gelo e os pacotes aparecem
+    P.p4_freezer_h = o => {
+      const g = G(), w = o.w || 1.3, d = o.d || .7, h = o.h || .86, r = rng(o.sem || 6041), e = .05;
+      const esm = m(o.c || '#eef0f0', { r: .35, me: .1 }), gelo = m('#e4eef4', { r: .25 }), escuro = m('#26282a', { r: .8 });
+      add(g, [ret(w, h - .08, e, 0, .08, d / 2 - e / 2), ret(w, h - .08, e, 0, .08, -d / 2 + e / 2), ret(e, h - .08, d, -w / 2 + e / 2, .08, 0), ret(e, h - .08, d, w / 2 - e / 2, .08, 0), ret(w, .1, d, 0, .08, 0)], esm);
+      add(g, [ret(w - .04, .08, d - .04, 0, 0, 0)], escuro);
+      add(g, Array.from({ length: 7 }, (_, i) => ret(.18, .012, .006, -w / 2 + .2 + i * .02, .16 + i * .025, d / 2 + .002)).concat([ret(.3, .01, .006, w / 2 - .25, .2, d / 2 + .002)]), escuro);
+      const led = mLuz('#40ff60', 1.4); add(g, [cil(.012, .012, .01, w / 2 - .12, .7, d / 2 + .004, 8, Math.PI / 2)], led);
+      add(g, [cil(.03, .03, .02, w / 2 - .22, .7, d / 2 + .01, 12, Math.PI / 2)], metal('#c8ccd0'));
+      add(g, [ret(w - 2 * e, .006, d - 2 * e, 0, .181, 0), ret(w - 2 * e, h - .26, .006, 0, .18, d / 2 - e - .004), ret(w - 2 * e, h - .26, .006, 0, .18, -d / 2 + e + .004), ret(.006, h - .26, d - 2 * e, -w / 2 + e + .004, .18, 0), ret(.006, h - .26, d - 2 * e, w / 2 - e - .004, .18, 0)], gelo);
+      const pac = [], car = [], sg = [];
+      for (let i = 0; i < 9; i++) { const pw = .2 + r() * .14, pd = .14 + r() * .1, ph = .08 + r() * .05, px = -w / 2 + e + .14 + (i % 4) * (w - 2 * e - .28) / 3, pz = (Math.floor(i / 4) - .8) * .2, py = .19 + (i > 7 ? .1 : 0) + (r() < .3 ? .09 : 0); (r() < .55 ? pac : car).push(ret(pw, ph, pd, px + (r() - .5) * .05, py, pz, (r() - .5) * .15, r() * .8, (r() - .5) * .1)); }
+      sg.push(ret(.22, .003, .16, -.1, .19, .05));
+      add(g, pac, m('#e8e0d4', { r: .85 })); add(g, car, m('#a83a3a', { r: .35 })); add(g, sg, m('#5a0808', { r: .2 }));
+      const lamp = mLuz('#d8f0ff', 1.3); add(g, [ret(.3, .02, .02, 0, h - .1, -d / 2 + e + .01)], lamp);
+      const dob = G(); dob.position.set(0, h, -d / 2); g.add(dob);
+      add(dob, [ret(w + .01, .07, d + .01, 0, 0, d / 2)], esm); add(dob, [ret(w - .12, .006, d - .12, 0, -.006, d / 2)], gelo);
+      add(dob, [ret(.4, .03, .04, 0, .01, d + .01)], m('#b8bcc0', { me: .5, r: .4 }));
+      vaiVem(g, k => { const s = suave(k); dob.rotation.x = -1.32 * s; acender(lamp, s > .03 ? 1 : 0); }, 1.3);
+      return g;
+    };
+
+    // caixa com tampa (caixote de madeira, caixa de munição militar ou baú de ferramentas)
+    P.p4_caixa_tampa = o => {
+      const g = G(), est = o.estilo || 'madeira', w = o.w || .9, d = o.d || .55, h = o.h || .5, hb = h - .06, e = .025, r = rng(o.sem || 6051);
+      const mat = est === 'militar' ? m(o.c || '#4a5230', { tex: 'metal_sujo', me: .35, r: .55 }) : est === 'metal' ? m(o.c || '#5a5e62', { tex: 'metal_sujo', me: .5, r: .45 }) : m(o.c || '#7a6038', { tex: 'madeira_velha', r: .85 });
+      const inner = m(est === 'madeira' ? '#3a2a18' : '#1c1e18', { r: .9 }), ferr = metal('#5a5a52');
+      add(g, [ret(w, hb, e, 0, 0, d / 2 - e / 2), ret(w, hb, e, 0, 0, -d / 2 + e / 2), ret(e, hb, d - 2 * e, -w / 2 + e / 2, 0, 0), ret(e, hb, d - 2 * e, w / 2 - e / 2, 0, 0), ret(w - 2 * e, e, d - 2 * e, 0, 0, 0)], mat);
+      add(g, [ret(w - 2 * e - .002, .004, d - 2 * e - .002, 0, e, 0), ret(w - 2 * e, hb - e - .01, .004, 0, e, -d / 2 + e + .002), ret(w - 2 * e, hb - e - .01, .004, 0, e, d / 2 - e - .002)], inner);
+      const det = [];
+      if (est === 'madeira') { [.12, hb - .08].forEach(y => det.push(ret(w + .012, .05, .012, 0, y, d / 2 + .006), ret(w + .012, .05, .012, 0, y, -d / 2 - .006))); [-1, 1].forEach(s => det.push(ret(.05, hb, .012, s * (w / 2 - .03), 0, d / 2 + .007))); }
+      else { [-1, 1].forEach(s => det.push(ret(.02, hb * .7, d + .012, s * (w / 2 - .12), hb * .15, 0))); det.push(ret(w + .01, .02, d + .01, 0, hb - .02, 0)); }
+      add(g, det, est === 'madeira' ? m('#5a4428', { tex: 'madeira_velha', r: .85 }) : mat);
+      [-1, 1].forEach(s => add(g, [new T.TorusGeometry(.045, .01, 5, 10, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI).translate(s * (w / 2 + .012), hb * .62, 0)], est === 'madeira' ? m('#8a7a5a', { r: 1 }) : ferr));
+      if (est !== 'madeira') add(g, [ret(.06, .07, .02, -w * .3, hb - .1, d / 2 + .011), ret(.06, .07, .02, w * .3, hb - .1, d / 2 + .011)], ferr);
+      if (o.txt) pl(g, Math.min(w * .7, .6), .14, m('#ffffff', { unico: true, mapa: textoTex(o.txt, { w: 256, h: 64, cor: est === 'madeira' ? '#1a1410' : '#e8e0c0', fundo: 'rgba(0,0,0,0)', tam: 34, fonte: 'Courier New, monospace' }), r: .9, op: .85 }), 0, hb * .5, d / 2 + .014);
+      // o que tem dentro
+      const C = {}, P2 = (c, ge) => (C[c] = C[c] || []).push(ge), yb = e + .004, Wi = w - 2 * e - .04, Di = d - 2 * e - .04, din = o.dentro || 'municao';
+      if (din === 'municao') {
+        if (est === 'militar') { for (let i = 0; i < 9; i++) for (let j = 0; j < 4; j++) { const x = -Wi / 2 + .04 + i * (Wi - .08) / 8, z = -Di / 2 + .05 + j * (Di - .1) / 3; P2('#b8943a', cil(.012, .012, .075, x, yb, z, 6)); P2('#6a4a2a', cil(.006, .011, .025, x, yb + .075, z, 6)); } }
+        else { for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) P2('#4a5230', ret(Wi / 3 - .02, .18, Di / 2 - .02, -Wi / 3 + i * Wi / 3, yb, -Di / 4 + j * Di / 2)); const pts = []; for (let k = 0; k <= 16; k++) pts.push([-Wi / 2 + .05 + k * (Wi - .1) / 16, yb + .2, Math.sin(k * .6) * .08]); pts.forEach(([x, y, z]) => P2('#b8943a', cil(.009, .009, .07, x, y, z, 6, Math.PI / 2))); P2('#6a5a3a', tuboG(pts, .012, 30, 4)); }
+      } else if (din === 'suprimento') {
+        for (let k = 0; k < 6; k++) P2('#f0ece0', cil(.04, .04, .14, -Wi / 2 + .08 + (k % 3) * .12, yb + .04, -Di / 4 + Math.floor(k / 3) * .1, 10, 0, 0, Math.PI / 2));
+        const cx = canvasMat(64, 64, (x, W2, H2) => { x.fillStyle = '#ece8dc'; x.fillRect(0, 0, W2, H2); x.fillStyle = '#b01414'; x.fillRect(26, 12, 12, 40); x.fillRect(12, 26, 40, 12); });
+        [[Wi * .22, -Di * .2], [Wi * .3, Di * .18]].forEach(([x, z]) => { add(g, [ret(.16, .1, .12, x, yb, z)], m('#ece8dc', { r: .9 })); pl(g, .1, .1, cx, x, yb + .101, z).rotation.x = -Math.PI / 2; });
+        [0, 1, 2].forEach(k => P2('#6a3a14', cil(.025, .025, .11, -Wi * .05 + k * .06, yb, Di * .3, 8)));
+      } else if (din === 'ferramentas') {
+        P2('#8a2a1a', ret(Wi, .05, Di * .6, 0, yb, -Di * .15)); P2('#9aa0a6', ret(.24, .015, .035, -Wi * .2, yb + .05, -Di * .2, 0, .3)); P2('#9aa0a6', ret(.2, .015, .03, Wi * .1, yb + .05, -Di * .05, 0, -.2));
+        P2('#3a2a1a', ret(.12, .03, .03, Wi * .3, yb + .05, -Di * .25)); P2('#6a6e72', ret(.04, .05, .07, Wi * .3 + .08, yb + .05, -Di * .25));
+        [0, 1, 2].forEach(k => { P2(['#c8a020', '#1a5aa0', '#c82a1a'][k], cil(.012, .012, .09, -Wi * .35 + k * .05, yb + .065, Di * .25, 8, Math.PI / 2)); P2('#9aa0a6', cil(.004, .004, .1, -Wi * .35 + k * .05, yb + .065, Di * .25 - .095, 6, Math.PI / 2)); });
+        P2('#2a2a2a', new T.TorusGeometry(.05, .02, 6, 12).rotateX(Math.PI / 2).translate(Wi * .3, yb + .02, Di * .2));
+      } else {
+        [['#5a5e52', 0], ['#7a6a5a', .07], ['#4a4e5a', .14]].forEach(([c, y]) => P2(c, ret(Wi * .55, .065, Di * .8, -Wi * .2, yb + y, 0, 0, (r() - .5) * .1)));
+        [0, 1].forEach(k => P2('#2a2a2a', cil(.025, .025, .2, Wi * .3, yb + .03 + k * .055, -Di * .1 + k * .05, 10, 0, 0, Math.PI / 2)));
+      }
+      Object.entries(C).forEach(([c, gs]) => add(g, gs, m(c, { r: .5, me: c === '#b8943a' || c === '#9aa0a6' ? .7 : 0 })));
+      const dob = G(); dob.position.set(0, hb, -d / 2); g.add(dob);
+      add(dob, [ret(w + .012, .06, d + .012, 0, 0, d / 2)].concat(est === 'madeira' ? [ret(w + .02, .015, .06, 0, .06, d * .2), ret(w + .02, .015, .06, 0, .06, d * .8)] : [ret(w * .8, .015, d * .6, 0, .06, d / 2)]), mat);
+      add(dob, [ret(w - .04, .004, d - .04, 0, -.004, d / 2)], inner);
+      if (est !== 'madeira') add(dob, [ret(.18, .025, .04, 0, .06, d / 2), ret(.06, .06, .02, -w * .3, -.03, d + .012), ret(.06, .06, .02, w * .3, -.03, d + .012)], ferr);
+      vaiVem(g, k => { dob.rotation.x = -1.92 * suave(k); }, 1.6);
+      return g;
+    };
+
+    // arara com trajes de proteção (capuz com visor, luvas de borracha, botas na grade): mostra só os que restam
+    P.p4_hazmat = o => {
+      const g = G(), n = o.n || 5, esp = o.esp || .56, W = (n - 1) * esp + .56, r = rng(o.sem || 6061), yr = 2.0;
+      const tubo = metal('#9aa0a6'), borr = m('#141516', { r: .42, me: .05 }), roda = m('#1e1e1e', { r: .7 }), fitaM = m('#8a8c88', { r: .45, me: .3 });
+      const arm = [cil(.018, .018, yr, -W / 2, .06, 0, 8), cil(.018, .018, yr, W / 2, .06, 0, 8), cil(.016, .016, W + .06, 0, yr + .06, 0, 8, 0, 0, Math.PI / 2)];
+      [-1, 1].forEach(s => arm.push(cil(.016, .016, .6, s * W / 2, .06, 0, 8, Math.PI / 2), barra([s * W / 2, .4, 0], [s * W / 2, .06, .26], .01, 6), barra([s * W / 2, .4, 0], [s * W / 2, .06, -.26], .01, 6)));
+      [-.17, .17].forEach(z => arm.push(cil(.01, .01, W, 0, .17, z, 6, 0, 0, Math.PI / 2)));
+      for (let k = 0; k <= Math.round(W / .09); k++) arm.push(cil(.005, .005, .34, -W / 2 + k * W / Math.round(W / .09), .17, 0, 4, Math.PI / 2));
+      add(g, arm, tubo);
+      add(g, [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([a, b]) => esf(.035, a * W / 2, .035, b * .3, 1, 1, .6, 8)), roda);
+      const tec = canvasMat(256, 512, (x, Wc, Hc) => {
+        x.fillStyle = o.c || '#d6bd22'; x.fillRect(0, 0, Wc, Hc);
+        for (let i = 0; i < 30; i++) { const px = r() * Wc, lw = 4 + r() * 16, gr = x.createLinearGradient(px - lw, 0, px + lw, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, r() < .55 ? 'rgba(80,55,0,.26)' : 'rgba(255,250,210,.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(px - lw, r() * Hc * .3, lw * 2, Hc * (.35 + r() * .65)); }
+        for (let i = 0; i < 16; i++) { const py = r() * Hc; x.strokeStyle = `rgba(90,65,0,${.14 + r() * .16})`; x.lineWidth = 1 + r() * 2.5; x.beginPath(); x.moveTo(0, py); for (let k = 0; k <= 8; k++) x.lineTo(k * Wc / 8, py + (r() - .5) * 12); x.stroke(); }
+        x.fillStyle = 'rgba(160,140,30,.6)'; x.fillRect(Wc * .5 - 4, 0, 8, Hc); x.fillRect(0, Hc * .42, Wc, 6);
+        x.strokeStyle = 'rgba(70,50,0,.4)'; x.lineWidth = 1; x.setLineDash([3, 3]); [Wc * .5 - 5, Wc * .5 + 5].forEach(px => { x.beginPath(); x.moveTo(px, 0); x.lineTo(px, Hc); x.stroke(); }); x.setLineDash([]);
+        sujar(x, Wc, Hc, r, 1400, .07);
+        for (let i = 0; i < 7; i++) { x.fillStyle = `rgba(60,50,30,${.05 + r() * .09})`; x.beginPath(); x.ellipse(r() * Wc, Hc * (.55 + r() * .45), 6 + r() * 22, 4 + r() * 12, r() * 3, 0, 7); x.fill(); }
+      }, { r: .5 });
+      const ziper = m(o.c2 || '#a8921a', { r: .6 }), visor = m('#1c2a32', { op: .5, r: .04, me: .4 }), luva = m(o.luva || '#1c241c', { r: .5 });
+      const dobra = (geo, k, a = .06) => { const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const X = p.getX(i), Y = p.getY(i), Z = p.getZ(i), an = Math.atan2(Z, X), f = 1 + a * Math.sin(an * 7 + Y * 9 + k) + a * .6 * Math.sin(Y * 23 + an * 3 + k * 2); p.setXYZ(i, X * f, Y, Z * f); } geo.computeVertexNormals(); return geo; };
+      const trajes = [];
+      for (let i = 0; i < n; i++) {
+        const xi = -W / 2 + .28 + i * esp, q = G(); q.position.x = xi; q.rotation.y = (r() - .5) * .25; g.add(q);
+        add(g, [new T.TorusGeometry(.03, .005, 5, 10, Math.PI * 1.3).rotateZ(-.15).translate(xi, yr + .035, 0), barra([xi, yr + .01, 0], [xi, yr - .05, 0], .004, 4)], tubo);
+        const k = i * 1.7 + r() * 3, T1 = [], B1 = [], F1 = [];
+        // tronco pendurado (pescoço → virilha), achatado: tecido vazio
+        const tr = new T.LatheGeometry([[.05, 1.66], [.15, 1.63], [.205, 1.57], [.215, 1.44], [.2, 1.3], [.19, 1.16], [.205, 1.04], [.2, .95], [.13, .9], [.03, .88]].map(([a, b]) => new T.Vector2(a, b)), 18);
+        dobra(tr, k, .07); tr.scale(1, 1, .6); T1.push(tr);
+        // capuz caído para a frente, preso na alça
+        const cap = new T.SphereGeometry(.15, 16, 12); dobra(cap, k + 2, .05); cap.scale(1, 1.12, .92); cap.translate(0, 1.8, .02); T1.push(cap);
+        T1.push(cil(.1, .13, .1, 0, 1.6, .0, 12));
+        const vz = new T.CylinderGeometry(.153, .153, .16, 12, 1, true, -.72, 1.44); vz.translate(0, 1.79, .022); add(q, [vz], visor);
+        const vf = new T.CylinderGeometry(.148, .148, .2, 12, 1, true, -.86, 1.72); vf.translate(0, 1.79, .022); B1.push(vf);
+        B1.push(barra([0, 1.94, .0], [0, yr - .05, 0], .008, 4));
+        // mangas, luvas com fita no punho
+        [-1, 1].forEach(s => {
+          const ma = tuboG([[s * .19, 1.56, 0], [s * .245, 1.32, -.01], [s * .24, 1.12, .03], [s * .22, 1.0, .05]], .058, 14, 8); T1.push(ma);
+          F1.push(cil(.062, .062, .05, s * .22, .985, .05, 10)); B1.push(cil(.056, .05, .09, s * .22, .9, .055, 10));
+          B1.push(esf(.045, s * .22, .86, .06, .9, 1.5, .55, 8), esf(.018, s * .22 - s * .035, .875, .075, 1, 1.8, 1, 6));
+          for (let f = 0; f < 3; f++) B1.push(esf(.012, s * .22 + (f - 1) * .016, .79, .065, 1, 2.4, 1, 5));
+          // pernas: caem retas, franzidas embaixo, com a bota-meia do próprio traje
+          const pe0 = new T.LatheGeometry([[.0, .47], [.06, .475], [.082, .52], [.088, .58], [.079, .64], [.084, .7], [.076, .78], [.08, .86], [.085, .95], [.06, .98]].map(([a, b]) => new T.Vector2(a, b)), 14);
+          dobra(pe0, k + s * 3, .06); pe0.translate(s * .105, 0, 0); T1.push(pe0);
+          T1.push(esf(.075, s * .105, .5, .02, 1, .5, 1.15, 10)); F1.push(cil(.087, .087, .03, s * .105, .6, 0, 12));
+          // botas de borracha na grade, embaixo do traje
+          B1.push(cil(.052, .058, .26, s * .085, .2, .0, 10), esf(.065, s * .085, .215, .07, .85, .55, 1.65, 10), ret(.11, .02, .27, s * .085, .18, .045));
+        });
+        T1.push(ret(.03, .66, .02, 0, .96, .12));
+        add(q, T1, tec); add(q, [ret(.04, .64, .022, 0, .97, .125)], ziper); add(q, B1, borr); add(q, F1, fitaM);
+        add(q, [ret(.07, .045, .004, .1, 1.42, .135)], m('#f0ece0', { r: .8 }));
+        trajes.push(q);
+      }
+      g.userData.aoInter = v => { const q = Math.max(0, Math.min(n, Math.round(v || 0))); trajes.forEach((t, i) => { t.visible = i < q; }); };
+      g.userData.aoInter(o.intQtd ?? n);
+      return g;
+    };
+
+    // piano de armário: teclas de verdade (descem quando alguém toca), estante com partitura, banqueta
+    P.p4_piano = o => {
+      const g = G(), W = o.w || 1.5, r = rng(o.sem || 6071), verniz = m(o.c || '#1c120c', { r: .2, me: .12 }), latao = metal('#b8943a');
+      add(g, [ret(W, .64, .4, 0, .05, -.1), ret(W + .02, .05, .44, 0, 0, -.1), ret(.085, .66, .1, -W / 2 + .06, 0, .24), ret(.085, .66, .1, W / 2 - .06, 0, .24),
+        ret(W, .05, .6, 0, .66, -.01), ret(.075, .24, .52, -W / 2 + .0375, .71, .0), ret(.075, .24, .52, W / 2 - .0375, .71, .0),
+        ret(W, .64, .34, 0, .71, -.13), ret(W + .04, .04, .4, 0, 1.35, -.13), ret(W - .15, .045, .025, 0, .69, .285)], verniz);
+      add(g, [ret(W - .2, .18, .012, 0, .82, .045), ret(W - .5, .3, .012, 0, 1.0, .05, -.28)], m('#2a1a10', { r: .3, me: .1 }));
+      add(g, [ret(W - .5, .03, .05, 0, .97, .1)], verniz);
+      const part = canvasMat(256, 128, (x, Wc, Hc) => { x.fillStyle = '#e8e0c8'; x.fillRect(0, 0, Wc, Hc); x.strokeStyle = '#3a3428'; x.lineWidth = 1; for (let s = 0; s < 3; s++) for (let l = 0; l < 5; l++) { x.beginPath(); x.moveTo(8, 14 + s * 38 + l * 5); x.lineTo(Wc - 8, 14 + s * 38 + l * 5); x.stroke(); } x.fillStyle = '#1a1612'; for (let s = 0; s < 3; s++) for (let k = 0; k < 14; k++) { const px = 24 + k * 16, py = 14 + s * 38 + Math.floor(r() * 9) * 2.5; x.beginPath(); x.ellipse(px, py, 3, 2.2, -.4, 0, 7); x.fill(); x.fillRect(px + 2, py - 13, 1, 13); } sujar(x, Wc, Hc, r, 300, .06); });
+      const pp = pl(g, .56, .26, part, 0, 1.12, .066); pp.rotation.x = -.28;
+      // castiçais na frente
+      [-1, 1].forEach(s => add(g, [barra([s * (W / 2 - .2), 1.15, .05], [s * (W / 2 - .12), 1.13, .16], .008, 5), cil(.03, .025, .02, s * (W / 2 - .12), 1.13, .16, 10), cil(.012, .012, .1, s * (W / 2 - .12), 1.15, .16, 6)], latao));
+      add(g, [cil(.011, .011, .09, -(W / 2 - .12), 1.15, .16, 6), cil(.011, .011, .06, W / 2 - .12, 1.15, .16, 6)], m('#ece4d0', { r: .6 }));
+      add(g, [-1, 0, 1].map(k => ret(.035, .015, .09, k * .09, .07, .24)), latao);
+      // teclas: brancas e pretas em InstancedMesh (uma chamada de desenho cada); pivô atrás
+      const nb = 52, Wk = W - .17, kw = Wk / nb, x0 = -Wk / 2 + kw / 2;
+      const gB = guardar(new T.BoxGeometry(kw - .0022, .022, .15)); gB.translate(0, .011, .075);
+      const gP = guardar(new T.BoxGeometry(kw * .56, .02, .095)); gP.translate(0, .01, .0475);
+      const pos = []; for (let i = 0; i < nb - 1; i++) if ([0, 1, 3, 4, 5].includes(i % 7)) pos.push(i);
+      const brancas = new T.InstancedMesh(gB, m('#ece6d2', { r: .28 }), nb), pretas = new T.InstancedMesh(gP, m('#121010', { r: .3 }), pos.length);
+      g.add(brancas, pretas);
+      const M4 = new T.Matrix4(), teclas = [];
+      const pinta = tk => { M4.makeRotationX(tk.a * .055); M4.setPosition(tk.x, tk.y - tk.a * .002, tk.z); tk.im.setMatrixAt(tk.i, M4); tk.im.instanceMatrix.needsUpdate = true; };
+      for (let i = 0; i < nb; i++) { const tk = { im: brancas, i, x: x0 + i * kw, y: .71, z: .14, a: 0, ate: 0 }; teclas.push(tk); pinta(tk); }
+      pos.forEach((p, j) => { const tk = { im: pretas, i: j, x: x0 + (p + .5) * kw, y: .732, z: .135, a: 0, ate: 0 }; teclas.push(tk); pinta(tk); });
+      if (o.banco !== 0) { const vel = m(o.cb || '#3a0c10', { tex: 'veludo', r: 1 }); add(g, [ret(.86, .07, .36, 0, .44, .8), ret(.05, .44, .05, -.38, 0, .66), ret(.05, .44, .05, .38, 0, .66), ret(.05, .44, .05, -.38, 0, .94), ret(.05, .44, .05, .38, 0, .94)], verniz); add(g, [ret(.82, .04, .32, 0, .51, .8)], vel); }
+      let toca = 0, prox = 0;
+      g.userData.aoInter = (v, inst, ev) => { if (ev && !inst) toca = 7.5; };
+      anim.push((dt, t) => {
+        if (toca > 0) { toca -= dt; prox -= dt; if (prox <= 0) { prox = .12 + r() * .22; const nn = 1 + Math.floor(r() * 2.6); for (let k = 0; k < nn; k++) { const tk = teclas[r() < .7 ? 14 + Math.floor(r() * 26) : Math.floor(r() * teclas.length)]; tk.ate = t + .14 + r() * .3; } } }
+        for (const tk of teclas) { const alvo = tk.ate > t ? 1 : 0; if (tk.a === alvo) continue; tk.a += Math.sign(alvo - tk.a) * Math.min(Math.abs(alvo - tk.a), dt * 16); pinta(tk); }
+      });
+      return g;
+    };
+
+    // rádio de campanha (mochila de rádio): mostrador aceso, fone no gancho com fio enrolado, antena de vareta
+    P.p4_radio_campanha = o => {
+      const g = G(), oli = m(o.c || '#4a4c30', { tex: 'metal_sujo', me: .3, r: .6 }), preto = m('#141414', { r: .5 }), lona = m('#5a5a3a', { r: 1 });
+      add(g, [ret(.4, .18, .26, 0, 0, 0), ret(.4, .3, .26, 0, .19, 0), ret(.42, .02, .28, 0, .17, 0), ret(.42, .02, .28, 0, .49, 0)], oli);
+      [-1, 1].forEach(s => add(g, [ret(.05, .5, .012, s * .12, .0, -.136), ret(.05, .012, .1, s * .12, .5, -.09)], lona));
+      const dial = canvasMat(128, 48, (x, Wc, Hc) => { x.fillStyle = '#2a1404'; x.fillRect(0, 0, Wc, Hc); x.fillStyle = '#ffb040'; x.font = 'bold 11px Arial'; for (let i = 0; i < 10; i++) { x.fillRect(6 + i * 12, 8, 2, 10); x.fillText(String(40 + i * 2), 2 + i * 12, 34); } x.fillStyle = '#ff3010'; x.fillRect(70, 4, 2, Hc - 8); }, { brilho: 1.2 });
+      dial.userData.ei0 = 1.2; pl(g, .16, .06, dial, -.07, .42, .131);
+      add(g, [cil(.025, .025, .03, .1, .42, .14, 12, Math.PI / 2), cil(.02, .02, .03, .1, .3, .14, 12, Math.PI / 2), cil(.018, .018, .03, -.12, .28, .14, 10, Math.PI / 2), cil(.018, .018, .03, -.05, .28, .14, 10, Math.PI / 2), ret(.012, .04, .02, .0, .28, .14, .4)], preto);
+      add(g, [cil(.016, .016, .025, .02, .22, .14, 8, Math.PI / 2), cil(.016, .016, .025, -.15, .22, .14, 8, Math.PI / 2)], metal('#a8a090'));
+      const fone = G(); fone.position.set(.215, .3, .04); g.add(fone);
+      add(fone, [ret(.03, .2, .04, 0, -.1, 0), esf(.03, 0, .1, .012, 1, .8, 1.2, 8), esf(.028, 0, -.1, .012, 1, .8, 1.2, 8)], preto);
+      add(g, [ret(.012, .03, .03, .205, .4, .04)], metal('#6a6a60'));
+      const esp = []; for (let k = 0; k <= 40; k++) { const t = k / 40, a = t * Math.PI * 14; esp.push([.215 + Math.cos(a) * .012 + t * .0, .18 - t * .1, .04 + Math.sin(a) * .012 - t * .03]); }
+      esp.push([.205, .06, -.0]); add(g, [tuboG(esp, .004, 80, 4)], preto);
+      const ant = G(); ant.position.set(-.15, .51, -.08); g.add(ant);
+      add(ant, [cil(.018, .02, .05, 0, -.02, 0, 8)], preto); add(ant, [tuboG([[0, .03, 0], [.01, .5, .0], [.03, 1.0, -.01], [.06, 1.35, -.02]], .005, 16, 4)], metal('#3a3a34'));
+      let toca = 0;
+      g.userData.aoInter = (v, inst, ev) => { if (ev && !inst) toca = 4.5; };
+      anim.push((dt, t) => {
+        if (toca > 0) { toca -= dt; const a = Math.min(1, toca / 2); ant.rotation.z = Math.sin(t * 7) * .06 * a; ant.rotation.x = Math.sin(t * 5.3) * .04 * a; fone.rotation.z = Math.sin(t * 40) * .05 * a; acender(dial, Math.sin(t * 22) > -.2 ? 1.6 : .4); if (toca <= 0) { ant.rotation.set(0, 0, 0); fone.rotation.set(0, 0, 0); acender(dial, 1); } }
+        else ant.rotation.z = Math.sin(t * .7) * .008;
+      });
+      return g;
+    };
+
+    // sineta de mesa (latão, cabo de madeira): balança quando tocam
+    P.p4_sineta = o => {
+      const g = G(), q = G(); g.add(q);
+      add(q, [new T.LatheGeometry([[.0, .0], [.048, .0], [.05, .006], [.042, .02], [.03, .05], [.024, .07], [.012, .078], [0, .08]].map(([a, b]) => new T.Vector2(a, b)), 20)], metal('#c8a040'));
+      add(q, [cil(.009, .012, .07, 0, .078, 0, 10), esf(.016, 0, .155, 0, 1, 1.1, 1, 10)], m('#3a2410', { r: .4 }));
+      let tt = 0, t0 = -1;
+      g.userData.aoInter = (v, inst, ev) => { if (ev && !inst) t0 = tt; };
+      anim.push((dt, t) => { tt = t; if (t0 < 0) return; const e = t - t0; if (e > 2.2) { t0 = -1; q.rotation.z = 0; return; } q.rotation.z = Math.sin(e * 22) * .22 * (1 - e / 2.2); });
+      return g;
+    };
+
+    // cartão de lugar (dobrado em pé, sobre a mesa)
+    P.p4_cartao = o => {
+      const g = G(), mt = m('#ffffff', { unico: true, mapa: textoTex(o.txt || '', { w: 256, h: 128, cor: '#2a1a0a', fundo: '#f2ead8', tam: 30, fonte: 'Georgia, serif', peso: 'italic' }), r: .8, lado: 2 });
+      const f = pl(g, .17, .085, mt, 0, .04, .014); f.rotation.x = -.34;
+      const b = pl(g, .17, .085, m('#f2ead8', { r: .8, lado: 2 }), 0, .04, -.014); b.rotation.x = .34;
+      return g;
+    };
+
+    // lampião de querosene no chão (vidro, grade de arame, alça)
+    P.p4_lampiao_chao = o => {
+      const g = G(), pint = m(o.c || '#3a4a2a', { me: .4, r: .5 }), arame = metal('#4a4a44');
+      add(g, [cil(.075, .08, .09, 0, 0, 0, 16), cil(.04, .06, .03, 0, .09, 0, 12), cil(.065, .045, .04, 0, .27, 0, 14), cil(.03, .03, .02, 0, .31, 0, 10)], pint);
+      add(g, [cil(.05, .056, .15, 0, .115, 0, 14)], m('#f4ecd8', { op: .3, r: .05 }));
+      add(g, [0, 1, 2, 3].map(k => { const a = k * Math.PI / 2 + .4; return barra([Math.cos(a) * .062, .11, Math.sin(a) * .062], [Math.cos(a) * .058, .27, Math.sin(a) * .058], .004, 4); }).concat([new T.TorusGeometry(.075, .005, 4, 16, Math.PI).translate(0, .33, 0)]), arame);
+      add(g, [new T.ConeGeometry(.011, .04, 6).translate(0, .15, 0)], BR('#ffb050', 2.6));
+      luz(g, '#ffb060', o.i ?? .55, o.d || 5, 0, .25, 0, 'vela');
+      return g;
+    };
+
+    // pano de boca do teatro: duas metades franzidas que correm para os lados; bambinela com franja dourada
+    P.p4_cortina_palco = o => {
+      const g = G(), W = o.w || 11, H = o.h || 3.1, hw = W / 2, nPl = Math.round(hw / .24), vel = m(o.c || '#6a0c18', { tex: 'veludo', r: 1, lado: 2 }), ouro = metal('#b8943a');
+      const metade = s => {
+        const geo = new T.PlaneGeometry(hw, H, nPl * 4, 4); geo.translate(-s * hw / 2, H / 2, 0);
+        const p = geo.attributes.position; for (let k = 0; k < p.count; k++) { const X = p.getX(k), Y = p.getY(k); p.setZ(k, Math.sin(X / hw * nPl * Math.PI * 2) * .07 * (1 + (1 - Y / H) * .3)); }
+        geo.computeVertexNormals();
+        const grp = G(); grp.position.x = s * hw; g.add(grp); grp.add(new T.Mesh(guardar(geo), vel));
+        const bar = new T.PlaneGeometry(hw, .08, nPl * 4, 1); bar.translate(-s * hw / 2, .04, .0); const pb = bar.attributes.position; for (let k = 0; k < pb.count; k++) pb.setZ(k, Math.sin(pb.getX(k) / hw * nPl * Math.PI * 2) * .072 * 1.3 + .004); bar.computeVertexNormals(); grp.add(new T.Mesh(guardar(bar), ouro));
+        return grp;
+      };
+      const esq = metade(-1), dir = metade(1);
+      const bam = new T.PlaneGeometry(W + .5, .55, 90, 1); bam.translate(0, H - .275, .14); const pv = bam.attributes.position; for (let k = 0; k < pv.count; k++) pv.setZ(k, .14 + Math.sin(pv.getX(k) * 9) * .05); bam.computeVertexNormals();
+      g.add(new T.Mesh(guardar(bam), vel));
+      add(g, [ret(W + .5, .06, .04, 0, H - .6, .17), ret(W + .6, .12, .3, 0, H - .05, .05)], ouro);
+      vaiVem(g, k => { const s = Math.max(.13, 1 - .87 * suave(k)); esq.scale.x = dir.scale.x = s; }, .42);
+      return g;
+    };
+
+    // cabo / fio / corda ligando dois pontos (coordenadas da sala, peça em 0,0): sem ponta solta
+    P.p4_cabo = o => {
+      const g = G(), R = o.raio || .016, raw = o.pts || []; if (raw.length < 2) return g;
+      const pts = raw.map(p => [p[0], Math.max(p[1], R * (p[1] < 0 ? -9999 : 1)), p[2]]), n = o.n || 1, r = rng(o.sem || 6091), geos = [];
+      for (let k = 0; k < n; k++) {
+        const pk = pts.map((p, i) => (i === 0 || i === pts.length - 1 || n === 1) ? p : [p[0] + (r() - .5) * .06, p[1], p[2] + (r() - .5) * .06]);
+        const cv = new T.CatmullRomCurve3(pk.map(p => new T.Vector3(...p)), false, 'centripetal');
+        geos.push(new T.TubeGeometry(cv, Math.max(16, Math.round(cv.getLength() * 8)), R * (1 - k * .12), 6));
+      }
+      add(g, geos, m(o.c || '#151515', { r: .75 }));
+      const pon = [];
+      if (o.plug !== 0) [0, pts.length - 1].forEach(i => { const a = pts[i], b = pts[i ? i - 1 : 1], v = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...v) || 1; pon.push(barra(a, [a[0] + v[0] / L * .05, a[1] + v[1] / L * .05, a[2] + v[2] / L * .05], R * 1.7, 8)); });
+      if (o.caixa) { const [x, y, z] = o.caixa; pon.push(ret(.1, .12, .1, x, y - .06, z)); }
+      if (pon.length) add(g, pon, m(o.cp || '#3a3c3e', { me: .4, r: .5 }));
+      if (o.no) { const [x, y, z, rr] = o.no; add(g, [new T.TorusGeometry(rr, R * 1.3, 6, 20).rotateX(Math.PI / 2).translate(x, y, z), new T.TorusGeometry(rr, R * 1.3, 6, 20).rotateX(Math.PI / 2).translate(x, y - R * 2.4, z)], m(o.c || '#151515', { r: .8 })); }
+      return g;
+    };
+
+    // canos de parede do piso ao forro, com coletor cujas pontas sobem para o forro (nada termina no ar)
+    P.p4_canos = o => {
+      const g = G(), n = o.n || 3, w = o.w || 2.4, R = o.raio || .07, mt = m(o.c || '#5a5e62', { tex: 'ferrugem', me: .55, r: .5 }), fl = m('#34363a', { me: .5, r: .5 });
+      const xs = Array.from({ length: n }, (_, i) => n > 1 ? -w / 2 + i * w / (n - 1) : 0), yh = ALT - .6, xe = w / 2 + .1, rc = .18, geos = [], fla = [];
+      xs.forEach(x => { geos.push(cil(R, R, ALT, x, 0, 0, 12)); fla.push(cil(R * 1.6, R * 1.6, .05, x, 0, 0, 12), cil(R * 1.6, R * 1.6, .05, x, ALT - .05, 0, 12), cil(R * 1.2, R * 1.2, .2, x, yh - .1, 0, 12)); [1.1, 2.5].forEach(y => fla.push(ret(R * 2.6, .05, .17, x, y, -.085))); });
+      geos.push(cil(R * .9, R * .9, 2 * xe, 0, yh, 0, 12, 0, 0, Math.PI / 2));
+      [-1, 1].forEach(s => { geos.push(new T.TorusGeometry(rc, R * .9, 8, 10, Math.PI / 2).rotateZ(s > 0 ? -Math.PI / 2 : Math.PI).translate(s * xe, yh + rc, 0)); geos.push(cil(R * .9, R * .9, ALT - yh - rc, s * (xe + rc), yh + rc, 0, 12)); fla.push(cil(R * 1.5, R * 1.5, .05, s * (xe + rc), ALT - .05, 0, 12)); });
+      add(g, geos, mt); add(g, fla, fl);
+      const vx = xs[0]; add(g, [new T.TorusGeometry(.1, .012, 6, 18).translate(vx, 1.45, R + .07), barra([vx - .1, 1.45, R + .07], [vx + .1, 1.45, R + .07], .007), barra([vx, 1.35, R + .07], [vx, 1.55, R + .07], .007), cil(.015, .015, .07, vx, 1.45, R + .035, 6, Math.PI / 2)], m('#a82a1a', { r: .5, me: .3 }));
+      if (n > 1) { const gx = xs[1]; add(g, [cil(.06, .06, .03, gx, 1.75, R + .035, 14, Math.PI / 2)], m('#e8e4d8', { r: .4 })); add(g, [cil(.064, .064, .02, gx, 1.75, R + .025, 14, Math.PI / 2), cil(.012, .012, .05, gx, 1.75, R + .01, 6, Math.PI / 2)], metal('#8a8a84')); }
+      return g;
+    };
+
+    // console de telas sem os cabos soltos na frente: os cabos saem por trás para a caixa de piso (ou entram na parede)
+    P.p4_console = o => {
+      const g = P.console_tela ? P.console_tela(o) : G();
+      const solto = g.children.find(c => c.isGroup && Math.abs(c.position.z - .9) < .001); if (solto) g.remove(solto);
+      if (!o.parede) { add(g, [-.15, 0, .15].map((x, k) => tuboG([[x, .22, -.34], [x, .12, -.4], [x * .7, .05, -.47], [x * .5, .035, -.54]], .016 + k * .003, 10, 6)), m('#121212', { r: .8 })); add(g, [ret(.5, .07, .2, 0, 0, -.6)], m('#3a3c3e', { tex: 'metal_sujo', me: .4, r: .5 })); }
+      return g;
+    };
+
+    // cartaz de papel colado na parede: título e linhas, tudo ajustado ao tamanho (sem texto cortado)
+    P.p4_cartaz = o => {
+      const g = G(), w = o.w || .8, h = o.h || 1.1, y = o.y ?? 1.1, r = rng(o.sem || 6101), L = String(o.txt || '').split('\n');
+      const mt = canvasMat(256, Math.round(256 * h / w), (x, Wc, Hc) => {
+        x.fillStyle = o.f || '#efe9d8'; x.fillRect(0, 0, Wc, Hc); sujar(x, Wc, Hc, r, 500, .07); escorrer(x, Wc, Hc, r, 4, 'rgba(90,70,40,.12)');
+        x.fillStyle = o.c || '#1e1a16'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        const nL = L.length, base = Math.min(Hc / (nL * 1.45 + .6), 48);
+        L.forEach((l, i) => { let t = i === 0 && nL > 1 ? base * 1.12 : base; x.font = `bold ${t}px Arial`; while (x.measureText(l).width > Wc * .84 && t > 8) { t -= 1; x.font = `bold ${t}px Arial`; } x.fillText(l, Wc / 2, Hc / 2 + (i - (nL - 1) / 2) * base * 1.45); });
+        x.strokeStyle = 'rgba(0,0,0,.25)'; x.lineWidth = 3; x.strokeRect(7, 7, Wc - 14, Hc - 14);
+      }, { r: .95 });
+      pl(g, w, h, mt, 0, y + h / 2, .008);
+      const fita = m('#e8e0b8', { op: .7, r: .6 }); [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([a, b]) => { const p = pl(g, .09, .035, fita, a * (w / 2 - .02), y + h / 2 + b * (h / 2 - .015), .011); p.rotation.z = a * b * .6; });
+      return g;
+    };
   });
   (NS.semColisao = NS.semColisao || new Set());
-  ['p4_foco', 'p4_halo', 'p4_fluor', 'p4_viga', 'p4_rastro', 'p4_estandarte', 'p4_vista_usina', 'p4_trilha', 'p4_monte', 'p4_estrada', 'p4_faixa_pedestre', 'p4_ribalta', 'p4_sombra', 'p4_mapa_parede', 'p4_tunel'].forEach(t => NS.semColisao.add(t));
+  ['p4_foco', 'p4_halo', 'p4_fluor', 'p4_viga', 'p4_rastro', 'p4_estandarte', 'p4_vista_usina', 'p4_trilha', 'p4_monte', 'p4_estrada', 'p4_faixa_pedestre', 'p4_ribalta', 'p4_sombra', 'p4_mapa_parede', 'p4_tunel', 'p4_cabo', 'p4_cortina_palco', 'p4_cartaz', 'p4_canos', 'p4_cartao'].forEach(t => NS.semColisao.add(t));
 })();
 
 /* ===================== 5º andar · sala de 20 m ===================== */
@@ -6710,6 +8822,22 @@
     const brilho = (cor, ei = 1.6) => m('#ffffff', { e: cor, ei, r: .4 });
     const madeira = (c = '#5a4028', rep) => m(c, { tex: 'madeira_velha', r: .82, rep });
     const pulso = (t, bpm = 62) => { const f = (t * bpm / 60) % 1; return Math.exp(-((f - .05) ** 2) / .0015) + .55 * Math.exp(-((f - .2) ** 2) / .0015); };
+
+    /* ---------- utilidades das interações (rodada 2) ---------- */
+    // anima um valor de 0 a 1 rumo ao alvo (abrir/fechar); fn(k) posiciona as partes
+    function animador(fn, vel = 1.6) {
+      let alvo = 0, atual = 0;
+      anim.push(dt => { if (atual === alvo) return; atual += Math.sign(alvo - atual) * Math.min(Math.abs(alvo - atual), dt * vel); fn(atual); });
+      return (v, inst) => { alvo = v ? 1 : 0; if (inst) { atual = alvo; fn(atual); } };
+    }
+    // reação curta quando alguém usa a peça (tocar): fn(k) com k de 0 a 1; em k = 1 a peça volta ao repouso
+    function surto(fn, dur) {
+      let t = -1;
+      anim.push(dt => { if (t < 0) return; t += dt; const k = Math.min(1, t / dur); fn(k); if (k >= 1) t = -1; });
+      return () => { t = 0; };
+    }
+    // brilho que liga e desliga (o 3D multiplica o brilho a cada quadro por userData.mult)
+    function ligaMat(mt, v) { if (!mt) return; if (mt.userData.base === undefined) mt.userData.base = mt.emissiveIntensity; mt.userData.mult = v ? 1 : .03; mt.emissiveIntensity = mt.userData.base * (v ? 1 : .03); }
 
     /* ---------- olhos de cavalo e bocas costuradas (para as paredes de carne) ---------- */
     // geometria de um olho (local, olhando para +z): órbita, globo escuro, canto branco e brilho
@@ -6780,14 +8908,17 @@
         addJ(gm, lst.orb, mats.orb); addJ(gm, lst.glo, mats.glo); addJ(gm, lst.esc, mats.esc); addJ(gm, lst.bri, mats.bri); addJ(gm, lst.cos, mats.cos); addJ(gm, lst.lab, mats.lab); addJ(gm, lst.fun, mats.fun);
       }
       const pul = o.pulsa ?? .06;
+      // tocar: quem encosta na carne faz os olhos vivos abrirem e encararem a sala, as bocas abrirem e a parede tremer
+      let al = 0; const alarme = surto(k => { al = k < .08 ? k / .08 : Math.max(0, 1 - (k - .3) / .7); al = Math.min(1, al); }, 5);
       anim.push((dt, t) => {
-        if (pul) gomos.forEach(([gm, u]) => { gm.scale.z = 1 + pul * Math.sin(t * 1.3 - u * .35); });
+        if (pul || al) gomos.forEach(([gm, u]) => { gm.scale.z = 1 + pul * Math.sin(t * 1.3 - u * .35) + al * .22 * Math.sin(t * 7 - u * 1.3); });
         vivos.forEach(([gl, pal, fs, vel, boca]) => {
-          if (boca) { pal.scale.y = pal.scale.x * (1 + .22 * Math.sin(t * vel + fs)); return; }
-          gl.rotation.y = Math.sin(t * .35 * vel + fs) * .4; gl.rotation.x = Math.sin(t * .27 * vel + fs * 2) * .18;
-          const pis = Math.sin(t * .6 * vel + fs) > .985; pal.scale.y = pis ? 1 : .12; pal.position.y = pis ? 0 : .15;
+          if (boca) { pal.scale.y = pal.scale.x * (1 + .22 * Math.sin(t * vel + fs) + al * .7); return; }
+          gl.rotation.y = Math.sin(t * .35 * vel + fs) * .4 * (1 - al); gl.rotation.x = Math.sin(t * .27 * vel + fs * 2) * .18 * (1 - al);
+          const pis = al < .2 && Math.sin(t * .6 * vel + fs) > .985; pal.scale.y = pis ? 1 : .12; pal.position.y = pis ? 0 : .15;
         });
       });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) alarme(); };
       return g;
     };
     P.p5_carne_verga = o => P.p5_parede_carne({ veias: 1, ...o });
@@ -6875,16 +9006,27 @@
       addJ(g, [cil(.11, .13, .04, 0, y, 0, 16), cil(.025, .025, .32, 0, y + .04, 0, 8), bola(.05, 0, y + .37, 0, 1, 1, 1, 8)], m('#c8b090', { me: .6, r: .35 }));
       const mt = canvasMat(256, 128, (x, W, H) => { x.fillStyle = '#1a2050'; x.fillRect(0, 0, W, H); x.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 40; i++) { const px = r() * W, py = r() * H, s = 2 + r() * 5; x.beginPath(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283, rr = k % 2 ? s * .45 : s; x.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr); } x.fill(); } }, { alfa: .5, lado: true });
       const cp = G(); cp.position.y = y + .3; g.add(cp); malha(cp, new T.CylinderGeometry(.16, .22, .28, 18, 1, true), mt).position.y = .14;
-      sf(g, .05, brilho(cor, 2.4), 0, y + .42, 0, 8);
+      const lb = m('#ffffff', { unico: true, e: cor, ei: 2.4, r: .4 }); sf(g, .05, lb, 0, y + .42, 0, 8);
       luz(g, cor, o.i || .9, o.d || 7, 0, y + .45, 0);
-      anim.push(dt => { cp.rotation.y += dt * (o.vel ?? .5); });
+      let lig = 1; anim.push(dt => { cp.rotation.y += dt * (o.vel ?? .5) * lig; });
+      // ligar: desligado, o abajur para, apaga, e as estrelas projetadas nas paredes somem (peças a5_projecao da sala)
+      if (o.int === 'ligar') g.userData.aoInter = v => { lig = v ? 1 : 0; ligaMat(lb, v); g.userData._lig = v ? 1 : 0; if (g.parent) g.parent.children.forEach(c => { if (c.userData.t === 'a5_projecao') c.visible = !!v; }); };
       return g;
     };
     P.p5_criado = o => {
       const g = G(), mad = madeira(o.c || '#d8cfe0'), w = o.w || .55, h = o.h || .6;
       addJ(g, [caixa(w, .04, .42, 0, h - .04, 0), caixa(w, h - .1, .4, 0, .06, 0), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => caixa(.04, .08, .04, a * (w / 2 - .04), 0, b * .17))], mad);
-      addJ(g, [caixa(w - .06, .2, .01, 0, h - .32, .2), caixa(w - .06, .2, .01, 0, h - .55, .2)], m(o.c2 || '#b8a8d0', { r: .6 }));
-      addJ(g, [bola(.02, 0, h - .22, .215, 1, 1, 1, 6), bola(.02, 0, h - .45, .215, 1, 1, 1, 6)], metal('#c8b070'));
+      const fr = m(o.c2 || '#b8a8d0', { r: .6 }), pu = metal('#c8b070');
+      addJ(g, [caixa(w - .06, .2, .01, 0, h - .55, .2)], fr); addJ(g, [bola(.02, 0, h - .45, .215, 1, 1, 1, 6)], pu);
+      const gv = G(); gv.position.set(0, h - .32, 0); g.add(gv);
+      addJ(gv, [caixa(w - .06, .2, .01, 0, 0, .2)], fr); addJ(gv, [bola(.02, 0, .1, .215, 1, 1, 1, 6)], pu);
+      if (o.int === 'abrir') {
+        pl(g, w - .1, .17, m('#080606', { r: 1 }), 0, h - .22, .199);
+        addJ(gv, [caixa(.015, .14, .36, -w / 2 + .05, .02, .01), caixa(.015, .14, .36, w / 2 - .05, .02, .01), caixa(w - .1, .01, .36, 0, .02, .01), caixa(w - .1, .14, .015, 0, .02, -.17)], mad);
+        addJ(gv, [caixa(.15, .004, .2, -.04, .032, .02, 0, .3, 0), cil(.005, .005, .13, .06, .036, .06, 6, 0, -.4, PI / 2)], m('#ece6d6', { r: .95 }));
+        const fn = animador(k => { gv.position.z = k * .26; }, 1.6);
+        g.userData.aoInter = (v, inst) => fn(v, inst);
+      }
       return g;
     };
     P.p5_bau = o => {
@@ -6892,9 +9034,10 @@
       addJ(g, [caixa(w, h, d, 0, .05, 0), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => caixa(.08, .05, .08, a * (w / 2 - .06), 0, b * (d / 2 - .06)))], mad);
       const fr = canvasMat(512, 256, (x, W, H) => { x.fillStyle = '#a04a3a'; x.fillRect(0, 0, W, H); const L = o.txt || 'A B C'; x.font = 'bold 110px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; const c = ['#f1c40f', '#2e86de', '#27ae60']; L.split(' ').forEach((l, i, a) => { x.fillStyle = c[i % 3]; x.fillText(l, W * (i + .5) / a.length, H / 2); }); for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(0,0,0,${r() * .15})`; x.fillRect(r() * W, r() * H, 2, 2); } });
       pl(g, w - .1, h - .14, fr, 0, .05 + h / 2, d / 2 + .003);
-      const tampa = G(); tampa.position.set(0, h + .05, -d / 2); tampa.rotation.x = -(o.aberto ?? .55); g.add(tampa); addJ(tampa, [caixa(w + .04, .06, d + .02, 0, 0, d / 2)], mad);
+      const tampa = G(); tampa.position.set(0, h + .05, -d / 2); tampa.rotation.x = -(o.int ? 0 : (o.aberto ?? .55)); g.add(tampa); addJ(tampa, [caixa(w + .04, .06, d + .02, 0, 0, d / 2)], mad);
       addJ(g, [caixa(.18, .1, .02, 0, h - .12, d / 2 + .01)], metal('#c8a050'));
-      const br = [], cs = ['#c0392b', '#2e86de', '#f1c40f', '#27ae60']; for (let i = 0; i < 5; i++) br.push(bola(.1 + r() * .06, (r() - .5) * w * .7, h - .02, (r() - .5) * d * .5, 1, 1, 1, 8)); addJ(g, br, m(cs[Math.floor(r() * 4)], { r: .5 }));
+      const yb = o.int ? h - .2 : h - .02, br = [], cs = ['#c0392b', '#2e86de', '#f1c40f', '#27ae60']; for (let i = 0; i < 5; i++) br.push(bola(.1 + r() * .06, (r() - .5) * w * .7, yb, (r() - .5) * d * .5, 1, 1, 1, 8)); addJ(g, br, m(cs[Math.floor(r() * 4)], { r: .5 }));
+      if (o.int === 'abrir') { const fn = animador(k => { tampa.rotation.x = -k * 1.35; }, 1.5); g.userData.aoInter = (v, inst) => fn(v, inst); }
       return g;
     };
     P.p5_cavalinho = o => {
@@ -6907,7 +9050,9 @@
       addJ(cav, [caixa(.34, .05, .4, 0, .99, -.05)], m('#a02a2a', { r: .6 }));
       // os balancins (dois arcos)
       const ba = []; [-1, 1].forEach(a => { const pp = []; for (let k = 0; k <= 10; k++) { const s = (k / 10 - .5) * 1.4; pp.push([a * .17, .05 + s * s * .25, s * .8]); } ba.push(tuboG(pp, .03, 14, 5)); }); addJ(cav, ba, mad);
-      const f = r() * 6; anim.push((dt, t) => { cav.rotation.x = Math.sin(t * (o.vel ?? .8) + f) * .12; });
+      let ph = r() * 6, ex = 0;
+      anim.push(dt => { if (ex > 0) ex = Math.max(0, ex - dt * .16); ph += dt * ((o.vel ?? .8) + ex * 2.4); cav.rotation.x = Math.sin(ph) * (.12 + ex * .28); });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) ex = 1; };
       return g;
     };
     P.p5_porta_alta = o => {
@@ -6925,8 +9070,10 @@
       const pe = [];
       const estrela = (s) => { const sh = new T.Shape(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283 + PI / 2, rr = k % 2 ? s * .42 : s; k ? sh.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : sh.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } return new T.ExtrudeGeometry(sh, { depth: .02, bevelEnabled: false }); };
       [[.55, 0], [-.55, 0], [0, .55], [0, -.55], [0, 0]].forEach(([x, z], i) => { const L = .25 + r() * .35; est.push(cil(.003, .003, L, x, -L, z, 3)); const e = i === 4 ? (() => { const sh = new T.Shape(); sh.absarc(0, 0, .13, .6, 5.7, false); sh.absarc(.06, 0, .1, 5.2, 1.1, true); return new T.ExtrudeGeometry(sh, { depth: .02, bevelEnabled: false }); })() : estrela(.09 + r() * .04); e.translate(x, -L - .1, z); pe.push(e); });
-      addJ(piv, est, m('#cfcfcf', { me: .5 })); addJ(piv, pe, m(o.c || '#ffe48a', { r: .5, e: '#3a3010', ei: .3, lado: 2 }));
-      anim.push(dt => { piv.rotation.y += dt * (o.vel ?? .25); });
+      const mp = m(o.c || '#ffe48a', { unico: true, r: .5, e: '#3a3010', ei: .35, lado: 2 });
+      addJ(piv, est, m('#cfcfcf', { me: .5 })); addJ(piv, pe, mp);
+      let lig = 1; anim.push(dt => { piv.rotation.y += dt * (o.vel ?? .25) * lig; });
+      if (o.int === 'ligar') g.userData.aoInter = v => { lig = v ? 1 : 0; ligaMat(mp, v); };
       return g;
     };
 
@@ -6983,15 +9130,25 @@
       const fu = malha(g, new T.CircleGeometry(.8, 32), canvasMat(256, 256, (x, W) => { const gr = x.createRadialGradient(W / 2, W / 2, 2, W / 2, W / 2, W / 2); gr.addColorStop(0, '#8a6a50'); gr.addColorStop(.06, '#3a2a24'); gr.addColorStop(.25, '#0a0808'); gr.addColorStop(1, '#141210'); x.fillStyle = gr; x.fillRect(0, 0, W, W); x.strokeStyle = 'rgba(80,70,60,.4)'; for (let k = 1; k < 9; k++) { x.beginPath(); x.arc(W / 2, W / 2, W / 2 * (1 - k / 10) ** 1.5, 0, 7); x.stroke(); } }, { brilho: .35 }));
       fu.rotation.x = PI / 2; fu.position.y = ALT - .015;
       // cabos que descem do pilar para o console
-      addJ(g, [tuboG([[.3, 1.2, .3], [.5, .3, .6], [.9, .05, 1.2], [1.8, .05, 1.6]], .025, 16, 5), tuboG([[-.2, 1.3, .35], [-.3, .4, .8], [-.4, .05, 1.4], [-.2, .05, 2.2]], .02, 16, 5)], m('#141414', { r: .6 }));
+      const mcb = m('#141414', { r: .6 }), rota = o.cabo || [[1.8, 1.6], [3, 2]];
+      addJ(g, [tuboG([[.3, 1.2, .38], [.42, .5, .5], [.55, .1, .62], [.62, .03, .7]], .025, 12, 5), tuboG([[.18, 1.25, .4], [.25, .45, .58], [.36, .08, .7], [.42, .03, .76]], .02, 12, 5)], mcb);
+      // o trecho do chão é uma malha separada (baixa: não entra na colisão); sobe no fim para dentro do console
+      const fim = [];
+      addJ(g, [.0, .07].map((dz, i) => { const pts = [[.62 - i * .2, .028, .7 + i * .06], ...rota.map(([x, z], k) => [x + (k < rota.length - 1 ? dz : 0), .028, z + dz])]; const L = pts[pts.length - 1]; fim.push(tuboG([L, [L[0] + .06, .12, L[2]], [L[0] + .09, .3, L[2]], [L[0] + .1, .5, L[2]]], .022, 10, 5)); return tuboG(pts, .022, 60, 5); }), mcb);
+      addJ(g, fim, mcb);
       return g;
     };
 
     /* ---------- CN 107 · guincho manual na borda do poço (corda que desce e volta cortada) ---------- */
     P.p5_guincho = o => {
       const g = G(), fe = m('#4a3a2a', { tex: 'ferrugem', r: .7, me: .5 }), co = m('#8a7a5a', { r: .95 }), dx = o.dx ?? 0, dz = o.dz ?? 1.6;
-      addJ(g, [haste([-.5, 0, -.35], [-.45, 1.0, 0], .04), haste([-.5, 0, .35], [-.45, 1.0, 0], .04), haste([.5, 0, -.35], [.45, 1.0, 0], .04), haste([.5, 0, .35], [.45, 1.0, 0], .04), caixa(1.1, .06, .06, 0, .05, -.35), caixa(1.1, .06, .06, 0, .05, .35), cil(.04, .04, 1.05, 0, 1.0, 0, 8, 0, 0, PI / 2), haste([.55, 1.0, 0], [.7, 1.0, 0], .025), haste([.7, 1.0, 0], [.7, .75, .05], .02), cil(.025, .025, .14, .76, .73, .05, 6, 0, 0, PI / 2)], fe);
-      addJ(g, [cil(.17, .17, .7, 0, 1.0, 0, 16, 0, 0, PI / 2)], co);
+      addJ(g, [haste([-.5, 0, -.35], [-.45, 1.0, 0], .04), haste([-.5, 0, .35], [-.45, 1.0, 0], .04), haste([.5, 0, -.35], [.45, 1.0, 0], .04), haste([.5, 0, .35], [.45, 1.0, 0], .04), caixa(1.1, .06, .06, 0, .05, -.35), caixa(1.1, .06, .06, 0, .05, .35)], fe);
+      // eixo com o tambor e a manivela (giram juntos quando alguém roda a manivela)
+      const eixo = G(); eixo.position.y = 1.0; g.add(eixo);
+      addJ(eixo, [cil(.04, .04, 1.05, 0, 0, 0, 8, 0, 0, PI / 2), haste([.55, 0, 0], [.7, 0, 0], .025), haste([.7, 0, 0], [.7, -.25, .05], .02), cil(.025, .025, .14, .76, -.27, .05, 6, 0, 0, PI / 2)], fe);
+      addJ(eixo, [cil(.17, .17, .7, 0, 0, 0, 16, 0, 0, PI / 2), ...[-.2, 0, .2].map(x => toro(.172, .012, x, 0, 0, 0, PI / 2, 0, 4, 16))], co);
+      const roda = surto(k => { eixo.rotation.x = -(1 - (1 - k) ** 2) * PI * 6; }, 3.5);
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) roda(); };
       const L = Math.hypot(dx, dz); const fim = o.cortada ? [[dx * .85, .05, dz * .85], [dx * .9 + .2, .04, dz * .9 - .1]] : [[dx, .2, dz], [dx * 1.05, -1.5, dz * 1.05]];
       addJ(g, [tuboG([[0, 1.1, .12], [dx * .3, .7, dz * .3 + .1], [dx * .6, .25, dz * .6], ...fim], .022, 24, 5)], co);
       if (o.cortada) { const fi = []; for (let i = 0; i < 5; i++) fi.push(haste([dx * .9 + .2, .04, dz * .9 - .1], [dx * .9 + .25 + Math.cos(i) * .12, .03, dz * .9 - .1 + Math.sin(i * 2) * .12], .005, .003, 3)); addJ(g, fi, co); }
@@ -7024,8 +9181,10 @@
       const fo = malha(ch, new T.ConeGeometry(.07, .3, 12).translate(0, .15, 0), m('#ffffff', { unico: true, e: cor, ei: 2.6, op: .85 })); fo.material.depthWrite = false;
       malha(ch, new T.ConeGeometry(.035, .14, 10).translate(0, .07, 0), m('#ffffff', { e: '#fff6d8', ei: 3 }));
       const halo = malha(ch, new T.SphereGeometry(.22, 12, 8).translate(0, .12, 0), m('#ffffff', { unico: true, e: cor, ei: .8, op: .12 })); halo.material.depthWrite = false; halo.material.blending = T.AdditiveBlending;
-      anim.push((dt, t) => { ch.scale.set(1 + Math.sin(t * 13) * .08, 1 + Math.sin(t * 9 + Math.sin(t * 23)) * .16, 1 + Math.cos(t * 11) * .08); ch.rotation.z = Math.sin(t * 2.3) * .05; });
-      luz(g, cor, o.i || 2.6, o.d || 11, 0, y0 + h + .3, 0, 'vela');
+      let so = 0; const sopro = surto(k => { so = k < .15 ? k / .15 : Math.max(0, 1 - (k - .15) / .85); }, 4);
+      const lv = luz(g, cor, o.i || 2.6, o.d || 11, 0, y0 + h + .3, 0, 'vela'), li = o.i || 2.6;
+      anim.push((dt, t) => { const k = 1 - so * .72; ch.scale.set((1 + Math.sin(t * 13) * .08) * k, (1 + Math.sin(t * 9 + Math.sin(t * 23)) * .16) * k, (1 + Math.cos(t * 11) * .08) * k); ch.rotation.z = Math.sin(t * 2.3) * .05 + so * .9 + so * .15 * Math.sin(t * 40); if (lv) lv.intensity = li * (1 - so * .65); });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) sopro(); };
       return g;
     };
 
@@ -7083,6 +9242,15 @@
       addJ(g, ts, tu); addJ(g, bs, ob);
       const te = canvasMat(256, 32, (x, W, Hh) => { for (let i = 0; i < 36; i++) { x.fillStyle = '#e8e0cc'; x.fillRect(i * W / 36 + 1, 0, W / 36 - 2, Hh); } for (let i = 0; i < 36; i++) if ([1, 2, 4, 5, 6][i % 7 - 0] !== undefined && i % 7 !== 0 && i % 7 !== 3) { x.fillStyle = '#141210'; x.fillRect(i * W / 36 + W / 72, 0, W / 60, Hh * .6); } });
       const tc = pl(g, w * .48, .2, te, 0, .97, .63); tc.rotation.x = -PI / 2 + .15;
+      if (o.int === 'tocar') {
+        const kb = G(); kb.position.set(0, .97, .63); kb.rotation.x = -PI / 2 + .15; g.add(kb);
+        const nk = 21, kw = w * .48 / nk, br = m('#ece4d0', { r: .4 }), teclas = [];
+        for (let i = 0; i < nk; i++) { const t = new T.Mesh(guardar(new T.BoxGeometry(kw * .9, .19, .018)), br); t.position.set(-w * .24 + (i + .5) * kw, 0, .009); kb.add(t); teclas.push(t); }
+        addJ(kb, Array.from({ length: nk - 1 }, (_, i) => i).filter(i => [0, 1, 3, 4, 5].includes(i % 7)).map(i => { const q = new T.BoxGeometry(kw * .55, .11, .02); q.translate(-w * .24 + (i + 1) * kw, .04, .028); return q; }), m('#141210', { r: .3 }));
+        let toca = 0; const desce = new Array(nk).fill(0);
+        anim.push(dt => { if (toca > 0) { toca -= dt; if (Math.random() < dt * 9) desce[Math.floor(Math.random() * nk)] = .35; } teclas.forEach((t, i) => { if (desce[i] > 0) desce[i] -= dt; t.position.z = desce[i] > 0 ? -.004 : .009; }); });
+        g.userData.aoInter = (v, inst, ev) => { if (ev) toca = 6; };
+      }
       return g;
     };
 
@@ -7096,13 +9264,24 @@
       addJ(esf, pa, m('#6a6e74', { tex: 'metal_sujo', r: .45, me: .45, rep: [1, 1], lado: 2 })); addJ(esf, ri, metal('#9a9a90'));
       const cos = m('#ffffff', { unico: true, e: '#8fd0ff', ei: 1.4 }); addJ(esf, [-.45, 0, .45].map(t => toro(R * Math.cos(t) + .05, .035, 0, R * Math.sin(t), 0, PI / 2, 0, 0, 5, 64)).concat([toro(R + .05, .03, 0, 0, 0, 0, 0, 0, 5, 64)]), cos);
       // cabos: os que sobem para o forro e os que descem e correm pelo chão até as paredes
-      const sobe = [], desce = [], chao = [];
+      const sobe = [], desce = [], chao = [], caixasP = [];
       for (let i = 0; i < (o.cabos || 18); i++) {
         const a = i / (o.cabos || 18) * 2 * PI + r() * .2, alto = i % 3 !== 0;
         if (alto) { const el = .35 + r() * .7, p0 = [Math.cos(a) * Math.cos(el) * R, yc + Math.sin(el) * R, Math.sin(a) * Math.cos(el) * R], d = R * Math.cos(el) + .6 + r() * 2.5; sobe.push(tuboG([p0, [Math.cos(a) * (d * .7 + p0[0] * 0), ALT - .25, Math.sin(a) * d * .7], [Math.cos(a) * d, ALT + .05, Math.sin(a) * d]].map((q, k) => k === 1 ? [Math.cos(a) * (R * Math.cos(el) * .5 + d * .5), ALT - .3 - r() * .4, Math.sin(a) * (R * Math.cos(el) * .5 + d * .5)] : q), .05 + r() * .05, 16, 6)); }
-        else { const el = -.35 - r() * .25, p0 = [Math.cos(a) * Math.cos(el) * R, yc + Math.sin(el) * R, Math.sin(a) * Math.cos(el) * R], d0 = R * Math.cos(el), dd = d0 + .9; desce.push(tuboG([p0, [Math.cos(a) * (d0 + .4), .4, Math.sin(a) * (d0 + .4)], [Math.cos(a) * dd, .07, Math.sin(a) * dd]], .07, 10, 6)); const L = o.alcance || 8.5, b = a + (r() - .5) * .3; chao.push(tuboG([[Math.cos(a) * dd, .07, Math.sin(a) * dd], [Math.cos(b) * (dd + L) * .55, .07, Math.sin(b) * (dd + L) * .55], [Math.cos(b) * (dd + L), .07, Math.sin(b) * (dd + L)]], .07, 18, 6)); }
+        else { const el = -.35 - r() * .25, p0 = [Math.cos(a) * Math.cos(el) * R, yc + Math.sin(el) * R, Math.sin(a) * Math.cos(el) * R], d0 = R * Math.cos(el), dd = d0 + .9; desce.push(tuboG([p0, [Math.cos(a) * (d0 + .4), .4, Math.sin(a) * (d0 + .4)], [Math.cos(a) * dd, .07, Math.sin(a) * dd]], .07, 10, 6));
+          let b = a + (r() - .5) * .3; const px = Math.cos(a) * dd, pz = Math.sin(a) * dd;
+          if (o.lim) {
+            // corre pelo chão até a parede (fugindo dos vãos de porta) e sobe numa caixa de passagem
+            const [x0, x1, z0, z1] = o.lim; let E = null, ex = 0;
+            for (let tt = 0; tt < 12; tt++) { const cx = Math.cos(b), cz = Math.sin(b), tx = cx > 0 ? (x1 - px) / cx : cx < 0 ? (x0 - px) / cx : 1e9, tz = cz > 0 ? (z1 - pz) / cz : cz < 0 ? (z0 - pz) / cz : 1e9, Lw = Math.min(tx, tz) - .09; ex = tx < tz ? Math.sign(cx) : 0; const ez = tx < tz ? 0 : Math.sign(cz); E = [px + cx * Lw, pz + cz * Lw, ex, ez]; if (!(o.vaos || []).some(([vx, vz]) => Math.hypot(vx - E[0], vz - E[1]) < 1.8)) break; b += .22; }
+            const M = [(px + E[0]) / 2, (pz + E[1]) / 2];
+            const Ex = E[0] - E[2] * .12, Ez = E[1] - E[3] * .12;
+            chao.push(tuboG([[px, .07, pz], [M[0], .07, M[1]], [Ex, .07, Ez]], .07, 24, 6));
+            // a subida na parede é uma malha própria (pequena: a colisão não cresce pela sala)
+            caixasP.push([tuboG([[Ex, .07, Ez], [E[0] + E[2] * .02, .14, E[1] + E[3] * .02], [E[0] + E[2] * .04, .4, E[1] + E[3] * .04], [E[0] + E[2] * .04, .62, E[1] + E[3] * .04]], .07, 10, 6), caixa(E[2] ? .14 : .34, .36, E[2] ? .34 : .14, E[0] + E[2] * .03, .6, E[1] + E[3] * .03)]);
+          } else { const L = o.alcance || 8.5; chao.push(tuboG([[px, .07, pz], [Math.cos(b) * (dd + L) * .55, .07, Math.sin(b) * (dd + L) * .55], [Math.cos(b) * (dd + L), .07, Math.sin(b) * (dd + L)]], .07, 18, 6)); } }
       }
-      const mcb = m('#161616', { r: .55 }); addJ(g, sobe, mcb); desce.forEach(q => addJ(g, [q], mcb)); addJ(g, chao, mcb);
+      const mcb = m('#161616', { r: .55 }); addJ(g, sobe, mcb); desce.forEach(q => addJ(g, [q], mcb)); addJ(g, chao, mcb); caixasP.forEach(([tb, cx]) => { addJ(g, [tb], mcb); addJ(g, [cx], metal('#5a5e60')); });
       // centelhas correndo na superfície
       const fa = []; for (let i = 0; i < 7; i++) { const f = sf(esf, .05, m('#ffffff', { e: '#bfe8ff', ei: 3 }), 0, 0, 0, 6); fa.push([f, r() * 9, .8 + r()]); }
       const l = luz(g, '#8fd0ff', o.i || 2.2, o.d || 14, 0, .9, R + 1.4);
@@ -7238,7 +9417,18 @@
       const g = G(), w = o.w || 1.7, d = o.d || .85, h = .76, r = rng(o.sem || 765), mad = madeira(o.c || '#3a2414'), cou = m(o.cc || '#2a3a2a', { r: .7 });
       addJ(g, [caixa(w, .05, d, 0, h - .05, 0), caixa(.45, h - .05, d - .06, -w / 2 + .23, 0, 0), caixa(.45, h - .05, d - .06, w / 2 - .23, 0, 0), caixa(w - .9, .5, .03, 0, .22, d / 2 - .06)], mad);
       pl(g, w - .2, d - .2, cou, 0, h + .002, 0).rotation.x = -PI / 2;
-      addJ(g, [0, 1, 2].map(k => caixa(.08, .02, .02, -w / 2 + .23, .18 + k * .19, -d / 2 + .02)).concat([0, 1, 2].map(k => caixa(.08, .02, .02, w / 2 - .23, .18 + k * .19, -d / 2 + .02))), metal('#b8954a'));
+      const gav = o.int === 'abrir';
+      addJ(g, [0, 1, 2].filter(k => !(gav && k === 2)).map(k => caixa(.08, .02, .02, -w / 2 + .23, .18 + k * .19, -d / 2 + .02)).concat([0, 1, 2].map(k => caixa(.08, .02, .02, w / 2 - .23, .18 + k * .19, -d / 2 + .02))), metal('#b8954a'));
+      if (gav) {
+        const gx = -w / 2 + .23, z0 = -d / 2 + .03; pl(g, .4, .16, m('#080604', { r: 1 }), gx, .56, z0 - .003).rotation.y = PI;
+        const gv = G(); gv.position.set(gx, .48, z0); g.add(gv);
+        addJ(gv, [caixa(.43, .17, .02, 0, 0, -.01), caixa(.02, .12, .5, -.19, .02, .25), caixa(.02, .12, .5, .19, .02, .25), caixa(.38, .012, .5, 0, .02, .25), caixa(.38, .12, .02, 0, .02, .5)], mad);
+        addJ(gv, [caixa(.08, .02, .02, 0, .08, -.025)], metal('#b8954a'));
+        addJ(gv, [caixa(.3, .02, .22, 0, .035, .2, 0, .1, 0), caixa(.3, .02, .22, .01, .055, .22, 0, -.1, 0)], m('#c8a868', { r: .85 }));
+        addJ(gv, [caixa(.21, .003, .29, -.02, .078, .26, 0, .4, 0), cil(.006, .006, .14, .1, .04, .1, 6, 0, .5, PI / 2)], m('#ece6d6', { r: .95 }));
+        const fn = animador(k => { gv.position.z = z0 - k * .36; }, 1.4);
+        g.userData.aoInter = (v, inst) => fn(v, inst);
+      }
       const nome = o.nome || '';
       const pn = canvasMat(512, 96, (x, W, H) => { x.fillStyle = '#b8954a'; x.fillRect(0, 0, W, H); x.strokeStyle = '#6a5020'; x.lineWidth = 6; x.strokeRect(3, 3, W - 6, H - 6); x.fillStyle = '#1a1206'; x.font = 'bold 46px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; let t = 46; while (x.measureText(nome).width > W * .9 && t > 14) { t -= 2; x.font = `bold ${t}px Georgia, serif`; } x.fillText(nome, W / 2, H / 2 + 2); }, { me: .6, r: .35 });
       const pc = G(); pc.position.set(0, h, d / 2 - .12); pc.rotation.x = -.35; g.add(pc); bx(pc, .5, .1, .03, mad, 0, 0, -.02); pl(pc, .48, .09, pn, 0, .05, 0);
@@ -7321,10 +9511,13 @@
       // cordão para o teto e cabos para o chão
       addJ(g, [tuboG([[0, y + .95, 0], [.05, y + 1.3, .05], [-.05, (y + ALT) / 2 + .7, 0], [0, ALT + .05, 0]], .13, 14, 10), bola(.2, 0, y + 1.0, 0, 1, .6, 1, 12)], carne('#8a3a40', { ei: .35, rep: [1, 3] }));
       const ca = [], cc = []; for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + r() * .3, d = 1.4 + r() * 1.2; ca.push(tuboG([[Math.cos(a) * .25, y - .9, Math.sin(a) * .25], [Math.cos(a) * .5, .45, Math.sin(a) * .5], [Math.cos(a) * .75, .06, Math.sin(a) * .75]], .04, 10, 5)); cc.push(tuboG([[Math.cos(a) * .75, .06, Math.sin(a) * .75], [Math.cos(a) * d * .7, .05, Math.sin(a) * d * .7], [Math.cos(a) * d, .04, Math.sin(a) * d]], .04, 10, 5)); } addJ(g, ca, m('#202022', { me: .4, r: .5 })); addJ(g, cc, m('#202022', { me: .4, r: .5 }));
+      { const an = [], nk = []; for (let i = 0; i < 7; i++) { const p = cc[i].parameters.path.getPoint(1); an.push(cil(.09, .1, .03, p.x, 0, p.z, 10)); nk.push(amassar(bola(.09, p.x, .02, p.z, 1.2, .5, 1.2, 8), .2, i)); } addJ(g, an, metal('#4a4a4a')); addJ(g, nk, carne('#7a2a30', { ei: .2 })); }
       const olhos = [];
       if (est === 'consagrado') { const fg = new T.PlaneGeometry(.2, .9, 1, 8), fp = fg.attributes.position; for (let i = 0; i < fp.count; i++) fp.setX(i, fp.getX(i) * (1 - Math.abs(fp.getY(i)) / .48)); fg.translate(0, .1, .71); malha(cas, fg, m('#050203', { r: 1, lado: 2 })); [-1, 1].forEach(s => { const e = sf(cas, .03, m('#ffffff', { e: '#fff2b0', ei: 2.4 }), s * .035, .18, .74, 8); e.scale.set(1, .6, .5); olhos.push(e); }); }
       const lc = luz(g, cor, .7, 5, 0, y, .9);
-      anim.push((dt, t) => { const p = pulso(t, est === 'rei' ? 30 : 58), k = 1 + (est === 'rei' ? .01 : .045) * p; cas.scale.set(k, k, k); pele.emissiveIntensity = .3 + .5 * p; lc.intensity = .55 + .35 * p; if (est === 'mae' || est === 'consagrado') { sil.rotation.y = Math.sin(t * 1.9) * .6; sil.position.x = Math.sin(t * 1.3) * .06; } if (olhos.length) olhos.forEach(e => { e.scale.y = Math.sin(t * .8) > .97 ? .1 : .6; }); });
+      let sx = 0; const susto = surto(k => { sx = 1 - k; }, 4);
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) susto(); };
+      anim.push((dt, t) => { const p = pulso(t, est === 'rei' ? 30 : 58), k = 1 + (est === 'rei' ? .01 : .045) * p + sx * .07 * Math.max(0, Math.sin(t * 9)); cas.scale.set(k, k, k); if (sx > 0 && est !== 'rei') sil.rotation.z = Math.sin(t * 14) * .25 * sx; pele.emissiveIntensity = .3 + .5 * p; lc.intensity = .55 + .35 * p; if (est === 'mae' || est === 'consagrado') { sil.rotation.y = Math.sin(t * 1.9) * .6; sil.position.x = Math.sin(t * 1.3) * .06; } if (olhos.length) olhos.forEach(e => { e.scale.y = Math.sin(t * .8) > .97 ? .1 : .6; }); });
       return g;
     };
 
@@ -7392,7 +9585,9 @@
       // a boca no chão (onde entra) e a cicatriz no forro (de onde desce)
       addJ(g, [amassar(new T.TorusGeometry(R * 1.25, R * .38, 8, 20).rotateX(PI / 2).translate(ate[0], .05, ate[1]), .15, 2)], carne('#6a1a22', { ei: .25 })); addJ(g, [amassar(new T.TorusGeometry(R * 1.25, R * .38, 8, 20).rotateX(PI / 2).translate(de[0], ALT - .05, de[1]), .15, 3)], carne('#6a1a22', { ei: .25 }));
       malha(g, new T.CircleGeometry(R * 1.1, 18).rotateX(-PI / 2).translate(ate[0], .02, ate[1]), m('#0a0202', { r: 1 }));
-      anim.push((dt, t) => { gom.forEach(([gr, k]) => { const p = pulso(t - k * .06, 54), s = 1 + .07 * p; gr.scale.set(s, s, s); }); mat.emissiveIntensity = .3 + .5 * pulso(t, 54); });
+      let fo = 0; const onda = surto(k => { fo = 1 - k; }, 4);
+      anim.push((dt, t) => { gom.forEach(([gr, k]) => { const p = pulso(t - k * .06, 54), s = 1 + .07 * p + fo * .16 * pulso(t * 2.2 - k * .12, 54); gr.scale.set(s, s, s); }); mat.emissiveIntensity = .3 + .5 * pulso(t, 54) + fo * .6; });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) onda(); };
       return g;
     };
 
@@ -7407,17 +9602,33 @@
       const lst = { orb: [], glo: [], esc: [], bri: [], cos: [] };
       for (let k = 0; k < (o.olhos || 0); k++) { const t0 = { orb: [], glo: [], esc: [], bri: [], cos: [] }; olhoGeo(t0, 0, 0, 0, .8 + r() * .4, k < (o.fechados || 0), r); const a = r() * 6.28, y = 1 + r() * (H - 1.8), rr = R * 1.05, M = new T.Matrix4().makeRotationY(PI / 2 - a).premultiply(new T.Matrix4().makeTranslation(Math.cos(a) * rr, y, Math.sin(a) * rr)); Object.keys(t0).forEach(kk => t0[kk].forEach(q => { q.applyMatrix4(M); lst[kk].push(q); })); }
       if (o.olhos) { const mats = { orb: carne('#4a1418', { ei: .15 }), glo: m('#0c0504', { r: .06, me: .3 }), esc: m('#d8c8b0', { r: .3 }), bri: m('#ffffff', { e: '#ffffff', ei: .7 }), cos: m('#120606', { r: .7 }) }; Object.keys(lst).forEach(kk => addJ(g, lst[kk], mats[kk])); }
-      const ph = r() * 6; anim.push((dt, t) => { const k = 1 + .04 * Math.sin(t * 1.3 + ph); me.scale.set(k, 1, k); });
+      let ct = 0; const contrai = surto(k => { ct = Math.sin(k * PI); }, 3);
+      const ph = r() * 6; anim.push((dt, t) => { const k = 1 + .04 * Math.sin(t * 1.3 + ph) - ct * .14 + ct * .03 * Math.sin(t * 31); me.scale.set(k, 1, k); });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) contrai(); };
       return g;
     };
     /* ---------- CN 102 · casa de bonecas (janelas acesas por dentro) ---------- */
     P.p5_casa_bonecas = o => {
-      const g = G(), w = o.w || 1.5, d = o.d || .7, h = o.h || 1.3, r = rng(o.sem || 787), pa = m(o.c || '#e8d8e8', { r: .7 }), te = m(o.c2 || '#8a4a6a', { r: .7 });
-      addJ(g, [caixa(w, h, d, 0, .12, 0), caixa(w + .1, .12, d + .1, 0, 0, 0), caixa(w * .9, .03, d * .95, 0, .12 + h * .5, .02)], pa);
-      const tg = new T.CylinderGeometry(.001, w * .62, .7, 4, 1); tg.rotateY(PI / 4); tg.scale(1, 1, d / w * 1.25); tg.translate(0, .12 + h + .35, 0); addJ(g, [tg, caixa(.18, .4, .18, w * .3, .12 + h + .1, 0)], te);
-      const ja = m('#ffffff', { unico: true, e: o.luz || '#ffd890', ei: .9 }), js = [];
-      [[-.3, .35], [.3, .35], [-.3, .9], [.3, .9]].forEach(([x, y], i) => { if (i === 2 && o.apagada) return; js.push(caixa(.22, .26, .02, x * w, .12 + y * h - .13, d / 2 + .005)); });
-      addJ(g, js, ja); addJ(g, [caixa(.24, .44, .02, 0, .12, d / 2 + .006)], te);
+      const g = G(), w = o.w || 1.5, d = o.d || .7, h = o.h || 1.3, r = rng(o.sem || 787), pa = m(o.c || '#e8d8e8', { r: .7 }), te = m(o.c2 || '#8a4a6a', { r: .7 }), e = .03, y0 = .12;
+      // caixa oca: base, laterais, fundo, forro, piso do meio e parede do meio (quatro cômodos)
+      addJ(g, [caixa(w + .1, y0, d + .1, 0, 0, 0), caixa(e, h, d, -w / 2 + e / 2, y0, 0), caixa(e, h, d, w / 2 - e / 2, y0, 0), caixa(w, h, e, 0, y0, -d / 2 + e / 2), caixa(w, e, d, 0, y0 + h - e, 0), caixa(w - 2 * e, e, d - e, 0, y0 + h * .5, e / 2), caixa(e, h - 2 * e, d - e, 0, y0 + e, e / 2)], pa);
+      addJ(g, [caixa(w - .08, h * .5 - .06, .005, -0, y0 + .03, -d / 2 + e + .003), caixa(w - .08, h * .5 - .06, .005, 0, y0 + h * .5 + .03, -d / 2 + e + .003)], m(o.cp || '#b89ac8', { r: .9 }));
+      // móveis em miniatura e uma boneca sentada
+      const mv = [], mb = [], hh = h * .5, cama = (x, y) => { mv.push(caixa(.3, .08, .18, x, y, -.1)); mv.push(caixa(.3, .14, .02, x, y, -.19)); mb.push(caixa(.27, .03, .15, x, y + .08, -.1)); };
+      cama(-w * .25, y0 + e); mv.push(caixa(.2, .02, .14, w * .25, y0 + e + .12, -.08)); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => mv.push(caixa(.015, .12, .015, w * .25 + a * .08, y0 + e, -.08 + b * .05)));
+      cama(w * .25, y0 + hh + e); mv.push(caixa(.18, .3, .1, -w * .3, y0 + hh + e, -.2)); mv.push(caixa(.1, .1, .1, -w * .15, y0 + hh + e, -.05));
+      addJ(g, mv, madeira('#8a5a3a')); addJ(g, mb, m('#e8c8d8', { r: .9 }));
+      addJ(g, [bola(.035, w * .18, y0 + e + .16, .02, 1, 1, 1, 8), cil(.025, .035, .1, w * .18, y0 + e + .02, .02, 8)], m('#e8d0c0', { r: .6 }));
+      const ja = m('#ffffff', { unico: true, e: o.luz || '#ffd890', ei: .9 });
+      addJ(g, [caixa(.12, .01, .06, -w * .25, y0 + hh - .01, 0), caixa(.12, .01, .06, w * .25, y0 + h - e - .01, 0)], ja);
+      const tg = new T.CylinderGeometry(.001, w * .62, .7, 4, 1); tg.rotateY(PI / 4); tg.scale(1, 1, d / w * 1.25); tg.translate(0, y0 + h + .35, 0); addJ(g, [tg, caixa(.18, .4, .18, w * .3, y0 + h + .1, 0)], te);
+      // a fachada: dobradiça no canto esquerdo da frente, janelas acesas e a portinha
+      const dob = G(); dob.position.set(-w / 2, y0, d / 2); g.add(dob);
+      bx(dob, w, h, .02, pa, w / 2, 0, .01);
+      const js = []; [[-.3, .35], [.3, .35], [-.3, .9], [.3, .9]].forEach(([x, y], i) => { if (i === 2 && o.apagada) return; js.push(caixa(.22, .26, .02, w / 2 + x * w, y * h - .13, .02)); });
+      addJ(dob, js, ja); addJ(dob, [caixa(.24, .44, .02, w / 2, 0, .021)], te);
+      const fn = animador(k => { dob.rotation.y = -k * 1.65; }, 1.1);
+      if (o.int === 'abrir') g.userData.aoInter = (v, inst) => fn(v, inst);
       const f = r() * 9; anim.push((dt, t) => { ja.emissiveIntensity = .7 + .2 * Math.sin(t * .7 + f) + (Math.sin(t * 5.3 + f) > .97 ? -.6 : 0); });
       return g;
     };
@@ -7449,13 +9660,276 @@
       const mat = m(o.c || '#f4f4f2', { tex: 'acolchoado', rep: [1, Math.max(1, Math.round(H / 1.2))], r: .9 }), jun = m('#d8d8d4', { r: .8 }), pain = [];
       for (let c = 0; c < nC; c++) { const geo = new T.PlaneGeometry(cw - .04, H - .06, 4, 8), p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const u = p.getX(i) / ((cw - .04) / 2), v = p.getY(i) / ((H - .06) / 2); p.setZ(i, .06 * (1 - u * u) * (1 - v * v * v * v)); } geo.computeVertexNormals(); geo.translate(0, H / 2 + y0, .02); const me = malha(g, geo, mat); me.position.x = -W / 2 + (c + .5) * cw; pain.push([me, c]); }
       const ju = []; for (let c = 0; c <= nC; c++) ju.push(caixa(.03, H, .04, -W / 2 + c * cw, y0, .01)); ju.push(caixa(W, .08, .05, 0, y0, .02)); addJ(g, ju, jun);
-      const vel = o.vel || .32, f = r() * 6; anim.push((dt, t) => { pain.forEach(([me, c]) => { me.scale.z = 1 + .9 * Math.sin(t * vel + f + c * .12); }); });
+      // tocar: quem encosta a mão sente a parede encher fundo uma vez (e voltar devagar)
+      let fu = 0; const fundo = surto(k => { fu = Math.sin(k * PI); }, 6);
+      const vel = o.vel || .32, f = r() * 6; anim.push((dt, t) => { pain.forEach(([me, c]) => { me.scale.z = 1 + .9 * Math.sin(t * vel + f + c * .12) + fu * 2.2; }); });
+      if (o.int === 'tocar') g.userData.aoInter = (v, inst, ev) => { if (ev) fundo(); };
+      return g;
+    };
+
+    /* =====================================================================================
+       INTERATIVIDADE (rodada 2): armários, gavetas, caixas, geladeira, chave geral, gravador e cabos ligados
+       Cada peça responde sozinha pelo userData.aoInter (veja interacoes3d.js): v = estado, inst = sem animação.
+       ===================================================================================== */
+    // o que fica dentro de armários, gavetas e caixas (genérico, sem lore): papéis, frascos, roupas, ferramentas…
+    function recheio(pai, tipo, w, d, y, r, alt = .32) {
+      if (!tipo || tipo === 'vazio') return;
+      const gs = {}, add = (k, geo) => (gs[k] = gs[k] || []).push(geo);
+      const MAT = { pas: () => m('#c8a868', { r: .85 }), fol: () => m('#ece6d6', { r: .95 }), vid: () => m('#cfe0dc', { op: .4, r: .05 }), liq: () => m('#6a7a3a', { r: .2, op: .85 }), san: () => m('#6a0a0e', { r: .25, e: '#2a0004', ei: .25 }), pan: () => m('#5a6a7a', { r: 1 }), pan2: () => m('#8a5a4a', { r: 1 }), bra: () => m('#ecebe6', { r: 1 }), fer: () => metal('#8a8e90'), ver: () => m('#a83a2a', { r: .6, me: .2 }), bor: () => m('#151515', { r: .9 }), cor: () => m('#8a7a5a', { r: .95 }), osso: matOsso, oco: matOco, lin: () => m('#7a1018', { r: .8 }), lin2: () => m('#d8c8a8', { r: .8 }), mad: () => madeira('#8a6a42') };
+      const nx = Math.max(1, Math.floor(w / .28));
+      if (tipo === 'papeis') {
+        for (let i = 0; i < nx; i++) { const x = -w / 2 + (i + .5) * w / nx; if (r() < .3) add('pas', caixa(.24, Math.min(alt, .26), .3, x, y, (r() - .5) * .04)); else for (let k = 0; k < 2 + Math.floor(r() * 4); k++) add('pas', caixa(.23 + r() * .03, .022, .3, x + (r() - .5) * .02, y + k * .024, (r() - .5) * .03, 0, (r() - .5) * .25, 0)); }
+        for (let i = 0; i < 3; i++) add('fol', caixa(.21, .003, .29, (r() - .5) * (w - .25), y + .14 + i * .004, (r() - .5) * (d - .3), 0, r() * 3, 0));
+      } else if (tipo === 'frascos' || tipo === 'bolsas') {
+        for (let i = 0; i < nx * 2; i++) { const x = -w / 2 + (i % nx + .5) * w / nx + (r() - .5) * .05, z = (i < nx ? -.08 : .1) * d * 2, hh = .1 + r() * Math.min(alt - .06, .16);
+          if (tipo === 'bolsas') { add('san', caixa(.15, .03, .24, x, y + (i < nx ? 0 : .035), z * .5, 0, (r() - .5) * .3, 0)); continue; }
+          add('vid', cil(.045, .045, hh, x, y, z, 10)); add(r() < .4 ? 'san' : 'liq', cil(.038, .038, hh * (.3 + r() * .55), x, y + .003, z, 10)); add('bor', cil(.047, .047, .02, x, y + hh, z, 10)); }
+      } else if (tipo === 'ferramentas') {
+        add('ver', caixa(.42, .18, .2, -w * .2, y, 0)); add('fer', caixa(.12, .03, .05, -w * .2, y + .18, 0));
+        add('bor', toro(.13, .018, w * .22, y + .03, 0, PI / 2, 0, 0, 5, 18)); add('bor', toro(.11, .018, w * .22, y + .065, .01, PI / 2, 0, 0, 5, 18));
+        add('fer', caixa(.24, .015, .04, w * .05, y, d * .2, 0, .6, 0)); add('fer', caixa(.2, .015, .03, w * .1, y, d * .25, 0, -.3, 0));
+      } else if (tipo === 'roupas' || tipo === 'lencois' || tipo === 'linhas') {
+        for (let i = 0; i < nx; i++) { const x = -w / 2 + (i + .5) * w / nx, kk = tipo === 'lencois' ? 'bra' : (i % 2 ? 'pan' : 'pan2');
+          if (tipo === 'linhas' && i % 2) { for (let k = 0; k < 3; k++) { add('mad', cil(.035, .035, .12, x - .06 + k * .06, y, -.05, 8)); add(k % 2 ? 'lin2' : 'lin', cil(.03, .03, .1, x - .06 + k * .06, y + .01, -.05, 8)); } continue; }
+          for (let k = 0; k < 2 + Math.floor(r() * 3); k++) add(kk, caixa(.24, .05, .28, x + (r() - .5) * .02, y + k * .052, (r() - .5) * .03, 0, (r() - .5) * .12, 0)); }
+      } else if (tipo === 'ossos') {
+        for (let i = 0; i < 16; i++) { const x = (r() - .5) * (w - .15), z = (r() - .5) * (d - .15), a = r() * 6.28, L = Math.min(w - .1, .26 + r() * .2); add('osso', haste([x - Math.cos(a) * L / 2, y + .03 + r() * .1, z - Math.sin(a) * L / 2], [x + Math.cos(a) * L / 2, y + .03 + r() * .1, z + Math.sin(a) * L / 2], .02, .018, 5)); }
+        const go = [], gd = []; for (let i = 0; i < 2; i++) cranio(go, gd, (i - .5) * w * .4, y + .14, (r() - .5) * d * .3, .95, r() * 6, -.2); go.forEach(q => add('osso', q)); gd.forEach(q => add('oco', q));
+      } else if (tipo === 'cordas') {
+        for (let i = 0; i < 3; i++) for (let k = 0; k < 4; k++) add('cor', toro(.14, .018, -w / 2 + .2 + i * (w - .4) / 2, y + .02 + k * .034, (r() - .5) * .06, PI / 2, 0, 0, 5, 20));
+        add('fer', toro(.035, .007, w * .1, y + .02, d * .25, PI / 2, 0, 0, 4, 10));
+      } else if (tipo === 'brinquedos') {
+        const cs = ['#c0392b', '#2e86de', '#f1c40f', '#27ae60']; for (let i = 0; i < nx * 2; i++) add('t' + (i % 4), i % 2 ? bola(.07, (r() - .5) * (w - .2), y + .07, (r() - .5) * (d - .2), 1, 1, 1, 8) : caixa(.1, .1, .1, (r() - .5) * (w - .2), y, (r() - .5) * (d - .2), 0, r() * 3, 0));
+        cs.forEach((c, i) => { MAT['t' + i] = () => m(c, { r: .6 }); });
+      }
+      Object.keys(gs).forEach(k => addJ(pai, gs[k], MAT[k]()));
+    }
+    // mancha de mão ensanguentada (plano pequeno, para o lado de dentro de portas e tampas)
+    const maoSangue = (pai, x, y, z, ry = 0, s = .22) => { const p = pl(pai, s, s * 1.2, canvasMat(64, 80, (c, W, H) => { c.fillStyle = 'rgba(110,8,12,.85)'; c.beginPath(); c.ellipse(W * .5, H * .62, W * .26, H * .2, 0, 0, 7); c.fill(); [[.24, .28], [.38, .14], [.54, .12], [.68, .2], [.8, .42]].forEach(([a, b]) => { c.beginPath(); c.ellipse(W * a, H * b + H * .12, W * .06, H * .14, (a - .5) * .8, 0, 7); c.fill(); }); }, { alfa: .3 }), x, y, z); p.rotation.y = ry; return p; };
+
+    /* ---------- armário de portas que abrem (madeira ou metal, com prateleiras e o que houver dentro) ---------- */
+    P.p5_armario_int = o => {
+      const g = G(), w = o.w || 1.0, h = o.h || 2.0, d = o.d || .5, r = rng(o.sem || 801), n = o.portas || (w > .75 ? 2 : 1), met = !!o.metal, e = .03;
+      const corpo = met ? m(o.c || '#5a6066', { me: .5, r: .45, tex: 'metal_sujo', rep: [1, 2] }) : madeira(o.c || '#5a4028', [1, 2]);
+      const dentro = m(o.ci || (met ? '#2a2e32' : '#2a1e14'), { r: .9 });
+      addJ(g, [caixa(e, h, d, -w / 2 + e / 2, 0, 0), caixa(e, h, d, w / 2 - e / 2, 0, 0), caixa(w, e, d, 0, h - e, 0), caixa(w, .08, d, 0, 0, 0), caixa(w + .04, .04, d + .03, 0, h, 0)], corpo);
+      const roupa = o.conteudo === 'roupas', ns = roupa ? 1 : (o.prateleiras ?? Math.max(2, Math.round(h / .48) - 1));
+      const pr = [caixa(w - 2 * e, h - .1, .012, 0, .08, -d / 2 + .006)], ys = [.08];
+      for (let i = 1; i <= ns; i++) { const y = roupa ? h - .38 : .08 + i * (h - .1) / (ns + 1); ys.push(y + .02); pr.push(caixa(w - 2 * e, .02, d - .06, 0, y, -.01)); }
+      addJ(g, pr, dentro);
+      if (roupa) {
+        // cabideiro com roupas penduradas
+        addJ(g, [cil(.012, .012, w - 2 * e, 0, h - .5, 0, 6, 0, 0, PI / 2)], metal('#b8b8b0'));
+        const rp = [], nr = Math.max(2, Math.round(w / .16)); for (let i = 0; i < nr; i++) { const x = -w / 2 + .1 + i * (w - .2) / Math.max(1, nr - 1), L = .7 + r() * .45; rp.push(caixa(.04, L, d * .7, x, h - .5 - L, 0, 0, (r() - .5) * .2, 0)); }
+        addJ(g, rp, m(o.cr || '#5a5a66', { r: 1 }));
+        recheio(g, 'lencois', w - .1, d - .1, ys[1], r);
+      } else ys.forEach((y, i) => recheio(g, (o.vazias || []).includes(i) ? 'vazio' : o.conteudo, w - .1, d - .1, y, r, (h - .1) / (ns + 1) - .05));
+      if (o.mancha) maoSangue(g, -w * .2, h * .55, -d / 2 + .02, 0, .26);
+      if (o.vidro) { const lz = m('#ffffff', { unico: true, e: o.cl || '#dff4ff', ei: 1.1 }); addJ(g, [caixa(w - .1, .02, .04, 0, h - .07, 0)], lz); g.userData.luzInt = lz; }
+      // as portas (dobradiças nas bordas da frente)
+      const ww = w / n, folhas = [], pux = metal(o.cp || '#b8b0a0'), vid = m('#c8dce0', { op: .28, r: .05 });
+      for (let i = 0; i < n; i++) {
+        const esq = n === 1 ? !o.dir : i === 0, sx = esq ? 1 : -1, dob = G(); dob.position.set(esq ? -w / 2 : w / 2, .08, d / 2); g.add(dob);
+        if (o.vidro) { addJ(dob, [caixa(ww - .01, .05, .025, sx * ww / 2, 0, .0125), caixa(ww - .01, .05, .025, sx * ww / 2, h - .15, .0125), caixa(.05, h - .1, .025, sx * .025, 0, .0125), caixa(.05, h - .1, .025, sx * (ww - .035), 0, .0125)], corpo); bx(dob, ww - .1, h - .2, .006, vid, sx * ww / 2, .05, .012); }
+        else {
+          bx(dob, ww - .01, h - .1, .025, corpo, sx * ww / 2, 0, .0125);
+          if (met) addJ(dob, [0, 1, 2, 3].map(k => caixa(ww * .5, .012, .006, sx * ww / 2, h - .35 - k * .05, .028)), m('#1a1a1a'));
+          else addJ(dob, [caixa(ww - .14, .02, .008, sx * ww / 2, .2, .028), caixa(ww - .14, .02, .008, sx * ww / 2, h - .35, .028), caixa(.02, h - .55, .008, sx * .07, .2, .028), caixa(.02, h - .55, .008, sx * (ww - .07), .2, .028)], madeira('#3a2818'));
+        }
+        bx(dob, .025, .18, .03, pux, sx * (ww - .06), h * .45, .04);
+        folhas.push([dob, sx]);
+      }
+      const pos = k => { folhas.forEach(([dob, sx]) => { dob.rotation.y = -sx * k * 1.85; }); if (g.userData.luzInt) ligaMat(g.userData.luzInt, k > .05); };
+      if (o.int === 'abrir') { const fn = animador(pos, 1.4); g.userData.aoInter = (v, inst) => fn(v, inst); }
+      pos(o.int ? 0 : (o.aberto || 0));
+      return g;
+    };
+
+    /* ---------- arquivo de aço de 4 gavetas (uma gaveta corre para fora, com as pastas) ---------- */
+    P.p5_arquivo_int = o => {
+      const g = G(), w = o.w || .5, h = o.h || 1.32, d = o.d || .62, n = o.n || 4, r = rng(o.sem || 803), gi = o.gaveta ?? 0, cor = m(o.c || '#7a8288', { me: .5, r: .45, tex: 'metal_sujo', rep: [1, 2] });
+      const fh = (h - .08) / n, pux = metal('#c8ccd0');
+      addJ(g, [caixa(.02, h, d, -w / 2 + .01, 0, 0), caixa(.02, h, d, w / 2 - .01, 0, 0), caixa(w, .02, d, 0, h - .02, 0), caixa(w, .06, d, 0, 0, 0), caixa(w - .04, h - .08, .02, 0, .06, -d / 2 + .01)], cor);
+      const et = canvasMat(128, 48, (x, W, H) => { x.fillStyle = '#e8e0c8'; x.fillRect(0, 0, W, H); x.fillStyle = '#222'; x.font = 'bold 26px Courier New, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(o.etq || 'A–F', W / 2, H / 2 + 1); });
+      const buraco = m('#060606', { r: 1 }); let gv0 = null;
+      for (let i = 0; i < n; i++) {
+        const y = .06 + (n - 1 - i) * fh, gv = G(); gv.position.set(0, y, 0); g.add(gv);
+        bx(gv, w - .03, fh - .015, .025, cor, 0, .005, d / 2 - .0125);
+        bx(gv, .16, .025, .03, pux, 0, fh * .5, d / 2 + .012); pl(gv, .1, .04, et, 0, fh * .78, d / 2 + .002);
+        if (i === gi) {
+          pl(g, w - .05, fh - .03, buraco, 0, y + fh / 2, d / 2 - .03);
+          addJ(gv, [caixa(.015, fh * .7, d - .08, -w / 2 + .035, .02, -.03), caixa(.015, fh * .7, d - .08, w / 2 - .035, .02, -.03), caixa(w - .07, .012, d - .08, 0, .02, -.03), caixa(w - .07, fh * .7, .012, 0, .02, -d / 2 + .05)], cor);
+          const ps = [], ps2 = []; for (let k = 0; k < 9; k++) (k % 3 ? ps : ps2).push(caixa(w - .1, fh * .62 - r() * .05, .01, 0, .03, -d / 2 + .09 + k * .052, (r() - .5) * .12, 0, 0));
+          addJ(gv, ps, m('#c8a868', { r: .85 })); addJ(gv, ps2, m('#7a9a6a', { r: .85 }));
+          addJ(gv, [caixa(.21, .29, .003, -.04, fh * .45, -.05, .2, .3, 0), caixa(.21, .29, .003, .06, fh * .4, .02, -.15, -.2, 0)], m('#ece6d6', { r: .95 }));
+          gv0 = gv;
+        }
+      }
+      const pos = k => { if (gv0) gv0.position.z = k * d * .78; };
+      if (o.int === 'abrir') { const fn = animador(pos, 1.6); g.userData.aoInter = (v, inst) => fn(v, inst); }
+      pos(o.int ? 0 : (o.aberto || 0));
+      return g;
+    };
+
+    /* ---------- caixa com tampa (madeira, metal ou pedra de ossuário), com o que houver dentro ---------- */
+    P.p5_caixa_tampa = o => {
+      const g = G(), w = o.w || 1.0, d = o.d || .6, h = o.h || .55, r = rng(o.sem || 805), est = o.estilo || 'madeira';
+      const mt = est === 'metal' ? m(o.c || '#4a5a4a', { tex: 'metal_sujo', me: .45, r: .5, rep: [1, 1] }) : est === 'pedra' ? m(o.c || '#8a8070', { tex: 'concreto_sujo', r: .95, rep: [1, 1] }) : madeira(o.c || '#5a4228');
+      const e = est === 'pedra' ? .07 : .03;
+      addJ(g, [caixa(w, .05, d, 0, 0, 0), caixa(e, h, d, -w / 2 + e / 2, 0, 0), caixa(e, h, d, w / 2 - e / 2, 0, 0), caixa(w, h, e, 0, 0, -d / 2 + e / 2), caixa(w, h, e, 0, 0, d / 2 - e / 2)], mt);
+      pl(g, w - 2 * e, d - 2 * e, m('#1a120c', { r: 1 }), 0, .052, 0).rotation.x = -PI / 2;
+      if (est === 'pedra') addJ(g, [caixa(w + .02, .05, d + .02, 0, h - .1, 0), caixa(w + .02, .05, d + .02, 0, .06, 0), caixa(.05, h - .2, .02, 0, .1, d / 2 + .005), caixa(w * .4, .05, .02, 0, h * .55, d / 2 + .005)], m('#6a6252', { tex: 'concreto_sujo', r: 1 }));
+      else addJ(g, [caixa(.05, h + .01, d + .01, -w / 2 + .14, 0, 0), caixa(.05, h + .01, d + .01, w / 2 - .14, 0, 0)], metal(est === 'metal' ? '#2a2a2a' : '#4a3a2a'));
+      recheio(g, o.conteudo, w - 2 * e - .04, d - 2 * e - .04, .05, r, h - .12);
+      const tp = G(); tp.position.set(0, h, -d / 2); g.add(tp);
+      addJ(tp, [caixa(w + .02, e + .015, d + .02, 0, 0, d / 2 + .0)], mt);
+      bx(tp, .12, .07, .02, metal('#8a8070'), 0, -.06, d + .02);
+      if (o.mancha) maoSangue(tp, .1, -.004, d * .55, 0, .2).rotation.x = PI / 2;
+      const pos = k => { tp.rotation.x = -k * 1.75; };
+      if (o.int === 'abrir') { const fn = animador(pos, 1.4); g.userData.aoInter = (v, inst) => fn(v, inst); }
+      pos(o.int ? 0 : (o.aberto || 0));
+      return g;
+    };
+
+    /* ---------- gaveta fria de necrotério (encaixa num vão da parede de gavetas a5_gavetas) ----------
+       lx = x local do vão, yb = base do vão (mesma origem e rotação da parede de gavetas). Sai com a bandeja. */
+    P.p5_gaveta_fria = o => {
+      const g = G(), lx = o.lx || 0, yb = o.yb ?? .15, cw = .62, ch = .56, z0 = .355, aco = m('#c0c4c8', { tex: 'metal_sujo', r: .35, me: .5, rep: [1, 1] }), r = rng(o.sem || 807);
+      pl(g, cw, ch, m('#030303', { r: 1 }), lx, yb + ch / 2, z0 + .002);
+      const gv = G(); gv.position.set(lx, yb, z0); g.add(gv);
+      bx(gv, cw, ch, .03, aco, 0, 0, .015);
+      bx(gv, .3, .03, .04, metal('#c8ccd0'), 0, ch * .34, .05);
+      const et = canvasMat(128, 48, (x, W, H) => { x.fillStyle = '#f2ecd8'; x.fillRect(0, 0, W, H); x.fillStyle = '#1a1a1a'; x.font = 'bold 28px Courier New, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(o.num || '').padStart(2, '0'), W / 2, H / 2 + 1); });
+      pl(gv, .24, .08, et, 0, ch * .76, .031);
+      addJ(gv, [caixa(cw - .08, .025, .62, 0, .03, -.31), caixa(cw - .08, .09, .02, 0, .03, -.61), caixa(.02, .06, .62, -cw / 2 + .05, .03, -.31), caixa(.02, .06, .62, cw / 2 - .05, .03, -.31)], aco);
+      const ge = []; for (let i = 0; i < 6; i++) ge.push(bola(.05 + r() * .06, (r() - .5) * (cw - .2), .058, -.08 - r() * .45, 1, .08, 1.4, 7)); addJ(gv, ge, m('#f4f8fa', { op: .55, r: .2 }));
+      if (o.conteudo === 'lencol') addJ(gv, [amassar(caixa(.36, .07, .3, 0, .055, -.35), .08, 2)], m('#d8d4cc', { r: .95 }));
+      const pos = k => { gv.position.z = z0 + k * .6; };
+      if (o.int === 'abrir') { const fn = animador(pos, 1.2); g.userData.aoInter = (v, inst) => fn(v, inst); }
+      pos(0);
+      return g;
+    };
+
+    /* ---------- chave geral de parede (alavanca, lâmpadas de sinal e eletroduto até o forro) ---------- */
+    P.p5_chave_geral = o => {
+      const g = G(), y = o.y ?? 1.0, cx = m(o.c || '#5a6a5a', { me: .45, r: .5, tex: 'metal_sujo', rep: [1, 1] });
+      addJ(g, [caixa(.56, .76, .2, 0, y, .1), caixa(.6, .04, .22, 0, y + .76, .1)], cx);
+      addJ(g, [cil(.035, .035, ALT - (y + .8) + .02, -.15, y + .8, .08, 8), cil(.055, .055, .06, -.15, ALT - .06, .08, 8), cil(.035, .035, y - .02, .15, 0, .08, 8), cil(.055, .055, .05, .15, 0, .08, 8)], metal('#7a7e80'));
+      const tx = canvasMat(256, 96, (x, W, H) => { x.fillStyle = '#e8c020'; x.fillRect(0, 0, W, H); x.fillStyle = '#111'; x.font = 'bold 34px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(o.txt || 'CHAVE GERAL', W / 2, H / 2); x.strokeStyle = '#111'; x.lineWidth = 6; x.strokeRect(4, 4, W - 8, H - 8); });
+      pl(g, .44, .16, tx, 0, y + .64, .201);
+      addJ(g, [caixa(.06, .22, .03, .17, y + .26, .2)], m('#1a1a1a', { r: .6 }));
+      const al = G(); al.position.set(.17, y + .37, .23); g.add(al);
+      addJ(al, [caixa(.035, .3, .035, 0, 0, 0)], metal('#b8b8b0')); addJ(al, [cil(.03, .03, .16, 0, .3, 0, 10, 0, 0, PI / 2)], m('#a01818', { r: .5 }));
+      const mv = m('#ffffff', { unico: true, e: '#40ff60', ei: 1.6 }), mr = m('#ffffff', { unico: true, e: '#ff2a20', ei: 1.6 });
+      sf(g, .03, mv, -.14, y + .42, .21, 8); sf(g, .03, mr, -.14, y + .3, .21, 8);
+      const pos = k => { al.rotation.x = .35 + (1 - k) * (PI - .7); };
+      const fn = animador(pos, 3);
+      g.userData.aoInter = (v, inst) => { fn(v, inst); ligaMat(mv, v); ligaMat(mr, !v); };
+      pos(1);
+      return g;
+    };
+
+    /* ---------- gravador de rolo (os rolos giram quando alguém aperta o play; o ponteiro não sai do zero) ---------- */
+    P.p5_gravador = o => {
+      const g = G(), cx = m('#2a2a2c', { r: .5, me: .3 }), alu = metal('#b8bcc0'), pre = m('#0a0a0a', { r: .6 });
+      addJ(g, [caixa(.56, .15, .4, 0, 0, 0)], cx);
+      addJ(g, [caixa(.54, .006, .38, 0, .15, 0)], m('#4a4a4e', { me: .5, r: .4 }));
+      const rolos = [-1, 1].map(s => { const ro = G(); ro.position.set(s * .14, .156, -.04); g.add(ro); addJ(ro, [cil(.11, .11, .01, 0, 0, 0, 22), cil(.02, .02, .03, 0, 0, 0, 8)], alu); addJ(ro, [cil(.075 + (s > 0 ? .0 : .02), .075 + (s > 0 ? .0 : .02), .008, 0, .01, 0, 22)], m('#3a2a1a', { r: .5 })); addJ(ro, [0, 1, 2].map(k => cil(.022, .022, .012, Math.cos(k * 2.094) * .06, .002, Math.sin(k * 2.094) * .06, 8)), pre); return ro; });
+      addJ(g, [caixa(.3, .006, .012, 0, .16, .07), caixa(.04, .02, .04, 0, .155, .08)], pre);
+      const vu = canvasMat(128, 64, (x, W, H) => { x.fillStyle = '#f0e6c8'; x.fillRect(0, 0, W, H); x.strokeStyle = '#222'; x.lineWidth = 2; x.beginPath(); x.arc(W / 2, H * 1.1, H * .8, 3.6, 5.8); x.stroke(); x.strokeStyle = '#b01010'; x.beginPath(); x.arc(W / 2, H * 1.1, H * .8, 5.2, 5.8); x.stroke(); x.fillStyle = '#111'; x.font = 'bold 12px Arial'; x.fillText('dB', W / 2 - 8, H * .9); x.strokeStyle = '#111'; x.lineWidth = 2; x.beginPath(); x.moveTo(W / 2, H * 1.05); x.lineTo(W * .18, H * .55); x.stroke(); });
+      pl(g, .12, .06, vu, -.16, .09, .201);
+      addJ(g, [0, 1, 2, 3, 4].map(k => caixa(.04, .025, .03, .02 + k * .05, .06, .2)), m('#c8c8c0', { r: .5 }));
+      let gira = 0; anim.push(dt => { if (gira <= 0) return; gira -= dt; rolos[0].rotation.y -= dt * 3.2; rolos[1].rotation.y -= dt * 4.4; });
+      g.userData.aoInter = (v, inst, ev) => { if (ev) gira = 9; };
+      return g;
+    };
+
+    /* ---------- cartaz de papel na parede (várias linhas; a letra se ajusta ao papel, nada sai cortado) ---------- */
+    P.p5_cartaz = o => {
+      const g = G(), w = o.w || 1, h = o.h || 1.2, y = o.y ?? 1.1, r = rng(o.sem || 813);
+      const mt = canvasMat(512, Math.round(512 * h / w), (x, W, H) => {
+        x.fillStyle = o.f || '#e6dcc2'; x.fillRect(0, 0, W, H);
+        for (let i = 0; i < 1400; i++) { x.fillStyle = `rgba(80,60,30,${r() * .08})`; x.fillRect(r() * W, r() * H, 3, 3); }
+        for (let i = 0; i < 4; i++) { const cx = r() * W, cy = r() * H, gr = x.createRadialGradient(cx, cy, 2, cx, cy, 40 + r() * 90); gr.addColorStop(0, 'rgba(110,80,40,.22)'); gr.addColorStop(1, 'rgba(110,80,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, W, H); }
+        x.strokeStyle = o.cb || '#7a1a10'; x.lineWidth = 10; x.strokeRect(16, 16, W - 32, H - 32);
+        const L = String(o.txt || '').split('\n'); let tam = Math.min((H - 90) / (L.length * 1.22), 140);
+        const fit = () => { x.font = `bold ${tam}px Arial, Helvetica, sans-serif`; return Math.max(...L.map(l => x.measureText(l).width)); };
+        while (fit() > W * .82 && tam > 10) tam -= 2;
+        x.fillStyle = o.c || '#1a1410'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        const alt = tam * 1.22, y0 = H / 2 - (L.length - 1) * alt / 2; L.forEach((l, i) => x.fillText(l, W / 2, y0 + i * alt));
+      }, { r: .92 });
+      pl(g, w, h, mt, 0, y + h / 2, .012);
+      addJ(g, [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => caixa(.12, .04, .004, a * (w / 2 - .04), y + h / 2 + b * (h / 2 - .02) - .02, .016, 0, 0, a * b * .6)), m('#d8d0b0', { op: .6, r: .5 }));
+      return g;
+    };
+
+    /* ---------- microfone num pedestal (o cabo desce pela haste até a base) ---------- */
+    P.p5_microfone_pe = o => {
+      const g = G(), h = o.h || 1.45, aco = metal('#3a3a3e'), pre = m('#141414', { r: .5 });
+      addJ(g, [0, 2.094, 4.188].map(a => haste([0, .12, 0], [Math.cos(a) * .3, .01, Math.sin(a) * .3], .012, .01, 5)).concat([cil(.012, .012, h - .1, 0, .1, 0, 6), cil(.02, .02, .05, 0, .1, 0, 8)]), aco);
+      const cab = G(); cab.position.y = h; g.add(cab);
+      addJ(cab, [haste([0, 0, 0], [0, .05, .22], .009), caixa(.03, .04, .05, 0, .02, .2)], aco);
+      const cp = G(); cp.position.set(0, .07, .26); cp.rotation.x = .5; cab.add(cp);
+      addJ(cp, [cil(.024, .02, .12, 0, -.03, 0, 10)], pre); addJ(cp, [bola(.03, 0, .1, 0, 1, 1.15, 1, 10)], m('#6a6a6e', { me: .6, r: .4 }));
+      addJ(g, [tuboG([[0, h + .02, .2], [.03, h - .05, .12], [.02, h - .3, .02], [.02, .5, .02], [.03, .12, .03], [.06, .02, .06]], .006, 24, 4)], pre);
+      let tr = 0; anim.push((dt, t) => { if (tr > 0) { tr = Math.max(0, tr - dt * .5); cab.rotation.z = Math.sin(t * 22) * .03 * tr; } });
+      g.userData.aoInter = (v, inst, ev) => { if (ev) tr = 1; };
+      return g;
+    };
+
+    /* ---------- geladeira de copa (porta que abre, luz de dentro, prateleiras; limpa ou podre) ---------- */
+    P.p5_geladeira = o => {
+      const g = G(), w = o.w || .75, h = o.h || 1.8, d = o.d || .68, r = rng(o.sem || 809), cor = m(o.c || '#d8d4c4', { r: .35, me: .1 }), lim = !!o.limpa;
+      const fo = m(lim ? '#eef0ee' : '#7a7462', { r: .6 });
+      addJ(g, [caixa(.04, h, d, -w / 2 + .02, 0, 0), caixa(.04, h, d, w / 2 - .02, 0, 0), caixa(w, .04, d, 0, h - .04, 0), caixa(w, .1, d, 0, 0, 0), caixa(w, h, .04, 0, 0, -d / 2 + .02)], cor);
+      addJ(g, [caixa(w - .08, h - .18, .01, 0, .1, -d / 2 + .045), caixa(w - .08, .01, d - .08, 0, h * .72, -.02)], fo);
+      const gr = []; [.42, .82, 1.0].forEach(y => gr.push(caixa(w - .09, .012, d - .12, 0, y, -.02))); addJ(g, gr, m(lim ? '#d8e8ec' : '#8a8a78', { op: .7, r: .1 }));
+      const it = {}, add = (k, q) => (it[k] = it[k] || []).push(q);
+      if (lim) { for (let i = 0; i < 4; i++) add(i % 2 ? 'gv' : 'gb', cil(.035, .035, .24, -w / 2 + .12 + i * .14, .432, -.1, 10)); add('cx', caixa(.09, .2, .07, .18, .832, -.08)); add('ov', caixa(.26, .05, .12, -.12, .832, -.1)); add('gb', cil(.05, .05, .14, -.15, 1.012, -.08, 12)); }
+      else { for (let i = 0; i < 5; i++) add('po', amassar(bola(.06 + r() * .05, -w / 2 + .14 + i * .12, .46, -.12 + (r() - .5) * .1, 1.2, .7, 1, 8), .3, i)); add('fr', cil(.04, .04, .16, .15, .832, -.12, 10)); add('fr', cil(.05, .05, .12, -.1, .832, -.1, 10)); add('ml', caixa(.09, .2, .07, -.22, .832, -.06, 0, .3, 0)); for (let i = 0; i < 4; i++) add('mo', bola(.05 + r() * .06, (r() - .5) * (w - .2), 1.012, (r() - .5) * .3, 1.4, .1, 1.2, 7)); }
+      const MI = { gb: () => m('#f2f2ec', { r: .4 }), gv: () => m('#4a8a5a', { op: .75, r: .1 }), cx: () => m('#e8e4d8', { r: .7 }), ov: () => m('#d8c8a0', { r: .9 }), po: () => m('#4a3a1e', { r: .8 }), fr: () => m('#2a2a1e', { op: .8, r: .2 }), ml: () => m('#6a6a52', { r: .9 }), mo: () => m('#7a8a6a', { r: 1 }) };
+      Object.keys(it).forEach(k => addJ(g, it[k], MI[k]()));
+      if (!lim) addJ(g, [caixa(.3, .005, .2, .05, .105, .05, 0, .4, 0)], m('#3a2a10', { op: .7, r: .3 }));
+      const lz = m('#ffffff', { unico: true, e: lim ? '#f4fbff' : '#e8e0b0', ei: 1.3 }); addJ(g, [caixa(.16, .03, .05, 0, h - .1, -.1)], lz);
+      const dob = G(); dob.position.set(-w / 2, .08, d / 2); g.add(dob);
+      addJ(dob, [caixa(w, h - .1, .055, w / 2, 0, .0275)], cor);
+      addJ(dob, [caixa(w - .1, h - .3, .01, w / 2, .1, -.004)], fo);
+      addJ(dob, [caixa(w - .14, .015, .1, w / 2, .5, -.05), caixa(w - .14, .015, .1, w / 2, 1.0, -.05), caixa(w - .14, .07, .01, w / 2, .5, -.1), caixa(w - .14, .07, .01, w / 2, 1.0, -.1)], m(lim ? '#dfe6e8' : '#8a8676', { r: .4 }));
+      if (lim) addJ(dob, [cil(.03, .03, .2, w * .3, .515, -.05, 10), cil(.03, .03, .2, w * .55, .515, -.05, 10)], m('#3a7a4a', { op: .8, r: .1 }));
+      addJ(dob, [caixa(.025, .5, .04, w - .05, h * .45, .075), caixa(w - .02, .01, .005, w / 2, h * .72 - .08, .056)], metal('#b8b8b0'));
+      const pos = k => { dob.rotation.y = -k * 1.75; ligaMat(lz, k > .05); };
+      if (o.int === 'abrir') { const fn = animador(pos, 1.3); g.userData.aoInter = (v, inst) => fn(v, inst); }
+      pos(0);
+      return g;
+    };
+
+    /* ---------- feixe de cabos ligado nas duas pontas ----------
+       pts = polilinha [x, y, z] em coordenadas locais (o item fica em 0,0 da sala e pts são da sala);
+       pontos baixos (y < .2) ficam deitados no chão; n cabos lado a lado; carne = fração dos cabos que viraram carne.
+       caixas = [[x, y, z, ry]] caixas de passagem de parede; argolas = [[x, z]] onde o cabo entra no chão ou numa máquina. */
+    P.p5_cabos = o => {
+      const g = G(), r = rng(o.sem || 811), pts = o.pts || [[0, .03, 0], [2, .03, 0]], n = o.n || 3, esp = o.esp ?? .07, R0 = o.raio || .022;
+      const perp = k => { for (let s = 1; s < pts.length; s++) for (const j of [k + s, k - s]) { if (j < 0 || j >= pts.length) continue; const dx = (pts[j][0] - pts[k][0]) * (j > k ? 1 : -1), dz = (pts[j][2] - pts[k][2]) * (j > k ? 1 : -1), L = Math.hypot(dx, dz); if (L > .05) return [-dz / L, dx / L]; } return [1, 0]; };
+      const cab = [], car = [];
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * esp, rad = R0 * (.8 + r() * .6);
+        const pp = pts.map((p, k) => { const [nx, nz] = perp(k), chao = p[1] < .2, w = chao && k > 0 && k < pts.length - 1 ? Math.sin(k * 1.7 + i * 2.3) * .05 : 0; return [p[0] + nx * (off + w), chao ? rad + .004 : p[1], p[2] + nz * (off + w)]; });
+        // pontos intermediários nos trechos longos, para a curva deitar no chão em vez de afundar
+        const fino = []; pp.forEach((p, k) => { if (k) { const a = pp[k - 1], L = Math.hypot(p[0] - a[0], p[1] - a[1], p[2] - a[2]); const ns = Math.floor(L / 1.2); for (let s = 1; s <= ns; s++) { const t = s / (ns + 1); fino.push([a[0] + (p[0] - a[0]) * t + (r() - .5) * .04, a[1] + (p[1] - a[1]) * t, a[2] + (p[2] - a[2]) * t + (r() - .5) * .04]); } } fino.push(p); });
+        (r() < (o.carne || 0) ? car : cab).push(tuboG(fino, rad, Math.max(12, fino.length * 6), 6));
+      }
+      addJ(g, cab, m(o.c || '#141414', { r: .65 }));
+      const mc = addJ(g, car, carne('#8a3a40', { rep: [1, 4], unico: true }));
+      if (mc) { const f = r() * 6; anim.push((dt, t) => { mc.material.emissiveIntensity = .3 + Math.max(0, Math.sin(t * 2.2 + f)) ** 8 * .9; }); }
+      const cx = []; (o.caixas || []).forEach(([x, y, z, ry]) => { const q = caixa(.22, .26, .1, 0, -.13, 0); rot(q, 0, (ry || 0) * PI / 180, 0); q.translate(x, y, z); cx.push(q); });
+      (o.argolas || []).forEach(([x, z, y]) => cx.push(cil(.07 + n * .02, .08 + n * .02, .025, x, y || 0, z, 12)));
+      if (cx.length) addJ(g, cx, metal('#5a5e60'));
       return g;
     };
   });
-  // peças planas, de parede ou de teto: não bloqueiam o caminho
+  // peças planas, de parede ou de teto: não bloqueiam o caminho (cabos deitados no chão também não)
   const SC = NS.semColisao = NS.semColisao || new Set();
-  ['p5_carne_verga', 'p5_placa_engolida', 'p5_mobile', 'p5_raizes_teto', 'p5_rio', 'p5_parede_respira'].forEach(t => SC.add(t));
+  ['p5_carne_verga', 'p5_placa_engolida', 'p5_mobile', 'p5_raizes_teto', 'p5_rio', 'p5_parede_respira', 'p5_cabos', 'p5_gaveta_fria', 'p5_cartaz'].forEach(t => SC.add(t));
 })();
 
 (() => { (window.ACF3D = window.ACF3D || {}).andaresProntos = true; })();

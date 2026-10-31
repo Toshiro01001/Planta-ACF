@@ -122,6 +122,13 @@
       if (hq === ha) return;
       a.definir(['m3d', k], quer ? { ...quer, _h: hq } : null);
     });
+    // trajes nos cabides: o estoque começa cheio (os jogadores só podem tirar: regra do Firebase)
+    const e0 = (a.estado || {}).estoque || {};
+    Object.entries(fonte).forEach(([k, c]) => (c.itens || []).forEach((it, i) => {
+      if (it.int !== 'vestir') return;
+      const kk = `v_${k}_${i}`;
+      if (e0[kk] === undefined) a.definir(['estoque', kk], it.intQtd ?? 1);
+    }));
   }
 
   /* ================= cartão da sala ================= */
@@ -302,6 +309,7 @@
       o.rotation.y = (it.r || 0) * Math.PI / 180;
       if (it.s) o.scale.setScalar(it.s);
       o.userData.t = it.t; o.userData.i = i; o.userData.esc = it.esc || null; o.userData.uso = it.uso || null;
+      if (it.int) o.userData.int = { m: it.int, nome: it.intN || '', item: it.intItem || '', qtd: it.intQtd ?? null, som: it.intSom || '', txt: it.intTxt || '', ini: it.intIni ?? null };
       if (it.t === 'campo_infinito') o.userData.campo = { r0: it.r0 || 1.3, r1: it.r1 || 2.6, ext: it.ext || 7, per: it.per || 'vontade', dt: it.dt || 20 };
       pai.add(o);
     });
@@ -581,7 +589,7 @@
       montarItens(F2, cena, g, ver, { cn: s.cn, vaos: Object.entries(s.vaos).map(([lado, v]) => ({ lado, u: v.centro - (lado === 'n' || lado === 's' ? s.cx : s.cz) })) });
       g.updateMatrixWorld(true);
       g.children.forEach(o => { if (o.userData.campo) campos.push({ p, cn: s.cn, x: s.cx + o.position.x, z: s.cz + o.position.z, ...o.userData.campo }); });
-      const virt = luzes.map(l => { const w = new T.Vector3(); l.getWorldPosition(w); l.parent.remove(l); return { l, p: w, base: l.intensity, cn: s.cn }; });
+      const virt = luzes.map(l => { const w = new T.Vector3(); l.getWorldPosition(w); let dono = l.parent; while (dono && dono.parent && dono.parent !== g) dono = dono.parent; l.parent.remove(l); return { l, p: w, base: l.intensity, cn: s.cn, dono: dono && dono.parent === g ? dono : null }; });
       (cena.luzes || []).forEach((l, i) => {
         const L = new T.PointLight(l.c || '#fff', l.i ?? 1, l.d ?? 8, 2);
         virt.push({ l: L, p: new T.Vector3(s.cx + (l.x || 0), l.y ?? ALT - .4, s.cz + (l.z || 0)), base: L.intensity, cn: s.cn, pisca: !!l.pisca, f: i * 1.7 });
@@ -589,6 +597,9 @@
       // sala sem luz própria: uma lâmpada fraca no teto (para não virar um quadrado preto)
       if (!virt.length && !s.cena) virt.push({ l: new T.PointLight('#ffe8c8', .6, 8, 2), p: new T.Vector3(s.cx, ALT - .4, s.cz), base: .6, cn: s.cn });
       if (cena.sombra !== false && s.cena) virt.push({ l: new T.PointLight(cena.sombraCor || '#fff4e6', (cena.sombraI ?? .8) * .8, 10, 2), p: new T.Vector3(s.cx + .8, ALT - .4, s.cz + .6), base: (cena.sombraI ?? .8) * .8, cn: s.cn });
+      // interações (abrir, ligar, tocar, ler, vestir, telão): interacoes3d.js
+      const IN = NS().inter ? NS().inter.preparar(T, g, s, p, desc) : { lista: [], dinam: [] };
+      IN.lista.forEach(e => interativos.push(e));
       // materiais que brilham (lâmpadas, telas): apagam junto com a luz da sala
       const emissivos = [];
       g.traverse(o => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > .3 && !emissivos.find(e => e.m === o.material)) emissivos.push({ m: o.material, base: o.material.emissiveIntensity }); });
@@ -600,8 +611,9 @@
       g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w, obj: o }); } });
       // itens do livro jogados: aparecem quando o Mestre espalha (mapa/estoque/i_<CN>_<n>)
       g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; interativos.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
-      const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '' };
+      const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN };
       carregadas.set(p, c);
+      if (NS().inter) NS().inter.aplicar(c, true);
       atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
     }
     // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
@@ -653,7 +665,7 @@
       const c = carregadas.get(p); if (!c) return;
       for (let i = campos.length - 1; i >= 0; i--) if (campos[i].p === p) campos.splice(i, 1);
       raiz.remove(c.g); c.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
-      for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc'].includes(interativos[i].tipo) && interativos[i].p === p) interativos.splice(i, 1);
+      for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc', 'int'].includes(interativos[i].tipo) && interativos[i].p === p) interativos.splice(i, 1);
       carregadas.delete(p);
     }
     const vizinhas = p => CS.filter(c => !c.saida && (c.p1 === p || c.p2 === p)).map(c => [c.p1 === p ? c.p2 : c.p1, c.ci]);
@@ -708,10 +720,10 @@
         L.position.copy(v.p); L.distance = v.l.distance; L.decay = v.l.decay;
         L.color.copy(v.l.color);
         if (modo === 'vermelha' || prot) { L.color.copy(VERM); if (prot) k *= .45 + .55 * Math.max(0, Math.sin(t * 4)); }
-        L.intensity = v.l.intensity * k;
+        L.intensity = v.l.intensity * k * (v.dono && v.dono.userData._lig === 0 ? 0 : 1);
       }
       // brilho das lâmpadas e telas acompanha
-      carregadas.forEach((c, p) => { const modo = modoLuz('c' + S[p].cn); const k = apagao ? 0 : fatorLuz(modo, t, p); c.emissivos.forEach(o => { o.m.emissiveIntensity = o.base * Math.max(k, apagao ? 0 : .04); }); });
+      carregadas.forEach((c, p) => { const modo = modoLuz('c' + S[p].cn); const k = apagao ? 0 : fatorLuz(modo, t, p); c.emissivos.forEach(o => { o.m.emissiveIntensity = o.base * Math.max(k, apagao ? 0 : .04) * (o.m.userData.mult ?? 1); }); });
       const kc = apagao ? 0 : fatorLuz(modoCorr, t, 0);
       mPainel.emissiveIntensity = 1.5 * kc; mPainelPisca.emissiveIntensity = 1.5 * kc * ((Math.sin(t * 2.7) > .85 || Math.sin(t * 11) > .95) ? .05 : 1);
       const corP = (modoCorr === 'vermelha' || prot) ? VERM : null; mPainel.emissive.set(corP || tema.luz); mPainelPisca.emissive.set(corP || tema.luz);
@@ -750,7 +762,7 @@
       for (const s of Object.values(S)) if (x >= s.x0 + RAIO && x <= s.x1 - RAIO && z >= s.z0 + RAIO && z <= s.z1 - RAIO) { ok = true; break; }
       if (!ok) for (const r of zonasCorr) if (dentroDe(r, x, z)) { ok = true; break; }
       if (!ok) return false;
-      for (const c of carregadas.values()) for (const r of c.obst) if (dentroDe(r, x, z)) return false;
+      for (const c of carregadas.values()) { for (const r of c.obst) if (dentroDe(r, x, z)) return false; if (c.inter && c.inter.dinam.length && !NS().inter.livre(c, x, z)) return false; }
       if (expoCena && expoCena.r.colisoes) for (const r of expoCena.r.colisoes) if (x >= r[0] - RAIO && x <= r[1] + RAIO && z >= r[2] - RAIO && z <= r[3] + RAIO) return false;
       return true;
     }
@@ -800,6 +812,7 @@
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos, campos,
       livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
+      atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
         tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
@@ -892,6 +905,11 @@
         // forma do Filho trocada, escondido/saiu do esconderijo ou nome mudou: refaz a miniatura
         if (o && (o.forma !== forma || o.esq !== !!tk.esq || o.rotulo !== ACF().rotulo(tk))) { remover(id); o = null; }
         if (!o) { o = criar(id, tk); if (!o) return; mapa.set(id, o); }
+        // traje vestido (ficha ativa → vitais do token): por cima da miniatura
+        const tj = (tk.vit && tk.vit.tj) || '';
+        if (o.tj !== tj && NS().inter) { if (o.trajeG) o.t.g.remove(o.trajeG); o.trajeG = tj ? NS().inter.traje(F, o.t.alt, tj) : null; if (o.trajeG) { o.trajeG.traverse(x => { x.userData.token = id; }); o.t.g.add(o.trajeG); } o.tj = tj;
+          // de traje, a miniatura some por dentro dele (fica o aro e o nome)
+          o.t.g.children.forEach(ch => { if (ch !== o.trajeG && ch !== o.nome && ch !== o.t.base && !ch.isLight && !ch.isSprite) ch.visible = !tj; }); }
         // posição do mapa caiu dentro de um móvel (cama, armário…): fica no ponto livre mais perto
         const ch = tk.x + ',' + tk.y + ':' + mundo.carregadas.size;
         if (o.chLivre !== ch) { o.chLivre = ch; let [x, z] = planta3D(a, tk.x, tk.y); if (!tk.esq && !mundo.livre3D(x, z) && mundo.area3D(x, z, .05)) [x, z] = pontoLivre(mundo.livre3D, x, z); o.bx = x; o.bz = z; }
@@ -1700,7 +1718,8 @@
       let melhor = null, bd = 1.7;
       mundo.interativos.forEach(it => {
         if (it.tipo === 'item' && !(it.obj && it.obj.visible)) return;
-        const d = Math.hypot(it.pos.x - est.px, it.pos.z - est.pz) - (it.sala ? 1.4 : 0);
+        if (it.tipo === 'int' && !NS().inter.rotulo(it, { quem, ctrl: V.ctrl })) return;
+        const d = it.tipo === 'int' ? NS().inter.distancia(it, est.px, est.pz) + .25 : Math.hypot(it.pos.x - est.px, it.pos.z - est.pz) - (it.sala ? 1.4 : 0);
         if (d < bd) { bd = d; melhor = it; }
       });
       // no corredor da saída (ou na sala da saída sem corredor), o elevador fica à mão mesmo de longe
@@ -1712,6 +1731,7 @@
       if (!melhor) return null;
       if (melhor.tipo === 'elevador') return quem === 'mestre' ? { ...melhor, txt: '🛗 Saída do andar: levar tokens' } : V.ctrl ? { ...melhor, txt: '🛗 Usar a saída do andar (pede ao Mestre)' } : null;
       if (melhor.tipo === 'item') return V.ctrl || quem === 'mestre' ? { ...melhor, txt: `🎒 Pegar: ${melhor.nome}` } : null;
+      if (melhor.tipo === 'int') { const txt = NS().inter.rotulo(melhor, { quem, ctrl: V.ctrl }); return txt ? { ...melhor, it: melhor, txt } : null; }
       if (melhor.tipo === 'doc') return { ...melhor, txt: melhor.arq === 'cifras' ? `◈ Ver a inscrição: ${melhor.tit}` : `📄 Ler: ${melhor.tit}` };
       if (melhor.tipo === 'esconderijo') return V.ctrl ? { ...melhor, txt: `✋ Esconder-se (${melhor.nome})` } : null;
       if (melhor.tipo === 'uso') return { ...melhor, txt: { loja: '🃏 Falar com o Maurício (loja)', agua: '💧 Pegar água (despensa)', comida: '🥫 Pegar comida (despensa)', arquivo: '📜 Ler o Arquivo (documentos e cifras)', terminal: '⌨ Usar o Terminal O.R.F.E.U.' }[melhor.uso] || '✋ Usar' };
@@ -1779,6 +1799,7 @@
       cam.updateProjectionMatrix();
       const foco = imersivo(est.modo) || V.ctrl ? [est.px, est.pz] : [alvo.x, alvo.z];
       mundo.atualizar(dt, tt, foco[0], foco[1], est.modo, cam.position);
+      if (NS().inter) { NS().inter.ouvinte = [cam.position.x, cam.position.z]; V.qVideo = (V.qVideo || 0) + 1; if (V.qVideo % 2 === 0) { try { NS().inter.videoQuadro(T, cam, ren.domElement, mundo.interativos, salaNoPonto3D(V.a, cam.position.x, cam.position.z), cam.position.x, cam.position.z); } catch (e) {} } }
       tok.atualizar(dt, tt, V.ctrl, V.ctrl ? [est.px, est.pz] : null, est.modo, cam.position, est.yaw);
       // lanterna: sai dos olhos (dentro) ou do token (fora)
       if (V.lanterna) {
@@ -2126,6 +2147,16 @@
           <datalist id="s3dCatItens">${((window.ACF_FICHAS && window.ACF_FICHAS.catalogoItens && window.ACF_FICHAS.catalogoItens()) || []).map(x => `<option value="${esc(x.n)}">`).join('')}</datalist>
           ${meus.length ? `<ul class="s3d-itm-lista">${meus.map(([k, v]) => `<li><span>${(est1['m_' + k] || 0) > 0 ? '🎒' : '✓ pego:'} ${esc(v.n)}</span><button type="button" data-itm="tirar" data-k="${esc(k)}" aria-label="Tirar ${esc(v.n)}">✕</button></li>`).join('')}</ul>` : ''}</section>`;
       }
+      // telão (vídeo do YouTube) e cabides de trajes desta sala
+      const ints = cn ? V.mundo.interativos.filter(it => it.tipo === 'int' && it.cn === cn) : [];
+      if (ints.some(it => it.m === 'video')) {
+        const vd = (e.video || {})['c' + cn];
+        h += `<section><h4>🎬 Telão desta sala</h4><p class="mini">Cole o link de um vídeo do YouTube. Passa para todos que estiverem nesta sala, sincronizado (quem entra depois pega o vídeo andando). O som sobe perto da tela.</p>
+          <div class="s3d-item-m"><input type="url" data-vid-url placeholder="https://www.youtube.com/watch?v=…" aria-label="Link do vídeo" value="${vd && vd.id ? 'https://youtu.be/' + esc(vd.id) : ''}"><button type="button" data-vid="passar">▶ Passar</button></div>
+          ${vd && vd.id ? '<div class="s3d-op"><button type="button" data-vid="parar">⏹ Parar o vídeo</button></div>' : ''}</section>`;
+      }
+      const cabs = ints.filter(it => it.m === 'vestir');
+      if (cabs.length) h += `<section><h4>🦺 Trajes nesta sala</h4>${cabs.map(it => { const n = (e.estoque || {})['v_' + it.k]; return `<p class="mini">${esc(it.d.item || it.nome)}: ${n === undefined ? (it.d.qtd ?? 1) : n} no cabide</p>`; }).join('')}<div class="s3d-op"><button type="button" data-trajes="repor">Repor os cabides</button></div></section>`;
       const ks = chavesItens(a), est0 = e.estoque || {}, noChao = ks.filter(k => (est0[k] || 0) > 0).length;
       if (ks.length) h += `<section><h4>Itens do livro no ${a}º andar</h4><p class="mini">${noChao} de ${ks.length} no chão. Quem pega leva para a ficha ativa (some para todos).</p><div class="s3d-op"><button type="button" data-itens="espalhar">Espalhar todos</button><button type="button" data-itens="recolher">Recolher</button></div></section>`;
     }
@@ -2162,6 +2193,16 @@
       [x, z] = pontoLivre(V.mundo.livre3D, x, z);
       const q = plantaDe3D(a, x, z), r = A.colocarItem3D(nome, a, q.x, q.y);
       toast(r || `Item deixado: ${nome}.`); setTimeout(desenharPainel, 150);
+    });
+    p.querySelectorAll('[data-vid]').forEach(b => b.onclick = () => {
+      if (b.dataset.vid === 'parar') { A.definir(['video', 'c' + cn], null); setTimeout(desenharPainel, 120); return; }
+      const id = NS().inter.idYoutube(($('[data-vid-url]', p) || {}).value);
+      if (!id) { toast('Link do YouTube não reconhecido.'); return; }
+      A.definir(['video', 'c' + cn], { id, t0: Date.now() }); toast('🎬 Passando no telão.'); setTimeout(desenharPainel, 120);
+    });
+    p.querySelectorAll('[data-trajes]').forEach(b => b.onclick = () => {
+      V.mundo.interativos.filter(it => it.tipo === 'int' && it.cn === cn && it.m === 'vestir').forEach(it => A.definir(['estoque', 'v_' + it.k], it.d.qtd ?? 1));
+      toast('Cabides repostos.'); setTimeout(desenharPainel, 150);
     });
     p.querySelectorAll('[data-itens]').forEach(b => b.onclick = () => {
       const ks = chavesItens(a), novo = { ...(e.estoque || {}) };
@@ -2292,6 +2333,7 @@
     else if (pr.tipo === 'porta') V.usarPorta(pr.ci);
     else if (pr.tipo === 'elevador') usarElevador(pr);
     else if (pr.tipo === 'item') { const r = ACF().pegarItemChao(pr.k, pr.nome); toast(r || `🎒 ${pr.nome} foi para a sua ficha.`); }
+    else if (pr.tipo === 'int') { setTimeout(() => { if (V) V.mundo.atualizarInter(); }, 60); NS().inter.usar(pr.it, { quem: V.quem, ctrl: V.ctrl, toast, raiz: $('#s3d') || document.body, abrirPainel: () => { const pp = $('#s3dPainel'); if (pp) { if (document.pointerLockElement) document.exitPointerLock(); pp.hidden = false; desenharPainel(); } } }); }
     else if (pr.tipo === 'doc') { if (document.pointerLockElement) document.exitPointerLock(); const AR = window.ACF_ARQUIVO; if (AR && AR.abrirNaSala) AR.abrirNaSala(pr.arq, pr.id); }
   }
 
@@ -2380,6 +2422,7 @@
   });
 
   function fechar(trocando) {
+    if (NS().inter) NS().inter.videoTirar();
     if (V) {
       V.rodando = false; cancelAnimationFrame(V.raf);
       removeEventListener('resize', V.tamanho);
@@ -2439,6 +2482,7 @@
       V.mundo.atualizarPortas();
       V.mundo.atualizarItensM();
       V.mundo.sincExpo();
+      V.mundo.atualizarInter();
       V.mundo.atualizarItens();
       V.mundo.atualizarDocs();
       V.tok.sincronizar();
@@ -2478,7 +2522,10 @@
       semLig = pts.filter(([, [i, j]]) => !visto.has(i * 10000 + j)).map(([l]) => l);
     }
     const c = m.carregadas.get(p), esc = m.interativos.filter(x => x.tipo === 'esconderijo' && x.p === p).length;
-    return { cn: s.cn, livre: Math.round(livres / (nx * nz) * 100), bloq: bloq.join(''), semLig: semLig.join(''), esc, itens: c ? c.g.children.length : 0 };
+    // interações: quantas de cada tipo, e se a resposta da peça (aoInter) roda sem erro
+    const ints = m.interativos.filter(x => x.tipo === 'int' && x.p === p), cont = {}; let intErr = '';
+    ints.forEach(it => { cont[it.m] = (cont[it.m] || 0) + 1; const f = it.obj.userData.aoInter; if (f) { try { f(1, true, null); f(0, true, null); f(it.ult ?? 0, true, null); } catch (e) { intErr += it.k + ':' + e.message + ' '; } } });
+    return { cn: s.cn, livre: Math.round(livres / (nx * nz) * 100), bloq: bloq.join(''), semLig: semLig.join(''), esc, itens: c ? c.g.children.length : 0, int: Object.entries(cont).map(([k, n]) => k + n).join(' '), intErr };
   }
   window.Sala3D = {
     _checar: checarSala, get _mundo() { return V ? V.mundo : null; },

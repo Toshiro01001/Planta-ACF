@@ -502,6 +502,8 @@ function recusaLocal(caminho, valor) {
     const n = (Store.state.estoque || {})[caminho[1]];
     return typeof n === 'number' && valor === n - 1 && valor >= 0 ? '' : 'A despensa não tem mais isso hoje.';
   }
+  // interações das salas do 3D (portão, luz, piano…): qualquer um, no formato da regra
+  if (caminho[0] === 'inter' && caminho.length === 2) return /^c\d{1,3}_\d{1,3}$/.test(caminho[1]) && valor && (valor.v === 0 || valor.v === 1) && typeof valor.ts === 'number' ? '' : 'Interação inválida.';
   if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
   // ferramentas que o Mestre divide com os auxiliares
   if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas'].includes(caminho[0])) return '';
@@ -5351,7 +5353,7 @@ function capacidadeEstoque() {
   itensMelhorias().forEach(i => { if (i.comprado && !i.oculto && i.estoque) Object.entries(i.estoque).forEach(([k, n]) => { cap[k] = (cap[k] || 0) + (+n || 0); }); });
   return cap;
 }
-const itensDoChao = () => Object.fromEntries(Object.entries(Store.state.estoque || {}).filter(([k]) => /^[im]_/.test(k)));
+const itensDoChao = () => Object.fromEntries(Object.entries(Store.state.estoque || {}).filter(([k]) => /^[imv]_/.test(k)));   // i_ itens do livro, m_ do Mestre, v_ trajes nos cabides
 function encherEstoque() { if (!mestre) return; const v = { ...itensDoChao(), ...capacidadeEstoque() }; Store.definir(['estoque'], Object.keys(v).length ? v : null); }
 // comprou ou desfez uma melhoria de despensa: ajusta sem apagar o que já foi pego
 function ajustarEstoque() {
@@ -5680,6 +5682,7 @@ const Mochila = { filtro: 'tudo', sel: null };
 const ICONE_ITEM = { arma: '⚔', protecao: '🛡', municao: '◦', amaldicoado: '☠', geral: '🎒' };
 function iconeItem(it) {
   if (it.usavel) return '💊';
+  if (it.vestivel) return '🦺';
   if (/lanterna/i.test(it.n)) return '🔦'; if (/documento|livro|manual|carta|bilhete|diário/i.test(it.n)) return '📄';
   if (/componente/i.test(it.n)) return '◈'; if (/chave/i.test(it.n)) return '🗝';
   return ICONE_ITEM[it.t] || '🎒';
@@ -5697,6 +5700,7 @@ function abrirMochila() {
       const f = e.target.closest('[data-mo-f]'); if (f) { Mochila.filtro = f.dataset.moF; desenharMochila(); return; }
       const it = e.target.closest('[data-mo-it]'); if (it) { Mochila.sel = it.dataset.moIt; desenharMochila(); return; }
       if (e.target.closest('[data-mo="ficha"]')) { fecharMochila(); if (FX && FX.abrirAtiva) FX.abrirAtiva(); return; }
+      const vv = e.target.closest('[data-mo="vestir"]'); if (vv && FX && FX.alternarVestidoAtiva) { aviso(FX.alternarVestidoAtiva(vv.dataset.id)); setTimeout(desenharMochila, 400); return; }
       const u = e.target.closest('[data-mo="usar"]'); if (u && FX && FX.usarItemAtiva) { u.disabled = true; FX.usarItemAtiva(u.dataset.id).then(r => { aviso(r); setTimeout(desenharMochila, 400); }); }
     });
     o.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); fecharMochila(); } });
@@ -5727,7 +5731,7 @@ function desenharMochila() {
       <aside class="mo-det">${sel ? `<h4>${iconeItem(sel)} ${esc(sel.n)}${sel.qtd > 1 ? ` ×${sel.qtd}` : ''}</h4>
         <p class="mo-tags">${[sel.cat ? 'Categoria ' + mo.ROM[sel.cat] : 'Categoria 0', 'Espaço ' + String(sel.esp).replace('.', ','), sel.dano ? 'Dano ' + esc(sel.dano) : '', sel.el ? esc(sel.el) : '', sel.vest ? 'Vestido' : '', sel.achado ? 'Achado na Caixa' : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('')}</p>
         <p class="mo-desc">${esc(sel.d || 'Sem descrição.')}</p>
-        <div class="mo-acoes">${sel.usavel ? `<button type="button" class="pri" data-mo="usar" data-id="${esc(sel.id)}">Usar (${esc(sel.uso.x)} ${esc(String(sel.uso.rec).toUpperCase())})</button>` : ''}<button type="button" data-mo="ficha">📋 Ver na ficha</button></div>` : '<p class="mo-vazio">Toque num item para ver os detalhes.</p>'}</aside>
+        <div class="mo-acoes">${sel.usavel ? `<button type="button" class="pri" data-mo="usar" data-id="${esc(sel.id)}">Usar (${esc(sel.uso.x)} ${esc(String(sel.uso.rec).toUpperCase())})</button>` : ''}${sel.vestivel ? `<button type="button" data-mo="vestir" data-id="${esc(sel.id)}">${sel.vest ? '🦺 Tirar (ação completa)' : '🦺 Vestir (ação completa)'}</button>` : ''}<button type="button" data-mo="ficha">📋 Ver na ficha</button></div>` : '<p class="mo-vazio">Toque num item para ver os detalhes.</p>'}</aside>
     </div>
     <p class="mo-dica">I abre e fecha · Esc fecha</p></div>`;
 }
@@ -5792,6 +5796,25 @@ function pegarItemChao(k, nome) {
   Chat.enviar(`🎒 ${Chat.autorNome()} pegou: ${nome}.`, 'geral');
   if (!naFicha) return 'Pegou, mas você não tem ficha ativa: anote o item na ficha.';
   return lim ? `${nome} foi para a ficha, mas passa do limite da patente ${lim.pat} (categoria ${lim.cat}: ${lim.tem + 1}/${lim.max}). Converse com o Mestre.` : '';
+}
+
+// interações nas salas do 3D (interacoes3d.js): portão, armário, luz, fliperama, piano…
+// mapa/inter/<c{CN}_{i}> = { v, ts, q }: qualquer conta logada grava (regra do Firebase)
+function interagir(k, v) {
+  if (!/^c\d{1,3}_\d{1,3}$/.test(k)) return;
+  Store.definir(['inter', k], { v: v ? 1 : 0, ts: Date.now(), q: String(quemSou()).slice(0, 40) });
+}
+// trajes num cabide do 3D: um sai do estoque (mapa/estoque/v_…) e entra vestido na ficha ativa
+function vestirTraje(k, nome) {
+  if (!/^v_c\d{1,3}_\d{1,3}$/.test(k)) return 'Traje inválido.';
+  const n = (Store.state.estoque || {})[k];
+  if (n !== undefined && n <= 0) return 'Não sobrou nenhum traje no cabide.';
+  const FX = window.ACF_FICHAS;
+  const r = FX && FX.vestirAtiva ? FX.vestirAtiva(nome) : null;
+  if (!r || r.erro) return (r && r.erro) || 'Você precisa de uma ficha ativa para vestir o traje.';
+  if (n !== undefined) Store.definir(['estoque', k], n - 1);
+  Chat.enviar(`🦺 ${Chat.autorNome()} vestiu: ${nome}.`, 'geral');
+  return r.msg;
 }
 
 // celular: as abas do Mestre ficam por cima do × do painel; este × fica dentro delas
@@ -6175,7 +6198,7 @@ window.ACF = {
   get andarAtual() { return andarAtual; },
   irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },
   // vista 3D
-  abrirMochila, fecharMochila, abrirNarrador, colocarItem3D, tirarItem3D, podeMover, visivelPara, visivelAoFilho, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
+  abrirMochila, fecharMochila, abrirNarrador, colocarItem3D, tirarItem3D, interagir, vestirTraje, podeMover, visivelPara, visivelAoFilho, moverToken3D, virarToken3D, efeitoToken, esconderToken, porta3D, ruidoDe, ruidoPior, NIVEIS,
   andavel: (a, x, y) => andavel(a, x, y),
   limiteDe: id => limiteDe(id),
   participa: id => !!participante(id),
