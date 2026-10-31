@@ -899,17 +899,29 @@
     function criar(id, tk) {
       const ap = aparencia(tk);
       const s = ap ? ap.ser : ACF().SER[tk.s]; if (!s) return null;
-      const forma = ap ? undefined : (formas()[tk.s] || formas()[id]);
+      // forma: a do próprio token (forma rolada na invocação) vem antes da escolhida para o Filho
+      const forma = ap ? undefined : (tk.fm || formas()[tk.s] || formas()[id]);
       const t = NSX.criarToken(F, id, s, forma);
+      if (s.mini) t.g.scale.multiplyScalar(.55);
       if (ap && ap.det === 'espelho') t.g.scale.x = -1;
       if (ap && ap.det === 'aro' && t.aro && t.aro.material && t.aro.material.emissive) t.aro.material.emissive.set(ap.cor || '#888');
       t.g.traverse(o => { o.userData.token = id; });
-      const nome = etiqueta((ACF().rotulo(tk) || s.nome) + (tk.esq ? ' · escondido' : ''), s.contorno || s.cor);
+      const nome = etiqueta((ACF().rotulo(tk) || s.nome) + (tk.esq ? ' · escondido' : '') + (tk.am && !ap ? ' · amigável' : ''), s.contorno || s.cor);
       nome.position.y = t.alt + .32; t.g.add(nome);
       grupo.add(t.g);
       const [x, z] = planta3D(a, tk.x, tk.y);
       t.g.position.set(x, 0, z);
-      return { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, rotulo: ACF().rotulo(tk), filho: s.tipo === 'filho', corAro: t.aro ? t.aro.material.emissive.clone() : null, ap: chaveAp(tk) };
+      const o = { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, am: !!tk.am, rotulo: ACF().rotulo(tk), filho: s.tipo === 'filho', corAro: t.aro ? t.aro.material.emissive.clone() : null, ap: chaveAp(tk), st: '', rvt: tk.rvt || 0 };
+      ganchosForma(o, tk, true);
+      return o;
+    }
+    // ganchos das formas detalhadas (filhos3d.js): estado(nome) persistente e acao('revelar') quando o Filho aparece aos jogadores
+    function ganchosForma(o, tk, novo) {
+      const st = tk.st || '';
+      if (typeof o.t.estado === 'function' && st !== o.st) { o.st = st; if (st) try { o.t.estado(st); } catch (e) { console.warn('3D estado:', st, e); } }
+      const rv = tk.rvt || 0;
+      if (rv && (novo ? Date.now() - rv < 5000 : rv !== o.rvt && Date.now() - rv < 8000) && typeof o.t.acao === 'function') try { o.t.acao('revelar'); } catch (e) { console.warn('3D revelar:', e); }
+      o.rvt = rv;
     }
     function remover(id) { const o = mapa.get(id); if (!o) return; grupo.remove(o.t.g); mapa.delete(id); }
     // Forma de Objeto (filhos.js): um objeto a mais na sala, da biblioteca, que todos veem (mapa/fil/ob)
@@ -939,10 +951,16 @@
         if (!tk || tk.a !== a || !quemVe(id, tk)) return;
         vistos.add(id);
         let o = mapa.get(id);
-        const forma = formas()[tk.s] || formas()[id];
+        const forma = chaveAp(tk) ? undefined : (tk.fm || formas()[tk.s] || formas()[id]);
         // forma do Filho trocada, escondido/saiu do esconderijo ou nome mudou: refaz a miniatura
         if (o && (o.forma !== forma || o.esq !== !!tk.esq || o.rotulo !== ACF().rotulo(tk) || o.ap !== chaveAp(tk))) { remover(id); o = null; }
+        // etiqueta "amigável" entrou ou saiu: troca só o nome (a miniatura continua, sem cortar a animação de ataque)
+        if (o && o.am !== !!tk.am) {
+          const s = ACF().SER[tk.s] || {}, nv = etiqueta((ACF().rotulo(tk) || s.nome) + (tk.esq ? ' · escondido' : '') + (tk.am ? ' · amigável' : ''), s.contorno || s.cor);
+          nv.position.copy(o.nome.position); nv.visible = o.nome.visible; o.t.g.remove(o.nome); o.t.g.add(nv); o.nome = nv; o.am = !!tk.am;
+        }
         if (!o) { o = criar(id, tk); if (!o) return; mapa.set(id, o); }
+        else ganchosForma(o, tk, false);
         // traje vestido (ficha ativa → vitais do token): por cima da miniatura
         const tj = (tk.vit && tk.vit.tj) || '';
         if (o.tj !== tj && NS().inter) { if (o.trajeG) o.t.g.remove(o.trajeG); o.trajeG = tj ? NS().inter.traje(F, o.t.alt, tj) : null; if (o.trajeG) { o.trajeG.traverse(x => { x.userData.token = id; }); o.t.g.add(o.trajeG); } o.tj = tj;
@@ -2173,7 +2191,12 @@
         const novo = { fx: fx && fx.ts, pv: vit.pv, san: vit.san };
         ult.set(id, novo);
         if (!u || tk.a !== V.a) return;
-        if (fx && fx.ts && fx.ts !== u.fx && agora - fx.ts < 15000) criar(fx.t === 'atk' ? 'atk' : fx.t === 'cura' ? 'cura' : 'hab', id, { txt: (fx.t === 'atk' ? '⚔ ' : fx.t === 'cura' ? '✚ ' : '✦ ') + String(fx.n || '').slice(0, 40), el: fx.el });
+        if (fx && fx.ts && fx.ts !== u.fx && agora - fx.ts < 15000) {
+          criar(fx.t === 'atk' ? 'atk' : fx.t === 'cura' ? 'cura' : 'hab', id, { txt: (fx.t === 'atk' ? '⚔ ' : fx.t === 'cura' ? '✚ ' : '✦ ') + String(fx.n || '').slice(0, 40), el: fx.el });
+          // forma detalhada com animação de ataque (filhos3d.js): toca junto com o efeito
+          const o = fx.t === 'atk' && V.tok && V.tok.mapa.get(id);
+          if (o && o.t && typeof o.t.acao === 'function') try { o.t.acao('ataque'); } catch (e) { console.warn('3D ataque:', e); }
+        }
         if (typeof vit.pv === 'number' && typeof u.pv === 'number' && vit.pv !== u.pv) criar(vit.pv < u.pv ? 'dano' : 'cura', id, { txt: `${vit.pv < u.pv ? '−' : '+'}${Math.abs(vit.pv - u.pv)} PV` });
         if (typeof vit.san === 'number' && typeof u.san === 'number' && vit.san < u.san) criar('san', id, { txt: `−${u.san - vit.san} SAN` });
       });
@@ -2413,7 +2436,7 @@
     else if (pr.tipo === 'porta') V.usarPorta(pr.ci);
     else if (pr.tipo === 'elevador') usarElevador(pr);
     else if (pr.tipo === 'item') { const r = ACF().pegarItemChao(pr.k, pr.nome); toast(r || `🎒 ${pr.nome} foi para a sua ficha.`); }
-    else if (pr.tipo === 'int') { setTimeout(() => { if (V) V.mundo.atualizarInter(); }, 60); NS().inter.usar(pr.it, { quem: V.quem, ctrl: V.ctrl, toast, raiz: $('#s3d') || document.body, abrirPainel: () => { const pp = $('#s3dPainel'); if (pp) { if (document.pointerLockElement) document.exitPointerLock(); pp.hidden = false; desenharPainel(); } } }); }
+    else if (pr.tipo === 'int') { setTimeout(() => { if (V) V.mundo.atualizarInter(); }, 60); if (pr.it && pr.it.m === 'ler' && window.ACF_FILHOS && ACF_FILHOS.leu) ACF_FILHOS.leu('i3d_' + pr.it.k); NS().inter.usar(pr.it, { quem: V.quem, ctrl: V.ctrl, toast, raiz: $('#s3d') || document.body, abrirPainel: () => { const pp = $('#s3dPainel'); if (pp) { if (document.pointerLockElement) document.exitPointerLock(); pp.hidden = false; desenharPainel(); } } }); }
     else if (pr.tipo === 'ext') { if (document.pointerLockElement) document.exitPointerLock(); try { pr.usar(); } catch (e) { console.warn(e); } }
     else if (pr.tipo === 'doc') { if (document.pointerLockElement) document.exitPointerLock(); const AR = window.ACF_ARQUIVO; if (AR && AR.abrirNaSala) AR.abrirNaSala(pr.arq, pr.id); }
   }
@@ -2619,6 +2642,9 @@
     _centro: p => V && V.mundo.centro(p),
     _cam: o => V && Object.assign(V.cam, o),
     _tok: id => V && V.tok.posDe(id),
+    // testes: forma, estado e ganchos da forma detalhada (acao/estado) de um token
+    _tokF: id => { const o = V && V.tok.mapa.get(id); return o ? { forma: o.forma || '', st: o.st || '', acao: typeof o.t.acao === 'function', estado: typeof o.t.estado === 'function', esc: +o.t.g.scale.y.toFixed(2) } : null; },
+    _tokEspiar: id => { const o = V && V.tok.mapa.get(id); if (!o) return false; const lg = (window.__acoes3d = window.__acoes3d || []); ['acao', 'estado'].forEach(k => { const f = o.t[k]; if (typeof f === 'function' && !f.__esp) { o.t[k] = (...a) => { lg.push([id, k, a[0]]); return f(...a); }; o.t[k].__esp = 1; } }); return true; },
     _tokAp: id => { const o = V && V.tok.mapa.get(id); return o ? { ap: o.ap, rotulo: o.rotulo, espelho: o.t.g.scale.x < 0 } : null; },
     _objsFil: (det) => (V && V.tok.objsFil ? [...V.tok.objsFil.values()].map(o => det ? { tipo: o.tipo, pos: [o.g.position.x, o.g.position.z], filhos: o.g.children.length, vis: o.g.visible } : o.tipo) : []),
     _v: () => V && { raf: V.raf, rodando: V.rodando, n: V.mundo.carregadas.size },

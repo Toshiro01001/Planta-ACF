@@ -134,6 +134,12 @@ const SERES = [
   { id: 'f00', tipo: 'filho', codigo: 'F-00', nome: 'Zero',       cor: '#ffffff' },
   { id: 'f20', tipo: 'filho', codigo: 'F-20', nome: 'Pele-Alheia',    cor: '#e76f51' },
   { id: 'f21', tipo: 'filho', codigo: 'F-21', nome: 'O Ouvinte',   cor: '#1b263b' },
+  { id: 'f22', tipo: 'filho', codigo: 'F-22', nome: 'Jazigo',     cor: '#7f8c6a' },
+  { id: 'f23', tipo: 'filho', codigo: 'F-23', nome: 'Mascote',    cor: '#c0533f' },
+  { id: 'f24', tipo: 'filho', codigo: 'F-24', nome: 'Negativo',   cor: '#a8916a' },
+  { id: 'f25', tipo: 'filho', codigo: 'F-25', nome: 'Desova',     cor: '#e58fa6' },
+  // cria: Filho pequeno e genérico (token menor no mapa); entra pelos botões de quem põe crias
+  { id: 'fc', tipo: 'filho', codigo: 'F-C', nome: 'Cria', cor: '#f3c1cf', mini: true },
 
   // Presença: aparição que o Mestre e os auxiliares põem no mapa. Entre os jogadores, só quem o Mestre escolher
   // (campo vis do token) enxerga; os outros nem sabem que ela está ali.
