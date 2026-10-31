@@ -27,6 +27,8 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `limpo.js` | HUD limpo: câmera compacta, dica só nas primeiras visitas, busca, recolher/abrir e favoritos no painel, aparência (limpo ou clássico) |
 | `sala3d.js`, `objetos3d.js`, `detalhes3d.js`, `tokens3d.js` | A vista 3D (ver "Duas maneiras de jogar") |
 | `nevoa.js` | Névoa de guerra e molduras dos tokens |
+| `momento.js` | Encontro (a passagem da exploração para a perseguição), cartas de ação na vez, sons dos Filhos, lanterna com bateria, mapa que mente, sustos que só um jogador vê, câmeras de segurança, corpos e o acabamento do 3D (fumaça, poeira na luz, sombras dos tokens). Código genérico: quem tem o quê fica nos dados secretos |
+| `filhos.js` | Características dos Filhos: sentidos do auxiliar, movimento, rastro e avisos aos jogadores, ocultação especial e os botões de habilidade (código genérico; quem tem o quê fica nos dados secretos) |
 | `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
 
 ## Publicar no GitHub Pages
@@ -132,7 +134,7 @@ Diário, anotações, funções, Balança e a lista do apagão ficam em `segredo
 
 ## Restaurar o site (aba Segredos → Backup)
 
-"🧹 Restaurar o site…" apaga o que foi feito nos testes. Você marca o que zerar: **Mapa e jogo**, **Conversas e respostas** e **Registros** vêm marcados; o que você preparou (regras restritas, Arquivo, Salas de Exposição, conquistas criadas, sons, loja, quadros, gatilhos, senhas, funções e nomes secretos das salas, Hall) vem desmarcado. As **fichas dos jogadores ficam de fora** (o Mestre não altera fichas; a lista mostra quais existem no servidor). Antes de apagar, o site baixa `backup-antes-de-restaurar-….json`; o "Restaurar backup…" devolve tudo, inclusive chat e relatório. Para confirmar, digite RESTAURAR. Com "Aparelhos de todos", cada celular e computador, ao abrir o site, apaga as visões recebidas, votos, respostas, telas já vistas, avisos e cofres abertos (o Caderno e as fichas ficam); com "Andares liberados", os jogadores digitam a senha dos andares de novo. Em `mapa/restauracao`.
+"🧹 Restaurar o site…" apaga o que foi feito nos testes. Você marca o que zerar: **Mapa e jogo**, **Conversas e respostas** e **Registros** vêm marcados; o que você preparou (regras restritas, Arquivo, Salas de Exposição, conquistas criadas, sons, loja, quadros, gatilhos, senhas, funções e nomes secretos das salas, características dos Filhos e etiquetas das salas, Hall) vem desmarcado. As **fichas dos jogadores ficam de fora** (o Mestre não altera fichas; a lista mostra quais existem no servidor). Antes de apagar, o site baixa `backup-antes-de-restaurar-….json`; o "Restaurar backup…" devolve tudo, inclusive chat e relatório. Para confirmar, digite RESTAURAR. Com "Aparelhos de todos", cada celular e computador, ao abrir o site, apaga as visões recebidas, votos, respostas, telas já vistas, avisos e cofres abertos (o Caderno e as fichas ficam); com "Andares liberados", os jogadores digitam a senha dos andares de novo. Em `mapa/restauracao`.
 
 ## Mais ferramentas
 
@@ -261,6 +263,7 @@ A planta 2.5D continua sendo o tabuleiro oficial. A vista 3D (estilo Foundry/Owl
 | `objetos3d.js` | Biblioteca de objetos genéricos (macas, racks, caldeiras, tronos, membranas…), texturas e efeitos |
 | `detalhes3d.js` | Objetos detalhados e texturas com desgaste (concreto manchado, metal enferrujado, forro com infiltração), feitos a partir das imagens de referência das salas: expositores, quadros elétricos, negatoscópio, lousa, cabines de gravação, monitores cardíacos, colunas de pressão, fitas VHS, placas "SALA CN" sobre as portas… |
 | `tokens3d.js` | Miniaturas: as sete cobaias, as quatro cobaias NPC (Coelho, Cara Pálida, Risa, Onírico, que anda rastejando), os robôs S.T.A.F.F., a Presença (aparição translúcida) e as formas dos Filhos. Rostos pintados em textura, com sombra, íris, brilho e cílios |
+| `filhos3d.js` | Formas detalhadas das criaturas (16: carne viva, boneco de pano de quatro, mulher encharcada, titã algemado, mulher de muitos braços, vulto de lodo, aranha de gaiola, homem de raízes, titereiro, fera de pelo, homem de texto, moldura, criatura de olhos, rastejante de braços, máscara sorridente, figura de orelhas). Baixa junto com o 3D. Só aparência: qual Filho usa qual forma é escolha do Mestre (mapa/formas) |
 | `andares3d.js` | Objetos próprios dos cinco andares (máquinas, relíquias, crescimentos de carne, vigas, passarelas, rastros, barricadas…), no mesmo estilo do `detalhes3d.js`, usados pelas salas montadas à mão para 20 m |
 | `interacoes3d.js` | Interações das salas no 3D (abrir, ligar, jogar, tocar, ler, vestir, telão com vídeo do YouTube), sons curtos gerados na hora e o traje vestido por cima da miniatura |
 | `exposicao3d.js` | Ambientes das Salas de Exposição no 3D (chuva, maré, paredes que fecham, desabamento, labirinto, horda, fogo, gelo…) e a camada animada por cima da sala no mapa 2.5D. Só construtores genéricos: nomes e textos das salas de exposição ficam no arquivo fora do GitHub |
@@ -295,6 +298,78 @@ No cartão de qualquer Filho no mapa 2D aparece **🎮 Controle (3D)**. O 3D abr
 - **Habilidade ou ação:** mostra o efeito em volta do Filho, com o nome, para todos que veem o Filho (nas duas vistas).
 - **📋 Ficha** abre a ficha completa; **Soltar o Controle** volta à câmera livre.
 - Sem ficha ligada, o quadro explica como ligar.
+
+### Características dos Filhos (`filhos.js`)
+
+O código é **genérico**: ele conhece os tipos (o sentido "faro", a trava "só no escuro", o botão "Teia"…), nunca qual Filho tem o quê. Isso fica nos dados secretos, que o Mestre importa de um arquivo **fora do GitHub** (`filhos-regras.json`, tipo `planta-acf-filhos`).
+
+**Onde fica cada coisa (Firebase)**
+
+| Caminho | O quê | Quem lê / grava |
+|---|---|---|
+| `privado/filhos/<ser>` | características de cada Filho | Mestre e auxiliares leem; Mestre grava |
+| `privado/etiquetas` | etiquetas das salas (`salas/cNN`) e dos corredores (`corr/aNkCI`): água, barulhenta, estreito, quadros, ninho | Mestre e auxiliares leem; Mestre grava |
+| `privado/filhosEstado` | estado em jogo: usos por cena, teias, raízes, cópias liberadas, estudo, repertório, Regente, movimento dobrado | Mestre e auxiliares |
+| `segredos/_filhos/<ser>/enigma` | a fraqueza | só o Mestre |
+| `mapa/fil` | o que os jogadores precisam ver, sem dizer de quem é: rastros e salas marcadas (`m`), avisos (`av`), objetos da Forma de Objeto (`ob`), Silêncio Absoluto (`sil`), pedidos de teste (`pd`), dia par (`dp`) e números públicos (`cfg`) | todos leem; Mestre e auxiliares gravam |
+| `filMsg/<cobaia>` | mensagens privadas (Chamado, Lembrança) | quem está logado lê; Mestre e auxiliares gravam |
+| `filAcoes` | Examinar a sala e Olhar ao redor dos jogadores | jogador só cria; Mestre e auxiliares leem |
+| `filResp/<pedido>/<cobaia>` | respostas aos testes pedidos | quem está logado |
+| `leituras` | quem abriu documentos do Arquivo, onde e quando (sentido "leitura") | jogador só cria; Mestre e auxiliares leem |
+
+Nos tokens dos Filhos, só Mestre e auxiliares mudam os campos `fo` (forma de objeto), `cp`/`cpd` (cópia e Detalhe), `oc` (ocultação especial), `pi` (pisca), `rv` (revelado nesta sala) e `pp` (pedido de publicar). As regras do Firebase barram o jogador nesses campos e em todos os tokens de Filhos e robôs.
+
+**Mestre (aba Segredos, bloco "Características dos Filhos"):** importar e exportar o arquivo; escolher um Filho e marcar sentidos, movimento, rastro, avisos, ocultação, botões, passivos, covil, números (DT de Ouvir o Coração, de Puxar os fios, da Teia, de Examinar, de Olhar, rolagem do Desconfiar, alcance da audição), Detalhe da cópia, lembranças e o enigma. As **etiquetas** ficam no cartão de cada sala ("Etiquetas dos Filhos") e de cada corredor. Onde a especificação diz PROPOSTA, é uma opção que você liga e desliga (ex.: "sala barulhenta proibida").
+
+**Auxiliar:** no cartão de cada Filho aparecem as características e os botões dele (também no quadro do Controle no 3D, embaixo dos ataques). Em "Sons na Caixa", **Ver pelos sentidos de** troca a vista do robô (vê tudo) pela do Filho escolhido; no Controle 3D a vista já é a do Filho controlado.
+
+- **Vista padrão de um Filho:** as cobaias na sala dele e nas salas reveladas, mais o som (manchas e setas, até 36 m). Os sentidos trocam ou somam: *sem visão* (nenhuma cobaia por vista), *visão curta* (mesma sala ou vizinha), *audição precisa* (baixo: mancha e o botão "Pedir teste" de Percepção contra Furtividade; médio: a sala exata em alcance médio, 18 m; alto ou mais: a sala exata em qualquer ponto do andar e movimento dobrado na próxima vez), *audição com alcance dobrado em sala com água*, *faro* (mancha vermelha onde há cobaia machucada), *faro curto* (brilho nas machucadas à vista), *solidão*, *vibração* (quem pisou na teia), *raízes*, *leitura* (marca de onde a cobaia abriu um documento, nos últimos 10 min), *descanso* (durante o interlúdio) e *ninho* (covil e salas vizinhas). Quem aparece por um sentido ganha um aro vermelho.
+- **Limites:** "1 por cena" conta pelo **Nova cena** do Mestre; "a cada 3 rodadas" conta pelas rodadas da perseguição. Cada uso vai para o canal Filhos do chat.
+
+**Movimento** (vale para o auxiliar sempre e para o Mestre na perseguição sem movimento livre): lento (metade do limite), imóvel, só no escuro (Apagão, luz apagada ou sala sem sinal), dobrado no Apagão, grande demais (não entra em corredor ou sala com a etiqueta "estreito"), arromba portas (passa pela porta fechada com estrondo), Pelos dutos (passa uma porta no próximo movimento), sala barulhenta proibida (PROPOSTA), sala alagada (metade do movimento para todos até o fim da cena), Regente (um Filho a mais fora da vez por rodada) e "parado no próximo turno" de quem foi visto com Olhar ao redor. Na perseguição, o limite do Filho já vem do deslocamento da ficha ligada a ele.
+
+**Jogadores:** rastros no mapa e no cartão da sala (chão molhado, lodo preto, raízes no chão, alagada) por alguns minutos; avisos ("o chão treme" com um rumo vago, "algo se arrasta acima do forro", "você se sente observado", estrondo de porta); testes pedidos numa janela (Vontade, Reflexos, Furtividade) com a ficha ativa; mensagens privadas (uma voz chamando, uma lembrança); no painel da cobaia e no cartão da sala, **🔍 Examinar a sala** e **👀 Olhar ao redor** (Percepção); **🤨 Desconfiar** nas mensagens do chat e no cartão de uma cobaia (Intuição contra a rolagem do Filho); aviso discreto do dia par; chat bloqueado (e as vozes do 3D caladas) durante o Silêncio Absoluto.
+
+**Ocultação especial:** no teto (some até alguém passar em Examinar), na parede (some em sala com quadros até atacar), sempre oculto (até atacar ou alguém passar em Olhar ao redor) e meio apagado (o token pisca). O ataque pelo Controle revela na sala onde ele está. O token oculto mora no `privado` (o jogador não recebe).
+
+**A cópia e a Forma de Objeto:** Forma de Objeto tira o token dos jogadores e põe um objeto da biblioteca do 3D (cadeira, caixote, maca, armário…) na sala. Uma cena inteira assim, na mesma sala que uma cobaia, libera **Estudar**; depois **Copiar** faz o token aparecer aos jogadores como aquela cobaia (foto, nome, cor e miniatura 3D), com o Detalhe que o Mestre escolheu (retrato espelhado, número FHP trocado ou o anel de outro tom). **Mimetismo Vocal** manda no chat Geral, como a cobaia copiada (ou agarrada num Abraço marcado pelo Mestre), só frases que ela escreveu no Geral nas últimas 24 horas, escolhidas numa lista, sem texto livre; o auxiliar nunca vê Sussurros. Mestre e auxiliares veem "🗣 voz imitada".
+
+**A tela do Mestre faz o trabalho automático** (rastros, avisos, ocultação, teias, estudo, Examinar e Olhar, dia par, "Enredada" de quem falhou na teia). Como no robô dos auxiliares, ela precisa estar aberta.
+
+**Limites:** o que aparece aos jogadores é público, então quem abrir as ferramentas do navegador consegue ver: os rastros e avisos (sem o nome do Filho), o objeto da Forma de Objeto, os campos `cp`/`cpd` de um Filho revelado que está copiando (e por isso a cópia), o campo `tk` de uma mensagem imitada, o Silêncio Absoluto e os pedidos de teste. As rolagens dos jogadores são feitas no próprio aparelho, como todas as outras do site, e o bloqueio do chat do Silêncio Absoluto é feito na tela (um jogador que mexa no código consegue escrever). As características, as etiquetas, o estado em jogo e o enigma nunca chegam aos jogadores.
+
+### Encontros, informação escondida e acabamento (`momento.js`)
+
+Ninguém escreve roteiro de susto: o site só propõe, e o Mestre decide.
+
+**1. Encontro: a passagem da exploração para a perseguição**
+
+- **Gatilho:** a tela do Mestre percebe quando um Filho à vista dos jogadores (sem ocultação geral, ocultação especial, Forma de Objeto ou cópia) fica na mesma sala que uma cobaia, ou quando o decibelímetro de uma sala passa do limite (Limite rompido). Aparece no topo da tela dele (também por cima do 3D) a proposta, por exemplo "Encontro: F-02 Remendo viu Sabonete em CN 13", com quem participa (cobaias escondidas vêm desmarcadas; no barulho, entram as cobaias da sala e o Filho mais perto do andar) e **Confirmar / Cancelar**. A mesma situação não é proposta de novo por 90 segundos. Com a perseguição já correndo, nada é proposto. No Apagão, ninguém vê ninguém.
+- **Cancelar (falso alarme):** nada acontece para os jogadores; o Diário anota.
+- **Confirmar:** a iniciativa é rolada na hora: cobaia com a ficha dela (a ativa, pelo nome que ela publica no token; o Mestre só lê), Filho com a "Iniciativa NdM+B" das perícias da ficha ligada a ele (ou 1d20 + o bônus dos Filhos do bloco Perseguição), sem ficha, 1d20. Quem vê a cena (o Mestre, os auxiliares e as cobaias da sala ou da lista) congela 2 s. No 3D, a câmera vira devagar para a criatura (para quem a enxerga), faz um zoom lento, as bordas escurecem e toca um som grave; no 2D, clarão e vinheta. Depois abre a faixa **PERSEGUIÇÃO** de sempre (`mapa/persg`), com a ordem pela iniciativa. O Diário guarda a iniciativa de cada um e de onde ela veio.
+- **Câmera de turno (3D):** um anel dourado no chão mostra até onde o token da vez ainda chega, em metros de regra (o mesmo limite que o site aplica, descontando o que ele já andou; a área segue as paredes e passa pelas portas). Quem não está na vez vê a tela levemente sem cor e o relógio da vez ("⏱ Vez de… 0:12", ou a contagem regressiva se o Mestre ligou o cronômetro). A opção **Perseguição: no começo de cada vez, a câmera mostra quem está na vez** (⚙ Opções › Câmera e mouse, ligada por padrão) vira a câmera de quem espera para o token da vez, sem tirar o controle de ninguém.
+- **Cartas de ação (vez do jogador, 2D e 3D):** Correr, Esconder, Despistar, Atacar e Usar item, cada uma com a perícia e a DT. Elas só mostram o que o site já faz: **Correr** é o teste da rodada na perseguição do Sobrevivendo ao Horror (Atletismo e a DT da rodada) ou, sem ela, o deslocamento que resta; **Esconder** é Furtividade DT 15 (o esconderijo do 3D com E, ou a ação "Esconder-se" da cena de furtividade); **Despistar** só existe na perseguição do SaH, para a presa com 1 sucesso ou mais; **Atacar** mostra a arma, a perícia e o bônus e abre a ficha na aba Em jogo (a DT é a Defesa do alvo, que só o Mestre sabe); **Usar item** abre a mochila com os itens que têm uso. O ▾ esconde as cartas.
+- **Fim da perseguição:** a cor volta devagar, o ambiente do 3D sobe aos poucos, a batida baixa de coração (de quem participava) some e toca um acorde de alívio. No 2D, as bordas escuras de quem esperava somem devagar.
+- **A miniatura e o estado:** ferido manca, morrendo se arrasta, enlouquecendo treme (`tokens3d.js`); vale também durante a perseguição, porque vem das vitais do token.
+
+**2. Informação escondida**
+
+- **Sons dos Filhos:** a tela do Mestre publica em `ecos3d` o tipo do som (passos, arrasto ou respiração) e uma posição aproximada (cerca de 1 m de erro), **sem dizer de quem**. Passos quando um Filho anda; arrasto se ele é lento ou tem forma rastejante; respiração de tempos em tempos quando ele está parado perto de uma cobaia. **Passos silenciosos** (características dos Filhos) calam passos e arrasto; a respiração continua, só de bem perto (4 m). Forma de Objeto não faz som. Cada jogador ouve com áudio posicional (PannerNode) o que acontece no andar dele, até 18 m (respiração, 7 m): no 3D, de onde vem em relação à câmera; no mapa, em relação ao token, olhando para o norte. Os eventos somem em 12 s. O Mestre desliga no bloco **Encontros, sons e câmeras**.
+- **Lanterna com bateria:** o botão 🔦 Luz do jogador só acende com um item cujo nome começa com "Lanterna" (Lanterna Tática, Lanterna UV…) na ficha ativa; sem ele, o botão avisa. A bateria (%) fica no próprio item (`itens.<id>.bat`), aparece no botão Luz e na mochila, e gasta enquanto a luz está acesa (padrão: 30 minutos de luz, o Mestre muda). Abaixo de 10% a luz treme; em 0 ela apaga. **Recarregar:** no cartão da cobaia (ou no 🎛 do 3D, **🔋 Pilhas**), o Mestre toca em **🔋 Recarregar a lanterna** (`mapa/pilhas/<cobaia>`); o aparelho do jogador põe a bateria em 100% uma vez só. Mestre e auxiliares continuam com a lanterna livre.
+- **Mapa que mente:** com a SAN abaixo de 25% do máximo (o Mestre muda), o mapa 2.5D daquele jogador às vezes (a cada meio minuto a um minuto e pouco) mostra uma porta e um pedaço de corredor que não existem, ou faz uma sala vizinha sumir, por alguns segundos. Só na tela dele; nada é gravado.
+- **O que só um jogador vê:** no cartão da cobaia, **👁 Susto só para…** (no 3D, também no painel 🎛 com o token escolhido) → **Rosto na janela**, **Figura no fim do corredor** ou **Nome sussurrado no chat**. Vai por `sustos/<cobaia>`, que só aquele aparelho escuta. No 3D o rosto aparece à frente da câmera (perto da parede) e some; a figura fica no fim do que ela está olhando e some quando ela chega perto. Fora do 3D, o rosto aparece num quadro na borda da tela e a figura no fim de um corredor da sala dela, no mapa. O nome entra no chat Geral só no aparelho dela, sem autor, com um sussurro. Para o teste de Sanidade, use o Medo em jogo.
+- **Câmeras de segurança:** monitores na parede (num ponto livre) das salas marcadas: por padrão a CN 02 e a CN 75. Quem está na sala do monitor, no 3D, vê as outras salas ao vivo (render-to-texture em baixa resolução, poucas vezes por segundo), trocando de sala e de canto a cada 6 s. Por padrão mostram as salas vizinhas; o Mestre escolhe as salas no bloco **Encontros, sons e câmeras** e pode pôr numa delas **um Filho que não está lá** (aparece só na imagem da câmera). Jogadores e auxiliares só veem salas reveladas; as outras dão "SEM SINAL". Em `mapa/cameras`.
+
+**3. Acabamento**
+
+- Fumaça e névoa baixa que se movem (três camadas no computador, uma no celular), poeira dentro da luz da lanterna e uma sombra redonda embaixo de cada token. Opções › Gráficos: **Fumaça e névoa baixa que se movem**, **Poeira no ar** (vale também para a poeira da lanterna) e **Câmeras de segurança nos monitores** (Automático, Ligadas com imagem melhor, Ligadas leves ou Desligadas; no celular o automático usa a imagem leve).
+- **Morte com peso:** quando o contador de Morrendo de uma cobaia chega a 3 (o óbito que a Mesa já registra), a tela do Mestre grava o corpo em `mapa/corpos/<cobaia>`, no ponto onde ela estava. No 3D, a miniatura caída com uma poça escura, no lugar do token; **E · Examinar o corpo** mostra nome, dia e hora do óbito e o que dá para ver de relance (armas, o que estava vestido, itens grandes e a lanterna; nada amaldiçoado, nada de segredo). No mapa 2D, uma ✝ na sala abre o mesmo exame. Quem vê: Mestre, auxiliares (salas reveladas) e as cobaias na mesma sala. Se o contador voltar a menos de 3, o corpo sai; o Mestre também tira pelo cartão da cobaia (**✝ Tirar o corpo do mapa**).
+
+**Mestre (aba Sessão, bloco "Encontros, sons e câmeras"):** propor encontros (liga/desliga), sons dos Filhos (liga/desliga), SAN para o mapa mentir (%), bateria da lanterna (minutos acesa), salas com monitor e, para cada uma, as salas que ela mostra e o Filho falso (`mapa/cfg/momento` e `mapa/cameras`).
+
+**No Firebase (novos):** `mapa/encontro`, `mapa/cameras`, `mapa/corpos`, `mapa/pilhas` e `mapa/cfg/momento` (todos leem, só o Mestre grava, com validação); `ecos3d` (todos logados leem, só o Mestre grava); `sustos/<cobaia>` (só o Mestre grava). **Atualize as regras** com `regras-firebase.json`.
+
+**Limites:** como o resto do mapa público, quem abrir as ferramentas do navegador pode ler `ecos3d` (posições aproximadas, sem nome), os sustos de qualquer cobaia (`sustos/<cobaia>`, como as Visões), a configuração das câmeras (inclusive o Filho falso) e os corpos. O congelamento de 2 s é feito na tela. A tela do Mestre precisa estar aberta para propor encontros, publicar os sons e gravar os corpos. O áudio só toca depois de um toque na página. A lanterna é a do 3D; no mapa 2D não há luz.
 
 ### Efeitos que todos veem
 
@@ -351,6 +426,13 @@ Quando o Mestre dá **▶ Iniciar** numa Sala de Exposição posta numa CN, aque
 - **Mapa 2.5D:** uma camada animada por cima da sala (chuva caindo, líquido subindo, paredes fechando, grade do labirinto, zonas piscando) e o selo **EXPOSIÇÃO · nome · rodada N**. Respeita "reduzir movimento" do aparelho.
 - O visual de cada sala de exposição vem do campo `cena3d` da biblioteca (`salas-exposicao.json`, fora do GitHub). Sem `cena3d`, o site escolhe pelo `modelo`, elemento e ambiente sonoro. **Importe a biblioteca de novo** (Mesa → Salas de Exposição → ⬆ Importar) para trazer o `cena3d` das 37 salas.
 - **Limite:** como o resto do estado da exposição em andamento, o nome público e o visual ficam em `mapa/expo` (todos leem). O efeito secreto e os eventos continuam só com o Mestre.
+
+### Formas detalhadas das criaturas
+
+Cada Filho com arte de referência ganhou uma forma própria no 3D (`filhos3d.js`), com textura, animação de respiração, tiques e jeito de andar (arrasta, rasteja, desliza, passos pesados; o homem de raízes não anda) e o núcleo roxo pulsando. Os que andam em bando saem cada um um pouco diferente. A forma de cada Filho vem no `salas-3d.json` (campo `formas`, fora do GitHub): ao importar de novo, a forma detalhada substitui a genérica antiga; uma forma que o Mestre escolheu no painel 🎛 (Forma da criatura no 3D) continua. As formas genéricas antigas seguem na lista para quem não tem arte.
+
+- **Limite:** o código das formas é público (sem codinomes nem habilidades). Quem ler o código vê as aparências, mas não sabe de quem é cada uma até o Mestre publicar a forma.
+- **Barulho das interações:** fliperama, piano, telefone, sino, rádio, portão de metal e máquinas contam como uma porta aberta no decibelímetro daquela sala por 2 minutos, e o Mestre recebe "🔊 Barulho em CN …: algo pode ter ouvido".
 
 ### Interações nas salas (tecla E)
 
@@ -504,8 +586,8 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 
 Tudo fica salvo neste aparelho (`acf-s3d-cfg`).
 
-- **Gráficos:** predefinição (Alta ou Leve), escala de resolução (50% a 150%), sombras da lanterna, brilho das luzes (bloom), aberração cromática, grão de filme, vinheta, névoa (leve, normal, densa, muito densa), poeira no ar, limite de quadros (sem limite, 60, 30) e contador de quadros por segundo. As marcadas com ↻ reabrem o 3D na hora.
-- **Câmera e mouse:** Jogo em terceira pessoa (desligado = primeira pessoa), campo de visão, balanço da câmera, sensibilidade do mouse e do toque, inverter o eixo vertical, nomes em cima dos personagens.
+- **Gráficos:** predefinição (Alta ou Leve), escala de resolução (50% a 150%), sombras da lanterna, brilho das luzes (bloom), aberração cromática, grão de filme, vinheta, névoa (leve, normal, densa, muito densa), poeira no ar (e na luz da lanterna), fumaça e névoa baixa que se movem, câmeras de segurança nos monitores, limite de quadros (sem limite, 60, 30) e contador de quadros por segundo. As marcadas com ↻ reabrem o 3D na hora.
+- **Câmera e mouse:** Jogo em terceira pessoa (desligado = primeira pessoa), campo de visão, balanço da câmera, sensibilidade do mouse e do toque, inverter o eixo vertical, nomes em cima dos personagens e, na perseguição, a câmera que mostra quem está na vez.
 - **Controles:** clique na tecla de uma ação e aperte a nova. Vale também botão do meio, direito ou lateral do mouse. Se a tecla já era de outra ação, as duas trocam. **Restaurar as teclas padrão** desfaz tudo.
 - **Áudio e chat:** volume do ambiente e dos passos, volume das vozes, balões de fala, a voz do seu personagem e os dados 3D.
 
@@ -677,5 +759,7 @@ Sem Firebase, o site funciona em **modo local**: as posições ficam no navegado
 ```
 
 7. Em **Configurações do projeto › Seus apps › Web (</>)**, registre um app e copie o objeto `firebaseConfig` para a linha `const FIREBASE` do `config.js`.
+
+As regras completas e atualizadas (incluindo `mapa/fil`, `privado/filhosEstado`, `filAcoes`, `filResp`, `filMsg` e `leituras` das características dos Filhos, e `mapa/encontro`, `mapa/cameras`, `mapa/corpos`, `mapa/pilhas`, `ecos3d` e `sustos` do `momento.js`) ficam no arquivo `regras-firebase.json`, fora do repositório; o bloco acima é o resumo antigo.
 
 Com isso: todo mundo vê o mapa público; Filhos, NPCs e robôs ocultos, nomes secretos das salas e o canal Filhos só chegam ao Mestre e à conta dos auxiliares; funções, anotações, diário e Balança só ao Mestre; os jogadores só movem a própria cobaia.

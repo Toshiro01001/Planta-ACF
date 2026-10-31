@@ -131,7 +131,7 @@ function aoClicarFaixa(e) {
 }
 
 // jogador: escolhe a ação e rola
-function abrirAcaoPers() {
+function abrirAcaoPers(pre) {
   const p = pers(), eu = meuPart(); if (!p.on || !eu) return;
   const rid = respId(p);
   if (ls.get('acf-resp-' + rid, false)) { A.aviso('Você já agiu nesta rodada. Espere o Mestre abrir a próxima.'); return; }
@@ -145,7 +145,7 @@ function abrirAcaoPers() {
   janela(rid, `<p class="mesa-k">PERSEGUIÇÃO · RODADA ${int(p.rod)}</p><h3>${eu.lado === 'presa' ? 'Fugindo' : 'Perseguindo'}</h3>
     <p>${esc(nomePer(p.pericia || 'atletismo'))} contra <b>DT ${dtRodada(p)}</b>. Você tem <b>${int(eu.s)}</b> sucesso${int(eu.s) === 1 ? '' : 's'} e <b>${int(eu.f)}</b> falha${int(eu.f) === 1 ? '' : 's'} (meta: ${int(p.meta)} antes de ${int(p.maxF)}).${sacrif ? ` Aliados se sacrificaram: <b>+${sacrif}O</b>.` : ''}${penAt ? ` Você foi atrapalhado: <b>−${penAt}O</b>.` : ''}</p>
     ${ev ? `<label class="chave sah-ev-op"><input type="checkbox" id="sahEvOk" ${ev.tipo === 'obstaculo' ? 'checked disabled' : ''}><span>${ev.tipo === 'obstaculo' ? 'Obstáculo (obrigatório)' : 'Tentar o atalho'}: ${esc(ev.txt)} <b>${esc(nomePer(ev.per))} DT ${int(ev.dt)}</b></span></label>` : ''}
-    <div class="mesa-acoes">${ops.map(([k, a], i) => `<label class="mesa-acao"><input type="radio" name="sahAcao" value="${k}" ${i === 0 ? 'checked' : ''}><b>${esc(a.n)}</b><small>${esc(a.d)}</small></label>`).join('')}</div>
+    <div class="mesa-acoes">${ops.map(([k, a], i) => `<label class="mesa-acao"><input type="radio" name="sahAcao" value="${k}" ${(pre && ops.some(o => o[0] === pre) ? k === pre : i === 0) ? 'checked' : ''}><b>${esc(a.n)}</b><small>${esc(a.d)}</small></label>`).join('')}</div>
     <label class="mesa-prato" id="sahOutraPer" hidden>Perícia <select id="sahPer">${opcoesPericia('acrobacia')}</select></label>
     <label class="mesa-prato" id="sahAlvo" hidden>Quem atrapalhar <select id="sahAlvoSel">${Object.entries(p.part || {}).filter(([id, x]) => id !== A.meu && x.lado === 'presa' && int(x.s) === int(eu.s) && !estadoPart(x, p)).map(([id, x]) => `<option value="${esc(id)}">${esc(x.nome)}</option>`).join('') || '<option value="">ninguém com os mesmos sucessos</option>'}</select></label>
     ${usadas.length ? `<p class="mini">Perícias já usadas nesta perseguição: ${usadas.map(x => esc(nomePer(x))).join(', ')}.</p>` : ''}
@@ -337,7 +337,7 @@ const EV_FURT = [
 ];
 const furt = () => est().furtSaH || {};
 const respF = f => `furt-${f.id}-${f.rod}`;
-function abrirAcaoFurt() {
+function abrirAcaoFurt(pre) {
   const f = furt(), eu = A.meu && (f.part || {})[A.meu]; if (!f.on || !eu) return;
   const rid = respF(f);
   if (ls.get('acf-resp-' + rid, false)) { A.aviso('Você já agiu nesta rodada.'); return; }
@@ -345,7 +345,7 @@ function abrirAcaoFurt() {
   const aliados = Object.entries(f.part || {}).filter(([id, x]) => id !== A.meu && !x.visto);
   janela(rid, `<p class="mesa-k">FURTIVIDADE · RODADA ${int(f.rod)}</p><h3>O que você faz?</h3>
     <p>Sua visibilidade: <b>${int(eu.vis)}</b> (com ${int(f.lim) || 3} ou mais no fim da rodada, você é visto${f.algoz ? ' por ' + esc(f.algoz) : ''}).</p>
-    <div class="mesa-acoes">${Object.entries(ACOES_F).filter(([k]) => !(k === 'distrair' && distRod)).map(([k, a], i) => `<label class="mesa-acao"><input type="radio" name="sahFa" value="${k}" ${i === 1 ? 'checked' : ''}><b>${esc(a.n)}</b><small>${esc(a.d)}${k === 'distrair' ? ` Agora: DT ${15 + 5 * usoDist}.` : ''}</small></label>`).join('')}</div>
+    <div class="mesa-acoes">${Object.entries(ACOES_F).filter(([k]) => !(k === 'distrair' && distRod)).map(([k, a], i) => `<label class="mesa-acao"><input type="radio" name="sahFa" value="${k}" ${(pre && ACOES_F[pre] ? k === pre : i === 1) ? 'checked' : ''}><b>${esc(a.n)}</b><small>${esc(a.d)}${k === 'distrair' ? ` Agora: DT ${15 + 5 * usoDist}.` : ''}</small></label>`).join('')}</div>
     <label class="mesa-prato" id="sahFal" hidden>Aliado <select id="sahFalSel"><option value="">${'você mesmo'}</option>${aliados.map(([id, x]) => `<option value="${esc(id)}">${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="chave" id="sahFideia" hidden><input type="checkbox" id="sahFbon"><span>O Mestre aprovou uma ideia boa (+O)</span></label>
     <div class="mesa-botoes"><button data-sj="ok" class="pri">Confirmar</button><button data-sj="fechar">Depois</button></div><div id="sahRes"></div>`, 'sah-furt-j');
@@ -595,5 +595,10 @@ document.addEventListener('click', e => {
   }
 });
 setTimeout(agendar, 400);
-window.ACF_SAH = { sortear, tabelaHtml };
+window.ACF_SAH = { sortear, tabelaHtml,
+  // cartas de ação na vez do jogador (momento.js): só leem o que a perseguição e a furtividade já têm
+  pers, furt, meuPart, dtRodada, estadoPart, ACOES_P, ACOES_F, nomePer,
+  jaAgiu: () => { const p = pers(); return !!(p.on && ls.get('acf-resp-' + respId(p), false)); },
+  jaAgiuFurt: () => { const f = furt(); return !!(f.on && ls.get('acf-resp-' + respF(f), false)); },
+  abrirAcaoPers, abrirAcaoFurt };
 })();

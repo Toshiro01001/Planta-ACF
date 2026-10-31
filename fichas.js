@@ -1910,7 +1910,9 @@ window.ACF_FICHAS = {
     if (!F.ativaD) return null;
     const d = F.ativaD, r = calc(d);
     const itens = lista(d.itens).map(it => ({ id: it.id, n: it.n || 'Item', t: it.t || 'geral', cat: catEfetiva(it), catR: ROM[catEfetiva(it)] || '0', esp: num(it.esp), qtd: it.qtd === undefined || it.qtd === '' ? 1 : int(it.qtd),
-      d: it.d || '', el: it.el || '', achado: !!it.achado, vest: !!it.vest, vestivel: ehVestivel(it), dano: it.a && it.a.dano ? it.a.dano : '', usavel: !!usoItem(it), uso: usoItem(it) }));
+      d: it.d || '', el: it.el || '', achado: !!it.achado, vest: !!it.vest, vestivel: ehVestivel(it), dano: it.a && it.a.dano ? it.a.dano : '', usavel: !!usoItem(it), uso: usoItem(it),
+      // lanterna (momento.js): bateria em %, guardada no próprio item
+      bat: /^lanterna/i.test(String(it.n || '').trim()) ? Math.max(0, Math.min(100, it.bat === undefined || it.bat === '' ? 100 : num(it.bat))) : undefined }));
     return { nome: d.nome || '', itens, carga: +r.carga.toFixed(1), cargaMax: r.cargaMax, sobrecarga: r.sobrecarga, contagem: r.contagem, lim: r.patente.lim, patente: r.patente.n, ROM };
   },
   // usar um item da mochila (cura e afins) na ficha ativa: mesma regra do botão "Usar em mim" da ficha
@@ -1937,5 +1939,9 @@ window.ACF_FICHAS = {
   abrirAux: chave => { abrir(); abrirFicha({ aux: true, dono: 'aux', chave }); },
   abrirAtiva: () => { if (F.ativaRef) { abrir(); abrirFicha(F.ativaRef); } else abrir(); },
   religar: () => { F.ativaId = undefined; ligarAtiva(); },
+  // ficha lida do servidor, com os campos que faltam (momento.js rola a iniciativa do Encontro com a ficha do jogador, só leitura)
+  normalizar: d => (d ? normalizar(d) : null),
+  // armas da ficha ativa como o botão "⚔ Atacar" da aba Em jogo as mostra (perícia, bônus e dano)
+  ataquesAtiva: () => { if (!F.ativaD) return []; try { const d = F.ativaD, r = calc(d); return [[DESARMADO, true]].concat(lista(d.itens).filter(it => it.t === 'arma').map(x => [x, false])).map(([it, des]) => { const inf = infoAtaque(d, r, it, des); return { n: it.n, per: inf.per, bAtk: inf.bAtk, dano: inf.dano }; }); } catch (e) { return []; } },
 };
 })();

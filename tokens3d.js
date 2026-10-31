@@ -1727,6 +1727,36 @@
     return { g, alt, anim };
   }
 
+  /* ---------- o corpo mostra o estado (vitais publicadas pela ficha ativa) ----------
+     ferido (PV abaixo da metade): manca ao andar; morrendo (PV 0): cai e se arrasta pelo chão;
+     enlouquecendo (SAN 0): treme. A base da miniatura não se mexe. */
+  function estadoDoCorpo(T, t, id) {
+    const corpo = new T.Group();
+    [...t.g.children].filter(c => c !== t.base).forEach(c => corpo.add(c));
+    t.g.add(corpo); t.corpo = corpo;
+    const animO = t.anim; let est = '', tE = 0, kc = 0, kf = 0, kt = 0;
+    const estadoDe = () => {
+      const tk = ((window.ACF && window.ACF.estado) || {}).tokens || {}, v = (tk[id] || {}).vit;
+      if (!v) return '';
+      if ((v.pv ?? 1) <= 0) return 'morrendo';
+      if ((v.san !== undefined && v.san <= 0) || (v.det && (v.pd ?? 1) <= 0)) return 'enlouquecendo';
+      if (v.pvM && v.pv < v.pvM / 2) return 'ferido';
+      return '';
+    };
+    t.anim = (dt, tt, andando) => {
+      if (animO) animO(dt, tt, andando);
+      tE -= dt; if (tE <= 0) { tE = .5; est = estadoDe(); }
+      const suave = (x, alvo) => x + (alvo - x) * Math.min(1, dt * 4);
+      kc = suave(kc, est === 'morrendo' ? 1 : 0); kf = suave(kf, est === 'ferido' ? 1 : 0); kt = suave(kt, est === 'enlouquecendo' ? 1 : 0);
+      const passo = Math.sin(tt * 6);
+      corpo.rotation.set(
+        kc * (1.32 + (andando ? Math.sin(tt * 3) * .05 : 0)),
+        kt * (Math.random() - .5) * .08,
+        kf * (andando ? passo * .09 : .05) + kt * (Math.random() - .5) * .05);
+      corpo.position.set(kt * (Math.random() - .5) * .02, kc * .16 - kf * (andando ? Math.abs(passo) * .045 : 0), -kc * .75 + (kc && andando ? Math.sin(tt * 3) * .06 : 0));
+    };
+  }
+
   /* ---------- fábrica principal ---------- */
   // s = ser (SER[tk.s]); forma = forma do Filho (mapa/formas); F = criarFabrica(...) do mundo
   function criarToken(F, id, s, forma) {
@@ -1735,7 +1765,12 @@
     if (!t) {
       if (s.tipo === 'cobaia' && COBAIAS[s.id]) t = COBAIAS[s.id](F);
       else if (s.tipo === 'robo') t = robo(F, s.id, s);
-      else if (s.tipo === 'filho') t = criatura(F, s, FORMAS.includes(forma) ? forma : 'esguio');
+      else if (s.tipo === 'filho') {
+        // forma detalhada (filhos3d.js, baixado com o 3D) ou uma das genéricas
+        const det = (NS.formasFilho || {})[forma];
+        if (det) { try { t = det.criar(F, { ...s, semente: id }); } catch (e) { console.warn('3D forma:', forma, e); } }
+        if (!t) t = criatura(F, s, FORMAS.includes(forma) ? forma : 'esguio');
+      }
       else if (s.tipo === 'espectro') t = espectro(F, s);
       else t = npc(F, s);
     }
@@ -1751,6 +1786,7 @@
     if (s.tipo === 'espectro') { disco.material = F.m('#141218', { r: .4, me: .3, op: .12 }); aro.material.transparent = true; aro.material.opacity = .3; }
     t.aro = aro; t.base = base;
     t.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+    if (s.tipo === 'cobaia' || s.tipo === 'npc') estadoDoCorpo(T, t, id);
     return t;
   }
 
