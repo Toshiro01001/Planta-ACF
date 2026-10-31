@@ -21,14 +21,20 @@
   // objetos dos andares 2 a 5 (andares3d.js): grande, então só baixa quando alguém abre o 3D (mesma versão deste arquivo)
   const VERSAO = ((document.currentScript && document.currentScript.src) || '').split('?')[1] || '';
   let extrasP = null;
-  const carregarExtras = () => extrasP || (extrasP = new Promise(ok => {
-    if ((window.ACF3D || {}).andaresProntos) return ok();
-    const s = document.createElement('script'); s.src = 'andares3d.js' + (VERSAO ? '?' + VERSAO : ''); s.async = true;
-    s.onload = () => ok(); s.onerror = () => { extrasP = null; s.remove(); ok(); };   // sem o arquivo, o 3D abre do mesmo jeito
+  // e as formas detalhadas das criaturas (filhos3d.js), também grandes: baixam junto
+  const baixar = arq => new Promise(ok => {
+    const s = document.createElement('script'); s.src = arq + (VERSAO ? '?' + VERSAO : ''); s.async = true;
+    s.onload = () => ok(true); s.onerror = () => { s.remove(); ok(false); };   // sem o arquivo, o 3D abre do mesmo jeito
     document.head.appendChild(s);
-  }));
+  });
+  const carregarExtras = () => extrasP || (extrasP = Promise.all([
+    (window.ACF3D || {}).andaresProntos ? true : baixar('andares3d.js'),
+    (window.ACF3D || {}).formasFilho ? true : baixar('filhos3d.js'),
+  ]).then(r => { if (r.includes(false)) extrasP = null; }));
   const ACF = () => window.ACF;
   const NS = () => window.ACF3D;
+  // extensões da vista (momento.js): iniciar(api), quadro(dt, t), perto(x, z), fechar()
+  const EXT = () => ((window.ACF3D || {}).vista) || [];
   // objeto de cena "campo_infinito": a figura flutuante (triângulo invertido) com o campo em volta.
   // O que ele faz com quem chega perto fica em Campos (mover): quanto mais perto, mais devagar; perto demais, preso.
   (window.ACF3D = window.ACF3D || {}).extensoes = window.ACF3D.extensoes || [];
@@ -77,6 +83,8 @@
     fov: 75, balanco: true, terceira: false, nomes: true, baloes: true,
     sens: 1, invY: false,
     volAmb: 1, volVoz: 1, teclas: {},
+    // momento.js: câmera de turno na perseguição, monitores de segurança e fumaça baixa
+    enquadrar: true, cameras: 'auto', fumaca: 'auto',
   };
   const CFG = Object.assign({}, CFG_PAD, lsG('acf-s3d-cfg', {}) || {});
   CFG.teclas = Object.assign({}, (lsG('acf-s3d-cfg', {}) || {}).teclas || {});
@@ -169,7 +177,8 @@
       if (d.narrativa && typeof d.narrativa === 'object') Object.entries(d.narrativa).forEach(([k, v]) => ACF().gravarSegredo(['_narrativa', k], v));
       // formas dos Filhos: só as que o Mestre ainda não escolheu
       const atuais = (ACF().estado || {}).formas || {};
-      Object.entries(d.formas || {}).forEach(([id, fm]) => { if (!atuais[id]) ACF().definir(['formas', id], fm); });
+      // a forma detalhada nova substitui a genérica que veio de um arquivo antigo (escolha do Mestre por uma detalhada fica)
+      Object.entries(d.formas || {}).forEach(([id, fm]) => { const at = atuais[id]; if (!at || (at !== fm && (NS().FORMAS || []).includes(at) && !(NS().FORMAS || []).includes(fm))) ACF().definir(['formas', id], fm); });
       ACF().diario('sessao', `Cenas 3D importadas (${n})`);
       ACF().aviso(`${n} cena(s) 3D importada(s).`);
       setTimeout(() => { agendarPublicar(); ACF().redesenharCartao(); }, 300);
@@ -688,9 +697,12 @@
         else vizinhas(p0).forEach(([p, ci]) => { const P = portas.find(q => q && q.c.ci === ci); if (P && P.v === 'a' || (!imersivo(modo) && !celular)) quer.add(p); });
       }
       [...quer].forEach(p => { if (!salaVisivel(p)) quer.delete(p); });
-      [...carregadas.keys()].forEach(p => { if (!quer.has(p)) descarregar(p); });
-      const falta = [...quer].find(p => !carregadas.has(p));
+      // salas a mais, carregadas só para as câmeras de segurança (momento.js): ficam escondidas na vista normal
+      const extra = new Set([...(ctx.extraSalas || [])].filter(p => S[p] && !quer.has(p)));
+      [...carregadas.keys()].forEach(p => { if (!quer.has(p) && !extra.has(p)) descarregar(p); });
+      const falta = [...quer].find(p => !carregadas.has(p)) || [...extra].find(p => !carregadas.has(p));
       if (falta) carregar(falta);
+      carregadas.forEach((c, p) => { const ex = extra.has(p); if (c.extra !== ex) { c.extra = ex; c.g.visible = !ex; } });
       // véus: salas que você não pode ver ficam escuras na porta
       const vis = Object.values(S).map(s => salaVisivel(s.p) ? 1 : 0).join('');
       if (vis !== visAntes) { visAntes = vis; Object.values(S).forEach(s => s.veus.forEach(v => { v.visible = !salaVisivel(s.p); })); }
@@ -706,7 +718,7 @@
       const e = est(), apagao = !!(A.apagao), prot = !!(A.protocolo);
       const modoCorr = modoLuz('a' + a);
       lista.length = 0;
-      carregadas.forEach(c => c.virt.forEach(v => lista.push(v)));
+      carregadas.forEach(c => { if (!c.extra) c.virt.forEach(v => lista.push(v)); });
       virtCorr.forEach(v => lista.push(v));
       lista.forEach(v => { v.d = (v.p.x - x) ** 2 + (v.p.z - z) ** 2 + (v.p.y - 1.6) ** 2; });
       lista.sort((u, w) => u.d - w.d);
@@ -762,7 +774,7 @@
       for (const s of Object.values(S)) if (x >= s.x0 + RAIO && x <= s.x1 - RAIO && z >= s.z0 + RAIO && z <= s.z1 - RAIO) { ok = true; break; }
       if (!ok) for (const r of zonasCorr) if (dentroDe(r, x, z)) { ok = true; break; }
       if (!ok) return false;
-      for (const c of carregadas.values()) { for (const r of c.obst) if (dentroDe(r, x, z)) return false; if (c.inter && c.inter.dinam.length && !NS().inter.livre(c, x, z)) return false; }
+      for (const c of carregadas.values()) { if (c.extra) continue; for (const r of c.obst) if (dentroDe(r, x, z)) return false; if (c.inter && c.inter.dinam.length && !NS().inter.livre(c, x, z)) return false; }
       if (expoCena && expoCena.r.colisoes) for (const r of expoCena.r.colisoes) if (x >= r[0] - RAIO && x <= r[1] + RAIO && z >= r[2] - RAIO && z <= r[3] + RAIO) return false;
       return true;
     }
@@ -881,19 +893,45 @@
       return sp;
     }
 
+    // a cópia (filhos.js): para os jogadores, a miniatura é a da cobaia copiada, com o Detalhe do Mestre
+    const aparencia = tk => (window.ACF_FILHOS ? ACF_FILHOS.aparencia(tk) : null);
+    const chaveAp = tk => { const ap = aparencia(tk); return ap ? ap.ser.id + ':' + (ap.det || '') : ''; };
     function criar(id, tk) {
-      const s = ACF().SER[tk.s]; if (!s) return null;
-      const forma = formas()[tk.s] || formas()[id];
+      const ap = aparencia(tk);
+      const s = ap ? ap.ser : ACF().SER[tk.s]; if (!s) return null;
+      const forma = ap ? undefined : (formas()[tk.s] || formas()[id]);
       const t = NSX.criarToken(F, id, s, forma);
+      if (ap && ap.det === 'espelho') t.g.scale.x = -1;
+      if (ap && ap.det === 'aro' && t.aro && t.aro.material && t.aro.material.emissive) t.aro.material.emissive.set(ap.cor || '#888');
       t.g.traverse(o => { o.userData.token = id; });
       const nome = etiqueta((ACF().rotulo(tk) || s.nome) + (tk.esq ? ' · escondido' : ''), s.contorno || s.cor);
       nome.position.y = t.alt + .32; t.g.add(nome);
       grupo.add(t.g);
       const [x, z] = planta3D(a, tk.x, tk.y);
       t.g.position.set(x, 0, z);
-      return { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, rotulo: ACF().rotulo(tk), filho: s.tipo === 'filho', corAro: t.aro ? t.aro.material.emissive.clone() : null };
+      return { t, x, z, ax: x, az: z, rot: 0, andando: 0, forma, nome, esq: !!tk.esq, rotulo: ACF().rotulo(tk), filho: s.tipo === 'filho', corAro: t.aro ? t.aro.material.emissive.clone() : null, ap: chaveAp(tk) };
     }
     function remover(id) { const o = mapa.get(id); if (!o) return; grupo.remove(o.t.g); mapa.delete(id); }
+    // Forma de Objeto (filhos.js): um objeto a mais na sala, da biblioteca, que todos veem (mapa/fil/ob)
+    const objsFil = new Map();
+    function sincronizarObjetos() {
+      const obs = (((A.estado || {}).fil || {}).ob) || {}, vivos = new Set();
+      Object.entries(obs).forEach(([k, ob]) => {
+        if (!ob || ob.a !== a || !F.P || typeof F.P[ob.o] !== 'function') return;
+        vivos.add(k);
+        let o = objsFil.get(k);
+        if (o && o.tipo !== ob.o) { grupo.remove(o.g); objsFil.delete(k); o = null; }
+        if (!o) {
+          let g = null; try { g = F.P[ob.o]({}); } catch (e) { console.warn('3D objeto:', ob.o, e); }
+          if (!g) return;
+          o = { g, tipo: ob.o }; grupo.add(g); objsFil.set(k, o);
+        }
+        let [x, z] = planta3D(a, ob.x, ob.y);
+        if (!mundo.livre3D(x, z) && mundo.area3D(x, z, .05)) [x, z] = pontoLivre(mundo.livre3D, x, z);
+        o.g.position.set(x, 0, z); o.g.rotation.y = ((ob.ts || 0) % 628) / 100;
+      });
+      [...objsFil.keys()].forEach(k => { if (!vivos.has(k)) { grupo.remove(objsFil.get(k).g); objsFil.delete(k); } });
+    }
 
     function sincronizar() {
       const tk0 = tokens(), vistos = new Set();
@@ -903,7 +941,7 @@
         let o = mapa.get(id);
         const forma = formas()[tk.s] || formas()[id];
         // forma do Filho trocada, escondido/saiu do esconderijo ou nome mudou: refaz a miniatura
-        if (o && (o.forma !== forma || o.esq !== !!tk.esq || o.rotulo !== ACF().rotulo(tk))) { remover(id); o = null; }
+        if (o && (o.forma !== forma || o.esq !== !!tk.esq || o.rotulo !== ACF().rotulo(tk) || o.ap !== chaveAp(tk))) { remover(id); o = null; }
         if (!o) { o = criar(id, tk); if (!o) return; mapa.set(id, o); }
         // traje vestido (ficha ativa → vitais do token): por cima da miniatura
         const tj = (tk.vit && tk.vit.tj) || '';
@@ -916,6 +954,7 @@
         o.ax = o.bx; o.az = o.bz;
       });
       [...mapa.keys()].forEach(id => { if (!vistos.has(id)) remover(id); });
+      sincronizarObjetos();
       // dois tokens no mesmo lugar: se afastam um pouco (o seu, que você controla, não sai do lugar)
       const ls2 = [...mapa.entries()];
       for (let it = 0; it < 4; it++) for (let i = 0; i < ls2.length; i++) for (let j = i + 1; j < ls2.length; j++) {
@@ -964,11 +1003,11 @@
     function objetos() { return grupo.children; }
     function posDe(id) { const o = mapa.get(id); return o ? [o.x, o.z] : null; }
     sincronizar();
-    return { sincronizar, atualizar, objetos, posDe, set selecionado(v) { selecionado = v; }, get selecionado() { return selecionado; }, mapa, descartar() { [...mapa.keys()].forEach(remover); ctx.cena.remove(grupo); } };
+    return { sincronizar, atualizar, objetos, posDe, set selecionado(v) { selecionado = v; }, get selecionado() { return selecionado; }, mapa, objsFil, descartar() { [...mapa.keys()].forEach(remover); ctx.cena.remove(grupo); } };
   }
   /* ================= som ambiente (gerado na hora, sem arquivos) ================= */
   const Som = (() => {
-    let ctx = null, saida = null, branco = null, marrom = null, ligado = true;
+    let ctx = null, saida = null, branco = null, marrom = null, ligado = true, abafo = 1;
     try { ligado = JSON.parse(localStorage.getItem('acf-s3d-som') ?? 'true'); } catch (e) {}
     const vozes = new Map();
     function buf(tipo) {
@@ -1055,12 +1094,14 @@
     return {
       preparar,
       get ligado() { return ligado; },
+      // momento.js: o ambiente abaixa no encontro e na perseguição e volta aos poucos no fim
+      get abafo() { return abafo; }, set abafo(v) { abafo = Math.max(0, Math.min(1, +v || 0)); },
       alternar() { ligado = !ligado; try { localStorage.setItem('acf-s3d-som', JSON.stringify(ligado)); } catch (e) {} return ligado; },
       // alvos: [{k, som, g}] · chamado algumas vezes por segundo
       atualizar(alvos) {
         if (!ctx) return;
         const t = ctx.currentTime, mudo = !ligado || (ACF() && ACF().mudo);
-        saida.gain.setTargetAtTime(mudo ? 0 : .7 * (CFG.volAmb ?? 1), t, .25);
+        saida.gain.setTargetAtTime(mudo ? 0 : .7 * (CFG.volAmb ?? 1) * abafo, t, .25);
         const quer = new Set();
         alvos.forEach(a => { quer.add(a.k); const v = vozes.get(a.k) || criarVoz(a.k, a.som); v.g.gain.setTargetAtTime(a.g, t, .5); });
         [...vozes.keys()].forEach(k => { if (!quer.has(k)) soltar(k); });
@@ -1086,9 +1127,9 @@
     const brilho = new T.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: VS, fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(.68, 1., l), 1.); }' });
     const borrao = new T.ShaderMaterial({ uniforms: { t: { value: null }, dir: { value: new T.Vector2() } }, vertexShader: VS, fragmentShader: 'uniform sampler2D t; uniform vec2 dir; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb * .227; c += (texture2D(t, vUv + dir * 1.385).rgb + texture2D(t, vUv - dir * 1.385).rgb) * .316; c += (texture2D(t, vUv + dir * 3.231).rgb + texture2D(t, vUv - dir * 3.231).rgb) * .07; gl_FragColor = vec4(c, 1.); }' });
     const final = new T.ShaderMaterial({
-      uniforms: { tCena: { value: null }, tBrilho: { value: null }, uBrilho: { value: 0 }, uTempo: { value: 0 }, uGrao: { value: .055 }, uVinheta: { value: 1.15 }, uAberr: { value: 0 }, uVermelho: { value: 0 }, uEscuro: { value: 0 }, uRes: { value: new T.Vector2(1, 1) } },
+      uniforms: { tCena: { value: null }, tBrilho: { value: null }, uBrilho: { value: 0 }, uTempo: { value: 0 }, uGrao: { value: .055 }, uVinheta: { value: 1.15 }, uAberr: { value: 0 }, uVermelho: { value: 0 }, uEscuro: { value: 0 }, uCinza: { value: 0 }, uBorda: { value: 0 }, uRes: { value: new T.Vector2(1, 1) } },
       vertexShader: VS,
-      fragmentShader: `uniform sampler2D tCena, tBrilho; uniform float uBrilho, uTempo, uGrao, uVinheta, uAberr, uVermelho, uEscuro; uniform vec2 uRes; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tCena, tBrilho; uniform float uBrilho, uTempo, uGrao, uVinheta, uAberr, uVermelho, uEscuro, uCinza, uBorda; uniform vec2 uRes; varying vec2 vUv;
         float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - .5; float d = length(c); vec2 off = c * uAberr * d * 2.;
@@ -1096,6 +1137,8 @@
           col += texture2D(tBrilho, vUv).rgb * uBrilho;
           col = mix(col, vec3(dot(col, vec3(.35, .2, .1))) * vec3(2.2, .35, .3), uVermelho);
           col *= 1. - uEscuro;
+          col = mix(col, vec3(dot(col, vec3(.299, .587, .114))), uCinza);
+          col *= 1. - uBorda * smoothstep(.22, .72, d);
           col *= smoothstep(.95, .2, d * uVinheta);
           col += (rnd(vUv * uRes + fract(uTempo) * 61.7) - .5) * uGrao;
           gl_FragColor = vec4(col, 1.);
@@ -1330,7 +1373,12 @@
     if (imersivo(c.modo) && c.largo) c.modo = 'fora';
     definirModo(c.modo); pintarBarra();
   }
-  function alternarLanterna() { if (!V) return; V.lanterna = !V.lanterna; pintarBarra(); }
+  function alternarLanterna() {
+    if (!V) return;
+    // jogador: a lanterna depende de um item "Lanterna" com bateria na ficha ativa (momento.js)
+    if (!V.lanterna && window.ACF_MOMENTO && ACF_MOMENTO.lanternaBloqueio) { const m = ACF_MOMENTO.lanternaBloqueio(V.quem); if (m) { toast(m); return; } }
+    V.lanterna = !V.lanterna; pintarBarra();
+  }
   function dica() {
     if (!V) return;
     try { V.tok.sincronizar(); } catch (e) {}   // quem controla mudou: a vista (ex.: a do Filho) pode mudar
@@ -1438,8 +1486,10 @@
     if (a.aux) return !!a.salaRevelada(cn);
     return !!a.meu && a.salaDe(a.meu) === cn;
   }
+  let abrirSeq = 0;
   async function abrir(cn, op = {}) {
     const a = ACF();
+    const seq = ++abrirSeq;   // duas aberturas ao mesmo tempo (vigia + clique) deixavam dois laços de desenho vivos: vale só a última
     if (!op.manter && !op.livre && !podeAbrir(cn)) { a.aviso(a.meu ? 'Para ver esta sala em 3D, o token da sua cobaia precisa estar nela.' : 'Esta sala não está liberada para você.'); return; }
     Som.preparar();   // precisa ser no clique (o celular só libera o som assim)
     const d = criarJanela();
@@ -1451,8 +1501,9 @@
     $('#s3dBtPainel').hidden = quemSou() === 'jog';
     $('[data-s3dv="chat"]', d).hidden = !disponivel('btnChat');
     $('.s3d-x[data-s3dv="fechar"]', d).focus();
-    try { await carregarThree(); await carregarExtras(); await NS().carregarModelos(); } catch (e) { msg.textContent = 'Não consegui carregar o 3D (sem internet?). Tente de novo.'; return; }
-    if (d.hidden) return;
+    try { await carregarThree(); await carregarExtras(); await NS().carregarModelos(); } catch (e) { if (seq === abrirSeq) msg.textContent = 'Não consegui carregar o 3D (sem internet?). Tente de novo.'; return; }
+    if (d.hidden || seq !== abrirSeq) return;
+    if (V) fechar(true);
     msg.hidden = true;
     try { iniciar({ cn, a: op.a || Math.ceil(cn / 25), largo: !!op.andar, manter, ctrl: op.ctrl || null }, d); }
     catch (e) { console.error(e); msg.hidden = false; msg.textContent = 'Não consegui montar o 3D neste aparelho.'; }
@@ -1582,6 +1633,8 @@
       if (m > .05) { const k = m > 1 ? 1 / m : 1; dx = (-sy * f + cyw * s) * k; dz = (-cyw * f - sy * s) * k; }
       else if (V.autoAlvo) { const ax = V.autoAlvo[0] - est.px, az = V.autoAlvo[1] - est.pz, dd = Math.hypot(ax, az); if (dd < .12) V.autoAlvo = null; else { dx = ax / dd; dz = az / dd; } }
       if (!dx && !dz) return false;
+      // encontro (momento.js): quem vê a cena congela por 2 s
+      if (V.congelado && performance.now() < V.congelado) return false;
       const ctrl = V.ctrl, livre = !ctrl;
       const vel = (livre ? (corre ? 8 : 4) : (corre ? 4 : 2)) * dt;
       if (livre) { est.px += dx * vel; est.pz += dz * vel; if (!imersivo(est.modo)) { est.ax = est.px; est.az = est.pz; } return true; }
@@ -1717,11 +1770,14 @@
       if (tk && tk.esq) return { tipo: 'sair', txt: '✋ Sair do esconderijo' };
       let melhor = null, bd = 1.7;
       mundo.interativos.forEach(it => {
+        if (it.p && (mundo.carregadas.get(it.p) || {}).extra) return;   // sala carregada só para a câmera de segurança
         if (it.tipo === 'item' && !(it.obj && it.obj.visible)) return;
         if (it.tipo === 'int' && !NS().inter.rotulo(it, { quem, ctrl: V.ctrl })) return;
         const d = it.tipo === 'int' ? NS().inter.distancia(it, est.px, est.pz) + .25 : Math.hypot(it.pos.x - est.px, it.pos.z - est.pz) - (it.sala ? 1.4 : 0);
         if (d < bd) { bd = d; melhor = it; }
       });
+      // coisas de outros módulos (momento.js: corpo de uma cobaia morta)
+      EXT().forEach(x => { if (!x.perto) return; try { const r = x.perto(est.px, est.pz); if (r && r.d < bd) { bd = r.d; melhor = r; } } catch (e) {} });
       // no corredor da saída (ou na sala da saída sem corredor), o elevador fica à mão mesmo de longe
       if (!melhor && tk && tk.a === a) {
         const rs = MAPA.g.retSaida(a), sd = MAPA.g.saidaDoAndar(a);
@@ -1729,6 +1785,7 @@
         if (naSaida) melhor = mundo.interativos.find(it => it.tipo === 'elevador') || null;
       }
       if (!melhor) return null;
+      if (melhor.tipo === 'ext') return melhor;
       if (melhor.tipo === 'elevador') return quem === 'mestre' ? { ...melhor, txt: '🛗 Saída do andar: levar tokens' } : V.ctrl ? { ...melhor, txt: '🛗 Usar a saída do andar (pede ao Mestre)' } : null;
       if (melhor.tipo === 'item') return V.ctrl || quem === 'mestre' ? { ...melhor, txt: `🎒 Pegar: ${melhor.nome}` } : null;
       if (melhor.tipo === 'int') { const txt = NS().inter.rotulo(melhor, { quem, ctrl: V.ctrl }); return txt ? { ...melhor, it: melhor, txt } : null; }
@@ -1818,6 +1875,7 @@
       Efeitos.tick(dt);
       if (V.tremor > 0) { V.tremor = Math.max(0, V.tremor - dt); cam.position.x += (Math.random() - .5) * V.tremor * .12; cam.position.y += (Math.random() - .5) * V.tremor * .08; }
       if (V.choque > 0) { V.choque = Math.max(0, V.choque - dt); pos.final.uniforms.uAberr.value = .006 + V.choque * .03; } else if (V.choque === 0) { V.choque = -1; pos.aplicar(); }
+      for (const x of EXT()) if (x.quadro) { try { x.quadro(dt, tt); } catch (e) { if (!x._erro) { x._erro = 1; console.warn('3D extensão:', e); } } }
       pos.render(cenaT, cam, tt);
       posicionarBaloes();
       // HUD algumas vezes por segundo
@@ -1841,6 +1899,14 @@
       Som.tick();
     };
     alvo.set(est.ax, 1, est.az);
+    // extensões (momento.js): recebem as peças da vista
+    ctx.extraSalas = new Set();
+    V.api = { T, A, a, cena: cenaT, camera: cam, ren, est, mundo, tok, pos, lanterna, celular, alta, CFG, ALT, SALA_M, ctx, Som, poeira,
+      get V() { return V; }, toast, primeiraP, imersivo, extraSalas: ctx.extraSalas, descartes,
+      planta3D: (x, y) => planta3D(a, x, y), plantaDe3D: (x, z) => plantaDe3D(a, x, z), salaNoPonto3D: (x, z) => salaNoPonto3D(a, x, z),
+      fabrica: () => { const F = NS().criarFabrica(T, [], [], descartes, { alt: ALT }); F.T = T; return F; },
+      quemVe: id => !!tok.mapa.get(id) };
+    EXT().forEach(x => { try { x.iniciar && x.iniciar(V.api); } catch (e) { console.warn('3D extensão:', e); } });
     V.raf = requestAnimationFrame(quadro);
     V.retomar = () => { if (V && !V.rodando) { V.rodando = true; t0 = performance.now(); V.raf = requestAnimationFrame(quadro); } };
   }
@@ -1892,20 +1958,24 @@
     const A = ACF(), t = A.textoChat ? A.textoChat(m) : { txt: m.t };
     let txt = String(t.txt || '').trim(); if (!txt) return;
     if (m.a === '_mestre') { legenda('Mestre', txt); return; }
-    const o = V.tok.mapa.get(m.a), tk = ((A.estado || {}).tokens || {})[m.a];
+    // Silêncio Absoluto (filhos.js): quem está surdo não ouve
+    if (window.ACF_FILHOS && ACF_FILHOS.chatBloqueado()) return;
+    // Mimetismo Vocal: a fala sai do token que imita (tk), não da cobaia imitada
+    const quemFala = m.tk && V.tok.mapa.get(m.tk) ? m.tk : m.a;
+    const o = V.tok.mapa.get(quemFala), tk = ((A.estado || {}).tokens || {})[quemFala];
     if (!o || !tk) return;                                   // fora da vista: nem balão nem voz
     if (txt.length > 150) txt = txt.slice(0, 147) + '…';
-    Baloes.lista.filter(b => b.id === m.a).forEach(tirarBalao);
+    Baloes.lista.filter(b => b.id === quemFala).forEach(tirarBalao);
     const el = document.createElement('div'); if (!CFG.baloes) el.style.display = 'none';
     el.className = 's3d-balao' + (t.cifrado ? ' cifrado ' + (t.cls || '') : '') + (m.d ? ' dado' : '');
     const trad = t.trad ? String(t.trad).trim() : '';
     el.innerHTML = `<b>${esc(A.rotulo(tk))}${t.lingua ? ` · ${esc(t.nome || 'língua desconhecida')}` : ''}</b><span>${esc(txt)}</span>` +
       (t.lingua ? (trad ? `<i class="s3d-trad">✦ ${esc(trad.length > 150 ? trad.slice(0, 147) + '…' : trad)}</i>` : '<i class="s3d-trad nao">Incompreensível. Só com Compreensão Paranormal.</i>') : '');
     V.d.appendChild(el);
-    Baloes.lista.push({ id: m.a, el, fim: performance.now() + Math.min(13000, 3800 + txt.length * 65) * (window.__acfLento || 1) });
+    Baloes.lista.push({ id: quemFala, el, fim: performance.now() + Math.min(13000, 3800 + txt.length * 65) * (window.__acfLento || 1) });
     // voz: C2P0 e Mostarda já falam pela regra do chat (app.js); os outros, com a voz escolhida
     if (!t.lingua && !m.d && window.ACF_VOZES) {
-      const s = A.SER[tk.s], voz = window.ACF_VOZES.vozDe(m.a, tk, s && s.tipo);
+      const s = A.SER[m.a] || A.SER[tk.s], voz = window.ACF_VOZES.vozDe(m.a, tk, s && s.tipo);
       const cp = V.camera.position, d = Math.hypot(o.x - cp.x, o.z - cp.z);
       const dur = window.ACF_VOZES.falar(voz, txt, { vol: Math.max(.18, 1 - d / (SALA_M * 2.4)) * (CFG.volVoz ?? 1), pan: panDe(o) });
       if (dur) { el.classList.add('falando'); setTimeout(() => el.classList.remove('falando'), dur * 1000); }
@@ -1980,13 +2050,16 @@
           const d = f.d, pvA = d.pv && d.pv.a !== undefined && d.pv.a !== '' ? int(d.pv.a) : int(d.pvMax), pvM = int(d.pvMax) || 1;
           h += `<div class="s3d-hab-vit"><span>PV ${pvA}/${pvM}</span><i style="--p:${Math.max(0, Math.min(100, pvA / pvM * 100))}%"></i><span>Def ${int(d.def)}</span><span>${esc(d.desl || '')}</span><span>VD ${int(d.vd)}</span></div>`;
         });
-        h += `<div class="s3d-hab-lista">${itens.map((it, i) => `<button type="button" data-hab="${i}" title="${esc(it.det)}">${kbd(i + 1)}<span>${it.tipo === 'atk' ? '⚔' : it.tipo === 'acao' ? '▶' : '✦'} ${esc(it.nome)}</span><small>${esc(it.tipo === 'atk' ? it.det : it.det.length > 70 ? it.det.slice(0, 68) + '…' : it.det)}</small></button>`).join('')}</div>
+        h += `<div class="s3d-hab-lista">${itens.map((it, i) => `<button type="button" data-hab="${i}" title="${esc(it.det)}">${kbd(i + 1)}<span>${it.tipo === 'atk' ? '⚔' : it.tipo === 'acao' ? '▶' : '✦'} ${esc(it.nome)}</span><small>${esc(it.tipo === 'atk' ? it.det : it.det.length > 70 ? it.det.slice(0, 68) + '…' : it.det)}</small></button>`).join('')}</div>`;
+        // características do Filho (filhos.js): os botões de habilidade do site
+        h += `${window.ACF_FILHOS ? ACF_FILHOS.htmlHab(V.ctrl) : ''}
           <div class="s3d-op">${fichas[0] ? `<button type="button" data-hab-ficha>📋 Ficha</button>` : ''}<button type="button" data-hab-soltar>Soltar o Controle</button></div>`;
       }
       if (el.dataset.h === h && !el.hidden) return;
       el.dataset.h = h; el.innerHTML = h; el.hidden = false; el.classList.toggle('recolhido', recolhido);
       $('[data-hab-min]', el).onclick = () => { recolhido = !recolhido; desenhar(); };
       el.querySelectorAll('[data-hab]').forEach(b => b.onclick = () => usar(itens[+b.dataset.hab]));
+      if (window.ACF_FILHOS) ACF_FILHOS.ligarHab(el, V.ctrl);
       const bf = $('[data-hab-ficha]', el); if (bf) bf.onclick = () => { if (document.pointerLockElement) document.exitPointerLock(); window.ACF_FICHAS.abrirAux(fichas[0].chave); };
       const bs = $('[data-hab-soltar]', el); if (bs) bs.onclick = () => { V.ctrl = null; V.ctrlMestre = null; definirModo('fora'); atualizar(); dica(); };
     }
@@ -2125,6 +2198,8 @@
     for (let p = 1; p <= 25; p++) { const cn = 25 * (a - 1) + p, c = cenaDe(cn); (c && c.itens || []).forEach((it, i) => { if (it.t === 'item_chao') out.push(`i_${cn}_${i}`); }); }
     return out;
   }
+  // formas das criaturas: as detalhadas (filhos3d.js) primeiro, depois as genéricas
+  const listaFormas = () => [...Object.entries(NS().formasFilho || {}).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, v.nome || k]), ...NS().FORMAS.map(f => [f, NS().NOMES_FORMA[f]])];
   function desenharPainel() {
     if (!V) return;
     const A = ACF(), p = $('#s3dPainel'), q = V.quem, a = V.a, e = A.estado || {};
@@ -2168,7 +2243,8 @@
         <button type="button" data-tk="seguir">🎥 Levar a câmera até ele</button>
         ${q === 'mestre' && sel.esq ? '<button type="button" data-tk="revelar">Tirar do esconderijo</button>' : ''}</div>
         ${q === 'mestre' ? htmlVoz(V.sel) : ''}
-        ${q === 'mestre' && s && s.tipo === 'filho' ? `<p class="mini">Forma da criatura no 3D</p><select data-forma>${NS().FORMAS.map(f => `<option value="${f}" ${((e.formas || {})[sel.s] || 'esguio') === f ? 'selected' : ''}>${esc(NS().NOMES_FORMA[f])}</option>`).join('')}</select>` : ''}</section>`;
+        ${q === 'mestre' && s && s.tipo === 'filho' ? `<p class="mini">Forma da criatura no 3D</p><select data-forma>${listaFormas().map(([f, nome]) => `<option value="${f}" ${((e.formas || {})[sel.s] || 'esguio') === f ? 'selected' : ''}>${esc(nome)}</option>`).join('')}</select>` : ''}
+        ${EXT().map(x => { try { return x.painelToken ? x.painelToken(V.sel, sel, q) || '' : ''; } catch (er) { return ''; } }).join('')}</section>`;
     } else h += '<section><h4>Tokens</h4><p class="mini">Toque num token para escolher: dá para controlá-lo com WASD (com as regras de distância) ou levar a câmera até ele.</p></section>';
     if (V.ctrl && V.ctrl !== V.sel && q !== 'jog') h += `<section><div class="s3d-op"><button type="button" data-tk="soltar">Soltar ${esc(A.rotulo((e.tokens || {})[V.ctrl] || {}))}</button></div></section>`;
     p.innerHTML = `<button type="button" class="s3d-painel-x" aria-label="Fechar o painel">✕</button>${h}`;
@@ -2184,6 +2260,7 @@
       desenharPainel();
     });
     const sf = p.querySelector('[data-forma]'); if (sf) sf.onchange = () => { A.definir(['formas', sel.s], sf.value); };
+    if (sel) EXT().forEach(x => { try { if (x.ligarPainel) x.ligarPainel(p, V.sel); } catch (er) {} });
     ligarVoz(p, desenharPainel);
     p.querySelectorAll('[data-itm]').forEach(b => b.onclick = () => {
       if (b.dataset.itm === 'tirar') { A.tirarItem3D(b.dataset.k); setTimeout(desenharPainel, 150); return; }
@@ -2248,6 +2325,8 @@
         ${chave('vinheta', 'Vinheta (bordas escuras)')}
         ${sel('nevoa', [[.6, 'Leve'], [1, 'Normal'], [1.6, 'Densa (mais medo)'], [2.4, 'Muito densa']], 'Névoa')}
         ${chave('poeira', 'Poeira no ar ↻')}
+        ${sel('fumaca', auto, 'Fumaça e névoa baixa que se movem')}
+        ${sel('cameras', [['auto', 'Automático'], ['alta', 'Ligadas (imagem melhor)'], ['baixa', 'Ligadas (leve)'], ['false', 'Desligadas']], 'Câmeras de segurança nos monitores')}
         ${sel('fps', [[0, 'Sem limite'], [60, '60 por segundo'], [30, '30 por segundo (economiza bateria)']], 'Limite de quadros')}
         ${chave('verFps', 'Mostrar quadros por segundo')}</section>`;
     } else if (abaOp === 'camera') {
@@ -2256,7 +2335,8 @@
         ${chave('balanco', 'Balanço da câmera ao andar e respirar')}
         ${faixa('sens', .2, 3, .05, 'Sensibilidade do mouse e do toque', v => (+v).toFixed(2).replace('.', ',') + '×')}
         ${chave('invY', 'Inverter o eixo vertical')}
-        ${chave('nomes', 'Nomes em cima dos personagens')}</section>`;
+        ${chave('nomes', 'Nomes em cima dos personagens')}
+        ${chave('enquadrar', 'Perseguição: no começo de cada vez, a câmera mostra quem está na vez')}</section>`;
     } else if (abaOp === 'controles') {
       const grupos = [['mov', 'Movimento'], ['jogo', 'Jogo'], ['atalho', 'Atalhos'], ['hab', 'Habilidades (Mestre e auxiliares no Controle de um Filho)']];
       h += `<p class="mini">Clique numa tecla e aperte a nova (vale botão do meio, direito ou lateral do mouse). Esc cancela. Setas sempre andam, Enter sempre abre o chat.</p>`;
@@ -2334,6 +2414,7 @@
     else if (pr.tipo === 'elevador') usarElevador(pr);
     else if (pr.tipo === 'item') { const r = ACF().pegarItemChao(pr.k, pr.nome); toast(r || `🎒 ${pr.nome} foi para a sua ficha.`); }
     else if (pr.tipo === 'int') { setTimeout(() => { if (V) V.mundo.atualizarInter(); }, 60); NS().inter.usar(pr.it, { quem: V.quem, ctrl: V.ctrl, toast, raiz: $('#s3d') || document.body, abrirPainel: () => { const pp = $('#s3dPainel'); if (pp) { if (document.pointerLockElement) document.exitPointerLock(); pp.hidden = false; desenharPainel(); } } }); }
+    else if (pr.tipo === 'ext') { if (document.pointerLockElement) document.exitPointerLock(); try { pr.usar(); } catch (e) { console.warn(e); } }
     else if (pr.tipo === 'doc') { if (document.pointerLockElement) document.exitPointerLock(); const AR = window.ACF_ARQUIVO; if (AR && AR.abrirNaSala) AR.abrirNaSala(pr.arq, pr.id); }
   }
 
@@ -2425,6 +2506,7 @@
     if (NS().inter) NS().inter.videoTirar();
     if (V) {
       V.rodando = false; cancelAnimationFrame(V.raf);
+      EXT().forEach(x => { try { x.fechar && x.fechar(); } catch (e) {} });
       removeEventListener('resize', V.tamanho);
       if (V.movendo && V.ctrl) { try { const q = plantaDe3D(V.a, V.cam.px, V.cam.pz); ACF().moverToken3D(V.ctrl, q.x, q.y, true); } catch (e) {} }
       try { V.tok.descartar(); } catch (e) {}
@@ -2537,7 +2619,10 @@
     _centro: p => V && V.mundo.centro(p),
     _cam: o => V && Object.assign(V.cam, o),
     _tok: id => V && V.tok.posDe(id),
+    _tokAp: id => { const o = V && V.tok.mapa.get(id); return o ? { ap: o.ap, rotulo: o.rotulo, espelho: o.t.g.scale.x < 0 } : null; },
+    _objsFil: (det) => (V && V.tok.objsFil ? [...V.tok.objsFil.values()].map(o => det ? { tipo: o.tipo, pos: [o.g.position.x, o.g.position.z], filhos: o.g.children.length, vis: o.g.visible } : o.tipo) : []),
     _v: () => V && { raf: V.raf, rodando: V.rodando, n: V.mundo.carregadas.size },
+    get _api() { return V ? V.api : null; },
     _mapa: { planta3D: (a, x, y) => (prepararMapa(), planta3D(a, x, y)), plantaDe3D: (a, x, z) => (prepararMapa(), plantaDe3D(a, x, z)) },
     Som
   };

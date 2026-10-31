@@ -102,6 +102,8 @@ function salaRevelada(andar, cn) {
 }
 // vista de um Filho (auxiliar no Controle, no 3D): escondido só aparece se falhou no teste (ou o Mestre liberou) e na mesma sala
 function visivelAoFilho(tk, filhoId) {
+  // características dos Filhos (filhos.js): sentidos trocam ou somam à visão padrão
+  if (window.ACF_FILHOS && tk && SER[tk.s]) { const r = ACF_FILHOS.percebe(filhoId, tk); if (r === true || r === false) return r; }
   if (!tk || !SER[tk.s] || !tk.esq) return true;
   const t = SER[tk.s].tipo; if (t !== 'cobaia' && t !== 'npc') return true;
   if (tk.vf) return true;
@@ -125,7 +127,10 @@ function visivelPara(tk) {
   if (v.mestre) return true;
   const tipo = SER[tk.s].tipo;
   if (tipo === 'espectro') return !!v.aux || (!!v.meu && tk.vis === v.meu);
-  if (v.aux) return true;
+  // auxiliar: vê tudo, a menos que esteja usando os sentidos de um Filho (filhos.js)
+  if (v.aux) return window.ACF_FILHOS ? ACF_FILHOS.veAux(tk) : true;
+  // ocultação especial dos Filhos (no teto, na parede, forma de objeto…): some para os jogadores
+  if (tipo !== 'cobaia' && (tk.oc || tk.fo || tk.pp)) return false;
   // escondido num esconderijo: só quem se escondeu (e o Mestre e os auxiliares) enxerga
   if (tk.esq && tk.s !== v.meu) return false;
   // apagão: o jogador só enxerga a própria ficha (salvo quem o Mestre liberou)
@@ -165,7 +170,8 @@ const CAMPOS_VAZIOS = () => ({ rev: {}, salas: {}, ruido: { q: 0, p: false }, pe
   portas: {}, relogio: null, fichas: {}, cego: {}, cfg: {}, nomes: {}, loja: {}, melhorias: {}, cond: {} });
 const estadoPadrao = () => ({ ...CAMPOS_VAZIOS(), tokens: posicoesIniciais() });
 // ficha que vai para o caminho privado (só Mestre e auxiliares leem): Filhos, NPCs e robôs ocultos
-const ehPrivado = tk => !!tk && !!tk.h && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia';
+// oc (ocultação especial), fo (forma de objeto) e pp (pedido de publicar do auxiliar) também ficam no privado
+const ehPrivado = tk => !!tk && !!SER[tk.s] && SER[tk.s].tipo !== 'cobaia' && (!!tk.h || !!tk.oc || !!tk.fo || !!tk.pp);
 const EMAIL_AUXILIARES = (typeof EMAIL_AUX !== 'undefined' ? EMAIL_AUX : 'auxiliares@caixa-acf.com').toLowerCase();
 let auxLogado = false;   // conta dos auxiliares conectada (Firebase)
 
@@ -268,6 +274,16 @@ const Store = {
 
   // caminho: ['tokens', id] ou ['rev', 'a1']; valor null apaga
   definir(caminho, valor) {
+    // auxiliar não cria token no mapa público: token que mora no privado e deixou de ser oculto
+    // fica no privado com "pp" (a tela do Mestre publica, como no robô)
+    // e não apaga token do mapa público: token público que ganhou forma de objeto ou ocultação especial continua
+    // público (os jogadores já não o desenham) até a tela do Mestre levar para o privado
+    let forcarPub = false;
+    if (aux && !mestre && this.modo === 'firebase' && caminho[0] === 'tokens' && caminho.length === 2 && valor) {
+      const naPub0 = !!(this.pub && this.pub.tokens && this.pub.tokens[caminho[1]]), naPriv0 = !!(this.privTok && this.privTok[caminho[1]]);
+      if (naPriv0 && !naPub0 && !ehPrivado(valor)) valor = { ...valor, pp: 1 };
+      else if (naPub0 && !valor.h && ehPrivado(valor)) forcarPub = true;
+    }
     // jogador e auxiliar: o site barra aqui o que o servidor recusaria
     if (!mestre) {
       const motivo = recusaLocal(caminho, valor);
@@ -286,7 +302,7 @@ const Store = {
         const naPub = !!(this.pub && this.pub.tokens && this.pub.tokens[id]);
         const naPriv = !!(this.privTok && this.privTok[id]);
         if (valor === null) ops = [naPub || !naPriv ? ['mapa/tokens/' + id, null] : null, naPriv ? ['privado/tokens/' + id, null] : null].filter(Boolean);
-        else if (ehPrivado(valor)) ops = [['privado/tokens/' + id, valor]].concat(naPub ? [['mapa/tokens/' + id, null]] : []);
+        else if (ehPrivado(valor) && !forcarPub) ops = [['privado/tokens/' + id, valor]].concat(naPub ? [['mapa/tokens/' + id, null]] : []);
         else ops = [['mapa/tokens/' + id, valor]].concat(naPriv ? [['privado/tokens/' + id, null]] : []);
       }
       const enviar = () => ops.forEach(([cam, v]) => this.db.ref(cam).set(v).catch(erroGravacao));
@@ -504,9 +520,11 @@ function recusaLocal(caminho, valor) {
   }
   // interações das salas do 3D (portão, luz, piano…): qualquer um, no formato da regra
   if (caminho[0] === 'inter' && caminho.length === 2) return /^c\d{1,3}_\d{1,3}$/.test(caminho[1]) && valor && (valor.v === 0 || valor.v === 1) && typeof valor.ts === 'number' ? '' : 'Interação inválida.';
+  // momento.js: encontro, câmeras de segurança, corpos e pilhas da lanterna são só do Mestre
+  if (['encontro', 'cameras', 'corpos', 'pilhas'].includes(caminho[0])) return 'Só o Mestre pode fazer isso.';
   if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
   // ferramentas que o Mestre divide com os auxiliares
-  if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas'].includes(caminho[0])) return '';
+  if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas', 'fil'].includes(caminho[0])) return '';
   if (aux && caminho[0] === 'cond' && caminho.length === 3 && ['_mt', '_et', '_ms'].includes(caminho[2])) return '';
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
   const atual = (Store.state.tokens || {})[caminho[1]];
@@ -520,6 +538,8 @@ function recusaLocal(caminho, valor) {
   if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover esse token.';
   const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
   if (!igual('s') || !igual('a') || !igual('h') || !igual('vf')) return 'Só o Mestre pode mudar o andar ou a ocultação de um token.';
+  // campos das características dos Filhos (forma de objeto, cópia, ocultação especial): só Mestre e auxiliares
+  if (!aux && ['fo', 'cp', 'cpd', 'oc', 'pi', 'rv', 'pp'].some(c => !igual(c))) return 'Só o Mestre pode fazer isso.';
   return '';
 }
 
@@ -1015,6 +1035,9 @@ function rotuloFicha(tk, id) {
   return rotuloBase(tk);
 }
 function rotuloBase(tk) {
+  // a cópia (filhos.js): para os jogadores, o nome é o da cobaia copiada
+  const ap = window.ACF_FILHOS && ACF_FILHOS.aparencia(tk);
+  if (ap) return ap.ser.nome;
   const s = SER[tk.s];
   if (s.tipo === 'filho') return tk.n > 1 ? `${s.codigo} ${s.nome} #${tk.n}` : `${s.codigo} ${s.nome}`;
   if (s.tipo === 'espectro') return tk.n > 1 ? `${s.nome} #${tk.n}` : s.nome;
@@ -1075,11 +1098,16 @@ function desenharFichas() {
     if (!visivelPara(tk)) return;
     vistos.add(id);
     let f = fichasDom.get(id);
+    // a cópia (filhos.js): para os jogadores, o token vira o da cobaia copiada, com o Detalhe escolhido pelo Mestre
+    const ap = window.ACF_FILHOS ? ACF_FILHOS.aparencia(tk) : null;
+    const apK = ap ? ap.ser.id + ':' + (ap.det || '') : '';
+    if (f && (f.dataset.ap || '') !== apK) { f.remove(); fichasDom.delete(id); f = null; }
     if (!f) {
-      const s = SER[tk.s];
-      f = el('div', 'ficha ' + s.tipo);
+      const s = ap ? ap.ser : SER[tk.s];
+      f = el('div', 'ficha ' + s.tipo + (ap && ap.det ? ' det-' + ap.det : ''));
+      f.dataset.ap = apK;
       f.dataset.id = id;
-      f.style.setProperty('--cor', s.cor);
+      f.style.setProperty('--cor', ap && ap.cor ? ap.cor : s.cor);
       // cor escura (ex.: preto): ganha um contorno claro para aparecer no mapa escuro
       if (s.contorno) { f.classList.add('escura'); f.style.setProperty('--contorno', s.contorno); }
       f.innerHTML = `<div class="ficha-sombra"></div>
@@ -1104,6 +1132,11 @@ function desenharFichas() {
     f.classList.toggle('escondida', !!tk.esq);
     f.classList.toggle('minha', !mestre && podeMover(tk));
     f.classList.toggle('vista-filhos', mestre && !!tk.vf);
+    // características dos Filhos: token que pisca (jogadores), ocultação especial e marca do sentido (Mestre e auxiliares)
+    f.classList.toggle('pisca-filho', !!tk.pi && !V().mestre && !V().aux);
+    f.classList.toggle('oculta-especial', (V().mestre || !!V().aux) && !!(tk.oc || tk.fo || tk.pp));
+    const sb = window.ACF_FILHOS ? ACF_FILHOS.marcaSentido(id, tk) : '';
+    if ((f.dataset.sentido || '') !== sb) { f.dataset.sentido = sb; f.title = sb ? 'Percebida pelo sentido: ' + sb : ''; }
     f.classList.toggle('selecionada', selecionado === id);
     f.classList.toggle('no-grupo', grupo.has(id));
     const cs = condicoesVisiveis(id);
@@ -1125,7 +1158,8 @@ function ligarArraste(f) {
     if (espiar) { selecionar(id); aviso('Volte à visão do Mestre para mover tokens.'); return; }
     if (mestre && e.shiftKey) { alternarGrupo(id); return; }
     if (!podeMover(tk)) { selecionar(id); return; }
-    const motivo = bloqueioPerseguicao(id, tk);
+    if (window.ACF_MOMENTO && ACF_MOMENTO.congelado && ACF_MOMENTO.congelado()) return;   // encontro: 2 s parado
+    const motivo = bloqueioPerseguicao(id, tk) || (window.ACF_FILHOS ? ACF_FILHOS.travado(id, tk) : '');
     if (motivo) { aviso(motivo); selecionar(id); return; }
     const p = telaParaPiso(e.clientX, e.clientY);
     const antes = { a: tk.a, x: tk.x, y: tk.y, m: tk.m || 0 };
@@ -1141,6 +1175,10 @@ function ligarArraste(f) {
     if (!arrastando || arrastando.id !== f.dataset.id) return;
     const tk = Store.state.tokens[arrastando.id];
     const p = telaParaPiso(e.clientX, e.clientY);
+    quemMove = arrastando.id;
+    try { moverArraste(tk, p); } finally { quemMove = null; }
+  });
+  function moverArraste(tk, p) {
     let alvo = { x: clamp(p.x + arrastando.dx, 0.3, W - 0.3), y: clamp(p.y + arrastando.dy, 0.3, H - 0.3) };
     const atual = { x: tk.x, y: tk.y };
     // paredes: não atravessa blocos maciços (só se a ficha já está num lugar andável)
@@ -1194,7 +1232,7 @@ function ligarArraste(f) {
       arrastando.ultimo = agora;
       Store.definir(['tokens', arrastando.id], { ...tk });
     }
-  });
+  }
   const fim = () => {
     if (!arrastando || arrastando.id !== f.dataset.id) return;
     const { id, andou, limitado, antes, outros } = arrastando;
@@ -1239,6 +1277,8 @@ function selecionarSala(cn) {
 /* Ganchos do cartão da sala: módulos extras (mesa.js, arquivo.js) acrescentam blocos
    ao cartão. g.mestre(cn) e g.publico(cn) devolvem HTML; g.ligar(c, cn, publico) liga os botões. */
 const ganchosSala = [];
+// ganchos no cartão de um token (momento.js: susto só para uma cobaia, lanterna, corpo): { html(id, tk), ligar(c, id) }
+const ganchosToken = [];
 function htmlGanchosSala(cn, publico) {
   return ganchosSala.map(g => { try { const f = publico ? g.publico : g.mestre; return f ? f(cn) || '' : ''; } catch (e) { console.warn(e); return ''; } }).join('');
 }
@@ -1506,12 +1546,14 @@ function desenharCartao() {
   delete c.dataset.sala;
   const tk = selecionado && Store.state.tokens[selecionado];
   if (!tk || !visivelPara(tk)) { c.hidden = true; return; }
-  const s = SER[tk.s];
-  c.style.setProperty('--cor', s.cor);
-  const foto = s.img ? `<img src="${s.img}" alt="">` : `<div class="cartao-bola"></div>`;
+  // a cópia (filhos.js): o jogador vê o cartão da cobaia copiada (com o Detalhe)
+  const apC = window.ACF_FILHOS ? ACF_FILHOS.aparencia(tk) : null;
+  const s = apC ? apC.ser : SER[tk.s];
+  c.style.setProperty('--cor', apC && apC.cor ? apC.cor : s.cor);
+  const foto = s.img ? `<img src="${s.img}" alt=""${apC && apC.det === 'espelho' ? ' class="espelhada"' : ''}>` : `<div class="cartao-bola"></div>`;
   let linhas = '';
   const fn = funcaoDe(s.id);
-  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}${fn ? `<br>Função: ${fn} <span class="so-mestre">só o Mestre vê</span>` : ''}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
+  if (s.tipo === 'cobaia') linhas = `<p>Interpretado por ${s.jogador}${fn && !apC ? `<br>Função: ${fn} <span class="so-mestre">só o Mestre vê</span>` : ''}</p>${!mestre && tk.s === meu ? '<p><strong>Esta é a sua cobaia.</strong> Arraste a ficha para movê-la.</p>' : ''}`;
   if (s.tipo === 'npc') linhas = fn ? `<p>Função: ${fn} <span class="so-mestre">só o Mestre vê</span></p>` : '';
   if (s.tipo === 'filho') linhas = `<p>Filho da O.R.F.E.U.</p>`;
   if (s.tipo === 'robo') linhas = `<p>Robô S.T.A.F.F. · não faz barulho</p>`;
@@ -1538,7 +1580,12 @@ function desenharCartao() {
   if (mestre && tk.esq && (s.tipo === 'cobaia' || s.tipo === 'npc')) acoes += `<div class="acoes"><p class="mini">👁 Escondido: ${tk.eo === 1 ? 'passou na Furtividade (os Filhos não veem)' : tk.eo === 0 ? 'falhou na Furtividade (os Filhos na sala veem)' : 'sem teste (os Filhos na sala veem)'}</p><button data-acao="eo">${tk.eo === 1 ? 'Marcar como falhou' : 'Marcar como passou'}</button></div>`;
   // Controle: Mestre e auxiliares assumem o Filho no 3D (em primeira pessoa, com as habilidades na tela)
   if ((s.tipo === 'filho' || s.tipo === 'espectro') && (mestre || aux) && !espiar) acoes += `<div class="acoes"><button data-acao="controle" class="btn-controle">🎮 Controle (3D)</button></div>`;
-  if (podeCor(s.id)) acoes += `<div class="acoes"><button data-acao="cor" class="btn-cor"><span class="pinta" style="--cor:${s.cor}"></span>Mudar a cor de ${esc(s.nome)}</button></div>`;
+  if (podeCor(s.id) && !apC) acoes += `<div class="acoes"><button data-acao="cor" class="btn-cor"><span class="pinta" style="--cor:${s.cor}"></span>Mudar a cor de ${esc(s.nome)}</button></div>`;
+  // características dos Filhos (filhos.js): botões do auxiliar e do Mestre; Desconfiar do jogador
+  const filC = window.ACF_FILHOS && !espiar ? ACF_FILHOS.htmlCartao(selecionado, tk) : '';
+  acoes += filC;
+  const gtk = espiar ? '' : ganchosToken.map(g => { try { return g.html ? g.html(selecionado, tk) || '' : ''; } catch (e) { console.warn(e); return ''; } }).join('');
+  acoes += gtk;
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
   const condMestre = mestre && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
@@ -1548,12 +1595,14 @@ function desenharCartao() {
   const abertos = c.dataset.ficha === selecionado ? $$('details', c).map(d => d.open) : [];
   c.dataset.ficha = selecionado;
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
-    <div class="cartao-topo">${foto}<div><h3>${titulo}</h3><span class="cod">${s.codigo}</span></div></div>
+    <div class="cartao-topo">${foto}<div><h3>${titulo}</h3><span class="cod">${apC && apC.codigo ? apC.codigo : s.codigo}</span></div></div>
     ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${condTxt}${fichaMinha}${acoes}${condMestre}${fichaEdit}`;
   c.hidden = false;
   $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
   if (fichaEdit) ligarEditarFicha(c, s.id);
   if (condMestre) ligarCondMestre(c, selecionado);
+  if (filC) ACF_FILHOS.ligarCartao(c, selecionado);
+  if (gtk) ganchosToken.forEach(g => { try { if (g.ligar) g.ligar(c, selecionado); } catch (e) { console.warn(e); } });
 
   $('.fechar', c).onclick = () => selecionar(null);
   const bcor = $('[data-acao="cor"]', c); if (bcor) bcor.onclick = () => Cores.escolher(s.id, bcor);
@@ -1827,7 +1876,35 @@ const NIVEIS = [
 // com a Pressurização Reversa comprada, o limite só rompe com uma cobaia a mais
 const nivelDe = n => n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : n === 5 ? 4 : (n === 6 && melhoriaAtiva('limite')) ? 4 : 5;
 // porta aberta ou código errado há pouco: conta como uma cobaia a mais na sala
-const barulhoEm = (a, p) => { const ts = (Store.state.barulho || {})[a + ':' + p]; return ts && Date.now() - ts < BARULHO_MS ? 1 : 0; };
+const barulhoEm = (a, p) => { const ts = (Store.state.barulho || {})[a + ':' + p]; return (ts && Date.now() - ts < BARULHO_MS ? 1 : 0) + barulhoInter(a, p); };
+// interações barulhentas do 3D (fliperama, piano, telefone, portão, máquina…) nos últimos 2 minutos: +1, como uma porta.
+// O estado é comum (mapa/inter), então todos os aparelhos fazem a mesma conta, sem gravar nada.
+const MODOS_RUIDO = new Set(['jogar', 'tocar']), SONS_RUIDO = /^(metal|porta|maquina|telefone|sino|piano|fliperama|radio|campainha)$/;
+function itemDaInter(k) {
+  const m = /^c(\d+)_(\d+)$/.exec(k); if (!m) return null;
+  const c = (Store.state.m3d || {})['c' + m[1]] || (mestre ? ((Segredos.dados || {})._3d || {})['c' + m[1]] : null);
+  return c && (c.itens || [])[+m[2]] || null;
+}
+const ruidoso = it => !!it && (MODOS_RUIDO.has(it.int) || (it.int === 'abrir' && SONS_RUIDO.test(it.intSom || '')) || (it.int === 'ligar' && /maquina|radio|fliperama/.test(it.intSom || '')));
+function barulhoInter(a, p) {
+  const pre = 'c' + cnDe(a, p) + '_', ag = Date.now();
+  return Object.entries(Store.state.inter || {}).some(([k, v]) => k.startsWith(pre) && v && ag - (v.ts || 0) < BARULHO_MS && ruidoso(itemDaInter(k))) ? 1 : 0;
+}
+// o Mestre fica sabendo na hora: "Barulho em CN 39 (Fliperama): algo pode ter ouvido"
+const interAvisadas = {};
+function avisarBarulhoInter() {
+  if (!mestre) return;
+  Object.entries(Store.state.inter || {}).forEach(([k, v]) => {
+    if (!v || interAvisadas[k] === v.ts) return;
+    const novo = interAvisadas[k] !== undefined || Date.now() - (v.ts || 0) < 15000;
+    interAvisadas[k] = v.ts;
+    const it = itemDaInter(k);
+    if (!novo || !ruidoso(it) || Date.now() - (v.ts || 0) > 15000) return;
+    const cn = +k.slice(1).split('_')[0];
+    aviso(`🔊 Barulho em CN ${String(cn).padStart(2, '0')} (${it.intN || it.t}): algo pode ter ouvido.`);
+  });
+}
+Store.aoMudar(avisarBarulhoInter);
 
 // agrupa as cobaias por sala (andar + posição). No corredor, cada uma conta sozinha.
 const isentos = new Set();   // cobaias na Zona Neutra (não contam)
@@ -2023,8 +2100,11 @@ const fmtM = v => (Math.round(v * 10) / 10).toFixed(1).replace('.', ',');
 function dentro(r, x, y, folga = 0) {
   return x >= r.x - folga && x <= r.x + r.w + folga && y >= r.y - folga && y <= r.y + r.h + folga;
 }
+// token que está sendo movido agora (as características dos Filhos limitam por onde ele passa)
+let quemMove = null;
 function andavel(andar, x, y) {
   if (bloqueadoPorPorta(andar, x, y)) return false;
+  if (quemMove && window.ACF_FILHOS && ACF_FILHOS.bloqueia(quemMove, andar, x, y)) return false;
   for (let p = 1; p <= 25; p++) if (dentro(retSala(p), x, y)) return true;
   for (const c of CORREDORES) if (dentro(c, x, y)) return true;
   const rs = retSaida(saidaDoAndar(andar));
@@ -2126,16 +2206,20 @@ const ordemP = () => (P().ordem ? Object.values(P().ordem) : []);
 function participante(id) { return P().on ? ordemP().find(o => o.id === id) : null; }
 function vezAtual() { const o = ordemP(); return P().on && o.length ? (o[P().vez || 0] || {}).id : null; }
 // limite em metros para quem está arrastando (null = sem limite)
+// limite do participante; as características dos Filhos (lento, dobrado, terreno alagado…) ajustam (filhos.js)
+const limPart = (id, pz) => { const l = pz.lim || 9; return window.ACF_FILHOS ? ACF_FILHOS.limite(id, l) : l; };
 function limiteDe(id) {
   const pz = participante(id);
   if (!pz || (mestre && movLivre)) return null;
-  return pz.lim || 9;
+  return limPart(id, pz);
 }
 function bloqueioPerseguicao(id, tk) {
   const pz = participante(id);
   if (!pz || (mestre && movLivre)) return '';
-  if (vezAtual() !== id) return 'Na perseguição, só quem está na vez se move.';
-  if ((tk.m || 0) >= (pz.lim || 9) - 0.001) return `Deslocamento esgotado (${pz.lim || 9} m). Use "Refazer rota" para voltar ao início.`;
+  // Regente (filhos.js): com o Filho que rege no andar, o auxiliar move mais um Filho por rodada fora da vez
+  if (vezAtual() !== id && !(window.ACF_FILHOS && ACF_FILHOS.regente(id, tk))) return 'Na perseguição, só quem está na vez se move.';
+  const lim = limPart(id, pz);
+  if ((tk.m || 0) >= lim - 0.001) return `Deslocamento esgotado (${fmtM(lim)} m). Use "Refazer rota" para voltar ao início.`;
   return '';
 }
 function nomeParticipante(id, paraJogador) {
@@ -2163,11 +2247,14 @@ function desenharSetup() {
     .sort((x, y) => ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[x[1].s].tipo) - ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[y[1].s].tipo));
   const antes = {};
   $$('#setupPersg .setup-linha').forEach(l => {
-    antes[l.dataset.id] = { ck: $('input.ck', l).checked, ini: $('input.ini', l).value, lim: $('input.lim', l).value };
+    antes[l.dataset.id] = { ck: $('input.ck', l).checked, ini: $('input.ini', l).value, lim: $('input.lim', l).value, m: $('input.lim', l).dataset.m || '' };
   });
   caixa.innerHTML = linhas.map(([id, tk]) => {
     const s = SER[tk.s];
-    const a0 = antes[id] || { ck: s.tipo === 'cobaia', ini: '', lim: '9' };
+    // Filho: o deslocamento vem da ficha ligada a ele (filhos.js); o resto, 9 m
+    const limF = s.tipo === 'filho' && window.ACF_FILHOS ? ACF_FILHOS.limPadrao(tk.s) : '';
+    const a0 = antes[id] ? { ...antes[id] } : { ck: s.tipo === 'cobaia', ini: '', lim: limF || '9' };
+    if (limF && !a0.m) a0.lim = limF;   // o Mestre ainda não mexeu no campo: vale o da ficha
     let ini = a0.ini, nota = '';
     if (tk.r && tk.r.ts > pedido && pedido) {
       if (tk.r.fora) nota = 'rola fora';
@@ -2178,10 +2265,11 @@ function desenharSetup() {
       ${bola(s)}<span class="setup-nome">${rotuloBase(tk)}${nota ? `<small>${nota}</small>` : ''}</span>
       <input class="ini" data-id="${id}" type="number" placeholder="ini" value="${ini}" aria-label="Iniciativa">
       <button class="dado-mini" data-id="${id}" title="Rolar a iniciativa">🎲</button>
-      <input class="lim" type="number" min="1" value="${a0.lim}" aria-label="Deslocamento em metros"><span class="m">m</span>
+      <input class="lim" type="number" min="1" value="${a0.lim}" data-m="${a0.m || ''}" aria-label="Deslocamento em metros"><span class="m">m</span>
     </div>`;
   }).join('') || '<p class="vazio">Ninguém neste andar.</p>';
   $$('#setupPersg .dado-mini').forEach(b => b.onclick = () => abrirDados(`Iniciativa: ${nomeParticipante(b.dataset.id)}`, b.dataset.id));
+  $$('#setupPersg input.lim').forEach(i => i.addEventListener('input', () => { i.dataset.m = '1'; }));
 }
 
 function desenharPerseguicao() {
@@ -2252,15 +2340,23 @@ function verificarPedidoIniciativa() {
 }
 
 $('#btnPedirIni').addEventListener('click', () => { Store.definir(['persg'], { ...P(), on: false, req: Date.now() }); aviso('Pedido enviado aos jogadores.'); });
+// começa a perseguição com a ordem dada ([{id, ini, lim}]); usado pelo botão e pelo Encontro (momento.js)
+function iniciarPerseguicao(ordem, extra) {
+  if (!mestre) return false;
+  ordem = (ordem || []).filter(o => o && Store.state.tokens[o.id]).map(o => ({ id: o.id, ini: +o.ini || 0, lim: Math.max(1, +o.lim || 9) })).sort((x, y) => y.ini - x.ini);
+  if (!ordem.length) return false;
+  Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1, vts: Date.now(), ...(extra || {}) });
+  iniciarTurno(ordem[0].id);
+  return true;
+}
 $('#btnIniciarPersg').addEventListener('click', () => {
   const ordem = $$('#setupPersg .setup-linha').filter(l => $('input.ck', l).checked).map(l => ({
     id: l.dataset.id,
     ini: parseInt($('input.ini', l).value, 10) || 0,
     lim: Math.max(1, parseFloat($('input.lim', l).value) || 9),
-  })).sort((x, y) => y.ini - x.ini);
+  }));
   if (!ordem.length) { aviso('Marque quem participa da perseguição.'); return; }
-  Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1, vts: Date.now() });
-  iniciarTurno(ordem[0].id);
+  iniciarPerseguicao(ordem);
 });
 $('#btnProxTurno').addEventListener('click', () => {
   const o = ordemP(); if (!o.length) return;
@@ -3109,11 +3205,11 @@ $('#arqBackup').addEventListener('change', async e => {
    cada aparelho, ao ver um carimbo novo, limpa o que guardou localmente.
    ========================================================= */
 // campos do mapa que são configuração (ficam); o resto é jogo e volta ao zero
-const MAPA_FICA = ['cfg', 'nomes', 'cego', 'loja', 'melhorias', 'regrasPub', 'senhasAndar', 'docs', 'cifras', 'hud', 'momentos', 'trancaAndar', 'trilha'];
+const MAPA_FICA = ['cfg', 'cameras', 'nomes', 'cego', 'loja', 'melhorias', 'regrasPub', 'senhasAndar', 'docs', 'cifras', 'hud', 'momentos', 'trancaAndar', 'trilha'];
 const REST_CATS = [
-  { id: 'mapa', n: 'Mapa e jogo', d: 'Tokens na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança.', on: true },
-  { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0 e do Mostarda, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões e entregas pendentes.', on: true,
-    nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas'] },
+  { id: 'mapa', n: 'Mapa e jogo', d: 'Tokens na posição inicial (NPCs e Filhos saem do mapa); portas, salas reveladas, ruído, perseguição, relógio, dia, condições, membrana, interlúdio, despensa, sala de exposição em andamento, dilema, tensão, holofote, abertura, ambiente e Balança; rastros, teias, raízes e usos das habilidades dos Filhos.', on: true, priv: ['filhosEstado'] },
+  { id: 'conversas', n: 'Conversas e respostas', d: 'Chat (Geral, Sussurros e Filhos), traduções da C2P0 e do Mostarda, sinais, avisos, pedidos ao Maurício, respostas a testes e dilemas, rolagens das salas, efeitos na tela, palpites de cifra, visões, sustos e sons dos Filhos e entregas pendentes.', on: true,
+    nos: ['chat', 'chatTrad', 'sinais', 'sinaisFilhos', 'avisos', 'pedidos', 'mesaResp', 'expoLog', 'efeito', 'cifraPalpite', 'visoes', 'entregas', 'filAcoes', 'filResp', 'filMsg', 'leituras', 'sustos', 'ecos3d'] },
   { id: 'registros', n: 'Registros', d: 'Relatório da missão, diário, noite secreta, marcas da noite, testes pedidos, Balança, total secreto das salas, histórico de NEX (o NEX inicial fica) e desejos da Parede.', on: true,
     nos: ['relatorio', 'desejos', 'nexCalc/ev'], seg: ['_diario', '_noite', '_marcas', '_testes', '_balanca', '_expoRun', '_nex'] },
   { id: 'hall', n: 'Hall da Caixa e conquistas obtidas', d: 'Episódios, estatísticas, salas superadas e as conquistas que cada cobaia ganhou. A lista de conquistas criadas fica.', on: false, nos: ['hall', 'conqJog'], seg: ['_conq/dadas'] },
@@ -3125,11 +3221,12 @@ const REST_CATS = [
   { id: 'loja', n: 'Loja do Maurício', d: 'Vendas criadas, melhorias, itens ocultos e imagens.', on: false, nos: ['lojaImg'], seg: ['_lojaOculta', '_melhOculta'], mapa: ['loja', 'melhorias'] },
   { id: 'quadros', n: 'Quadros', d: 'Quadros da equipe e tudo o que foi desenhado neles.', on: false, nos: ['quadrosMeta', 'quadrosItens'] },
   { id: 'prep', n: 'Gatilhos, cenas e anotações', d: 'Gatilhos das salas, cenas prontas, anotações das salas e salas sem sinal.', on: false, seg: ['_gatilhos', '_cenas', '_notas', '_semSinal', '_narrativa'] },
+  { id: 'filhos', n: 'Características dos Filhos', d: 'Sentidos, movimento, botões e enigma de cada Filho e as etiquetas das salas (o arquivo filhos-regras.json importa de novo).', on: false, priv: ['filhos', 'etiquetas'], seg: ['_filhos'] },
   { id: 'senhas', n: 'Senhas', d: 'A pasta Senhas e as senhas dos andares trocadas pelo site.', on: false, nos: ['senhas'], mapa: ['senhasAndar'] },
   { id: 'funcoes', n: 'Funções e nomes secretos das salas', d: 'As funções das cobaias, quem vê no apagão e os nomes secretos das salas.', on: false, seg: ['_apagao', '_apagaoVe', '*funcoes'], priv: ['salas', 'saidas', 'andares'] },
 ];
 // o que cada aparelho apaga ao ver o carimbo (o Caderno e as fichas ficam)
-const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-', 'acf-conq-vistas-'];
+const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-', 'acf-conq-vistas-', 'acf-sustos-'];
 function verRestauracao() {
   const r = Store.state.restauracao;
   if (!r || !r.ts) return;
@@ -3699,6 +3796,7 @@ function bloqueadoPorPorta(andar, x, y) {
     // porta fechada: nem o corredor dá para pisar. Só a ponta encostada na sala fica livre
     // (no sentido do comprimento); na largura, o corredor inteiro fica bloqueado
     if (portaAberta(andar, ci)) continue;
+    if (quemMove && window.ACF_FILHOS && ACF_FILHOS.ignoraPorta(quemMove, andar, ci)) continue;
     const c = CORREDORES[ci];
     const r = c.eixo === 'h' ? { x: c.x + 0.05, y: c.y - 0.01, w: c.w - 0.1, h: c.h + 0.02 } : { x: c.x - 0.01, y: c.y + 0.05, w: c.w + 0.02, h: c.h - 0.1 };
     if (dentro(r, x, y)) return true;
@@ -3880,8 +3978,9 @@ function desenharCartaoCorredor() {
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div><h3>Corredor</h3><span class="cod">${nomeC}</span></div></div>
     <p>Porta de ferro: <strong>${textoPorta(pub)}</strong> · 14 m</p>
-    ${acoes}${blocoMestre}`;
+    ${acoes}${blocoMestre}${window.ACF_FILHOS && !espiar ? ACF_FILHOS.htmlCorredor(andarAtual, ci) : ''}`;
   c.hidden = false;
+  if (window.ACF_FILHOS && !espiar) ACF_FILHOS.ligarCorredor(c, andarAtual, ci);
   $('.fechar', c).onclick = () => selecionar(null);
   const refazer = () => { montarAndar(); atualizarTudo(); };
   const form = $('.teclado-porta', c);
@@ -4082,6 +4181,7 @@ function imagemReduzida(arquivo, max = 1000) {
    ========================================================= */
 const Chat = {
   msgs: { geral: {}, sus: {}, filhos: {} },
+  locais: [],            // mensagens que só existem neste aparelho (momento.js: um nome sussurrado só para este jogador)
   enviados: [],          // sussurros que este aparelho mandou (só ele guarda)
   respostas: {},         // respostas do Mestre para este aparelho
   offs: [], chaveLigada: '', canal: 'geral', aberto: false, visto: {}, resp: null,
@@ -4137,6 +4237,7 @@ const Chat = {
     let l;
     if (c === 'sus' && !mestre) l = this.enviados.concat(Object.values(this.respostas || {}));
     else l = Object.entries(this.msgs[c] || {}).map(([k, m]) => (m ? { ...m, _k: k } : m));
+    if (c === 'geral' && !mestre && this.locais.length) l = l.concat(this.locais);
     return l.filter(m => m && m.ts).sort((x, y) => x.ts - y.ts).slice(-250);
   },
   // apaga uma mensagem do servidor (some para todos); resposta do Mestre sai também da caixa do jogador
@@ -4188,7 +4289,9 @@ const Chat = {
       const avatar = s ? `<span class="bola" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>` : '<span class="bola mestre-bola">M</span>';
       const para = mestre && c === 'sus' && m.para ? ` <small>→ ${esc(this.nomeDoCx(m.para))}</small>` : '';
       const btn = (mestre && c === 'sus' && m.cx && m.a !== '_mestre' ? `<button class="responder" data-cx="${esc(m.cx)}" data-nome="${esc(m.n || '')}">responder</button>` : '')
-        + (mestre && m._k ? `<button class="msg-lixo" data-k="${esc(m._k)}" title="Apagar esta mensagem para todos" aria-label="Apagar mensagem">🗑</button>` : '');
+        + (mestre && m._k ? `<button class="msg-lixo" data-k="${esc(m._k)}" title="Apagar esta mensagem para todos" aria-label="Apagar mensagem">🗑</button>` : '')
+        + (window.ACF_FILHOS ? ACF_FILHOS.btnMsg(m, c) : '');
+      if (m.local) return `<li class="msg-local"><span class="bola mestre-bola">?</span><div class="msg"><div class="msg-topo"><b>…</b><time>${hora(m.ts).slice(0, 5)}</time></div><div class="msg-txt"><i>${esc(m.t)}</i></div></div></li>`;
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
         ${ehBz(m) ? `<div class="msg-txt msg-bz ${linguaDe(m).cls}" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(falaDe(m))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
@@ -4200,6 +4303,7 @@ const Chat = {
       this.apagarMsg(c, b.dataset.k);
     });
     $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
+    $$('[data-desconfiar]', lista).forEach(b => b.onclick = () => { const m = this.lista(c).find(x => x._k === b.dataset.desconfiar); if (m && window.ACF_FILHOS) ACF_FILHOS.desconfiarMsg(m); });
     if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();
   },
@@ -4226,6 +4330,9 @@ const Chat = {
   enviar(texto, canal = this.canal, d = false) {
     texto = String(texto || '').trim().slice(0, 500);
     if (!texto || !this.chaveLigada) return;
+    // Silêncio Absoluto (filhos.js): a cobaia surda não manda mensagens (rolagens de dado continuam)
+    const surdo = !d && window.ACF_FILHOS ? ACF_FILHOS.chatBloqueado() : '';
+    if (surdo) { aviso(surdo); return false; }
     const m = { a: this.autorId(), n: this.autorNome(), t: texto, ts: Date.now() };
     if (d) m.d = true;
     else if (LINGUAS[m.a]) m.t = embaralhar(texto.slice(0, 360));
@@ -4823,11 +4930,17 @@ const INTENS = ['', 'baixo', 'médio', 'alto', 'forte', 'ensurdecedor'];
 function desenharEscuta(grupos) {
   if (!stage || !(aux && !mestre)) return;
   const agora = Date.now();
+  const FIL = window.ACF_FILHOS;
   grupos.forEach((gr, k) => {
     if (gr.a !== andarAtual) return;
-    const n = nivelDe(gr.ids.length + (gr.extra || 0)); if (!n) return;
-    const c = centroEco(gr, k); if (!c) return;
-    ecos[k] = { ...(ecos[k] || {}), a: gr.a, x: c.x, y: c.y, n, ts: agora };
+    // Silêncio Absoluto (filhos.js): o som das cobaias surdas some do mapa do auxiliar
+    const ids = FIL ? FIL.semSilenciados(gr.ids) : gr.ids;
+    const n = nivelDe(ids.length + (gr.extra || 0)); if (!n) return;
+    // sentidos do Filho em foco: audição precisa (sala exata), alcance, ou nada (null = escuta padrão)
+    const ouv = FIL ? FIL.ouve(gr, k, n) : null;
+    if (ouv === false) return;
+    const c = ouv && ouv.exata ? ouv.c : centroEco(gr, k); if (!c) return;
+    ecos[k] = { ...(ecos[k] || {}), a: gr.a, x: c.x, y: c.y, n, ts: agora, exata: !!(ouv && ouv.exata), teste: !!(ouv && ouv.teste), ids: ids.slice(), p: gr.p };
   });
   // manchas
   const vivas = new Set();
@@ -4839,6 +4952,7 @@ function desenharEscuta(grupos) {
     if (!d) { d = el('div', 'eco-zona'); d.dataset.k = k; stage.appendChild(d); }
     d.style.left = px(e.x); d.style.top = px(e.y);
     const atual = idade < 4000;
+    d.classList.toggle('exata', !!e.exata && atual);
     d.classList.toggle('rastro', !atual);
     d.style.setProperty('--som', atual ? e.n : 0);
     d.style.setProperty('--rastro', atual ? 1 : (1 - idade / RASTRO_MS).toFixed(2));
@@ -4846,7 +4960,8 @@ function desenharEscuta(grupos) {
   $$('.eco-zona', stage).forEach(d => { if (!vivas.has(d.dataset.k)) d.remove(); });
   // setas nos Filhos e no robô do auxiliar
   const atuais = Object.values(ecos).filter(e => e.a === andarAtual && agora - e.ts < 4000);
-  const ouvintes = Object.entries(Store.state.tokens || {}).filter(([id, tk]) => tk.a === andarAtual && SER[tk.s] && (SER[tk.s].tipo === 'filho' || tk.s === aux) && visivelPara(tk));
+  const fFoco = FIL ? FIL.foco : null;   // vista pelos sentidos de um Filho: só a seta dele
+  const ouvintes = Object.entries(Store.state.tokens || {}).filter(([id, tk]) => tk.a === andarAtual && SER[tk.s] && (SER[tk.s].tipo === 'filho' || tk.s === aux) && visivelPara(tk) && (!fFoco || id === fFoco));
   const setas = new Set();
   const linhas = [];
   ouvintes.forEach(([id, tk]) => {
@@ -4865,9 +4980,13 @@ function desenharEscuta(grupos) {
   $$('.eco-seta', stage).forEach(s => { if (!setas.has(s.dataset.id)) s.remove(); });
   const lista = $('#escutaAux');
   if (lista) {
-    const html = linhas.length ? linhas.join('') : `<li class="vazio">${atuais.length ? 'Coloque um Filho neste andar para saber a direção do som.' : 'Silêncio neste andar.'}</li>`;
-    if (lista.dataset.html !== html) { lista.innerHTML = html; lista.dataset.html = html; }
+    const extra = FIL ? FIL.linhasEscuta(atuais) : '';
+    const surdo = FIL ? FIL.semAudicao() : '';
+    const html = (linhas.length ? linhas.join('') : `<li class="vazio">${surdo || (atuais.length ? 'Coloque um Filho neste andar para saber a direção do som.' : 'Silêncio neste andar.')}</li>`) + extra;
+    if (lista.dataset.html !== html) { lista.innerHTML = html; lista.dataset.html = html; if (FIL) FIL.ligarEscuta(lista); }
   }
+  // o que os outros sentidos do Filho em foco percebem (faro, solidão, raízes, leitura…)
+  if (FIL) FIL.desenharSentidos(stage);
 }
 
 /* =========================================================
@@ -5729,7 +5848,7 @@ function desenharMochila() {
     <div class="mo-corpo">
       <ul class="mo-grade">${lista.length ? lista.map(i => `<li><button type="button" data-mo-it="${esc(i.id)}" class="${i.id === Mochila.sel ? 'on' : ''}${i.achado ? ' achado' : ''}" title="${esc(i.n)}"><i>${iconeItem(i)}</i><span>${esc(i.n)}</span>${i.qtd > 1 ? `<b>×${i.qtd}</b>` : ''}${i.cat ? `<small>${mo.ROM[i.cat]}</small>` : ''}</button></li>`).join('') : '<li class="mo-vazio">Nada aqui.</li>'}</ul>
       <aside class="mo-det">${sel ? `<h4>${iconeItem(sel)} ${esc(sel.n)}${sel.qtd > 1 ? ` ×${sel.qtd}` : ''}</h4>
-        <p class="mo-tags">${[sel.cat ? 'Categoria ' + mo.ROM[sel.cat] : 'Categoria 0', 'Espaço ' + String(sel.esp).replace('.', ','), sel.dano ? 'Dano ' + esc(sel.dano) : '', sel.el ? esc(sel.el) : '', sel.vest ? 'Vestido' : '', sel.achado ? 'Achado na Caixa' : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('')}</p>
+        <p class="mo-tags">${[sel.cat ? 'Categoria ' + mo.ROM[sel.cat] : 'Categoria 0', 'Espaço ' + String(sel.esp).replace('.', ','), sel.dano ? 'Dano ' + esc(sel.dano) : '', sel.el ? esc(sel.el) : '', sel.vest ? 'Vestido' : '', sel.bat !== undefined ? `🔋 Bateria ${Math.round(sel.bat)}%` : '', sel.achado ? 'Achado na Caixa' : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('')}</p>
         <p class="mo-desc">${esc(sel.d || 'Sem descrição.')}</p>
         <div class="mo-acoes">${sel.usavel ? `<button type="button" class="pri" data-mo="usar" data-id="${esc(sel.id)}">Usar (${esc(sel.uso.x)} ${esc(String(sel.uso.rec).toUpperCase())})</button>` : ''}${sel.vestivel ? `<button type="button" data-mo="vestir" data-id="${esc(sel.id)}">${sel.vest ? '🦺 Tirar (ação completa)' : '🦺 Vestir (ação completa)'}</button>` : ''}<button type="button" data-mo="ficha">📋 Ver na ficha</button></div>` : '<p class="mo-vazio">Toque num item para ver os detalhes.</p>'}</aside>
     </div>
@@ -6062,6 +6181,12 @@ function moverToken3D(id, x, y, fim) {
   if (!podeMover(tk)) return { ok: false, motivo: meu ? 'Você só pode mover o token da sua cobaia.' : 'Você não pode mover esse token.' };
   const motivo = bloqueioPerseguicao(id, tk);
   if (motivo) return { ok: false, motivo, persg: true };
+  const trava = window.ACF_FILHOS ? ACF_FILHOS.travado(id, tk) : '';
+  if (trava) return { ok: false, motivo: trava, persg: true };
+  quemMove = id;
+  try { return moverToken3DLivre(id, tk, x, y, fim); } finally { quemMove = null; }
+}
+function moverToken3DLivre(id, tk, x, y, fim) {
   const atual = { x: tk.x, y: tk.y };
   let alvo = { x: clamp(x, 0.3, W - 0.3), y: clamp(y, 0.3, H - 0.3) };
   if (Math.hypot(alvo.x - atual.x, alvo.y - atual.y) < 0.004 && !fim) return { ok: true, x: tk.x, y: tk.y, m: tk.m || 0, lim: limiteDe(id) };
@@ -6183,6 +6308,10 @@ window.ACF = {
   get segredosProntos() { return mestre && Segredos.pronto; },
   gravarSegredo: (c, v) => { if (mestre) Segredos.gravar(c, v); },
   ganchoSala: g => { ganchosSala.push(g); },
+  ganchoToken: g => { ganchosToken.push(g); },
+  iniciarPerseguicao: (o, x) => iniciarPerseguicao(o, x),
+  chatLocal(m) { if (!m || !m.t) return; Chat.locais.push({ a: '', n: '', t: String(m.t).slice(0, 200), ts: m.ts || Date.now(), local: true }); Chat.locais = Chat.locais.slice(-20); Chat.atualizar(); },
+  get selecionado() { return selecionado; }, selecionar: id => selecionar(id), abrirDados: (t, id) => abrirDados(t, id),
   ganchoChat: f => { ganchosChat.push(f); },
   redesenharCartao: () => { if (salaSel) desenharCartao(); },
   redesenharChat: () => { if (Chat.aberto) Chat.desenhar(); },
@@ -6213,6 +6342,17 @@ window.ACF = {
   // elevador, itens do chão, metros e chat no 3D
   podeVer: a => podeVer(a), naSaida, get salaSel() { return salaSel; }, metros: () => Metros.total, zerarMetros, levarElevador, pedirElevador, tokensNaSaida, pegarItemChao, postarRolagem, postarRolagemSecreta,
   custoMetros: (a, b) => custoMetros(a, b), fmtM,
+  // peças internas para as características dos Filhos (filhos.js)
+  _int: {
+    Priv, Store, Chat, Segredos, V: () => V(), stage, px, el, cnDe, salaEm, retSala, corredorEm: (x, y) => corredorEm(x, y), CORREDORES, R, G, T,
+    gruposDeSala: () => gruposDeSala(), nivelDe: n => nivelDe(n), P: () => P(), vezAtual: () => vezAtual(), participante: id => participante(id),
+    custoMetros: (a, b) => custoMetros(a, b), rumo: (dx, dy) => rumo(dx, dy), salaRevelada: (a, cn) => salaRevelada(a, cn), descreveLocal: tk => descreveLocal(tk),
+    selecionar: id => selecionar(id), desenharCartao: () => desenharCartao(), atualizarTudo: () => atualizarTudo(), get selecionado() { return selecionado; },
+    get andarAtual() { return andarAtual; }, get espiar() { return espiar; }, apagao: () => apagaoAtivo(), portaAberta: (a, ci) => portaAberta(a, ci),
+    andavel: (a, x, y) => andavel(a, x, y), erroGravacao, rotuloBase: tk => rotuloBase(tk), postarRolagemSecreta: t => postarRolagemSecreta(t),
+    get quemMove() { return quemMove; }, ehPrivado: tk => ehPrivado(tk), CENTRO_ZN,
+    limparEcos: () => { Object.keys(ecos).forEach(k => delete ecos[k]); if (aux && !mestre) desenharEscuta(gruposDeSala()); },
+  },
   // texto de uma mensagem do chat como ESTE aparelho pode ler (C2P0 e Mostarda: só com o ritual, Mestre e auxiliares)
   textoChat(m) {
     if (!m) return { txt: '' };
