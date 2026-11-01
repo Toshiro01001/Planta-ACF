@@ -6198,7 +6198,7 @@
         if (piso) { g.add(malha(curva([[.2, .16, -.39], [.21, .06, -.405], [.22, .012, -.41]], .007, 8, 4), m('#111'))); g.add(malha(ret(.09, .012, .05, .22, 0, -.405), metal('#6a6a64'))); }
         else { g.add(malha(curva([[.2, .16, -.39], [.22, .05, -.41], [.24, .02, -.418], [.25, .2, -.418], [.25, .3, -.42]], .007, 14, 4), m('#111'))); g.add(juntar([ret(.08, .12, .015, .25, .24, -.4325)], m('#e8e4d8', { r: .5 }))); }
         // estado: atração, partida, game over
-        const st = { nomes: o.nomes || ['AAA', 'MAX', 'ZEN', 'BOB', 'JOE'], chama: !!o.chama };
+        const st = { nomes: o.nomes || ['BOB', 'MAX', 'ZEN', 'AAA', 'JOE'], chama: !!o.chama };
         let partida = -1, acc = 0, tl = (o.sem || 1) * 3.7;
         if (tv) anim.push(dt => { tl += dt; if (partida >= 0) { partida += dt; if (partida > 20.5) partida = -1; } acc += dt; if (acc < .1) return; acc = 0; flTela(tv.x, J, partida, tl, st); tv.t.needsUpdate = true; });
         if (queb) { const lmM = let1; anim.push((dt, t) => { const k = Math.sin(t * 7.3) > .3 || Math.sin(t * 23) > .9 ? .15 : 1; brilho(lmM, k); }); }

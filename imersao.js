@@ -760,6 +760,8 @@ const Resumo = {
     if (rel && rel.pistas && rel.pistas.length) L.push(`🔎 Pistas: ${rel.pistas.slice(0, 8).join(' | ')}`);
     if (sustos) L.push(`👁 Sustos: ${sustos}`);
     if (marcas) L.push(`🩸 Marcas deixadas na Caixa: ${marcas}`);
+    // linhas de outros módulos (perseg3d.js: replays das perseguições), sem citar Filhos nem salas
+    (window.ACF_RESUMO_EXTRA || []).forEach(f => { try { const x = f(ini, fim); if (x) [].concat(x).forEach(l => L.push(String(l))); } catch (e) {} });
     return L.join('\n');
   },
   async abrir(en) {

@@ -408,7 +408,7 @@ function travado(id, tk) {
   if (!tk || !ehFilho(tk) || !regraVale(id)) return '';
   if (tk.dc) return 'Imagem falsa (interferência): não se move.';
   const c = cfgTk(tk); if (!c) return '';
-  if (tk.fo) return 'Em forma de objeto: volte à forma normal para se mover.';
+  if (tk.fo) { const tr = window.ACF_DISFARCE ? ACF_DISFARCE.travaObjeto(id, tk) : null; if (tr !== '') return tr || 'Em forma de objeto: volte à forma normal para se mover.'; }   // disfarce3d.js: "só se move quando ninguém olha"
   if (c.mov === 'imovel') return 'Este Filho não se move no mapa (imóvel).';
   if (c.mov === 'escuro') { const cn = cnTk(tk); const corrEsc = !cn && (I().apagao() || (est().luz || {})['a' + tk.a] === 'off'); if (!(cn ? escuroEm(tk.a, cn) : corrEsc)) return 'Só se move no escuro: este lugar está iluminado.'; }
   const tv = (ef().trava || {})[id];
@@ -678,8 +678,8 @@ const USAR = {
     escolher('Forma de Objeto', OBJETOS.map(([k, n]) => [k, n]), o => {
       const t2 = tokens()[id]; if (!t2) return;
       const obk = 'o' + novaChave().slice(-10);
+      gravarEstado(['obj', id], obk);   // o dono antes do objeto: a limpeza da tela do Mestre não apaga objeto sem dono
       gravarPub(['ob', obk], { a: t2.a, x: t2.x, y: t2.y, o, ts: agora() });
-      gravarEstado(['obj', id], obk);
       A().definir(['tokens', id], { ...t2, fo: o });
       logFilhos(`${rotuloGM(t2)} virou objeto (${o})`);
     });
@@ -824,6 +824,7 @@ function usar(id, k) {
   const c = cfgTk(tk) || {};
   if (!hab(c, k) && !souMestre()) return A().aviso('Este Filho não tem essa habilidade.');
   const b = bloqueioUso(id, c, k); if (b) return A().aviso(b);
+  if (window.ACF_DISFARCE && ACF_DISFARCE.usar(id, k, tk, c)) return;   // disfarce3d.js: objeto e cópia (modo Disfarce no 3D)
   let r;
   try { r = USAR[k](id, tk, c); } catch (e) { console.warn('filhos:', k, e); return A().aviso('Não deu para usar agora.'); }
   if (typeof r === 'string') { if (limiteHab(c, k) && k !== 'enraizar' && k !== 'atravessar') marcarUso(id, k); logFilhos(`${rotuloGM(tk)} · ${r}`); A().aviso('✦ ' + r); }
@@ -1766,6 +1767,7 @@ const Motor = {
       if (!x || agora() - (x.ts || 0) > 600000) { A().Rede.set('filAcoes/' + k, null).catch(() => {}); return; }
       const p = x.cn - 25 * (x.a - 1);
       if (x.t === 'flash') this.flash(x, p);
+      if (x.t === 'reparar' && window.ACF_DISFARCE) ACF_DISFARCE.aoReparar(x);   // disfarce3d.js: Reparar (Diário)
       Object.entries(tokens()).forEach(([id, tk]) => {
         if (!ehFilho(tk) || tk.dc || tk.a !== x.a) return;
         const c = cfgTk(tk); if (!c) return;
@@ -1891,15 +1893,59 @@ function extraFicha(id, tk) {
 function visivelJogador(tk) { return !(ehFilho(tk) && lenteOculto(tk) && !lenteMinha()); }
 const foraDoEncontro = tk => !!(tk && (tk.dc || lenteOculto(tk)));
 
+/* ---------- Visão da criatura (visao3d.js): o que os sentidos de um Filho mostram, sem gravar nada ---------- */
+// como o Filho percebe uma cobaia/NPC: { ve: pela vista, s: sentido que dá a posição exata ('' se nenhum) }; null sem características
+function comoPercebe(filhoId, tk) {
+  const f = tokens()[filhoId], t = tipoDe(tk);
+  if (!f || !ehFilho(f) || !tk || (t !== 'cobaia' && t !== 'npc')) return null;
+  const c = cfgTk(f); if (!c) return null;
+  if (tk.a !== f.a) return { ve: false, s: '' };
+  const s = sentidoExato(f, c, idDe(tk) || tk.s, tk);
+  return { ve: enxerga(f, c, tk), s, machucada: machucada(tk), faroCurto: sent(c, 'faro_curto') };
+}
+// sons das salas (a mesma conta da escuta do auxiliar, sem o pedido de teste nem o movimento dobrado), faro, trilha e leitura
+function sentidosDe(filhoId) {
+  const f = tokens()[filhoId]; if (!f || !ehFilho(f)) return null;
+  const c = cfgTk(f), a = f.a, out = { cfg: !!c, sent: c ? Object.keys(c.sent || {}).filter(k => c.sent[k]) : [], sons: [], faro: [], trilha: [], leitura: [] };
+  const precisa = sent(c, 'audicao_precisa');
+  if (!c || sent(c, 'audicao') || precisa) {
+    let alc = (c && +c.alcAud) || ALC_LONGO; const cf = cnTk(f);
+    if (c && sent(c, 'audicao_agua') && cf && tagsSala(cf).agua) alc *= 2;
+    I().gruposDeSala().forEach((gr, k) => {
+      if (gr.a !== a) return;
+      const n = I().nivelDe(semSilenciados(gr.ids).length + (gr.extra || 0)); if (!n) return;
+      const tc = gr.p ? null : tokens()[String(k).slice(5)];
+      const centro = gr.p ? centroSala(gr.p) : tc ? { x: tc.x, y: tc.y } : null; if (!centro) return;
+      const r = gr.p ? I().retSala(gr.p) : null, alvo = r ? { x: Math.max(r.x, Math.min(r.x + r.w, f.x)), y: Math.max(r.y, Math.min(r.y + r.h, f.y)) } : centro;
+      const d = metros({ x: f.x, y: f.y }, alvo);
+      const exata = precisa && !!gr.p && (n >= 3 || (n === 2 && d <= ALC_MEDIO));
+      if (!precisa && d > alc) return;
+      out.sons.push({ k: String(k), x: centro.x, y: centro.y, n, exata, p: gr.p || 0 });
+    });
+  }
+  if (sent(c, 'faro')) cobaiasNoAndar(a).forEach(([cid, t]) => { if (!machucada(t)) return; const p = salaP(t), q = p ? centroSala(p) : { x: t.x, y: t.y }; out.faro.push({ id: cid, x: q.x, y: q.y }); });
+  if (sent(c, 'leitura')) Object.values(leituras).forEach(l => { if (l && l.a === a && agora() - (l.ts || 0) <= LEITURA_MIN * 60e3) out.leitura.push({ x: l.x, y: l.y, ts: l.ts }); });
+  if (sent(c, 'trilha')) {
+    const lim = (int(c.trilhaMin) || TRILHA_MIN) * 60e3;
+    cobaiasNoAndar(a).forEach(([cid]) => {
+      const pts = Object.values(((ef().trilha || {})[cid]) || {}).filter(v => v && v.a === a && agora() - (v.ts || 0) < lim).sort((x, y) => x.ts - y.ts).map(v => ({ cn: v.cn, ts: v.ts }));
+      if (pts.length) out.trilha.push({ id: cid, cor: (SERd(cid) || {}).cor || '#ffffff', pts, lim });
+    });
+  }
+  return out;
+}
+
 window.ACF_FILHOS = {
   // ganchos usados por app.js e sala3d.js
   percebe, veAux, marcaSentido, ouve, semSilenciados, semAudicao, linhasEscuta, ligarEscuta, desenharSentidos, chatBloqueado,
   limite, travado, bloqueia, ignoraPorta, regente, aparencia, htmlCartao, ligarCartao, htmlCorredor, ligarCorredor,
   btnMsg, desconfiarMsg, htmlHab, ligarHab, usar, leu, limPadrao, atravessa, extraFicha, visivelJogador, foraDoEncontro, chipsDe, htmlChips,
   // para testes e outras telas
-  get foco() { return focoAtual(); }, definirFoco, cfgDe, cfgTk, Editor, ETIQUETAS, tagsSala, tagsCorr, marcasVivas, exatos, Motor, HABS, SENTIDOS, OBJETOS,
+  get foco() { return focoAtual(); }, definirFoco, cfgDe, cfgTk, Editor, ETIQUETAS, tagsSala, tagsCorr, marcasVivas, exatos, Motor, HABS, SENTIDOS, OBJETOS, DETALHES,
   // modo foto do imersao.js: o mesmo Flash do botão (câmera ou celular na ficha ativa, 1 por cena)
   dispararFlash, flashPronto: () => !!itemDe(RX_FLASH) && flashCena !== cena() && !!meuLugar(),
+  // visão da criatura (visao3d.js)
+  comoPercebe, sentidosDe,
 };
 iniciar();
 })();
