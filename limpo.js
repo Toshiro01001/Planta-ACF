@@ -2,7 +2,8 @@
    - visual enxuto por padrão (body.hud-limpo); "Visual clássico" volta ao antigo neste aparelho
    - câmera: só +, −, centralizar e "⋯" (o resto abre no ⋯)
    - dica do mapa só nas primeiras visitas
-   - painel: barra com busca (Mestre e auxiliares), recolher/abrir tudo, ★ favoritos no topo e ⚙ aparência */
+   - painel: barra com busca (Mestre e auxiliares), recolher/abrir tudo, ☰ lista de ferramentas ou todos os blocos (paineis.js),
+     ★ favoritos no topo e ⚙ aparência */
 (() => {
   'use strict';
   const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -41,11 +42,15 @@
   barra.innerHTML = `<input type="search" id="painelBusca" class="painel-busca" placeholder="Procurar ferramenta…" aria-label="Procurar no painel" autocomplete="off">
     <button type="button" class="pb-btn" data-pb="recolher" title="Recolher todos os blocos" aria-label="Recolher todos os blocos">⊟</button>
     <button type="button" class="pb-btn" data-pb="abrir" title="Abrir todos os blocos" aria-label="Abrir todos os blocos">⊞</button>
+    <button type="button" class="pb-btn" data-pb="modo" title="Ver todos os blocos de uma vez" aria-label="Alternar entre lista de ferramentas e todos os blocos abertos">☰</button>
     <button type="button" class="pb-btn" data-pb="cfg" title="Aparência" aria-label="Aparência" aria-expanded="false">⚙</button>
     <div class="pb-menu" hidden>
       <b>Aparência neste aparelho</b>
       <label class="chave"><input type="radio" name="pbVisual" value="limpo"><span>Limpo (menos coisas na tela)</span></label>
       <label class="chave"><input type="radio" name="pbVisual" value="classico"><span>Clássico (o visual anterior)</span></label>
+      <b>Painel</b>
+      <label class="chave"><input type="radio" name="pbModo" value="lanc"><span>Lista de ferramentas (toque para abrir)</span></label>
+      <label class="chave"><input type="radio" name="pbModo" value="tudo"><span>Todos os blocos abertos, um embaixo do outro</span></label>
       <div class="pb-linha"><button type="button" class="btn-fantasma" data-pb="som">🔊 Som</button><button type="button" class="btn-fantasma" data-pb="ajuda">? Ajuda</button></div>
       <p class="mini">★ no título de um bloco o leva para o topo do painel.</p>
     </div>`;
@@ -62,11 +67,12 @@
     painel.classList.toggle('buscando', !!q);
     // primeiro pelo título do bloco; se nenhum título bate, procura no conteúdo
     const blocos = $$('.painel > .bloco');
-    if (!q) { blocos.forEach(b => b.classList.remove('fora-busca', 'achou')); return; }
+    if (!q) { blocos.forEach(b => b.classList.remove('fora-busca', 'achou')); document.dispatchEvent(new Event('acf-pn-busca')); return; }
     const tit = b => { const h = $('h2', b); return semAcento(h ? h.textContent : ''); };
     const porTitulo = blocos.filter(b => tit(b).includes(q));
     const lista = porTitulo.length ? porTitulo : blocos.filter(b => semAcento(b.textContent).includes(q));
     blocos.forEach(b => { const ok = lista.includes(b); b.classList.toggle('fora-busca', !ok); b.classList.toggle('achou', ok && porTitulo.length > 0); });
+    document.dispatchEvent(new Event('acf-pn-busca'));
   };
   busca.addEventListener('input', filtrar);
   busca.addEventListener('keydown', e => { if (e.key === 'Escape') { busca.value = ''; filtrar(); } });
@@ -79,9 +85,20 @@
     if (b.dataset.pb === 'abrir') blocosVisiveis().forEach(x => { if (x.classList.contains('fechado')) $('h2.dobra', x).click(); });
     if (b.dataset.pb === 'som' && $('#btnSom')) { $('#btnSom').click(); }
     if (b.dataset.pb === 'ajuda' && $('#btnAjuda')) { $('.pb-menu', barra).hidden = true; $('#btnAjuda').click(); }
-    if (b.dataset.pb === 'cfg') { const m = $('.pb-menu', barra); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); $$('input[name="pbVisual"]', m).forEach(i => { i.checked = i.value === (ls.get('acf-visual', 'limpo') === 'classico' ? 'classico' : 'limpo'); }); }
+    if (b.dataset.pb === 'modo') { ls.set('acf-pn-modo', ls.get('acf-pn-modo', 'lanc') === 'tudo' ? 'lanc' : 'tudo'); ajustarModo(); document.dispatchEvent(new Event('acf-pn')); }
+    if (b.dataset.pb === 'cfg') { $$('input[name="pbModo"]', barra).forEach(i => { i.checked = i.value === ls.get('acf-pn-modo', 'lanc'); }); const m = $('.pb-menu', barra); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); $$('input[name="pbVisual"]', m).forEach(i => { i.checked = i.value === (ls.get('acf-visual', 'limpo') === 'classico' ? 'classico' : 'limpo'); }); }
   });
-  barra.addEventListener('change', e => { if (e.target.name === 'pbVisual') { ls.set('acf-visual', e.target.value); aplicarVisual(); } });
+  barra.addEventListener('change', e => {
+    if (e.target.name === 'pbVisual') { ls.set('acf-visual', e.target.value); aplicarVisual(); document.dispatchEvent(new Event('acf-pn')); }
+    if (e.target.name === 'pbModo') { ls.set('acf-pn-modo', e.target.value); ajustarModo(); document.dispatchEvent(new Event('acf-pn')); }
+  });
+  // painel como lançador (paineis.js) ou todos os blocos abertos: o botão ☰/▦ mostra para onde ele leva
+  function ajustarModo() {
+    const lanc = ls.get('acf-pn-modo', 'lanc') !== 'tudo', bt = $('[data-pb="modo"]', barra);
+    bt.textContent = lanc ? '☰' : '▦'; bt.title = lanc ? 'Ver todos os blocos de uma vez' : 'Voltar à lista de ferramentas';
+    barra.classList.toggle('pb-lanc', lanc);
+  }
+  ajustarModo();
   document.addEventListener('click', e => { const m = $('.pb-menu', barra); if (!m.hidden && !barra.contains(e.target)) { m.hidden = true; $('[data-pb="cfg"]', barra).setAttribute('aria-expanded', 'false'); } });
 
   // ★ favoritos: estrela no título; os marcados sobem para o topo do painel
