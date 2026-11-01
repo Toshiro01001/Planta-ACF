@@ -1898,6 +1898,8 @@ window.ACF_FILHOS = {
   btnMsg, desconfiarMsg, htmlHab, ligarHab, usar, leu, limPadrao, atravessa, extraFicha, visivelJogador, foraDoEncontro, chipsDe, htmlChips,
   // para testes e outras telas
   get foco() { return focoAtual(); }, definirFoco, cfgDe, cfgTk, Editor, ETIQUETAS, tagsSala, tagsCorr, marcasVivas, exatos, Motor, HABS, SENTIDOS, OBJETOS,
+  // modo foto do imersao.js: o mesmo Flash do botão (câmera ou celular na ficha ativa, 1 por cena)
+  dispararFlash, flashPronto: () => !!itemDe(RX_FLASH) && flashCena !== cena() && !!meuLugar(),
 };
 iniciar();
 })();

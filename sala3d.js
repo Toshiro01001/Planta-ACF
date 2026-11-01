@@ -85,6 +85,8 @@
     volAmb: 1, volVoz: 1, teclas: {},
     // momento.js: câmera de turno na perseguição, monitores de segurança e fumaça baixa
     enquadrar: true, cameras: 'auto', fumaca: 'auto',
+    // imersao.js: qualidade automática, coração e respiração do personagem, vibração do celular
+    autoQual: true, coracao: true, vibrar: true,
   };
   const CFG = Object.assign({}, CFG_PAD, lsG('acf-s3d-cfg', {}) || {});
   CFG.teclas = Object.assign({}, (lsG('acf-s3d-cfg', {}) || {}).teclas || {});
@@ -1479,6 +1481,7 @@
     [['btnRegras', '📖', 'Regras'], ['btnHall', '🏛', 'Hall da Caixa'], ['btnParede', '🧱', 'Parede de Desejos'], ['btnMinhaCor', '🎨', 'Cor da minha cobaia']].forEach(([id, ic, t]) => { if (disponivel(id)) add(ic, t, () => clicar(id)); });
     if ((q === 'mestre' || q === 'aux') && window.ACF_MESA && window.ACF_MESA.abrirEscudo) add('🛡', 'Escudo do Mestre', () => window.ACF_MESA.abrirEscudo());
     add(Som.ligado ? '🔊' : '🔇', 'Som do 3D', () => { Som.preparar(); Som.alternar(); pintarBarra(); });
+    EXT().forEach(x => { try { if (x.menu) x.menu(add, q); } catch (er) {} });   // extensões (imersao.js: fotos)
     add('⚙', 'Opções do 3D', () => { const o = $('#s3dOpcoes'); o.hidden = false; $('#s3dPainel').hidden = true; desenharOpcoes(); });
     if (disponivel('btnAjuda')) add('❓', 'Ajuda', () => clicar('btnAjuda'));
     add('🚪', 'Sair do 3D', () => fechar(), 'Esc');
@@ -2371,6 +2374,7 @@
     } else {
       h += `<section>${faixa('volAmb', 0, 1.5, .05, 'Volume do ambiente e dos passos', pct)}
         ${faixa('volVoz', 0, 1.5, .05, 'Volume das vozes do chat', pct)}
+        ${window.ACF_SONS ? ACF_SONS.opcaoHTML() : ''}
         ${chave('baloes', 'Balões de fala em cima das cabeças')}
         ${htmlVoz()}</section>
         <section><b>Dados</b>
@@ -2378,6 +2382,8 @@
         <label class="chave"><input type="checkbox" data-op="d3m" ${lsG('acf-dados3d-2d', false) ? 'checked' : ''}><span>Também no mapa 2D</span></label></section>
         <p class="mini">Modelos próprios: coloque arquivos .glb na pasta modelos/ e liste em modelos/modelos.json (veja o README).</p>`;
     }
+    // extensões (imersao.js): opções a mais em cada aba, gravadas como as outras
+    h += EXT().map(x => { try { return x.opcoes ? x.opcoes(abaOp, { sel, chave, faixa, quem: V && V.quem }) || '' : ''; } catch (er) { return ''; } }).join('');
     o.innerHTML = h;
     const reabrir = () => { if (V) abrir(25 * (V.a - 1) + 1, { a: V.a, manter: true, andar: V.cam.largo }); };
     const REABRE = new Set(['escala', 'sombras', 'poeira']);
@@ -2416,6 +2422,7 @@
     const d3 = o.querySelector('[data-op="d3"]'), d3m = o.querySelector('[data-op="d3m"]');
     if (d3) d3.onchange = () => lsS('acf-dados3d', d3.checked); if (d3m) d3m.onchange = () => lsS('acf-dados3d-2d', d3m.checked);
     ligarVoz(o, () => desenharOpcoes());
+    if (window.ACF_SONS) ACF_SONS.ligarOpcao(o);   // legendas de som (sons-filhos.js)
   }
 
   /* ---------- "E" / botão na tela: interagir com o que está perto ---------- */

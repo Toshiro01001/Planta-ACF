@@ -28,13 +28,15 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `sala3d.js`, `objetos3d.js`, `detalhes3d.js`, `tokens3d.js` | A vista 3D (ver "Duas maneiras de jogar") |
 | `nevoa.js` | Névoa de guerra e molduras dos tokens |
 | `momento.js` | Encontro (a passagem da exploração para a perseguição), cartas de ação na vez, sons dos Filhos, lanterna com bateria, mapa que mente, sustos que só um jogador vê, câmeras de segurança, corpos e o acabamento do 3D (fumaça, poeira na luz, sombras dos tokens). Código genérico: quem tem o quê fica nos dados secretos |
+| `imersao.js` | Imersão automática: qualidade do 3D que se ajusta sozinha, coração e respiração do personagem, vibração do celular, luzes e telas que reagem a um Filho por perto, marcas que ficam no 3D, backup automático, resumo da sessão, tutorial da primeira vez e modo foto (ver "Imersão automática"). Código genérico |
 | `filhos.js` | Características dos Filhos: sentidos do auxiliar, movimento, rastro e avisos aos jogadores, ocultação especial e os botões de habilidade (código genérico; quem tem o quê fica nos dados secretos) |
+| `sons-filhos.js`, `sons/` | Sons gravados das criaturas: 7 arquivos por forma 3D em `sons/filhos/` (`<forma>-respira.mp3` etc.), áudio posicional, legendas de som (ver "Sons das criaturas"); créditos e licenças em `sons/CREDITOS.md` |
 | `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
 
 ## Publicar no GitHub Pages
 
 1. Crie um repositório público (ex.: `Planta-ACF`).
-2. **Add file › Upload files** e arraste os arquivos soltos e a pasta `img`. O `index.html` precisa ficar na raiz.
+2. **Add file › Upload files** e arraste os arquivos soltos e as pastas `img` e `sons`. O `index.html` precisa ficar na raiz.
 3. **Settings › Pages › Deploy from a branch › main › / (root) › Save**.
 
 ## Elevadores
@@ -383,6 +385,37 @@ Ninguém escreve roteiro de susto: o site só propõe, e o Mestre decide.
 
 **Limites:** como o resto do mapa público, quem abrir as ferramentas do navegador pode ler `ecos3d` (posições aproximadas, sem nome), os sustos de qualquer cobaia (`sustos/<cobaia>`, como as Visões), a configuração das câmeras (inclusive o Filho falso) e os corpos. O congelamento de 2 s é feito na tela. A tela do Mestre precisa estar aberta para propor encontros, publicar os sons e gravar os corpos. O áudio só toca depois de um toque na página. A lanterna é a do 3D; no mapa 2D não há luz.
 
+### Sons das criaturas (`sons-filhos.js`)
+
+Cada forma 3D de Filho tem sons próprios, em arquivos dentro do site: quando uma criatura está perto, dá para ouvir ela respirar, andar, rosnar, atacar e aparecer, de onde ela está.
+
+**Os arquivos.** Todos ficam na pasta `sons/filhos/`, com o nome da forma na frente (como `afogada` ou `lodo`; nunca o codinome) e sempre os mesmos 7 finais. Exemplo: `lodo-respira.mp3`, `lodo-move.mp3`, `lodo-voz1.mp3`…
+
+| Arquivo | Quando toca |
+|---|---|
+| `<forma>-respira.mp3` | Em repetição, enquanto a criatura está parada |
+| `<forma>-move.mp3` | Em repetição, enquanto ela anda (a respiração continua baixinha por baixo) |
+| `<forma>-voz1.mp3`, `-voz2`, `-voz3` | Um deles ao acaso, raramente: a cada 20 a 60 s, com mais chance quanto mais perto |
+| `<forma>-ataque.mp3` | Quando ela ataca (o mesmo momento em que o 3D anima o ataque) |
+| `<forma>-revela.mp3` | Quando o Mestre a revela aos jogadores (o mesmo momento da animação de revelação) |
+
+MP3 mono, 24 kHz, 48 kbps, volume igualado entre as criaturas (loudness parecida) e loops sem estalo na emenda. São 30 formas, cerca de 100 a 160 KB cada, uns 3,5 MB no total; cada aparelho só baixa os sons das formas que estão no andar. `sons/filhos/indice.json` lista as formas que têm sons, o tamanho exato de cada loop, quais formas são quase mudas e as palavras das legendas. As duas formas silenciosas pela ficha (`orelhas` e `olhos_muitos`) quase não fazem som: respiração quase inaudível e nenhuma voz ao acaso; só o ataque e a revelação. Formas sem arquivos (as genéricas, como `esguio`) usam os sons sintetizados de sempre do `momento.js`.
+
+**Como trocar um som:** substitua o arquivo de mesmo nome (por exemplo, `sons/filhos/lodo-voz2.mp3`) e publique. MP3 mono de 22 a 32 kHz e 48 a 64 kbps fica leve; um arquivo de loop pode ter qualquer duração (o site faz a repetição do arquivo inteiro). Se a fonte for de outra pessoa, registre autor, endereço e licença em `sons/CREDITOS.md`. Para dar sons a uma forma nova, crie os 7 arquivos com o nome da forma na frente e acrescente a forma em `indice.json` (copie a linha de outra forma, troque as legendas e apague o campo `n`, que guarda o tamanho dos loops gerados aqui). Para o navegador baixar de novo depois de trocar arquivos, mude o `VER` no topo de `sons-filhos.js`.
+
+**Quem ouve o quê.**
+- **Mestre e auxiliares:** os Filhos do andar aberto, nas posições reais. No 3D, quem escuta é a câmera (na vista de cima, o ponto do chão para onde ela olha); no mapa 2D, o token selecionado (sem token selecionado, silêncio).
+- **Jogadores:** só os ecos que a tela do Mestre já publica em `ecos3d` (posição aproximada, cerca de 1 m de erro, sem dizer quem). O eco agora leva também a forma (`f`, só a aparência) e um apelido sorteado na sessão (`q`), para o jogador ouvir os sons gravados certos. Tudo o que já valia continua: **passos silenciosos** calam os passos, Forma de Objeto não faz som, a cópia de uma cobaia não manda a forma (soa como antes) e a chave "Sons dos Filhos" do Mestre desliga tudo. Ataque e revelação: com o Filho à vista, de onde ele está; sem enxergar, só de um rumo aproximado.
+- Alcance de 18 m, com volume caindo com a distância e áudio posicional (HRTF no computador; no celular, esquerda e direita). Na primeira vez que uma forma é ouvida, o som sintetizado cobre enquanto os arquivos baixam.
+
+**Volume e mudo.** Respeita o 🔊 do site, o "Som do 3D" e o "Volume do ambiente e dos passos" das Opções do 3D (fora do 3D, vale o último volume escolhido). O áudio só começa depois do primeiro toque na página (regra dos navegadores).
+
+**Legendas de som** (desligadas por padrão, valem só neste aparelho): textos discretos no meio da parte de baixo da tela, como "[um rosnado ao norte]", "[algo arrasta à esquerda]" ou "[respiração molhada muito perto]", sem dizer o que é. No 3D, a direção é em relação à câmera (à frente, atrás, à esquerda, à direita); no mapa, pelos pontos cardeais (o norte fica para cima). Liga em **Opções › Áudio e chat › Legendas de som** no 3D, no botão **CC** ao lado do 🔊 no topo do mapa ou, em telas estreitas, no ⚙ do painel.
+
+**Firebase:** nenhum caminho novo; `ecos3d` aceita os campos opcionais `f` (forma: letras minúsculas, números e `_`) e `q` (até 8 caracteres). Atualize as regras com `regras-firebase.json`.
+
+**Limites:** como os ecos já eram públicos, quem abrir as ferramentas do navegador pode ver a forma de quem fez o barulho (a aparência, nunca o nome). A tela do Mestre precisa estar aberta para os jogadores ouvirem (é ela que publica os ecos). As vozes ao acaso de cada aparelho são sorteadas ali mesmo (duas pessoas não ouvem a mesma voz no mesmo instante). Os sons foram feitos com gravações CC0 (domínio público) e síntese própria; fontes e licenças em `sons/CREDITOS.md`.
+
 ### Efeitos que todos veem
 
 Aparecem em volta do personagem, para quem está vendo aquele token (no 3D e no mapa 2D):
@@ -600,10 +633,11 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 
 Tudo fica salvo neste aparelho (`acf-s3d-cfg`).
 
-- **Gráficos:** predefinição (Alta ou Leve), escala de resolução (50% a 150%), sombras da lanterna, brilho das luzes (bloom), aberração cromática, grão de filme, vinheta, névoa (leve, normal, densa, muito densa), poeira no ar (e na luz da lanterna), fumaça e névoa baixa que se movem, câmeras de segurança nos monitores, limite de quadros (sem limite, 60, 30) e contador de quadros por segundo. As marcadas com ↻ reabrem o 3D na hora.
+- **Gráficos:** predefinição (Alta ou Leve), escala de resolução (50% a 150%), sombras da lanterna, brilho das luzes (bloom), aberração cromática, grão de filme, vinheta, névoa (leve, normal, densa, muito densa), poeira no ar (e na luz da lanterna), fumaça e névoa baixa que se movem, câmeras de segurança nos monitores, limite de quadros (sem limite, 60, 30) e contador de quadros por segundo. As marcadas com ↻ reabrem o 3D na hora. Embaixo, **Qualidade automática** (ligada por padrão) e em que degrau ela está agora.
 - **Câmera e mouse:** Jogo em terceira pessoa (desligado = primeira pessoa), campo de visão, balanço da câmera, sensibilidade do mouse e do toque, inverter o eixo vertical, nomes em cima dos personagens e, na perseguição, a câmera que mostra quem está na vez.
 - **Controles:** clique na tecla de uma ação e aperte a nova. Vale também botão do meio, direito ou lateral do mouse. Se a tecla já era de outra ação, as duas trocam. **Restaurar as teclas padrão** desfaz tudo.
-- **Áudio e chat:** volume do ambiente e dos passos, volume das vozes, balões de fala, a voz do seu personagem e os dados 3D.
+- **Áudio e chat:** volume do ambiente e dos passos, volume das vozes, balões de fala, a voz do seu personagem e os dados 3D. Embaixo, **Coração e respiração do meu personagem** (jogador) e **Vibração do celular** (ligadas por padrão).
+- Em **Controles**, o jogador tem **Rever o tutorial do 3D**. No menu ☰, **📷 Fotos da sessão** abre a galeria deste aparelho.
 
 Com qualquer janela do site aberta por cima do 3D (ficha, chat, arquivo, loja), as teclas vão para ela, não para o jogo.
 
@@ -633,6 +667,34 @@ Cada auxiliar com perfil de robô (C2P0, B00BIES, M3RL1N, K4ISER) coloca o próp
 ### Desempenho
 
 O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só os móveis da sala atual (e vizinhas, para o Mestre) ficam carregados; as luzes são um conjunto fixo (6 no celular, 10 no computador) que copia as mais próximas.
+
+A **qualidade automática** (`imersao.js`) cuida do resto: veja abaixo.
+
+### Imersão automática (`imersao.js`)
+
+Tudo aqui roda sozinho, sem nenhum botão para o Mestre apertar na mesa. Cada coisa tem no máximo uma opção para ligar e desligar, salva neste aparelho junto com as outras Opções do 3D.
+
+**1. Qualidade automática do 3D** (⚙ Opções › Gráficos › Qualidade automática, ligada). O 3D mede os quadros por segundo. Se ficar abaixo de ~26 (ou de 80% do limite escolhido) por 4 segundos, desce um degrau; se sobrar folga (92% do limite) por 15 segundos seguidos, sobe um. Se cair de novo logo depois de subir, espera o dobro antes de tentar outra vez (até 4 minutos), para não ficar indo e voltando. Degraus: 0 tudo ligado; 1 resolução 85%; 2 sem poeira no ar e sem fumaça baixa; 3 resolução 72% e câmeras de segurança leves; 4 sem câmeras de segurança e sem sombra da lanterna; 5 resolução 60% e menos luzes no conjunto (60% das mais próximas). O aparelho lembra o degrau por 3 dias e começa nele da próxima vez. **O que o jogador escolheu à mão manda:** a escala de resolução, a poeira, a fumaça, as sombras e as câmeras só mudam sozinhas se estiverem no padrão (100%, ligada, Automático). Na primeira vez que baixa, aparece um aviso discreto. A aba Gráficos mostra o degrau atual e os quadros por segundo.
+
+**2. Coração e respiração do personagem** (só o jogador ouve; Opções › Áudio › Coração e respiração). Um batimento grave aparece quando há perigo e acelera com ele (de ~62 a ~160 por minuto): PV abaixo de 60% (vitais publicadas pela ficha ativa), um Filho à vista a menos de 12 m de regra, um eco de som de Filho perto, a perseguição em que a cobaia participa e um susto recente. Sem perigo, silêncio. Com a opção ligada, é ele que faz a batida da perseguição (no lugar da batida fixa do `momento.js`, que volta se a opção for desligada). **Ofegante:** depois de correr mais de ~1 s no 3D (Shift ou o joystick no fim) e ao fim de uma perseguição de que participou, alguns segundos de respiração pesada que vai acalmando. Tudo gerado na hora (WebAudio), respeitando o mudo do site, o "Som do 3D" e o volume do ambiente; só toca depois do primeiro toque na página.
+
+**3. Vibração do celular** (Opções › Áudio › Vibração do celular). Vibra no dano ao próprio personagem (mais forte se perder 25% dos PV de uma vez; trocar de ficha não conta), no susto que só ele vê, no Encontro confirmado e no "o chão treme" (os dois últimos já existiam e agora obedecem a mesma opção, como todas as vibrações do site). Onde o navegador não vibra (iPhone, computador), nada acontece.
+
+**4. Ambiente que reage.** Quando um Filho passa perto, as luzes da sala piscam, as lâmpadas e telas falham, monitores, TVs, telões e terminais (peças de tela e interações "ligar" e "vídeo") chiam com cor e brilho tremendo, o telão do YouTube ganha chiado e toca um zumbido elétrico curto vindo de onde ele está. Na tela do Mestre e dos auxiliares, vale a posição real de cada Filho que anda no andar aberto; nos jogadores, só os ecos de som que o `momento.js` já publica (`ecos3d`, posição aproximada, sem dizer quem; "passos silenciosos" continuam calando). Só efeito local no 3D: nada é gravado.
+
+**5. Marcas que ficam.** A tela do Mestre grava em `mapa/marcas` (sem dizer quem): **garras** onde um Filho atacou pelo Controle (apontando para a cobaia mais perto; perto de uma parede, também na parede) e **rastro** a cada ~2 m de regra que um Filho à vista anda durante a perseguição. No 3D de todos viram decalques no chão (arranhões, manchas arrastadas). O "Nova cena" do Mestre apaga tudo; no máximo 80 marcas (as mais velhas saem).
+
+**6. Backup automático** (aba Segredos › Backup). A tela do Mestre guarda a cada 15 minutos o mesmo pacote do "Baixar backup" (mapa, segredos, privado e Calculadora de NEX), só se algo mudou, no servidor em `segredosBk` (só o Mestre lê), e mantém os 6 últimos. O primeiro sai até 15 minutos depois de abrir a tela (ou 1 minuto, se o último for mais velho que isso). **Voltar a um backup automático…** lista os guardados (data, hora, dia na Caixa, tokens, tamanho), com **Voltar** em cada um (pede confirmação; o diário atual é mantido) e **Guardar um agora**. Sem Firebase (modo local), ficam no navegador e cabem menos.
+
+**7. Resumo automático da sessão** (aba Mesa › Resumo automático da sessão). Quando o Encerramento exibido para todos termina (ou é parado) na tela do Mestre, abre sozinho um relatório para revisar e editar: salas visitadas (no total e por cobaia), encontros (e falsos alarmes), perseguições, quem quase morreu (caiu em Morrendo, morreu, enlouqueceu ou chegou a 25% dos PV ou menos), corpos, itens achados (as mensagens "pegou" e "vestiu" do chat), interações curiosas no 3D (o que foi tocado, ligado, lido, jogado, aberto quando era cofre, gaveta ou armário, com quem e onde), pistas, sustos e marcas. Vem do que o site já registra: Diário, Relatório da Mesa, chat Geral e `mapa/inter`. A sessão vai da Abertura (ou da última "Nova sessão" do Diário) até o Encerramento. **O texto não cita Filhos nem nomes de salas não reveladas.** Botões: **Copiar para o grupo**, **Mandar no chat Geral** (em mensagens de até 480 caracteres) e **Baixar .txt**. O botão **📝 Ver o resumo desta sessão** monta de novo a qualquer hora.
+
+**8. Tutorial da primeira vez no 3D** (jogador). Seis cartões curtos, 5 segundos cada (andar, olhar, usar com E, mochila com I, lanterna, menu), com o texto do celular ou do computador e as teclas que o jogador escolheu; **Pular** ou **Próximo**. Uma vez por aparelho; **Rever o tutorial do 3D** fica em Opções › Controles.
+
+**9. Modo foto** (jogador, auxiliar e Mestre). O botão 📷 no topo do 3D (no celular estreito, flutuando na borda direita) tira uma foto da vista, sem a interface, os nomes e o anel da vez, na resolução cheia do aparelho (mesmo com a qualidade automática baixa), com clarão e som de obturador. Uma prévia aparece por alguns segundos com **⬇** e **Galeria**. As fotos ficam só neste aparelho (IndexedDB, até 60), agrupadas por sessão em ☰ › **📷 Fotos da sessão**, com **⬇ Baixar** e apagar. Se a ficha ativa tem câmera ou celular e um Filho "só por uma lente" está à frente, na mesma sala, a foto dispara o **mesmo Flash** do botão ⚡ (1 por cena, mesma regra).
+
+**No Firebase (novos):** `mapa/marcas/<k>` = `{a, x, y, t: g|r, r, ts, c}` (todos leem; só o Mestre grava, com validação) e `segredosBk/idx/<k>` = `{ts, n, kb, dia}` + `segredosBk/d/<k>` = o pacote em texto (só o Mestre lê e grava). **Atualize as regras** com `regras-firebase.json`.
+
+**Limites:** a qualidade automática mede o desempenho do 3D, não a bateria nem o calor do aparelho; trocar sombras e luzes recompila os materiais uma vez (um pequeno tranco). O coração, a respiração e a vibração dependem do navegador (som só depois de um toque; vibração só no Android). O ambiente e as marcas são pistas visuais: quem abrir as ferramentas do navegador pode ler `mapa/marcas` (posições, sem nome), como os `ecos3d`. As marcas, o backup automático e o resumo precisam da tela do Mestre aberta. As fotos não saem deste aparelho (limpar os dados do site apaga a galeria).
 
 ### Formato do `salas-3d.json`
 
