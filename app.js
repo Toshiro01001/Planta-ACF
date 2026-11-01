@@ -1646,10 +1646,10 @@ function desenharPainel() {
   $('#listaCobaias').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
     const tk = tokens[s.id];
     const visivel = tk && visivelPara(tk);
-    return `<li data-id="${s.id}">${bola(s)}<span class="info">
+    return `<li data-id="${s.id}" style="--cor:${s.cor}">${bola(s)}<span class="info">
       <strong>${Presenca.online(s.id) ? '<span class="ponto-on on" title="conectado agora"></span>' : ''}${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
       <span class="sub">${s.jogador}${funcaoDe(s.id) ? ' · ' + funcaoDe(s.id) : ''}</span>
-      <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span></span></li>`;
+      <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span>${mestre || s.id === meu ? miniBarras(fichaComVitais(s.id)) : ''}</span></li>`;
   }).join('');
 
   // Presenças no andar aberto (NPCs e Filhos)
@@ -4563,6 +4563,13 @@ function barrasFicha(f) {
   }).join('') + (f.nv !== undefined ? `<div class="barra barra-nex"><span class="barra-r">Nível</span><b>${String(f.nv).startsWith('E') ? 'Estágio ' + String(f.nv).slice(1) : f.nv}</b></div>` : '')
     + (f.nex !== undefined ? `<div class="barra barra-nex"><span class="barra-r">NEX</span><b>${f.nex}%</b></div>` : '')
     + (f.sM !== undefined || f.sm !== undefined ? `<div class="barra barra-nex"><span class="barra-r">Sucatas</span><b>${f.sM || 0} maiores · ${f.sm || 0} menores</b></div>` : '');
+}
+// mini barras de PV, SAN e PE no cartão da lista de cobaias (só o Mestre vê as de todos; o jogador, a própria). Visual limpo.
+function miniBarras(f) {
+  if (!f) return '';
+  const p = (v, m) => m ? Math.max(0, Math.min(100, Math.round((v || 0) / m * 100))) : null;
+  const l = [['pv', p(f.pv, f.pvm)], ['san', p(f.san, f.sanm)], ['pe', p(f.pe, f.pem)]].filter(x => x[1] !== null);
+  return l.length ? `<span class="pn-mb" aria-hidden="true">${l.map(([k, v]) => `<i class="${k}" style="--p:${v}%" title="${k.toUpperCase()} ${v}%"></i>`).join('')}</span>` : '';
 }
 function htmlEditarFicha(id) {
   const f = fichaDe(id) || {};
