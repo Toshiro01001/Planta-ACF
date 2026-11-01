@@ -934,15 +934,17 @@
         if (!ob || ob.a !== a || !F.P || typeof F.P[ob.o] !== 'function') return;
         vivos.add(k);
         let o = objsFil.get(k);
-        if (o && o.tipo !== ob.o) { grupo.remove(o.g); objsFil.delete(k); o = null; }
+        // disfarce3d.js: o modelo exato da cena (cn, i), girado (r), na altura (h), na parede (p) e com o detalhe (d)
+        const DF = window.ACF_DISFARCE, sig = DF ? DF.assinatura(ob) : ob.o;
+        if (o && o.tipo !== sig) { grupo.remove(o.g); objsFil.delete(k); o = null; }
         if (!o) {
-          let g = null; try { g = F.P[ob.o]({}); } catch (e) { console.warn('3D objeto:', ob.o, e); }
+          let g = null; try { g = (DF && DF.modelo(F, ob, k)) || F.P[ob.o]({}); } catch (e) { console.warn('3D objeto:', ob.o, e); }
           if (!g) return;
-          o = { g, tipo: ob.o }; grupo.add(g); objsFil.set(k, o);
+          o = { g, tipo: sig }; grupo.add(g); objsFil.set(k, o);
         }
         let [x, z] = planta3D(a, ob.x, ob.y);
-        if (!mundo.livre3D(x, z) && mundo.area3D(x, z, .05)) [x, z] = pontoLivre(mundo.livre3D, x, z);
-        o.g.position.set(x, 0, z); o.g.rotation.y = ((ob.ts || 0) % 628) / 100;
+        if (!ob.p && !mundo.livre3D(x, z) && mundo.area3D(x, z, .05)) [x, z] = pontoLivre(mundo.livre3D, x, z);
+        o.g.position.set(x, typeof ob.h === 'number' ? ob.h : 0, z); o.g.rotation.y = typeof ob.r === 'number' ? ob.r * Math.PI / 180 : ((ob.ts || 0) % 628) / 100;
       });
       [...objsFil.keys()].forEach(k => { if (!vivos.has(k)) { grupo.remove(objsFil.get(k).g); objsFil.delete(k); } });
     }
@@ -1308,6 +1310,8 @@
     if (sobreposta()) return;
     if (e.target && e.target.matches && e.target.matches('input, textarea, select, [contenteditable="true"]')) { if (e.key === 'Escape') e.target.blur(); return; }
     e.stopImmediatePropagation();
+    // extensões (fuga3d.js: sinal, barulho, barricada e o olhar para trás com custo na perseguição)
+    if (EXT().some(x => { try { return !!(x.tecla && x.tecla(k, acaoDaTecla(k), e)); } catch (er) { return false; } })) { e.preventDefault(); return; }
     if (k === 'escape') {
       e.preventDefault();
       if (document.pointerLockElement || performance.now() - V_destravou < 400) return;   // o Esc só soltou o mouse
@@ -1727,6 +1731,8 @@
 
     /* ---------- tocar/clicar: token, porta, esconderijo ou chão ---------- */
     function tocar(ray, plano, ptv, mira) {
+      // extensões (disfarce3d.js: no modo Disfarce, o toque escolhe o objeto a copiar ou o lugar dele)
+      if (EXT().some(x => { try { return !!(x.tocar && x.tocar(ray, mira)); } catch (er) { return false; } })) return;
       const alvos = [...tok.objetos(), ...mundo.raiz.children];
       const hits = ray.intersectObjects(alvos, true);
       // o raio do Three.js não liga para o que está escondido: pula paredes ocultas, véus e tetos
@@ -1744,6 +1750,8 @@
       }
       if (mira) { interagir(); return; }
       if (!ray.ray.intersectPlane(plano, ptv)) return;
+      // extensões (fuga3d.js: na vez da perseguição, o toque mostra a rota e os metros antes de andar)
+      if (V.ctrl && EXT().some(x => { try { return !!(x.chao && x.chao(ptv.x, ptv.z)); } catch (er) { return false; } })) return;
       if (V.ctrl) { V.autoAlvo = [ptv.x, ptv.z]; return; }
       if (quem !== 'jog') { const p = salaNoPonto3D(a, ptv.x, ptv.z); const [x, z] = p ? mundo.centro(p) : [ptv.x, ptv.z]; est.px = x; est.pz = z; est.ax = x; est.az = z; }
     }

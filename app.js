@@ -522,10 +522,15 @@ function recusaLocal(caminho, valor) {
   }
   // interações das salas do 3D (portão, luz, piano…): qualquer um, no formato da regra
   if (caminho[0] === 'inter' && caminho.length === 2) return /^c\d{1,3}_\d{1,3}$/.test(caminho[1]) && valor && (valor.v === 0 || valor.v === 1) && typeof valor.ts === 'number' ? '' : 'Interação inválida.';
+  // fuga3d.js: barricadas, barulho de propósito e sinais (qualquer um, no formato da regra)
+  if (caminho[0] === 'barricadas' && caminho.length === 2) return /^(c\d{1,3}:\d{1,3}|a[1-5]:c\d{1,2})$/.test(caminho[1]) && (valor === null || (valor && (valor.t === 'movel' || valor.t === 'porta') && typeof valor.a === 'number' && typeof valor.ci === 'number' && typeof valor.ts === 'number')) ? '' : 'Barricada inválida.';
+  if (caminho[0] === 'fuga' && caminho.length === 3 && (caminho[1] === 'r' || caminho[1] === 's')) return /^[rs][0-9a-z]{4,20}$/.test(caminho[2]) && (valor === null || (valor && typeof valor.a === 'number' && typeof valor.ts === 'number' && typeof valor.t === 'string')) ? '' : 'Sinal inválido.';
   // momento.js: encontro, câmeras de segurança, corpos e pilhas da lanterna são só do Mestre
-  if (['encontro', 'cameras', 'corpos', 'pilhas', 'marcas'].includes(caminho[0])) return 'Só o Mestre pode fazer isso.';   // marcas: imersao.js
+  if (['encontro', 'cameras', 'corpos', 'pilhas', 'marcas', 'replay'].includes(caminho[0])) return 'Só o Mestre pode fazer isso.';   // marcas: imersao.js; replay: perseg3d.js
   if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
   // ferramentas que o Mestre divide com os auxiliares
+  // disfarce3d.js: o objeto do disfarce no formato da regra (modelo da cena cn/i, giro r, altura h, parede p, detalhe d)
+  if (aux && caminho[0] === 'fil' && caminho[1] === 'ob' && caminho.length === 3) { const v = valor; return v === null || (v && typeof v.a === 'number' && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.o === 'string' && v.o.length <= 24 && typeof v.ts === 'number' && (v.d === undefined || (typeof v.d === 'string' && v.d.length <= 12)) && (v.cn === undefined || (v.cn >= 1 && v.cn <= 125)) && (v.h === undefined || (v.h >= 0 && v.h <= 4))) ? '' : 'Objeto do disfarce inválido.'; }
   if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas', 'fil'].includes(caminho[0])) return '';
   if (aux && caminho[0] === 'cond' && caminho.length === 3 && ['_mt', '_et', '_ms'].includes(caminho[2])) return '';
   if (caminho[0] !== 'tokens' || caminho.length !== 2) return 'Só o Mestre pode fazer isso.';
@@ -1930,6 +1935,8 @@ function gruposDeSala() {
   });
   // barulho de porta soma como se houvesse mais uma cobaia na sala
   g.forEach(gr => { gr.extra = gr.p ? barulhoEm(gr.a, gr.p) : 0; });
+  // barulho de propósito (fuga3d.js): soma na sala, mesmo sem cobaia nela
+  if (window.ACF_FUGA) try { ACF_FUGA.gruposExtra(g); } catch (e) {}
   return g;
 }
 
@@ -2113,6 +2120,7 @@ function dentro(r, x, y, folga = 0) {
 let quemMove = null;
 function andavel(andar, x, y) {
   if (bloqueadoPorPorta(andar, x, y)) return false;
+  if (window.ACF_FUGA && ACF_FUGA.bloqueia(quemMove, andar, x, y)) return false;   // barricadas (fuga3d.js)
   if (quemMove && window.ACF_FILHOS && ACF_FILHOS.bloqueia(quemMove, andar, x, y)) return false;
   // características dos Filhos: quem atravessa paredes anda por toda a planta do andar
   if (quemMove && window.ACF_FILHOS && ACF_FILHOS.atravessa && ACF_FILHOS.atravessa(quemMove)) return x >= 0 && y >= 0 && x <= W && y <= H;

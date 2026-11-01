@@ -425,8 +425,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .corr-m { position: absolute; inset: 0; display: grid; place-items: center; font: 11px var(--mono); color: rgba(196,168,255,.55); pointer-events: none; }
 
 /* ---------- Funções (só Mestre) ---------- */
-.lista-funcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
-.funcao-linha { display: grid; gap: 2px; font-size: 13px; color: var(--texto-dim); }
+.lista-funcoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
+.funcao-linha { display: grid; gap: 2px; min-width: 0; font-size: 13px; color: var(--texto-dim); }
+.funcao-linha input { width: 100%; min-width: 0; box-sizing: border-box; }
 .funcao-linha input {
   background: #0b0910; border: 1px solid var(--linha); color: var(--texto);
   border-radius: 5px; padding: 5px 7px; font: 13px var(--mono);
@@ -920,10 +921,10 @@ body.em-persg .faixa-apagao { top: calc(var(--topo-h) + 28px); }
 .chat-abas .n { margin-left: 5px; background: #ff3b5c; color: #fff; border-radius: 8px; padding: 0 5px; font: 10px/15px var(--mono); }
 .chat-dica { margin: 6px 14px; font-size: 12px; color: var(--texto-dim); }
 .chat-lista { list-style: none; margin: 0; padding: 4px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-.chat-lista li { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: start; }
+.chat-lista li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; align-items: start; }
 .chat-lista li.vazio { display: block; font-style: italic; color: var(--texto-dim); font-size: 13px; }
 .chat-lista .bola { width: 30px; height: 30px; border-radius: 50%; background: var(--cor) center / cover; border: 2px solid var(--cor); display: inline-block; }
-.chat-lista .msg { background: #17121f; border-radius: 8px; padding: 6px 9px; min-width: 0; }
+.chat-lista .msg { background: #17121f; border-radius: 8px; padding: 6px 9px; min-width: 0; overflow-wrap: break-word; }
 .chat-lista li.meu .msg { background: #22183a; }
 .chat-lista li.dado .msg { border-left: 3px solid #f5c84c; }
 .msg-topo { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -1460,7 +1461,7 @@ body.em-replay .ficha { opacity: .12; }
 .fx-foto::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 3px, rgba(0,0,0,.18) 3px 4px); pointer-events: none; }
 .fx-foto span { position: absolute; inset: auto 0 0 0; font: 9px var(--mono); letter-spacing: .14em; background: rgba(13,12,15,.85); color: var(--fx-tinta); text-align: center; padding: 4px 0; opacity: 0; transition: opacity .2s; z-index: 1; }
 .fx-foto:hover span { opacity: 1; }
-.fx-foto-tag { position: absolute; top: 8px; right: -4px; z-index: 1; font: normal 9px var(--mono); letter-spacing: .16em; background: var(--fx-carimbo); color: #fff; padding: 2px 8px; text-transform: uppercase; transform: rotate(3deg); max-width: 110px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fx-foto-tag { position: absolute; top: 8px; right: 2px; z-index: 1; font: normal 9px var(--mono); letter-spacing: .16em; background: var(--fx-carimbo); color: #fff; padding: 2px 8px; text-transform: uppercase; transform: rotate(3deg); max-width: calc(100% - 8px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .so-leitura .fx-foto { cursor: default; }
 .fx-dossie-campos { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .fx-nome input { font: 700 26px var(--display) !important; letter-spacing: .02em; width: 100%; padding: 0 0 2px !important; }
@@ -3769,12 +3770,25 @@ body.s3d-aberta { overflow: hidden; }
 }
 .s3d-tit { display: flex; flex-direction: column; min-width: 0; pointer-events: auto; }
 .s3d-tit b { font: 700 13px/1 var(--mono); letter-spacing: .18em; color: var(--roxo-claro); }
-.s3d-tit span { font: 600 18px/1.2 var(--display); margin-top: 4px; overflow-wrap: anywhere; }
+.s3d-tit span { font: 600 18px/1.2 var(--display); margin-top: 4px; overflow-wrap: break-word; hyphens: auto; }
+/* celular estreito com muitos botões no topo (Mestre): nome da sala menor e a dica desce para não encavalar */
+@media (max-width: 440px) {
+  .s3d-tit span { font-size: 14px; line-height: 1.15; }
+}
 .s3d-x { pointer-events: auto; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--linha); background: rgba(18,15,26,.85); color: var(--texto); font-size: 20px; cursor: pointer; }
 .s3d-x:hover { border-color: var(--roxo); }
 .s3d-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; font: 14px var(--mono); color: var(--texto-dim); }
 .s3d-msg[hidden] { display: none; }
 .s3d-dica { position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); max-width: calc(100% - 160px); margin: 0; font: 11px/1.4 var(--mono); color: var(--texto-dim); pointer-events: none; text-shadow: 0 1px 3px #000; }
+@media (max-width: 440px) { .s3d-dica { top: calc(max(10px, env(safe-area-inset-top)) + 82px); } }
+/* Mestre no celular estreito (7 botões no topo): o nome da sala vai para a linha de baixo, inteiro, e a dica desce junto */
+@media (max-width: 440px) {
+  .s3d-topo:has(#s3dBtPainel:not([hidden])) { flex-wrap: wrap; row-gap: 4px; }
+  .s3d-topo:has(#s3dBtPainel:not([hidden])) .s3d-topo-bts { order: 1; margin-left: auto; }
+  .s3d-topo:has(#s3dBtPainel:not([hidden])) .s3d-tit { order: 2; flex-basis: 100%; max-width: calc(100% - 118px); }
+  .s3d-topo:has(#s3dBtPainel:not([hidden])) .s3d-tit span { font-size: 15px; }
+  .s3d:has(#s3dBtPainel:not([hidden])) .s3d-dica { top: calc(max(10px, env(safe-area-inset-top)) + 100px); }
+}
 .s3d-barra {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 4px;
   padding: 5px; border-radius: 14px; background: rgba(18,15,26,.9); border: 1px solid var(--linha); max-width: calc(100% - 16px);
@@ -3856,6 +3870,9 @@ body.s3d-aberta { overflow: hidden; }
   .s3d-prompt { max-width: calc(100% - 150px); font-size: 12px; left: auto; right: 12px; transform: none; }
   .s3d-faixas { top: calc(max(10px, env(safe-area-inset-top)) + 100px); }
 }
+/* botões da fuga (Barricar, Barulho, Sinal) no mesmo canto: o "Esconder-se" sobe para cima deles */
+.s3d:has(#fugaBarra:not([hidden])) .s3d-prompt { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 128px); }
+.s3d:has(#fugaBarra:not([hidden])):has(#fugaRota:not([hidden])) .s3d-prompt { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 182px); }
 /* 2D: token escondido num esconderijo (só o dono e o Mestre veem) */
 .ficha.escondida { opacity: .5; }
 .ficha.escondida .ficha-nome::after { content: ' · escondido'; color: var(--texto-dim); }
@@ -4080,14 +4097,15 @@ body.s3d-aberta .alertas-mestre { z-index: 9550; }
 .mo-lims { display: flex; flex-wrap: wrap; gap: 6px; font: 11px var(--mono); }
 .mo-lims span { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--linha); }
 .mo-lims span.estoura { border-color: #ff4d6d; color: #ff8a9a; }
-.mo-filtros { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.mo-filtros { display: flex; flex-wrap: wrap; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .mo-filtros button { flex: 0 0 auto; min-height: 34px; padding: 4px 12px; border-radius: 17px; border: 1px solid var(--linha); background: transparent; color: var(--texto); font: 12px var(--mono); cursor: pointer; }
 .mo-filtros button.on { background: var(--roxo-escuro); border-color: var(--roxo); color: #fff; }
 .mo-corpo { display: grid; grid-template-columns: 1fr minmax(220px, 300px); gap: 12px; min-height: 0; }
 .mo-grade { list-style: none; margin: 0; padding: 0 2px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; overflow: auto; align-content: start; }
 .mo-grade button { position: relative; width: 100%; min-height: 96px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 8px 6px; border-radius: 10px; border: 1px solid #2c2440; background: radial-gradient(circle at 50% 30%, #241c33, #120e19); color: var(--texto); cursor: pointer; font: 11px/1.2 var(--mono); text-align: center; }
 .mo-grade button i { font-style: normal; font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
-.mo-grade button span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mo-grade button span { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; font-size: 10.5px; letter-spacing: -.02em; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.mo-grade button { padding-left: 4px; padding-right: 4px; }
 .mo-grade button b { position: absolute; right: 6px; top: 4px; font: 700 11px var(--mono); color: #ffd56a; }
 .mo-grade button small { position: absolute; left: 6px; top: 4px; color: var(--roxo-claro); }
 .mo-grade button.on { border-color: var(--roxo); box-shadow: 0 0 0 1px var(--roxo), 0 0 14px rgba(139,92,246,.35); }

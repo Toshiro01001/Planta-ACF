@@ -30,6 +30,10 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `nevoa.js` | Névoa de guerra e molduras dos tokens |
 | `momento.js` | Encontro (a passagem da exploração para a perseguição), cartas de ação na vez, sons dos Filhos, lanterna com bateria, mapa que mente, sustos que só um jogador vê, câmeras de segurança, corpos e o acabamento do 3D (fumaça, poeira na luz, sombras dos tokens). Código genérico: quem tem o quê fica nos dados secretos |
 | `imersao.js` | Imersão automática: qualidade do 3D que se ajusta sozinha, coração e respiração do personagem, vibração do celular, luzes e telas que reagem a um Filho por perto, marcas que ficam no 3D, backup automático, resumo da sessão, tutorial da primeira vez e modo foto (ver "Imersão automática"). Código genérico |
+| `fuga3d.js` | Fuga dos jogadores no 3D: rota com custo e "ele te pega aqui", olhar para trás, barricadas, esconderijo por dentro, barulho de propósito e sinais (ver "Fuga dos jogadores"). Código genérico |
+| `visao3d.js` | Visão da criatura: no Controle de um Filho (Mestre e auxiliares), a câmera vai para os olhos dele, com um filtro por forma 3D e os sentidos dele por cima (ver "Visão da criatura"). Código genérico |
+| `perseg3d.js` | Os Filhos na perseguição, do lado do Mestre: piloto automático (rota sugerida pelos sentidos), comportamento visível no 3D, abertura da perseguição, o Filho que para na porta da Zona Neutra, replay visto de cima e a linha de iniciativa no topo do 3D (ver "Os Filhos na perseguição"). Código genérico |
+| `disfarce3d.js` | Disfarce no 3D (Forma de Objeto e cópia, no espírito do Prop Hunt): virar qualquer modelo da sala ou qualquer cobaia, sempre com um detalhe errado que só se vê de perto, o "🔍 Reparar" dos jogadores e a quebra do disfarce (ver "Disfarce no 3D"). Código genérico |
 | `filhos.js` | Características dos Filhos: sentidos do auxiliar, movimento, rastro e avisos aos jogadores, ocultação especial e os botões de habilidade (código genérico; quem tem o quê fica nos dados secretos) |
 | `sons-filhos.js`, `sons/` | Sons gravados das criaturas: 7 arquivos por forma 3D em `sons/filhos/` (`<forma>-respira.mp3` etc.), áudio posicional, legendas de som (ver "Sons das criaturas"); créditos e licenças em `sons/CREDITOS.md` |
 | `img/` | Retratos das cobaias, o ícone da aba e o fundo da Parede de Desejos (`parede.jpg`, `eco-sigilo.svg`) |
@@ -99,6 +103,7 @@ Vale para o Mestre (as 5 abas), os auxiliares e os jogadores, no visual limpo. O
 - **Jogador:** "Sua cobaia" fica sempre à vista no alto como cartão herói (retrato, barras de PV, SAN e PE, Nível e NEX em chips, Examinar e Olhar, e Loja, Arquivo, Regras, Hall, Parede e Cor em grade de ícones), com a lista de ferramentas embaixo. Durante uma perseguição, o bloco da perseguição também fica à vista.
 - **Por dentro dos blocos:** caixas de seleção viram chips liga/desliga; explicações longas ficam atrás do **?** (as curtas e as que mostram estado continuam à vista); blocos grandes ganham **seções em abas** (Colocar no mapa: Cobaias e NPCs · Filhos · Grupo; Kit do auxiliar: Filhos · Robô · Rolagem · Cores; Cores; Senhas; Painel de retratos; Sessão: Tensão · Holofote · Cobaia · Dilema) ou **seções recolhíveis** (Ambiente: Trilha por andar e Sons próprios começam fechadas; Câmeras de segurança). A aba e as seções abertas ficam guardadas por aparelho. Personagens viram uma grade de chips com retrato; participantes da perseguição, cartões de uma linha; a lista de cobaias, cartões com a borda na cor de cada uma e mini barras de PV, SAN e PE (o Mestre vê de todas; o jogador, só a própria). Os filtros do Diário e a velocidade do replay viram chips.
 - **Nada mudou no comportamento:** os blocos continuam no mesmo lugar da página, com os mesmos ids; a lista só decide qual aparece. Outros módulos abrem um bloco com `ACF_PN.abrir('idDoBloco')` (`ACF_PN.fechar()`, `ACF_PN.aberto`, `ACF_PN.ligado`).
+- **Nada passa da tela nem fica comido** (360, 390, 412, celular deitado 740 x 360 e 1280): as abas do Mestre mostram o nome inteiro; o título e o estado no alto da folha quebram linha em vez de virar "…"; colunas de campos (Funções, participantes da Perseguição SaH) encolhem ou caem para uma coluna; textos sem espaço (links no chat, tradução de robô) quebram dentro do balão; no celular, a gaveta do painel começa abaixo das faixas de perseguição, Protocolo e apagão, e as cartas "Sua vez" descem para a borda de baixo com o painel rolando acima delas. Abas que rolam de lado continuam com o degradê na borda; os chips de estado dos cartões da lista continuam numa linha só (o cabeçalho da folha mostra tudo).
 
 ## Celular
 
@@ -315,6 +320,66 @@ No cartão de qualquer Filho no mapa 2D aparece **🎮 Controle (3D)**. O 3D abr
 - **📋 Ficha** abre a ficha completa; **Soltar o Controle** volta à câmera livre.
 - Sem ficha ligada, o quadro explica como ligar.
 
+### Visão da criatura (`visao3d.js`)
+
+Quem controla um Filho no 3D (Mestre ou auxiliar) passa a ver **como a criatura vê**: a câmera vai para os olhos dela e a tela ganha o filtro daquela criatura. O auxiliar caça sabendo só o que o Filho saberia. **Jogadores nunca veem isso.**
+
+- **Entrar e sair:** ao assumir o Controle de um Filho, a visão liga sozinha (opção, ligada por padrão). O botão **👁** no topo do 3D (no celular estreito, flutuando na borda direita, abaixo do 📷) e a tecla **V** entram e saem. Trocar a câmera para Fora ou Cima, ou soltar o Controle, volta à visão normal.
+- **Altura dos olhos:** vem da altura do modelo 3D da forma (a gaiola perto do teto, a fera de juba rente ao chão, o titã lá em cima), limitada pelo teto da sala ou do corredor.
+- **Selo no topo:** o nome da visão e os sentidos do Filho ("👂 audição · 🩸 faro"). O Mestre tem **Ver tudo**: mostra todos, sem a regra dos sentidos (só o filtro da forma continua). **✕** sai.
+
+**1. Um filtro por forma 3D (só a aparência).** Cada uma das 30 formas detalhadas tem o seu; as formas genéricas (esguio, colosso, sombra…) usam o padrão, "Olhar de predador".
+
+| Forma | Visão |
+|---|---|
+| afogada | Debaixo d'água turva: tudo verde-azulado, o longe some na água, cáusticas, gotas que escorrem na lente e cabelo molhado pendurado na frente |
+| anfibio_cria | Olho de peixe rente ao chão: lente redonda e abaulada, verde turvo, uma membrana que passa devagar |
+| anfibio_ovos | Esferas rosadas: a vista partida em esferas de geleia rosada, cada uma com uma pupila escura que gira |
+| aranha_gaiola | Pelas grades da gaiola: barras de ferro enferrujado em cúpula, luz quente de lanterna, panos rasgados no alto |
+| aureola_mascara | Auréola e máscara de caveira: raios dourados, a auréola em volta do centro, a vista pelos dois buracos dos olhos |
+| boca_no_tronco | Pela boca do tronco: a vista é a fenda vertical da boca, com os dentes nas bordas, abrindo e fechando com a respiração |
+| bracos_rastejante | Sob a mortalha, entre os braços: rente ao chão, capuz de pano rasgado, braços cinzentos com anéis de ouro puxando o corpo |
+| cabeca_cao | Nariz de cão: cores de cão (vermelho e verde viram amarelo e oliva), um pouco borrado, o focinho fora de foco e fiapos de cheiro no ar |
+| cabeca_tv | Tubo de televisão: tela curva, linhas de varredura, máscara de fósforo, imagem fantasma |
+| cabelos_longos | Cortina de cabelo: fios pretos balançando por toda a tela, túnel escuro, verde pálido |
+| eletrico_agachado | Só arestas elétricas: o mundo vira contorno violeta aceso sobre o escuro, com um raio fino de vez em quando |
+| enraizado | Sob o chapéu de palha: aba de palha trançada no alto, folhas e galhos nos lados, raízes embaixo |
+| esfolado | Carne viva: tudo em vermelho, veias nas bordas e o pulso do coração |
+| estatica_tres_cabecas | Três telas de chiado: três vistas lado a lado (esquerda, frente, direita), fora de sincronia, com chiado de VHS |
+| fera_juba_lodo | Por baixo da juba de lodo: rente ao chão, mechas grossas de lodo pingando do alto, barro rachado nos cantos |
+| fera_pelo | Um olho vermelho: só um olho (o lado esquerdo quase cego), tudo avermelhado, pelo empapado de sangue nas bordas, o tranco de quem fareja |
+| filme_queimado | Fotogramas queimando: sépia, grão, riscos, dupla exposição, furos da película nas bordas e os cantos queimando devagar |
+| fitas_magenta | Fitas de tinta: a imagem escorre como tinta na água, em magenta e violeta |
+| lodo | Película oleosa: escuro, brilho de óleo nas bordas, gotas pretas escorrendo pelos lados; o centro fica limpo |
+| marionetista | Fios vermelhos no palco: preto e branco, só o vermelho fica, fios vermelhos balançando, luz de palco |
+| mascara_sorriso | Pelas frestas da máscara: duas frestas largas em forma de olhos sorrindo, o cachecol vermelho embaixo |
+| moldura | Pintura a óleo rachada: pinceladas, craquelado, verniz amarelado e a moldura dourada |
+| muitos_bracos | Entre lágrimas e braços: lágrimas que escorrem, bordas borradas, mãos pálidas abraçando pelas bordas, tom de foto antiga |
+| olhos_muitos | Mosaico de olhos: dezenas de olhos amendoados, piscando fora de ritmo |
+| orelhas | Quase cego: vê pelos ecos. Quase tudo preto; quando há som, a onda acende a sala por onde passa |
+| protese | Radiografia: tudo invertido em azul de negatoscópio, cabos pendurados no alto e a linha do monitor cardíaco |
+| retalhos_quadrupede | Retalhos costurados: a vista em retalhos de cores diferentes, com costuras e pontos em cruz |
+| sobretudo_vazio | Pelos buracos do vazio: escuro violeta, a sala só aparece pelos buracos, com a borda acesa |
+| texto_vivo | Tinta e letras: papel claro, as arestas e o que é claro viram letras; as cobaias, manchas de tinta |
+| tita_algemado | Fúria acorrentada: vermelho escuro, rachaduras acesas nas bordas, correntes penduradas e o tranco dos passos pesados |
+
+**2. Os sentidos por cima (dos dados, nunca do código).** O que aparece vem das características do Filho em `privado/filhos` (a mesma conta da vista do auxiliar: `ACF_FILHOS.comoPercebe` e `sentidosDe`, sem gravar nada):
+
+- **Quem a criatura não percebe some** (as mesmas regras de sempre: visão padrão nas salas reveladas, visão curta, escondido que passou no teste…). **Quem ela percebe por outro sentido** (vibração, tela, câmera, raízes, solidão, ninho, maior NEX, leitura, rastro próprio, teste falhado) aparece como **silhueta acesa através das paredes**, na cor do sentido (vibração laranja, tela e câmera ciano, raízes verde, NEX violeta…).
+- **Sem visão** (sem visão ou vibração no chão): o mundo fica quase preto, só o contorno do que está perto; o resto vem dos outros sentidos.
+- **Visão curta:** o que está longe some no escuro.
+- **Audição:** o barulho de cada sala (a mesma escala do decibelímetro, com o alcance do Filho) vira uma **onda de luz que corre pelas paredes**, saindo da sala exata (audição precisa) ou de um ponto borrado perto dela (mancha), e acende a geometria por onde passa nos Filhos que quase não veem. O centro da tela fica mais limpo.
+- **Vibração no chão:** um anel laranja no chão aos pés de quem se mexeu; quem fica parado some.
+- **Faro de sangue:** uma mancha vermelha, através das paredes, na sala de cada cobaia machucada. **Faro curto:** um brilho vermelho em quem está machucado e à vista.
+- **Faro de trilha:** pegadas acesas no chão, na cor de cada cobaia, pelas salas por onde ela passou (as mais velhas mais apagadas), escondidas atrás das paredes.
+- **Leitura:** um brilho amarelo onde a cobaia abriu um documento.
+
+**Opções** (⚙ › Gráficos › Visão da criatura, só Mestre e auxiliares): **Entrar na visão ao controlar um Filho** (ligada), **Intensidade do filtro** (20% a 100%) e **Reduzir efeitos que se mexem** (Como o sistema, Sim ou Não: quase para as animações; as ondas de som continuam, porque são informação).
+
+**Desempenho:** a cena é desenhada uma vez numa textura com profundidade e um único passe faz o filtro e os sentidos (sem o bloom normal). As silhuetas e marcas pedem um passe pequeno, em meia resolução, só quando existem. No celular a textura sai a 70%, e cai mais quando a qualidade automática desce do 3º degrau. Nada pisca forte: tudo pulsa devagar.
+
+**Firebase:** nenhum caminho novo. **Limites:** a visão é só na tela de quem controla (os jogadores não sabem que ela existe). Sem textura de profundidade (WebGL 1 sem a extensão), não há ondas nas paredes nem a vista escura dos Filhos sem visão. A trilha mostra as salas da trilha gravada (o caminho dentro da sala é desenhado, não o real). Pegadas e ondas são do aparelho de quem controla (a tela do Mestre precisa estar aberta para gravar a trilha, como sempre).
+
 ### Características dos Filhos (`filhos.js`)
 
 O código é **genérico**: ele conhece os tipos (o sentido "faro", a trava "só no escuro", o botão "Teia"…), nunca qual Filho tem o quê. Isso fica nos dados secretos, que o Mestre importa de um arquivo **fora do GitHub** (`filhos-regras.json`, tipo `planta-acf-filhos`).
@@ -360,7 +425,7 @@ Nos tokens dos Filhos, só Mestre e auxiliares mudam os campos `fo` (forma de ob
 - **Forma rolada (Avançado):** com "🎲 Rolar a forma" ligado, quando o token entra no mapa a tela do Mestre rola o dado (1d4), grava no token o elemento e a forma 3D daquela face e avisa você; o auxiliar não escolhe. Cada face tem o seu "comportamento desta forma" (sentidos e movimento que valem só com ela, para as PROPOSTAS). O token nasce oculto e mora no `privado`: nada chega aos jogadores antes de você revelar. No 2D, o token ganha o anel e o ícone do elemento.
 - **Estados do modelo 3D (Avançado):** o nome do estado da forma em cada momento (normal, andando, com cobaia na sala, conectado, transmitindo, durante o Flash). A tela do Mestre grava o estado no token e o 3D de todos chama `estado(nome)` na forma.
 
-**A cópia e a Forma de Objeto:** Forma de Objeto tira o token dos jogadores e põe um objeto da biblioteca do 3D (cadeira, caixote, maca, armário…) na sala. Uma cena inteira assim, na mesma sala que uma cobaia, libera **Estudar**; depois **Copiar** faz o token aparecer aos jogadores como aquela cobaia (foto, nome, cor e miniatura 3D), com o Detalhe que o Mestre escolheu (retrato espelhado, número FHP trocado ou o anel de outro tom). **Mimetismo Vocal** manda no chat Geral, como a cobaia copiada (ou agarrada num Abraço marcado pelo Mestre), só frases que ela escreveu no Geral nas últimas 24 horas, escolhidas numa lista, sem texto livre; o auxiliar nunca vê Sussurros. Mestre e auxiliares veem "🗣 voz imitada".
+**A cópia e a Forma de Objeto:** Forma de Objeto tira o token dos jogadores e põe um objeto da biblioteca do 3D (cadeira, caixote, maca, armário…) na sala. Uma cena inteira assim, na mesma sala que uma cobaia, libera **Estudar**; depois **Copiar** faz o token aparecer aos jogadores como aquela cobaia (foto, nome, cor e miniatura 3D), com o Detalhe que o Mestre escolheu (retrato espelhado, número FHP trocado ou o anel de outro tom). **Mimetismo Vocal** manda no chat Geral, como a cobaia copiada (ou agarrada num Abraço marcado pelo Mestre), só frases que ela escreveu no Geral nas últimas 24 horas, escolhidas numa lista, sem texto livre; o auxiliar nunca vê Sussurros. Mestre e auxiliares veem "🗣 voz imitada". No 3D, as duas viram o **modo Disfarce**, com o detalhe errado e o "🔍 Reparar" dos jogadores (ver "Disfarce no 3D").
 
 **A tela do Mestre faz o trabalho automático** (rastros, avisos, ocultação, teias, estudo, Examinar e Olhar, dia par, "Enredada" de quem falhou na teia). Como no robô dos auxiliares, ela precisa estar aberta.
 
@@ -599,6 +664,122 @@ As duas vistas usam a MESMA perseguição (`mapa/persg`): ordem de iniciativa, d
 - **Só no 3D:** funciona igual. O Mestre conduz pela gaveta 🗂 (Painel do Mestre, bloco Perseguição: pedir iniciativa, iniciar, próxima vez, refazer rota, cronômetro); os jogadores rolam a iniciativa pelo pedido que abre na tela (os dados 3D rolam junto); os Filhos andam pelo Mestre ou pelo auxiliar (🎛 → controlar o token), com as mesmas regras, a menos que o Mestre ligue o movimento livre.
 - **Cuidado:** no 3D o jogador só enxerga a própria sala. Para ter a visão do andar inteiro durante a fuga, o Mestre pode deixar o 2.5D aberto em outra aba ou usar o botão 🏢 Andar.
 
+### Fuga dos jogadores (`fuga3d.js`)
+
+O lado das cobaias na perseguição: o que o jogador pode fazer no 3D para fugir, além de correr. Tudo aparece para quem controla a própria cobaia (o Mestre também, controlando uma cobaia ou NPC). Na perseguição, as ações que custam alguma coisa só valem **na sua vez**; fora dela, valem a qualquer hora e sem custo de metros.
+
+**Botões:** no canto de baixo à direita do 3D, acima da barra das câmeras: **👀 Atrás** (só na perseguição), **🪑 Barricar**, **📣 Barulho** e **📍 Sinal**. Barricar, Barulho e Sinal também estão no menu ☰ e nas teclas **X**, **V** e **G** (se não estiverem em outra ação nas Opções). Barricar e Barulho abrem uma janelinha com as escolhas do lugar onde você está.
+
+1. **Rota com custo.** Na sua vez, tocar (ou clicar) no chão do 3D desenha o caminho até lá, desviando de móveis, portas fechadas e barricadas, com um ponto a cada metro de regra e o total no fim ("6,2 m · sobra 2,8"). O trecho que passa do seu deslocamento fica vermelho e tracejado, com "para aqui" onde você para. Um cartão acima dos botões repete os números, com **▶ Ir** e **✕**. Tocar de novo no mesmo ponto (ou ▶ Ir) anda pelo caminho, usando o mesmo andar por toque de antes (as regras de metros e paredes continuam valendo). Quem preferir andar no primeiro toque desliga em ⚙ Opções › Controles › Fuga. Fora da sua vez e fora da perseguição, o toque no chão anda como sempre.
+   **"Ele te pega aqui":** com um Filho **visível** que está na perseguição (revelado, à vista deste jogador; nunca um oculto, em forma de objeto, copiando ou só por uma lente), a rota mostra o caminho dele em vermelho até onde ele chega no próximo turno, com o deslocamento dele na perseguição. Se ele alcança o ponto onde você vai parar: X vermelho e "ele te pega aqui". Se não: anel laranja "ele chega até aqui · falta X m". A conta usa só o que o jogador sabe (portas e barricadas comuns), não as características secretas do Filho.
+2. **Olhar para trás.** A câmera vira por 2 s (primeira pessoa, terceira pessoa ou vista de fora) e um quadro diz o que está atrás: o Filho visível mais perto com a distância ("8 m"; noutra sala, "na sala ao lado", "a 2 salas"; no corredor, os metros), com um anel vermelho embaixo dele se ele está à vista no 3D. Sem nada visível: "Nada à vista". Na perseguição, o **Q** (olhar para trás) passa a fazer a mesma coisa, com o mesmo custo. Fora dela, o Q continua como antes.
+3. **Barricada** (Sobrevivendo ao Horror, "Criar obstáculo": **Força DT 15**). Perto de uma porta da sala (até uns 6 m), a janelinha oferece o maior móvel por perto ("Derrubar a estante na porta norte, à sua frente", "Empurrar a maca…") e, se a porta do corredor está aberta, "Fechar e travar a porta". A ficha ativa rola Força (sem ficha, 1d20) e a rolagem vai ao chat. Passou: o móvel vai até o vão e tomba atravessado (com caixas e uma cadeira completando o vão), ou a porta fecha com tábuas pregadas; todos veem nas duas vistas (no mapa 2D, 🪑 ou ⛔ na ponta do corredor). A passagem fica **bloqueada nas regras do mapa** para todos (2D, 3D, rota, piloto automático). Fazer barricada faz barulho (+1 na sala, 1 min). **Desfazer:** perto dela, **E · Desfazer a barricada**. **Filhos:** quem tem **arromba portas** quebra passando (estrondo, +2 de barulho); quem **atravessa paredes** passa direto; os outros contornam ou arrombam: no Controle, perto dela, **E · Arrombar a barricada** rola Força DT 15 com a ficha ligada ao Filho (sem ficha, 1d20), em segredo. Esses três custam, na perseguição, o que o Mestre escolher (padrão: metade da vez). Não dá para fechar um vão com alguém parado nele. Esconderijos e móveis com interação (armários que abrem, geladeiras) não são usados.
+4. **Esconderijo por dentro.** Quem se esconde (E num esconderijo, Furtividade DT 15 como antes) passa a ver o mundo de dentro do móvel, em primeira pessoa: pelas **frestas** da porta (dentro do armário, da cabine), pelo **vão** baixo (embaixo da cama, da mesa, da maca), por cima do que cobre (atrás das caixas, do balcão) ou **entre as estantes**. A cabeça vira pouco (você está apertado ali). Com **Coração e respiração** ligado (Opções › Áudio), a respiração fica baixa e lenta; com um Filho à vista a poucos metros, ela prende e a imagem treme. O Filho passando aparece normalmente se ele estiver visível para esse jogador (as mesmas regras de sempre). A rolagem continua a do livro: só muda o que o jogador vê.
+5. **Barulho de propósito.** **Gritar** (+2 no decibelímetro da sala, 1 min e meio), **assobiar** (+1, 1 min) ou **jogar um objeto** pela porta aberta de um dos vãos para a sala vizinha (+1 lá, 1 min). O barulho entra no mesmo ruído das salas (o decibelímetro, a escuta dos auxiliares, a audição dos Filhos e o encontro por barulho), mesmo numa sala vazia: serve para atrair a criatura para longe de um colega. Quem está no andar ouve, de onde veio (até 24 m; legenda de som, se ligada). Na perseguição, só na sua vez; um a cada 8 s. Zona Neutra não conta.
+6. **Sinalizar.** **📍 Aqui!**, **➜ Ele foi por ali** (seta para onde você olha) ou **⚠ Perigo!**, no ponto onde a mira encosta no chão (até 25 m, sem passar da parede). O grupo inteiro vê por 8 s: feixe de luz, anel e o nome de quem marcou no 3D (por cima das paredes) e um marcador no mapa 2D. Por padrão faz um pouco de barulho (+1 na sala, 20 s).
+
+**Mestre (aba Sessão, bloco Perseguição, seção "Fuga dos jogadores"):** chips liga/desliga para a rota com custo, o "ele te pega aqui", as barricadas, o barulho de propósito, o sinal, o barulho do sinal e o esconderijo por dentro; quanto custa **olhar para trás** (nada, um pouco de barulho, que é o padrão, 1,5 m ou 3 m da vez) e quanto custa a **barricada** na perseguição (nada, 3 m, metade da vez, que é o padrão, ou a vez inteira); e **🧹 Tirar as barricadas do mapa**. Tudo em `mapa/cfg/fuga`.
+
+**No Firebase (novos, todos leem; qualquer conta logada grava no formato certo):**
+
+| Caminho | O quê |
+|---|---|
+| `mapa/barricadas/<k>` | `k` = `cNN:i` (móvel `i` da cena da sala NN) ou `aA:cCI` (porta do corredor CI do andar A); valor `{ t: movel \| porta, a, ci, cn, lado, i?, ob?, q, ts }`. Bloqueia uma faixa do corredor `ci`: a ponta encostada na sala `cn` (móvel) ou o meio (porta). `ACF_FUGA.zonaBarr(v)` devolve o retângulo em unidades da planta; `ACF_FUGA.barricadas(a)` lista com a zona; `ACF_FUGA.bloqueia(id, a, x, y)` é a mesma conta do mapa (o `andavel` do `app.js` já usa). Quem atravessa paredes passa; quem arromba quebra ao passar |
+| `mapa/fuga/r/<k>` | barulho de propósito `{ a, p (sala 1 a 24), n (1 ou 2), t: grito \| assobio \| objeto \| olhar \| sinal \| barr \| arromba, ts, x?, y? }`; vale enquanto durar (20 a 90 s, pelo tipo) e entra em `gruposDeSala` como cobaias a mais (`ACF_FUGA.ruidos()`) |
+| `mapa/fuga/s/<k>` | sinal `{ a, x, y, t: aqui \| foi \| perigo, ts, q (quem), d? (graus na planta, 0 = leste, 90 = sul) }`, 8 s |
+
+Quem gravou apaga o que venceu; a tela do Mestre também limpa. **Atualize as regras** com `regras-firebase.json`.
+
+**Limites:** o caminho e o "ele te pega aqui" são previsões feitas no aparelho do jogador, com as regras públicas (o Filho pode ter características que mudam isso). A rota desvia só dos móveis das salas carregadas no 3D (a sua e as vizinhas). A barricada bloqueia o vão; o móvel tombado é desenhado onde a regra bloqueia, mas é só aparência (as caixas que completam o vão não existem na cena). Os sinais, barulhos e barricadas são públicos: quem abrir as ferramentas do navegador vê quem marcou e onde. O teste de Força do Filho sem ficha ligada é 1d20.
+
+### Os Filhos na perseguição (`perseg3d.js`)
+
+O lado do Mestre na perseguição: a criatura sugere o que faria, age pelo que é e a mesa ganha abertura, porta batendo e replay. **Nada acontece sozinho para assustar:** tudo nasce de um clique do Mestre (iniciar, confirmar, mostrar) ou de uma regra que já dispara (a cobaia entrou na Zona Neutra).
+
+**1. Piloto automático do Filho (Mestre e auxiliares).** Na vez de um Filho aparece o cartão **🐾 Vez de …** (por cima do 3D e no canto do mapa; também no bloco Perseguição). **Mover Filho** calcula para onde a criatura iria e desenha a rota: no 3D, uma fita laranja no chão com setas, os metros em pé no fim do alcance e um alvo vermelho pulsando onde ela queria chegar; no mapa 2.5D, a mesma linha (forte até onde ele chega nesta vez, fraca até o alvo) com os metros em pé no fim. **✔ Confirmar rota** anda com o token pela rota (pelas mesmas regras do arraste: `moverToken3D`, vez, limite, portas, paredes, barricadas); **↻ Outro alvo** troca para a próxima opção; **✕** descarta. Mover o Filho à mão (2D ou 3D) apaga a sugestão. Com **Rota já no começo da vez** ligada, a sugestão aparece sozinha: é só confirmar.
+- **Como escolhe o alvo** (pelos sentidos de `privado/filhos`, nunca pelo nome): quem ele percebe pela regra do `filhos.js` (visão, visão curta ou total, vibração de quem se mexeu, teia, solidão, raízes, ninho, maior NEX, telas, câmeras, leitura, rastro próprio) vem primeiro; depois o **faro de sangue** (cobaia ferida), o **faro de trilha** (a sala mais nova da trilha) e a **audição** (o barulho do decibelímetro, das portas, das interações e do barulho de propósito, ao alcance; audição precisa só dá a direção no sussurro). Entre alvos do mesmo tipo, o mais perto pelo caminho. O cartão diz o motivo ("ouviu barulho moderado em CN 13", "faro de sangue (ferida)"…), a sala, quem é e quantos metros anda.
+- **Até onde vai:** o deslocamento da vez (limite da ficha ou da perseguição, com lento, dobro, água etc. do `filhos.js`), menos o que já andou. **Respeita** portas fechadas (só passa quem arromba, atravessa, tem os dutos ou nada entre salas com água), paredes (quem atravessa anda em linha reta pela planta), "grande demais" em lugar estreito, "não entra em metal", "evita barulho", barricadas (`fuga3d.js`) e a **Zona Neutra, onde nenhum Filho entra**: se o alvo está lá, a rota termina no batente. Imóvel, só no escuro, forma de objeto ou parado pelo Olhar: o cartão diz por que não anda. Ele para um pouco antes da cobaia (não fica em cima dela).
+
+**2. Comportamento visível no 3D** (sem mexer nas formas: só gira, inclina, sobe, afunda ou deixa translúcido o grupo do token). **Ouve:** parado, vira o corpo para o barulho mais forte ao alcance e inclina de leve. **Fareja:** com faro de sangue sobre uma cobaia ferida na sala ou ao lado, ou com faro de trilha numa sala da trilha, abaixa e cheira o chão (andando, vai inclinado). **Teto:** quem tem a ocultação "no teto" anda de cabeça para baixo no teto (4 m na sala, 2,7 m no corredor). **Água:** quem tem afinidade com água (rápido na água, ouve na água, canos, alagar ou rastro molhado) afunda devagar na sala "água" e some, deixando ondas no chão. **Parede:** quem está dentro de uma parede (atravessa paredes) fica translúcido. Mestre e auxiliares calculam pelas características; para os jogadores, a tela do Mestre grava no token público só o que já está à vista (`tokens.<id>.cpt`: `t` teto, `a` água, `f` fareja, `o<graus>` ouvindo), nunca para um Filho oculto.
+
+**3. Abertura da perseguição.** Quando o Mestre clica em **Iniciar perseguição** (não no Encontro, que tem o próprio momento), a tela dele marca a revelação nos Filhos da ordem que estão à vista (`rvt`): todos que veem a criatura (revelada) têm 2 s de câmera nela, com a animação `acao('revelar')` e o som de revelação da forma (`sons-filhos.js`); no 2D, o mapa centra nela com um pulso vermelho. Depois a câmera volta ao primeiro da iniciativa.
+
+**4. O Filho para na porta.** Durante a perseguição, quando uma cobaia da ordem entra na Zona Neutra, a porta bate (som grave com eco, de onde fica a porta; com legenda se as legendas de som estão ligadas; o celular de quem entrou treme) e, no 2D, a porta pisca. A criatura da perseguição que estava a até 16 m daquela porta para, encara o batente por 3 s e vira as costas (só animação: a posição não muda). O piloto nunca leva um Filho para dentro da Zona Neutra.
+
+**5. Replay da perseguição.** A tela do Mestre grava as posições de quem está na ordem, de quem é a vez e os ataques (o efeito de ataque do Controle e as garras do `imersao.js`). No fim da perseguição abre, só para ele, um replay de 8 a 20 s visto de cima: o pedaço do andar onde tudo aconteceu, o caminho de cada um na cor da cobaia, o do Filho tracejado em vermelho, as marcas de ataque aparecendo na hora certa e "Rodada N · vez de …" em cima. As pausas da mesa somem (só contam os momentos em que alguém andou). Ficam os 8 últimos em **Mesa › Momentos marcantes › 🎞 Replays de perseguição** (▶ ver, 📣 mostrar a todos, 🗑 apagar) e entram no **Resumo automático da sessão** (quando, duração, rodadas, cobaias e ataques; sem citar Filhos nem salas). **📣 Mostrar a todos** abre o replay na tela dos jogadores e auxiliares; para eles, o Filho só aparece nos trechos em que estava à vista, com o rótulo genérico "criatura", e os retratos de quem não se via somem.
+
+**6. Linha de iniciativa no 3D.** No lugar da faixa "PERSEGUIÇÃO · Vez de…", uma fileira de retratos no topo: quem age (maior, com aro dourado e o nome), quem vem depois (até 7; 4 no celular) e **???** tracejado para quem você não vê (o Filho oculto), a rodada, o relógio da vez (o mesmo do momento.js, que some enquanto a linha aparece) e "Sua vez: x / 9 m" ou "aguarde a sua vez". **No celular (até 560 px), a faixa e a linha ficam à esquerda do decibelímetro**: nada passa por cima dele (antes a faixa ficava embaixo); durante a perseguição, a linha de dicas de teclas some no celular para dar lugar a ela.
+
+**7. Opções (bloco Perseguição do Mestre, seção "Filhos na perseguição"):** chips liga/desliga, todos ligados por padrão: 🐾 Piloto automático do Filho · 🗺 Rota já no começo da vez · 🎭 Comportamento visível no 3D · 🎬 Abertura (2 s na criatura) · 🚪 O Filho para na porta · 🎞 Replay no fim · 👥 Linha de iniciativa no 3D. Valem para todos (`mapa/cfg/perseg/<opção>` = `false` desliga).
+
+**No Firebase (novos):** `mapa/cfg/perseg/<opção>` (só `false`, com validação), `mapa/replay` = `{ id, ts, j }` (o replay que o Mestre mandou mostrar, em texto, até 60 000 caracteres; sai sozinho em 5 minutos) e o campo `cpt` nos tokens dos Filhos (sem regra nova: o jogador não grava token de Filho). Os replays do Mestre ficam em `segredos/_replays/<k>` (só o Mestre). **Atualize as regras** com `regras-firebase.json`.
+
+**Limites:** o piloto é uma sugestão calculada na tela de quem clicou, com uma grade de 25 cm; os móveis das salas não contam (como no mapa), e a rota anda em tempo real (num aparelho lento ela chega mais depressa ao fim). O alvo vem de uma leitura simples dos sentidos; casos que a ficha resolve por teste (Percepção contra Furtividade, Olhar ao redor) continuam com o Mestre. A tela do Mestre precisa estar aberta para publicar o comportamento (`cpt`), marcar a abertura e gravar o replay; se ela recarregar no meio, aquele replay perde o começo. Quem abrir as ferramentas do navegador pode ler o `cpt` de um Filho à vista e o replay mostrado (os mesmos caminhos que a tela já mostra). O replay mostra o andar onde a perseguição começou.
+
+### Disfarce no 3D (`disfarce3d.js`)
+
+A Forma de Objeto e a cópia, no espírito do "Hide n' Seek" e do "Prop Hunt": o Filho que tem os botões **Forma de Objeto** e **Copiar** (características do Filho, nunca o código) vira **qualquer modelo da sala** ou **qualquer cobaia**, e **toda transformação tem um detalhe errado** que só se percebe olhando de perto e com atenção. De longe e de relance, tudo parece perfeito.
+
+**Quem controla o Filho (Mestre ou auxiliar, no Controle do 3D).** No canto de baixo à direita aparecem **🪑 Objeto** e **🧍 Cobaia** (disfarçado: **↩ Voltar**, **🪑 Trocar** e **🧍 Cobaia**). Os botões Forma de Objeto e Copiar do quadro de habilidades e do menu ☰ abrem o mesmo modo.
+
+1. **Virar um objeto:** no modo Disfarce, um círculo de mira aparece no meio da tela e o modelo da sala que a mira toca ganha **contorno dourado** e o nome ("Arquivo · clique para copiar"). Só entra o que dá para ser: cadeiras, mesas, monitores, computadores, arquivos, armários, estantes, macas, caixas, lixeiras, vasos, carrinhos, máquinas, quadros e relógios de parede (paredes, manchas, papéis no chão, luzes do teto e o que é grande demais ficam de fora). Um **toque** (ou clique) copia **aquele modelo exato da cena** (o mesmo item, montado igual) para a posição do Filho. A câmera sai para trás e o objeto aparece como um fantasma amarelo: **⟲ ⟳** (ou **Q/E**) giram, tocar no chão ajusta o lugar até 2,5 m do Filho (o token anda até lá pelas regras de sempre, então na perseguição gasta metros), **⬇ chão / ⬆ alto** põe em cima de algo quando o original estava numa mesa, e o detalhe errado é **🎲 Sorteio** (padrão) ou **Escolher…**. **✔ Virar** (ou Enter) confirma; **✕** (ou Esc) cancela. Quadros e relógios encostam na parede mais perto. **📋 Lista** mantém a lista antiga (cadeira, caixote, maca…). Virar faz uma animação curta: a criatura encolhe torcendo e o objeto cresce no lugar. No 3D do Mestre e de quem controla, o Filho em forma de objeto aparece só como o objeto com o anel e o nome dele; o auxiliar que não controla vê só o objeto (sem anel, sombra, nome nem seleção), e o jogador nem recebe o token.
+2. **Virar uma cobaia:** a lista das cobaias e o detalhe (o da ficha, se o Mestre escolheu um; senão 🎲 Sorteio; ou Escolher…). Para os jogadores, o token vira a miniatura daquela cobaia, com nome, cor e retrato, e anda como ela. **Exigir Estudar (ficha)** vem ligado: o auxiliar só copia a cobaia já estudada (uma cena inteira como objeto na mesma sala). O Mestre vê todas, com "✔ estudada" ou "sem Estudar". No 3D do Mestre e dos auxiliares, o Filho copiando aparece como a cobaia (com o anel e a base dela), com o nome do Filho em cima.
+3. **Voltar à forma:** a forma falsa se deforma (estica, treme, encolhe soltando farelos escuros) e a criatura cresce no lugar, com a animação `acao('revelar')` da forma 3D e o som de revelação (`sons-filhos.js`). O disfarce também cai sozinho quando o Filho **ataca** pelo Controle, quando a **PV da ficha ligada a ele cai** (foi acertado: o Mestre baixa a PV como sempre) e quando o Mestre toca em **💥 Revelar o disfarce** (painel do token no 3D, ou o próprio botão Forma de Objeto/Copiar de novo, no 2D e no 3D).
+
+**O detalhe errado.** Cada aparelho calcula a **atenção** de quem olha: sobe quando a mira está no disfarce a menos de ~2,5 m por ~1,5 s, ou com a lanterna em cima (até ~4,5 m), e cai quando a pessoa se afasta ou olha para outro lado. Os detalhes crescem com ela (cor, opacidade, brilho, movimento); os de peça (uma perna a mais, uma unha) são pequenos demais para aparecer de longe. Mestre e auxiliares sempre veem os detalhes pela metade.
+
+| Objetos (20) | Como se nota de perto |
+|---|---|
+| Respira | sobe e desce de leve, como um peito |
+| Espelhado | letreiros, números e a etiqueta de patrimônio ao contrário |
+| Um tom errado | a cor puxa para o amarelado, o verde, o azul ou o rosado, diferente das peças iguais |
+| Veias num canto | um canto com textura de pele e veias finas, pulsando |
+| Uma peça a mais | uma perna, roda ou puxador repetido; sem peças repetidas, um puxador onde não tem gaveta |
+| Um olho por um instante | um olho abre numa fresta (ou na tela do monitor) e fecha, só para quem está reparando |
+| Cabo solto | um cabo sai dele e termina no ar, com os fios de cobre à mostra |
+| Não reflete a lanterna | com a lanterna em cima, a superfície fica chapada e escura |
+| Vira devagar | quando você dá as costas, ele gira até ~17° para o seu lado |
+| Gota escura | de tempos em tempos uma gota escorre e pinga numa pocinha |
+| Quente | um vapor fino sobe dele |
+| Limpo demais | novo, com brilho de verniz, num lugar sujo |
+| Duplicata | igual a um objeto da sala até no arranhão (o original ganha o mesmo risco) |
+| Dentes numa fresta | uma fileira de dentes pequenos numa junta |
+| Fios de cabelo | fios escuros saindo de uma junta |
+| Uma unha | uma unha no lugar de um parafuso |
+| Úmido | brilha molhado e deixa uma poça |
+| Etiqueta impossível | etiqueta de inventário com data que não existe (31/02, 32/13…) |
+| Sombra errada | a sombra no chão é de um vulto de braços compridos |
+| Pulsa | um calombo que pulsa como um coração |
+
+| Cobaias (18) | Como se nota de perto |
+|---|---|
+| Retrato espelhado, Número FHP trocado, Anel de outro tom | os três da ficha (2D; o espelhado e o anel também no 3D) |
+| Pisca fora de ritmo | um olho de cada vez, devagar demais |
+| Sombra atrasada | a sombra fica para trás quando ela anda e nunca fica embaixo |
+| Um dedo a mais | seis dedos numa das mãos |
+| Roupa espelhada | o que é de um lado da roupa está do outro |
+| Olhos de bicho | os olhos devolvem a luz da lanterna |
+| Pescoço que gira demais | a cabeça acompanha você além do que um pescoço vira |
+| Respira fora do ritmo | prende o ar e depois respira rápido |
+| Joelhos ao contrário | ao andar, os joelhos dobram para trás |
+| Pescoço comprido | um dedo mais longo |
+| Sorriso que não acaba | um sorriso largo que não sai do rosto |
+| Parado demais | não respira nem mexe a cabeça |
+| Anda deslizando | anda quase sem mexer as pernas |
+| Um pouco mais alto | uns dois dedos mais alto que a original |
+| Pele de outro tom | o rosto um tom acinzentado |
+| Braços compridos | as mãos ficam abaixo de onde deveriam |
+
+O sorteio dos objetos pesa pelo modelo (o olho prefere telas, o cabo prefere aparelhos, a peça a mais prefere móveis). A cobaia de escorpião sorteia só os detalhes que não dependem de um corpo humano. No editor do Filho (aba Segredos › Filhos, aba Botões), "Detalhe da cópia" agora lista os 18; vazio é **🎲 Sorteio no 3D**.
+
+**Jogadores (os caçadores): 🔍 Reparar.** No 3D, mirando de perto (até ~2,7 m) **qualquer** objeto da sala ou **qualquer** cobaia por 1,5 s, aparece **🔍 Reparar: <nome>** logo abaixo do meio da tela (tecla **E**, ou toque no botão; num objeto com interação própria, como um armário que abre, o E continua sendo dele e o Reparar fica no botão). É o teste do livro que já existia: **objeto** = Percepção contra a DT de Examinar a sala (a mesma publicada, `examinarDT` dos dados); **cobaia** = Desconfiar, Intuição contra a Enganação do Filho (3d20+15 nos dados). Passou num disfarce: "Esse objeto tem algo errado: …" (ou "Essa pessoa tem algo errado: …"), e o detalhe fica realçado só para aquele jogador (contorno azul e o detalhe no máximo). Passou num objeto comum: "Nada de errado com isso." Falhou: "Você não nota nada de estranho." (a ficha não pune). Sem DT nos dados, o Mestre decide. A mesma coisa só se repara de novo depois de 20 s. A rolagem vai ao Mestre em segredo e ao **Diário** (a tela do Mestre anota quem reparou em quê, o resultado e se era o disfarce; se passou num disfarce, também um alerta). Atacar um objeto ou cobaia suspeita é a ação **Atacar** de sempre (se acertar, o Mestre baixa a PV e o disfarce cai). Nada diz "é o Filho" sem o teste ou sem a revelação.
+
+**Regras da casa (painel Filhos, aba Segredos, seção "🎭 Disfarce no 3D"):** **Exigir Estudar (ficha)** (ligada) e, desligadas por padrão: **Sinal periódico** (a cada 70 a 110 s, o mesmo ritmo em todos os aparelhos, o disfarce treme e solta um estalo e um assobio baixo, com som posicional e legenda se ligada), **Só se move quando ninguém olha** (em forma de objeto, o Filho pode andar, e o objeto vai junto, enquanto nenhuma cobaia da sala estiver olhando para ele; quem não publicou para onde olha conta como olhando) e **Trocar de objeto custa a vez** (na perseguição, virar, trocar ou copiar só na vez dele e gasta o resto do deslocamento). Desligadas, valem as regras da ficha.
+
+**No Firebase:** `mapa/fil/ob/<k>` ganhou campos (com validação nas regras e no `recusaLocal`): `{ a, x, y, o, ts, cn?, i?, r?, h?, p?, d? }` (modelo da cena `cn`/`i`, giro em graus, altura, 1 = na parede, chave do detalhe). `mapa/cfg/disf/<k>` (só o Mestre, booleano). `filAcoes` aceita `t: reparar` com `o` (o que foi reparado: `ob:<k>`, `tk:<id>` ou `cNN:i`) e `ok`. Nos tokens dos Filhos, `cpd` passa a aceitar as chaves novas. O dono do objeto continua em `privado/filhosEstado/obj`. **Atualize as regras** com `regras-firebase.json`.
+
+**Limites:** o detalhe é visual e público, como o resto do disfarce: quem abrir as ferramentas do navegador vê `mapa/fil/ob` (o objeto e a chave do detalhe) e, no token de um Filho copiando, `cp` e `cpd` (já era assim). A atenção e os realces são calculados em cada aparelho; um jogador com a câmera longe de verdade não vê nada mesmo que o colega veja. As animações de virar e de quebrar aparecem para quem tem aquela sala carregada no 3D; quem chega depois só vê o resultado. Os detalhes de movimento (respira, vira, cabeça, joelhos) não aparecem numa foto parada. A tela do Mestre precisa estar aberta para desfazer o disfarce no ataque e na PV caindo, para anotar o Reparar no Diário e para levar o objeto junto quando o Filho anda. Modelos da cena dependem do arquivo de cenas importado; sem ele, só a lista antiga.
+
 ### Protocolo no 3D
 
 Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as luzes ficam vermelhas e pulsando, a tela puxa para o vermelho e toca uma **sirene**. Os Filhos que o Mestre (ou o auxiliar) revela aparecem com as formas escolhidas.
@@ -641,6 +822,7 @@ Quando o Protocolo Filho da O.R.F.E.U. começa: faixa vermelha no topo, todas as
 | N | Narrador (Mestre) |
 | L | Lanterna |
 | 1 a 9 | Habilidades do Filho no Controle (Mestre e auxiliares) |
+| V | Visão da criatura: ver pelos olhos do Filho no Controle (Mestre e auxiliares) |
 | Esc | Solta o mouse; depois fecha menu, gaveta, painéis e a vista |
 
 ### Opções (⚙, tecla O), como num jogo
@@ -657,7 +839,7 @@ Com qualquer janela do site aberta por cima do 3D (ficha, chat, arquivo, loja), 
 
 **Celular:** joystick no canto esquerdo anda; arrastar a tela olha em volta; pinça aproxima. No celular a gaveta abre como uma folha que sobe de baixo (82% da tela) e esconde joystick e barra enquanto está aberta. Toque no objeto (ou no aviso "E · …" que aparece embaixo) para usar.
 
-**Topo da tela:** ☰ Menu · 💬 Chat · 🗂 Gaveta · 🎛 Controles (Mestre e auxiliares) · ⚙ Opções · ✕ Sair.
+**Topo da tela:** ☰ Menu · 💬 Chat · 🗂 Gaveta · 🎛 Controles (Mestre e auxiliares) · 👁 Visão da criatura (no Controle de um Filho) · ⚙ Opções · ✕ Sair.
 
 ### Tudo do site dentro do 3D
 
