@@ -407,6 +407,8 @@ const Eco = {
     const k = A().Rede.chave(), j = () => (Math.random() - .5) * 1.2;
     const W = A().geo.W, H = A().geo.H;
     const v = { a: tk.a, x: +Math.max(0, Math.min(W, tk.x + j())).toFixed(2), y: +Math.max(0, Math.min(H, tk.y + j())).toFixed(2), t: tipo, ts: agora() };
+    // sons-filhos.js: a forma (só aparência) e um apelido sorteado, para o jogador ouvir os sons gravados
+    const sf = window.ACF_SONS && ACF_SONS.marca ? ACF_SONS.marca(tk) : null; if (sf) Object.assign(v, sf);
     this.meus.push([k, v.ts]);
     A().Rede.set('ecos3d/' + k, v).catch(() => {});
   },
@@ -436,6 +438,8 @@ const Eco = {
     const eu = A().meu, tk = tokens()[eu]; if (!tk || tk.a !== e.a) return false;
     const mu = MU(), dist = Math.hypot(e.x - tk.x, e.y - tk.y) * mu;
     if (dist > (e.t === 'respiracao' ? 7 : 18)) return false;
+    // sons gravados da forma (sons-filhos.js); sem arquivo, segue o som sintetizado abaixo (reserva)
+    if (window.ACF_SONS && ACF_SONS.eco(e)) return true;
     Aud.preparar(); if (!Aud.ok()) return false;
     const ap = api3();
     if (ap && ap.a === e.a) {

@@ -844,6 +844,9 @@
 /* afogada.js · forma de Filho: mulher alta de vestido claro encharcado e rasgado, cabelo preto
    molhado cobrindo o rosto, mãos longas e pálidas; a água escorre sem parar das mangas, da barra
    e das pontas do cabelo e forma uma poça com ondas aos pés. Ela desliza mais do que anda.
+   Ações: acao('ataque') avança deslizando com os braços esticados, a cortina de cabelo se abre e
+   a boca escancarada jorra água; acao('revelar') a poça se alarga e ela sobe de dentro da água,
+   da cabeça para baixo, com o cabelo colado e a água escorrendo, até estalar a cabeça e encarar.
    Formato: ACF3D.formasFilho.afogada = { nome, criar(F, s) → { g, alt, raioBase, anim } } */
 (() => {
   'use strict';
@@ -1200,18 +1203,18 @@
       const calota = malha(cab, new T.SphereGeometry(.106, 22, 12, 0, PI * 2, 0, 1.6), matCab); calota.scale.set(.9, 1.12, .98); calota.rotation.x = -.5;
       const paraCorpo = (p, ref) => V(p[0] + ref.x, p[1] + ref.y, p[2] + ref.z);
       const daCurva = (pts, ref, folga) => pts.map(p => { const w = afasta(paraCorpo(p, ref), folga); return [w.x - ref.x, w.y - ref.y, w.z - ref.z]; });
-      const frente = { a: [], c: [] }, costas = { a: [], c: [] }, pontas = [];
+      const frenteE = { a: [], c: [] }, frenteD = { a: [], c: [] }, costas = { a: [], c: [] }, pontas = [];
       const fio = (lista, pts, r0) => lista.push(tubo(pts, t => r0 * (1 - t * .8) * Math.min(1, .55 + t * 9), { seg: 16, rad: 4 }));
       const cartao = (lista, pts, larg, fresta = 0) => lista.push(fita(pts, t => larg * (1 - t * .25) * (1 - fresta * Math.exp(-Math.pow((t - .2) / .05, 2))), { seg: 22, rep: 1 }));
       // cortina da frente: três cartões, com uma fresta onde o olho espia
       [[-.066, .045, 0, 0], [-.034, .04, 0, .006], [-.006, .045, .6, 0], [.032, .036, 0, .007], [.06, .045, 0, 0]].forEach(([cx, w, fr2, dz2], i) => {
         const fim = -.6 - R() * .22;
-        cartao(frente.c, daCurva([[cx * .45, .105, .01], [cx * .85, .094 + dz2, .075], [cx, .045, .114 + dz2], [cx * 1.04, -.05, .124 + dz2], [cx * 1.12, -.22, .12 + dz2], [cx * 1.25, -.44, .12 + dz2], [cx * 1.35, fim, .11 + dz2]], HC, .035), w, fr2);
+        cartao((cx < -.01 ? frenteE : frenteD).c, daCurva([[cx * .45, .105, .01], [cx * .85, .094 + dz2, .075], [cx, .045, .114 + dz2], [cx * 1.04, -.05, .124 + dz2], [cx * 1.12, -.22, .12 + dz2], [cx * 1.25, -.44, .12 + dz2], [cx * 1.35, fim, .11 + dz2]], HC, .035), w, fr2);
       });
       for (let i = 0; i < 14; i++) {
         const x0 = -.075 + i / 13 * .15; if (x0 > .0 && x0 < .028) continue;
         const j = (R() - .5) * .03, fim = -.6 - R() * .32;
-        fio(frente.a, daCurva([[x0 * .5, .108, .015], [x0 * .85, .098, .08], [x0 * 1.02, .048, .12], [x0 * 1.08 + j * .3, -.04, .13], [x0 * 1.15 + j * .6, -.17, .127], [x0 * 1.3 + j, -.36, .128], [x0 * 1.45 + j, fim, .118]], HC, .042), .0045 + R() * .002);
+        fio((x0 < -.01 ? frenteE : frenteD).a, daCurva([[x0 * .5, .108, .015], [x0 * .85, .098, .08], [x0 * 1.02, .048, .12], [x0 * 1.08 + j * .3, -.04, .13], [x0 * 1.15 + j * .6, -.17, .127], [x0 * 1.3 + j, -.36, .128], [x0 * 1.45 + j, fim, .118]], HC, .042), .0045 + R() * .002);
         pontas.push(V(x0 * 1.45 + j, fim, .118));
       }
       // lados e costas: cartões largos até a cintura e mais abaixo
@@ -1231,7 +1234,8 @@
       }
       const U2 = T.BufferGeometryUtils;
       const juntaFios = (pai, l) => [[l.a, matCab], [l.c, matCard]].forEach(([lista, m]) => { if (!lista.length) return; const geo = U2 && U2.mergeBufferGeometries(lista); if (geo) { lista.forEach(q => q.dispose()); malha(pai, geo, m); } else lista.forEach(q => malha(pai, q, m)); });
-      const cortina = grupo(cab); juntaFios(cortina, frente);
+      // a cortina da frente em duas metades, para poder se abrir
+      const cortina = grupo(cab), cortE = grupo(cortina), cortD = grupo(cortina); juntaFios(cortE, frenteE); juntaFios(cortD, frenteD);
       const nuca = grupo(alto, HC.x, HC.y, HC.z); juntaFios(nuca, costas);
       const gotasCab = pontas.filter((p, i) => i % 3 === 0).map(p => grupo(cortina, p.x, p.y, p.z));
 
@@ -1256,9 +1260,12 @@
         // pano pesado de água: a parte de baixo da manga cede, e o pano enruga
         const A = cot.clone(), AB = fim.clone().sub(A), L2 = AB.lengthSq();
         deform(geoM, (x, y, z) => { const p = V(x, y, z), pr = p.clone().sub(A).dot(AB) / L2; let dy = 0; if (pr > 0) { const k = Math.min(1, pr), c = A.clone().addScaledVector(AB, k), d = y - c.y; if (d < 0) dy = d * 1.1 * k; } const n = fbm(x * 22, y * 22, z * 22, 2) * .014; return [x + n, y + dy + n * .4, z - n * .8]; });
-        malha(corpo, geoM, matManga);
+        // manga e cortina num pivô no ombro: acompanham o braço quando ele se estica nas ações
+        const pivo = grupo(corpo, ombro.x, ombro.y, ombro.z), dirRep = pul.clone().sub(ombro).normalize();
+        geoM.translate(-ombro.x, -ombro.y, -ombro.z);
+        malha(pivo, geoM, matManga);
         // cortina de pano que pende de todo o antebraço, mais longa perto do punho, quase até o chão
-        const tiras = grupo(corpo, cot.x, cot.y, cot.z), pontasT = [], NC = 9, NRr = 12, pc = [], uvc = [], ic = [];
+        const tiras = grupo(pivo, cot.x - ombro.x, cot.y - ombro.y, cot.z - ombro.z), pontasT = [], NC = 9, NRr = 12, pc = [], uvc = [], ic = [];
         const u0 = sx < 0 ? .08 : .55;
         for (let i = 0; i <= NC; i++) {
           const s2 = i / NC, topo = fim.clone().sub(cot).multiplyScalar(s2).add(V(sx * .01, -.045 - s2 * .02, -.025)), comp = .5 + s2 * .55;
@@ -1271,7 +1278,7 @@
         const geoC = new T.BufferGeometry(); geoC.setAttribute('position', new T.Float32BufferAttribute(pc, 3)); geoC.setAttribute('uv', new T.Float32BufferAttribute(uvc, 2)); geoC.setIndex(ic); geoC.computeVertexNormals();
         malha(tiras, geoC, matVest);
         [.45, .75, 1].forEach(s2 => { const topo = fim.clone().sub(cot).multiplyScalar(s2).add(V(sx * .01, -.045 - s2 * .02, -.025)), comp = .5 + s2 * .55; pontasT.push(grupo(tiras, topo.x + sx * .08 * (1 + s2 * .5), topo.y - comp + .06, topo.z - .04)); });
-        return { sx, br, m, alvo, polo, gotas, tiras, pontasT };
+        return { sx, br, m, alvo, polo, gotas, tiras, pontasT, pivo, dirRep, ombroP: ombro };
       });
 
       /* ---------- água: poça com ondas, filetes e gotas ---------- */
@@ -1304,7 +1311,7 @@
       const DM = new T.Matrix4(), DQ = new T.Quaternion(), DS = V(1, 1.9, 1), P0 = V();
 
       /* ---------- animação ---------- */
-      let desl = 0, prox = 0;
+      let desl = 0, prox = 0; const QM = new T.Quaternion();
       const pos = geoV.attributes.position;
       const anim = (dt, t, andando) => {
         desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 2.5);
@@ -1324,12 +1331,17 @@
         // braços flutuando, dedos tremendo
         lados.forEach((l, i) => {
           const a = l.alvo.clone(); a.y += Math.sin(t * .8 + i * 2) * .025 - desl * .03; a.z += -desl * .08 + Math.sin(t * .6 + i) * .015; a.x += l.sx * desl * .03;
+          if (AC.braco) a.lerp(V(l.sx * (.2 + AC.abre * .12), 1.78 + Math.sin(t * 11 + i) * .02, .78), AC.braco);
           ik(l.br, a, l.polo);
+          if (AC.braco > .001) { posEm(l.br.punho, corpo, P0).sub(l.ombroP).normalize(); QM.setFromUnitVectors(l.dirRep, P0); l.pivo.quaternion.identity().slerp(QM, AC.braco); }
+          else l.pivo.quaternion.identity();
           const tique = Math.sin(t * 9.3 + i * 4) > .985 ? .5 : 0;
-          l.m.curvar([.32 + tique, .38, .42 + tique * .5, .5, .2], .06, t);
+          const ab = 1 - AC.braco * .85;
+          l.m.curvar([(.32 + tique) * ab, .38 * ab, (.42 + tique * .5) * ab, .5 * ab, .2], .06 + AC.braco * .08, t);
           l.tiras.rotation.x = -desl * .22 + Math.sin(t * 1.3 + i) * .035; l.tiras.rotation.z = l.sx * (desl * .06 + Math.sin(t * 1.1 + i * 2) * .025);
         });
         saia.rotation.y = Math.sin(t * .7) * .02; saia.position.z = -desl * .015;
+        acaoPose(t);
         // barra do vestido ondulando (e arrastando para trás ao deslizar)
         for (let k = 0; k < pos.count; k++) {
           const bx = baseV[k * 3], by = baseV[k * 3 + 1], bz = baseV[k * 3 + 2];
@@ -1356,9 +1368,76 @@
         gotas.instanceMatrix.needsUpdate = true;
         ondas.forEach(o => { const k = (t - o.t0) / o.dur; if (k < 0 || k > 1) { o.mo.opacity = 0; return; } o.o.position.set(o.cx, .045, o.cz); o.o.scale.setScalar(.03 + k * o.tam); o.mo.opacity = (1 - k) * .45; });
       };
+      /* ---------- ações: ataque e revelar ---------- */
+      // boca que se escancara por trás do cabelo e o jorro de água que sai dela
+      const matBoca = mat({ color: '#070203', emissive: '#1a0306', emissiveIntensity: 1, roughness: .3 });
+      const boca = malha(cab, new T.SphereGeometry(.03, 14, 10), matBoca); boca.position.set(0, -.048, .078); boca.visible = false;
+      const jatoG = grupo(cab, 0, -.05, .09);
+      const matJato = F.guardar(new T.MeshStandardMaterial({ color: new T.Color('#cfeff2'), emissive: new T.Color('#1d4a52'), map: texF, transparent: true, opacity: 0, roughness: .05, depthWrite: false, side: T.DoubleSide }));
+      const geoJ = new T.CylinderGeometry(.06, .016, 1, 10, 1, true); geoJ.translate(0, .5, 0);
+      const jato = malha(jatoG, geoJ, matJato); jato.visible = false; jato.scale.set(.01, .01, .01);
+      // respingos do jorro (malha instanciada própria)
+      const NJ = 46, respingos = new T.InstancedMesh(F.guardar(new T.SphereGeometry(.014, 6, 4)), matG, NJ); respingos.frustumCulled = false; agua.add(respingos);
+      const RJ = []; for (let i = 0; i < NJ; i++) RJ.push({ p: V(), v: V(), vivo: false });
+      const AC = { braco: 0, abre: 0 }, origem = V(), dirJ = V(), QJ = new T.Quaternion(), Y1 = V(0, 1, 0);
+      let ac = null, tAnt = 0;
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') { ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.7 : 2.0 }; } };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      function acaoPose(t) {
+        const dt = Math.min(.1, Math.max(0, t - tAnt)); tAnt = t;
+        let jorro = 0, abre = 0, bocaA = 0, sobe = 0, pocaK = 0;
+        AC.braco = 0; AC.abre = 0; corpo.position.z = 0;
+        if (ac) {
+          ac.t += dt; const u = ac.t;
+          if (u >= ac.dur) ac = null;
+          else if (ac.tipo === 'ataque') {
+            const avan = qd(u, [[0, 0], [.18, -.06], [.5, .55], [1.1, .5], [1.7, 0]]);
+            corpo.position.z = avan; corpo.position.y += qd(u, [[0, 0], [.45, .08], [1.1, .06], [1.7, 0]]);
+            corpo.rotation.x += qd(u, [[0, 0], [.18, -.1], [.5, .2], [1.1, .16], [1.7, 0]]);
+            AC.braco = qd(u, [[0, 0], [.16, .15], [.45, 1], [1.15, 1], [1.7, 0]]);
+            abre = qd(u, [[0, 0], [.25, .2], [.5, 1], [1.2, 1], [1.7, 0]]);
+            bocaA = qd(u, [[0, 0], [.35, .3], [.52, 1], [1.2, 1], [1.6, 0]]);
+            jorro = qd(u, [[0, 0], [.42, 0], [.55, 1], [1.15, .9], [1.45, 0]]);
+            cab.rotation.x += qd(u, [[0, 0], [.4, -.45], [1.2, -.4], [1.7, 0]]); cab.rotation.y *= 1 - abre; cab.rotation.z *= 1 - abre * .8;
+            pocaK = qd(u, [[0, 0], [.6, .45], [1.7, 0]]);
+          } else {
+            // sobe de dentro da poça
+            pocaK = qd(u, [[0, .9], [.5, .9], [1.6, .35], [2, 0]]);
+            sobe = qd(u, [[0, 1], [.12, 1], [1.05, 0], [2, 0]]);
+            corpo.position.y -= sobe * 2.35; corpo.rotation.x += sobe * .12;
+            corpo.position.z = Math.sin(t * 7) * .012 * sobe;
+            const enc = qd(u, [[0, 0], [1.0, 0], [1.12, 1], [1.6, 1], [2, 0]]);
+            cab.rotation.x += sobe * .55 - enc * .35; cab.rotation.y *= 1 - enc; cab.rotation.z += enc * .25 - cab.rotation.z * enc * .6;
+            abre = enc * .55; bocaA = enc * .7;
+            AC.braco = qd(u, [[0, 0], [1.1, 0], [1.4, .35], [2, 0]]);
+            nuca.rotation.x -= sobe * .25;
+          }
+        }
+        AC.abre = abre;
+        // cabelo se abrindo para os lados (e a cortina inteira levanta um pouco)
+        cortE.rotation.set(-abre * .25, -abre * .2, -abre * .62); cortD.rotation.set(-abre * .25, abre * .2, abre * .62);
+        boca.visible = bocaA > .02; boca.scale.set(1 + bocaA * .3, .4 + bocaA * 2.3, .6 + bocaA * .3);
+        poca.scale.setScalar(1 + pocaK); ondas.forEach(o => { if (pocaK > .2 && o.mo.opacity === 0 && Math.random() < .08) { o.t0 = t; o.cx = (Math.random() - .5) * .6; o.cz = (Math.random() - .5) * .6; o.tam = .5 + Math.random() * .6; } });
+        nuc.g.scale.setScalar(1 + bocaA * .25);
+        // jorro: tubo de água da boca para a frente e para baixo, e respingos
+        jato.visible = jorro > .02; matJato.opacity = .8 * jorro;
+        if (jato.visible) {
+          jatoG.rotation.set(2.05 - Math.sin(t * 13) * .05, 0, Math.sin(t * 17) * .04); jato.scale.set(1 + Math.sin(t * 29) * .15, .25 + jorro * .95, 1 + Math.sin(t * 23) * .15);
+        }
+        posEm(jatoG, g, origem); g.updateWorldMatrix(true, true);
+        dirJ.set(0, 1, 0).applyQuaternion(jatoG.getWorldQuaternion(QJ)); g.getWorldQuaternion(DQ); dirJ.applyQuaternion(DQ.invert()); DQ.identity();
+        RJ.forEach((d, i) => {
+          if (!d.vivo && jorro > .3 && Math.random() < jorro * .5) { d.vivo = true; d.p.copy(origem); d.v.copy(dirJ).multiplyScalar(2.2 + Math.random() * 1.4).add(V((Math.random() - .5) * .7, (Math.random() - .3) * .6, (Math.random() - .5) * .5)); }
+          if (d.vivo) { d.v.y -= 9.8 * dt; d.p.addScaledVector(d.v, dt); if (d.p.y < .05) d.vivo = false; }
+          if (d.vivo) DM.compose(d.p, DQ, DS); else DM.makeScale(0, 0, 0);
+          respingos.setMatrixAt(i, DM);
+        });
+        respingos.instanceMatrix.needsUpdate = true;
+      }
       // primeira pose antes do primeiro quadro
       anim(0, 0, false);
-      return { g, alt: 2.32, raioBase: .5, anim };
+      return { g, alt: 2.32, raioBase: .5, anim, acao };
     },
   };
 })();
@@ -2426,7 +2505,11 @@
    Gaiola de passarinho ornamentada e enferrujada, como uma lanterna, com panos cinzentos rasgados por
    cima e uma luz quente lá dentro, pendurada no teto por correntes. Dela saem oito pernas finíssimas
    de osso e metal, com juntas altas perto do teto, que descem até o chão terminando em espetos.
-   Anda perna por perna. */
+   Anda perna por perna.
+   Ações: acao('ataque') a gaiola dá um tranco para a frente, a luz de dentro estoura e as duas pernas
+   da frente se erguem e cravam os espetos no chão à frente; acao('revelar') a gaiola desce do teto com
+   as pernas dobradas junto dela, dá um solavanco nas correntes e as pernas se desdobram uma a uma,
+   cravando no chão, enquanto a luz se acende. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
   (NS.formasFilho = NS.formasFilho || {}).aranha_gaiola = {
@@ -2606,10 +2689,12 @@
         corpo.rotation.x = Math.sin(t * .9) * .025 + Math.sin(fase * 6.283 * 8) * .02 * kAnda + kAnda * .04;
         corpo.rotation.z = Math.sin(t * .7 + 1) * .03 + tique(t, 7.3, .6, 1) * .05;
         corpo.rotation.y = Math.sin(t * .23) * .08;
+        acaoCorpo(dt, t);
         corpo.updateMatrix();
         // luz tremulando como lamparina, às vezes quase apaga
         const pisca = .78 + .14 * Math.sin(t * 9 + Math.sin(t * 23)) + .08 * Math.sin(t * 31) - tique(t, 6.7, .25, 2) * .6;
-        luz.intensity = .9 * pisca; mLuz.emissiveIntensity = 1.6 * pisca; halo.material.opacity = .55 + .45 * pisca;
+        const pk = Math.max(0, pisca * AC.luz);
+        luz.intensity = .9 * pk; mLuz.emissiveIntensity = 1.6 * pk; halo.material.opacity = Math.min(1, (.55 + .45 * pisca) * Math.min(1, AC.luz)); const hk = Math.min(1.35, Math.max(.3, AC.luz)); halo.scale.set(1.3 * hk, 1.6 * hk, 1);
         panos.forEach(pn => { pn.piv.rotation.x = Math.sin(t * .8 + pn.f) * .03; pn.piv.rotation.z = pn.z0 + Math.sin(t * .6 + pn.f * 2) * .03; });
         // pernas: uma de cada vez, levanta alto e crava o espeto no chão
         pernas.forEach((p, k) => {
@@ -2621,6 +2706,7 @@
           // parada: de vez em quando uma perna bate a ponta no chão, como dedos tamborilando
           const toque = tique(t, 3.3 + k * .41, .35, k * 1.37) * (1 - kAnda);
           p.alvo.set(p.pe0.x + dx, dy + toque * .28, p.pe0.z + dz);
+          acaoPerna(p);
           p.H.copy(p.hip).applyMatrix4(corpo.matrix); p.O.copy(p.ombro).applyMatrix4(corpo.matrix);
           // joelho alto, quase no teto: fica entre o ombro e o pé, puxado para cima; sobe quando a perna levanta
           tmp.set(p.alvo.x - p.O.x, 0, p.alvo.z - p.O.z);
@@ -2633,10 +2719,55 @@
           p.pino.position.copy(p.K); p.pino.quaternion.setFromUnitVectors(CIMA, perp.set(-p.alvo.z, 0, p.alvo.x).normalize());
         });
         const pu = Math.pow(.5 + .5 * Math.sin(t * 1.25), 3);
-        nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.4; nucleo.hl.material.opacity = .45 + pu * .55;
+        nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.4 + AC.nuc; nucleo.hl.material.opacity = Math.min(1, .45 + pu * .55 + AC.nuc * .2);
       };
+      /* ================= ações únicas: ataque e revelar ================= */
+      let ac = null;
+      const AC = { luz: 1, nuc: 0, u: 0 };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.6 : 2.0 }; };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const frente = [pernas[0], pernas[4]], dobra = V3();
+      function acaoCorpo(dt, t) {
+        AC.luz = 1; AC.nuc = 0; corpo.position.set(0, TETO, 0);
+        if (!ac) return;
+        ac.t += dt; const u = AC.u = ac.t; if (u >= ac.dur) { ac = null; return; }
+        if (ac.tipo === 'ataque') {
+          corpo.rotation.x += qd(u, [[0, 0], [.3, -.12], [.55, .3], [1.05, .24], [1.6, 0]]);
+          corpo.position.z = qd(u, [[0, 0], [.3, -.15], [.55, .55], [1.05, .48], [1.6, 0]]);
+          corpo.position.y = TETO + qd(u, [[0, 0], [.3, .1], [.55, -.5], [1.05, -.42], [1.6, 0]]);
+          AC.luz = qd(u, [[0, 1], [.3, .25], [.5, 2.6], [.9, 1.8], [1.6, 1]]) + Math.sin(t * 37) * .2 * (u > .45 && u < 1 ? 1 : 0);
+          AC.nuc = qd(u, [[0, 0], [.55, 3], [1.6, 0]]);
+        } else {
+          // desce do teto e dá um solavanco nas correntes
+          const desce = qd(u, [[0, 1], [.08, 1], [.55, -.08], [.68, .05], [.82, -.02], [1.0, 0], [2, 0]]);
+          corpo.position.y = TETO + desce * 1.2;
+          corpo.rotation.z += Math.sin(u * 14) * .06 * Math.max(0, 1 - u);
+          corpo.rotation.x += Math.sin(u * 11 + 1) * .05 * Math.max(0, 1 - u);
+          AC.luz = qd(u, [[0, .05], [.5, .05], [.62, 1.8], [.7, .3], [.8, 1.5], [1.2, 1.2], [2, 1]]);
+          AC.nuc = qd(u, [[0, 0], [.6, 0], [.9, 2.5], [2, 0]]);
+        }
+      }
+      function acaoPerna(p) {
+        if (!ac) return; const u = AC.u;
+        if (ac.tipo === 'ataque') {
+          const k = frente.indexOf(p);
+          if (k >= 0) {
+            const ergue = qd(u, [[0, 0], [.3, 1], [.44, 1], [.56, 0], [1.6, 0]]), crava = qd(u, [[0, 0], [.4, 0], [.56, 1], [1.05, 1], [1.6, 0]]);
+            dobra.set(Math.sin(p.ang) * .7, 3.2, Math.cos(p.ang) * .7 + 1.5);
+            p.alvo.lerp(dobra, ergue);
+            dobra.set((k ? 1 : -1) * .3, 0, 1.95);
+            p.alvo.lerp(dobra, crava * (1 - ergue));
+          } else { p.alvo.x *= 1 + qd(u, [[0, 0], [.55, .06], [1.6, 0]]); p.alvo.z += qd(u, [[0, 0], [.55, -.1], [1.6, 0]]); }
+        } else {
+          // pernas dobradas junto da gaiola; desdobram uma de cada vez e cravam
+          const ini = .5 + p.ordem * .1, abre = qd(u, [[0, 0], [ini, 0], [ini + .28, 1], [2, 1]]);
+          dobra.set(Math.sin(p.ang) * 1.0, TETO - .45 + corpo.position.y - TETO, Math.cos(p.ang) * 1.0);
+          p.alvo.lerp(dobra, 1 - abre);
+        }
+      }
       anim(0, 0, false);
-      return { g, alt: 3.9, raioBase: .6, anim };
+      return { g, alt: 3.9, raioBase: .6, anim, acao };
     },
   };
 })();
@@ -3698,7 +3829,10 @@
    Massa baixa e comprida coberta por uma mortalha cinzenta rasgada, com um capuz na frente onde só
    aparecem dois olhos pálidos. Por baixo, dezenas de braços cinza-escuros cheios de tendões, com
    pulseiras e anéis de ouro e garras de ponta dourada, se arrastam em onda; alguns braços passam por
-   cima das costas e puxam o corpo para a frente. Baixo e comprido, rente ao chão. */
+   cima das costas e puxam o corpo para a frente. Baixo e comprido, rente ao chão.
+   Ações: acao('ataque') empina a frente, ergue os braços dianteiros e os crava adiante, garras na vítima;
+          acao('revelar') é só um monte de pano no chão até os braços se desdobrarem para fora, de trás para a frente,
+          e o capuz se erguer abrindo os olhos. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
   (NS.formasFilho = NS.formasFilho || {}).bracos_rastejante = {
@@ -3898,15 +4032,29 @@
       const maosCapuz = [-1, 1].map(sx => { const m2 = new T.Mesh(qMao, [mPele, mOuro]); m2.scale.set(sx * .8, .8, .8); m2.position.set(sx * .17, -.17, .2); m2.rotation.set(1.25, sx * -.5, 0, 'YXZ'); cab.add(m2); return m2; });
 
       /* ================= animação ================= */
-      let fase = 0, kAnda = 0;
-      const tmp = V3(), alvoH = V3();
+      let fase = 0, kAnda = 0, acA = null;
+      const tmp = V3(), alvoH = V3(), poloT = V3();
+      // ações únicas: curvas suaves de 0 a 1 e uma mola que passa do ponto
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const mola = x => x <= 0 ? 0 : 1 - Math.exp(-x * 7) * Math.cos(x * 16);
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
       const anim = (dt, t, andando) => {
+        // pesos das ações: empinar e cravar (ataque); monte de pano que se desdobra (revelar)
+        let empina = 0, crava = 0, uR = -1, monte = 0, ergue = 1;
+        if (acA) {
+          acA.t += dt; const u = acA.t;
+          if (acA.tipo === 'ataque') { empina = faixa(u, 0, .28) * (1 - faixa(u, .95, 1.4)); crava = faixa(u, .28, .42) * (1 - faixa(u, .9, 1.35)); }
+          else { uR = u; monte = 1 - faixa(u, .25, .9); ergue = faixa(u, .85, 1.15); }
+          if (u >= acA.dur) acA = null;
+        }
         kAnda += ((andando ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
         fase += dt * .9 * kAnda;
         // corpo: ondula, respira e se arrasta aos trancos
         const resp = Math.sin(t * 1.4 + Math.sin(t * .5)) * .5 + .5, tranco = Math.pow(Math.max(0, Math.sin(fase * 6.283 * 2)), 3) * kAnda;
-        corpo.position.set(Math.sin(fase * 6.283) * .03 * kAnda, -.02 * resp + tranco * .03, tranco * .05);
-        corpo.rotation.set(0, Math.sin(fase * 6.283) * .04 * kAnda, Math.sin(fase * 6.283 + 1) * .03 * kAnda + Math.sin(t * .6) * .01);
+        corpo.position.set(Math.sin(fase * 6.283) * .03 * kAnda, -.02 * resp + tranco * .03 + empina * .12 - crava * .04 - monte * .3, tranco * .05 + crava * .25 - empina * .08);
+        corpo.rotation.set(-empina * .32 + crava * .22, Math.sin(fase * 6.283) * .04 * kAnda, Math.sin(fase * 6.283 + 1) * .03 * kAnda + Math.sin(t * .6) * .01);
+        corpo.scale.set(1 + monte * .12, 1 - monte * .45, 1);
         corpo.updateMatrix();
         // mortalha: onda correndo da frente para trás por cima dos braços
         const pM2 = mortalha.geometry.attributes.position;
@@ -3914,9 +4062,12 @@
         pM2.needsUpdate = true; mortalha.geometry.computeVertexNormals();
         // capuz: balança devagar e dá viradas bruscas; olhos piscam
         const vira = tique(t, 5.3, .45, 1.3), vira2 = tique(t, 8.9, .35, 4.2);
-        cab.rotation.set(.12 + Math.sin(t * .8) * .05 - vira2 * .2 + tranco * .1, Math.sin(t * .4) * .2 + vira * .7, Math.sin(t * .5) * .08 + vira * .3 - vira2 * .25);
+        const quieto = 1 - Math.max(empina, monte);
+        cab.rotation.set(.12 + (Math.sin(t * .8) * .05 - vira2 * .2) * quieto + tranco * .1 - empina * .1 + crava * .35 + monte * .7, (Math.sin(t * .4) * .2 + vira * .7) * quieto, (Math.sin(t * .5) * .08 + vira * .3 - vira2 * .25) * quieto);
         maosCapuz.forEach((m2, i) => { m2.rotation.x = 1.25 + Math.sin(t * 2.3 + i * 2) * .06 + tique(t, 3.9, .3, i * 1.7) * .35; });
-        const pisca = tique(t, 4.1, .14) > .4 ? .1 : 1; olhos.forEach((o, i) => { o.scale.y = .6 * pisca; halos[i].material.opacity = pisca; });
+        let pisca = tique(t, 4.1, .14) > .4 ? .1 : 1;
+        if (uR >= 0) pisca = uR < .85 ? 0 : uR < 1.0 ? (Math.sin(uR * 90) > 0 ? 1 : .2) : 1;   // os olhos acendem por último, falhando
+        olhos.forEach((o, i) => { o.scale.y = .6 * Math.max(pisca, .02) * (1 + empina * .5); halos[i].material.opacity = pisca * (1 + empina * .6); });
         // braços: onda metacrônica (como uma centopeia), cada mão desliza para trás e é levada à frente pelo alto
         bracos.forEach((b, i) => {
           const c = ((fase * (b.longo ? 1 : 2) - b.fase) % 1 + 1) % 1, duty = b.longo ? .7 : .62;
@@ -3928,8 +4079,23 @@
           // parado: dedos tamborilam e um braço ou outro muda de apoio
           const ajeita = tique(t, 4.6 + i * .37, .5, i * 1.9) * (1 - kAnda);
           b.alvo.set(b.pe.x, b.pe.y + dy + ajeita * .12, b.pe.z + dz + ajeita * .05);
+          // ataque: os braços da frente e os compridos sobem e se cravam adiante, fechando em volta da vítima
+          const frente = b.longo ? 1 : b.k === 0 ? 1 : b.k === 1 ? .75 : b.k === 2 ? .35 : 0;
+          if (frente > 0 && (empina > 0 || crava > 0)) {
+            const gx = b.sx * (.25 + (b.longo ? .1 : .25) * (1 - frente)), gz = 1.55 + (b.longo ? .2 : 0);
+            const hx = b.alvo.x * (1 - crava) + gx * crava, hz = b.alvo.z * (1 - crava) + gz * crava;
+            b.alvo.set(hx * (1 - empina * .3 * (1 - crava)), b.alvo.y + empina * (1 - crava) * (b.longo ? .9 : .6) * frente + crava * .02, hz + empina * (1 - crava) * .15);
+          }
+          // revelar: as mãos começam encolhidas sob o pano e se abrem uma a uma, de trás para a frente
+          if (uR >= 0) {
+            const ordem = b.longo ? .55 : (NL - 1 - b.k) / (NL - 1) * .45, abre = mola((uR - .25 - ordem) * 1.2);
+            const ex = b.sx * .42, ez = b.ombro.z * .85; b.abre = Math.min(1, Math.max(0, abre));
+            b.alvo.set(ex + (b.alvo.x - ex) * abre, .05 + (b.alvo.y - .05) * abre + Math.max(0, Math.sin(Math.min(1, Math.max(0, abre)) * Math.PI)) * .15, ez + (b.alvo.z - ez) * abre);
+          }
           b.H.copy(b.ombro).applyMatrix4(corpo.matrix);
-          ik(b.H, b.alvo, b.a, b.b, b.polo, b.K);
+          // dobrados sob o pano, os cotovelos ficam para fora e para baixo
+          if (uR >= 0) poloT.set(b.sx, .15, 0).lerp(b.polo, b.abre); else poloT.copy(b.polo);
+          ik(b.H, b.alvo, b.a, b.b, poloT, b.K);
           b.sup.position.copy(b.H); b.sup.quaternion.setFromUnitVectors(CIMA, tmp.subVectors(b.K, b.H).normalize());
           b.inf.position.copy(b.K); b.inf.quaternion.setFromUnitVectors(CIMA, tmp.subVectors(b.alvo, b.K).normalize());
           b.cot.position.copy(b.K);
@@ -3937,13 +4103,13 @@
           b.mg.position.copy(fim);
           // a mão aponta para fora e para a frente; no ar, os dedos caem
           const yaw = Math.atan2(fim.x - b.H.x * .5, (fim.z - b.H.z) + .35);
-          b.mg.rotation.set(dy * 2.2 + Math.sin(t * 6 + i) * .04 * (1 - kAnda) + ajeita * .6, yaw, 0, 'YXZ');
+          b.mg.rotation.set(dy * 2.2 + Math.sin(t * 6 + i) * .04 * (1 - kAnda) + ajeita * .6 + (frente > 0 ? empina * (1 - crava) * 1.2 * frente - crava * .4 * frente : 0), yaw, 0, 'YXZ');
         });
         const pu = Math.pow(.5 + .5 * Math.sin(t * 1.3), 3);
         nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.4; nucleo.hl.material.opacity = .45 + pu * .55;
       };
       anim(0, 0, false);
-      return { g, alt: 1.0, raioBase: .9, anim };
+      return { g, alt: 1.0, raioBase: .9, anim, acao };
     },
   };
 })();
@@ -5502,6 +5668,10 @@
    verde rasgado com ferramentas no bolso, galhos com folhas saindo dos ombros e dos braços, a parte de
    baixo do corpo desfeita em raízes espalhadas pelo chão (com um crânio e costelas entre elas), uma
    tesoura de poda enferrujada numa mão e garras longas na outra. Fica plantado no lugar: as raízes seguram o corpo.
+   Ações: acao('ataque') ergue a tesoura aberta acima da cabeça e a crava no chão à frente, curvando o
+   corpo; as raízes do chão se agitam e pontas de raiz rompem o piso à frente, subindo como lanças.
+   acao('revelar') brota do chão: as raízes se espalham, o corpo sobe de dentro da terra com a boca
+   aberta, os galhos tremem e lanças de raiz se erguem em volta dele e afundam de novo.
    Formato: ACF3D.formasFilho.enraizado = { nome, criar(F, s) → { g, alt, raioBase, anim } } */
 (() => {
   'use strict';
@@ -5966,18 +6136,20 @@
         mand.rotation.x = .62 + grito * .32 + Math.sin(t * 9) * .02 * grito;
         // tesoura: estala de tempos em tempos
         const ciclo = (t % 3.2) / 3.2, ab = ciclo < .55 ? ciclo / .55 * .55 : ciclo < .62 ? .55 * (1 - (ciclo - .55) / .07) : 0;
-        laminas[0].rotation.z = ab / 2; laminas[1].rotation.z = -ab / 2;
+        const abT = AC.tes >= 0 ? AC.tes : ab;
+        laminas[0].rotation.z = abT / 2; laminas[1].rotation.z = -abT / 2;
         // garras abrem e fecham devagar, com tique
         const tq = Math.sin(t * 7.7) > .97 ? .35 : 0;
         bracos[1].m.curvar([.2 + Math.sin(t * .9) * .15 + tq, .25 + Math.sin(t * .9 + .4) * .15, .3 + Math.sin(t * .9 + .8) * .15 + tq, .35 + Math.sin(t * .9 + 1.2) * .15, .2], .04, t);
         bracos[0].m.curvar(.85, .02, t);
-        bracos.forEach((b, i) => { const a = b.alvo.clone().add(V(0, Math.sin(t * .6 + i) * .02, Math.sin(t * .4 + i * 2) * .02)); ik(b.br, a, b.polo); });
+        acaoPose(dt, t);
+        bracos.forEach((b, i) => { const a = b.alvo.clone().add(V(0, Math.sin(t * .6 + i) * .02, Math.sin(t * .4 + i * 2) * .02)); if (AC.w[i] > 0) a.lerp(AC.alvo[i], AC.w[i]); ik(b.br, a, b.polo); });
         // galhos e folhas ao vento
-        galhos.forEach((gq, i) => { gq.g.rotation.x = Math.sin(t * 1.1 + i) * .03 * (1 + agit); gq.g.rotation.z = Math.sin(t * .9 + i * 1.7) * .035 * (1 + agit); });
+        galhos.forEach((gq, i) => { gq.g.rotation.x = Math.sin(t * 1.1 + i) * .03 * (1 + agit); gq.g.rotation.z = Math.sin(t * .9 + i * 1.7) * .035 * (1 + agit) + Math.sin(t * 17 + i) * .12 * AC.galho; });
         // raízes: as pontas se contorcem (mais se o Mestre tenta arrastá-lo)
         quadro++;
         if (posR && quadro % 2 === 0) {
-          const amp = .012 + agit * .03;
+          const amp = .012 + agit * .03 + AC.raiz * .05;
           for (let k = 0; k < posR.count; k++) {
             const bx = raizBase[k * 3], by = raizBase[k * 3 + 1], bz = raizBase[k * 3 + 2], r = Math.hypot(bx, bz);
             if (r < .45) continue;
@@ -5988,8 +6160,58 @@
         }
         nuc.pulso(t);
       };
+      /* ---------- ações: ataque e revelar ---------- */
+      // lanças de raiz que rompem o piso (escondidas até uma ação)
+      const lancas = [];
+      for (let i = 0; i < 6; i++) {
+        const gL = grupo(g), H = .9 + R() * .7, cv = (R() - .5) * .3, q = [];
+        for (let j = 0; j <= 6; j++) { const v2 = j / 6; q.push([Math.sin(v2 * 2.4 + i) * .05 + cv * v2 * v2, v2 * H, Math.cos(v2 * 2 + i) * .04]); }
+        malha(gL, tubo(q, t => .055 * Math.pow(1 - t, 1.2) + .003, { seg: 14, rad: 6 }), matRaiz);
+        const fr = grupo(gL); for (let k = 0; k < 2; k++) { const v0 = .3 + k * .25, b = q[Math.round(v0 * 6)], sg = k ? 1 : -1; malha(fr, tubo([b, [b[0] + sg * .12, b[1] + .12, b[2] + .03], [b[0] + sg * .2, b[1] + .26, b[2]]], t => .018 * (1 - t) + .002, { seg: 6, rad: 4 }), matRaiz); }
+        gL.visible = false; lancas.push({ g: gL, i });
+      }
+      let ac = null;
+      const AC = { w: [0, 0], alvo: [V(), V()], tes: -1, raiz: 0, galho: 0 };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.8 : 2.0 }; };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const poeLanca = (l, x, z, k, giro) => { l.g.visible = k > .01; l.g.position.set(x, -.02, z); l.g.scale.set(.6 + k * .4, Math.max(.001, k), .6 + k * .4); l.g.rotation.set(0, giro, 0); };
+      function acaoPose(dt, t) {
+        AC.w[0] = AC.w[1] = 0; AC.tes = -1; AC.raiz = 0; AC.galho = 0; corpo.position.y = .9; raizG.scale.set(1, 1, 1);
+        if (!ac) { lancas.forEach(l => { l.g.visible = false; }); return; }
+        ac.t += dt; const u = ac.t; if (u >= ac.dur) { ac = null; lancas.forEach(l => { l.g.visible = false; }); return; }
+        const tr = Math.sin(t * 51) * Math.sin(t * 19);
+        if (ac.tipo === 'ataque') {
+          const ergue = qd(u, [[0, 0], [.35, 1], [.45, 1], [.56, 0], [1.8, 0]]), crava = qd(u, [[0, 0], [.42, 0], [.56, 1], [1.2, 1], [1.8, 0]]);
+          AC.w[0] = Math.max(ergue, crava);
+          AC.alvo[0].set(-.28 * ergue - .1 * crava, 2.45 * ergue + .78 * crava, .25 * ergue + .7 * crava).multiplyScalar(1 / Math.max(.001, ergue + crava));
+          AC.w[1] = qd(u, [[0, 0], [.4, .7], [.6, 1], [1.2, 1], [1.8, 0]]); AC.alvo[1].set(.42, 1.45, .62);
+          AC.tes = ergue * .9 + (1 - ergue) * (crava > .5 ? 0 : ergue * .9);
+          corpo.rotation.x += qd(u, [[0, 0], [.35, -.12], [.56, .42], [1.2, .36], [1.8, 0]]) + (crava > .9 ? tr * .015 : 0);
+          corpo.rotation.y += qd(u, [[0, 0], [.35, .25], [.56, -.1], [1.8, 0]]);
+          cab.rotation.x += qd(u, [[0, 0], [.35, -.2], [.56, .35], [1.2, .3], [1.8, 0]]);
+          mand.rotation.x += crava * (.3 + tr * .04);
+          AC.raiz = qd(u, [[0, 0], [.5, 0], [.62, 1], [1.3, .6], [1.8, 0]]); AC.galho = AC.raiz * .6;
+          lancas.forEach((l, k) => { const atr = .54 + k * .05, kk = qd(u, [[0, 0], [atr, 0], [atr + .12, 1.05], [atr + .22, 1], [1.45, 1], [1.8, 0]]); const a = (k / 5 - .5) * 1.5; poeLanca(l, Math.sin(a) * (.75 + (k % 2) * .35), .55 + Math.cos(a) * (.75 + (k % 2) * .35), kk, a + k); });
+        } else {
+          // brota do chão: as raízes se espalham e o corpo sobe
+          const sobe = qd(u, [[0, 0], [.15, 0], [1.05, 1.03], [1.25, 1], [2, 1]]);
+          corpo.position.y = .9 - (1 - sobe) * 2.1;
+          corpo.rotation.z += Math.sin(t * 9) * .05 * (1 - sobe);
+          const espalha = qd(u, [[0, .25], [.7, 1], [2, 1]]); raizG.scale.set(espalha, .6 + espalha * .4, espalha);
+          const grito = qd(u, [[0, 0], [.95, 0], [1.15, 1], [1.6, 1], [2, 0]]);
+          cab.rotation.x += -grito * .25 + (1 - sobe) * .5; cab.rotation.z += grito * tr * .05;
+          mand.rotation.x += grito * .35;
+          AC.tes = grito > .5 ? (Math.sin(t * 22) > 0 ? .7 : 0) : -1;
+          AC.w[1] = grito; AC.alvo[1].set(.6, 1.55, .35);
+          AC.galho = Math.max(1 - sobe, grito);
+          AC.raiz = Math.max(1 - sobe, grito) * .8;
+          lancas.forEach((l, k) => { const atr = .25 + k * .07, kk = qd(u, [[0, 0], [atr, 0], [atr + .18, 1], [1.3, 1], [1.7, 0]]); const a = k / 6 * Math.PI * 2 + .3; poeLanca(l, Math.sin(a) * 1.05, Math.cos(a) * 1.05, kk * .85, a); });
+        }
+        nuc.g.scale.setScalar(1 + AC.raiz * .3);
+      }
       anim(0, 0, false);
-      return { g, alt: 2.45, raioBase: .7, anim };
+      return { g, alt: 2.45, raioBase: .7, anim, acao };
     },
   };
 })();
@@ -6353,8 +6575,68 @@
           b.dedos.forEach((d, j) => { const curl = .15 + .3 * (.5 + .5 * Math.sin(tt * 2.2 + j * .8 + i * 2)) + (Math.sin(tt * 9 + j) > .95 ? .4 : 0); d.rotation.z = -b.sd * curl; d.rotation.x = d.userData.pol ? .3 : 0; });
         });
       };
-      anim(0, 0, false); const caixa = new T.Box3().setFromObject(g);
-      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .42, anim };
+      /* ---------- ações únicas: acao('ataque') e acao('revelar') ----------
+         ataque: agacha, ergue os dois braços de garras acima da cabeça e salta para a frente rasgando o ar,
+         com a mandíbula escancarada. revelar: surge dobrado sobre si, sobe aos trancos, a cabeça estala para
+         a frente, a boca se abre além do normal e os braços se abrem com os dedos esticados. */
+      let ac = null; const desfazer = [];
+      const soma = (o, k2, v) => { o[k2] += v; desfazer.push([o, k2, v]); };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.5 : 1.9 }; };
+      const animBase = anim;
+      const animTudo = (dt, t, andando) => {
+        while (desfazer.length) { const [o, k2, v] = desfazer.pop(); o[k2] -= v; }
+        animBase(dt, t, andando);
+        if (!ac) return;
+        ac.t += dt; const u = ac.t;
+        if (u >= ac.dur) { ac = null; return; }
+        const tr = Math.sin(t * 61) * Math.sin(t * 23); // tremor nervoso
+        if (ac.tipo === 'ataque') {
+          const bx = qd(u, [[0, 0], [.28, -2.8], [.5, -1.75], [.62, -1.55], [.95, -1.2], [1.5, 0]]);
+          const lan = qd(u, [[0, 0], [.28, -.08], [.52, .45], [.95, .4], [1.5, 0]]);
+          const ag = qd(u, [[0, 0], [.3, -.16], [.55, -.1], [1.05, -.08], [1.5, 0]]);
+          const inc = qd(u, [[0, 0], [.28, -.22], [.55, .42], [.95, .36], [1.5, 0]]);
+          bracos.forEach((b, i) => {
+            soma(b.ombro.rotation, 'x', bx + (i ? .25 : 0) * Math.min(1, u * 3) * (1 - u / 1.5));
+            soma(b.ombro.rotation, 'z', b.sd * qd(u, [[0, 0], [.28, .4], [.55, -.22], [.95, -.18], [1.5, 0]]));
+            soma(b.cotov.rotation, 'x', qd(u, [[0, 0], [.28, -.7], [.5, -.05], [.95, -.3], [1.5, 0]]));
+            b.dedos.forEach(d => soma(d.rotation, 'z', b.sd * qd(u, [[0, 0], [.28, .4], [.5, .3], [.66, -.45], [1.5, 0]])));
+          });
+          soma(corpo.position, 'z', lan); soma(corpo.position, 'y', ag);
+          soma(peito.rotation, 'x', inc);
+          pernas.forEach((p, i) => {
+            soma(p.coxa.rotation, 'x', i ? qd(u, [[0, 0], [.3, -.35], [.55, -.75], [1.05, -.6], [1.5, 0]]) : qd(u, [[0, 0], [.3, -.3], [.55, .35], [1.05, .3], [1.5, 0]]));
+            soma(p.joelho.rotation, 'x', i ? qd(u, [[0, 0], [.3, .7], [.55, .6], [1.05, .5], [1.5, 0]]) : qd(u, [[0, 0], [.3, .6], [.55, .35], [1.5, 0]]));
+          });
+          soma(cab.rotation, 'x', qd(u, [[0, 0], [.28, -.35], [.55, -.05], [.95, -.05], [1.5, 0]]));
+          soma(cab.rotation, 'y', -cab.rotation.y * qd(u, [[0, 0], [.3, 1], [1.1, 1], [1.5, 0]]));
+          soma(mand.rotation, 'x', qd(u, [[0, 0], [.28, .55], [.55, .8], [.95, .65], [1.5, 0]]) + tr * .05);
+          nuc.mat.emissiveIntensity += qd(u, [[0, 0], [.55, 2.2], [1.5, 0]]);
+        } else {
+          // dobrado sobre si, depois sobe aos trancos
+          const dob = qd(u, [[0, 1], [.12, 1], [.3, .55], [.38, .62], [.52, 0], [1.9, 0]]);
+          const tranco = u > .12 && u < .55 ? Math.max(0, Math.sin(u * 48)) * .12 : 0;
+          const grito = qd(u, [[0, 0], [.42, 0], [.6, 1], [1.4, 1], [1.9, 0]]);
+          soma(peito.rotation, 'x', dob * 1.05 - tranco + grito * .12);
+          soma(corpo.position, 'y', -dob * .3);
+          pernas.forEach(p => { soma(p.coxa.rotation, 'x', -dob * .9); soma(p.joelho.rotation, 'x', dob * 1.5); soma(p.tornozelo.rotation, 'x', -dob * .5); });
+          soma(cab.rotation, 'x', dob * .8 - grito * .35);
+          soma(cab.rotation, 'y', -cab.rotation.y * Math.max(dob, grito) + qd(u, [[0, 0], [.2, 1.2], [.42, 1.2], [.5, 0]]));
+          soma(cab.rotation, 'z', grito * (.45 + tr * .12));
+          soma(mand.rotation, 'x', grito * (.95 + tr * .08));
+          bracos.forEach(b => {
+            soma(b.ombro.rotation, 'x', -dob * .7 - grito * (1.15 + (b.sd > 0 ? .3 : 0)));
+            soma(b.ombro.rotation, 'z', b.sd * grito * (.5 + (b.sd > 0 ? 0 : .2)));
+            soma(b.cotov.rotation, 'x', -grito * (.55 + tr * .05));
+            b.dedos.forEach(d => soma(d.rotation, 'z', b.sd * grito * .45));
+          });
+          peito.scale.multiplyScalar(1 + grito * .05);
+          nuc.mat.emissiveIntensity += grito * 3;
+        }
+      };
+      animTudo(0, 0, false); const caixa = new T.Box3().setFromObject(g);
+      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .42, anim: animTudo, acao };
     },
   };
 })();
@@ -7480,7 +7762,9 @@
   }
   /* Fera curvada de pelo branco-acinzentado empapado de sangue, costelas vermelhas expostas, chifres ao longo dos
      ombros, bocarra que se abre na vertical cheia de dentes, um olho vermelho aceso, braços longos de garras,
-     pernas dobradas para trás e cauda. Parada, parece inquieta: fareja e sacode a cabeça. */
+     pernas dobradas para trás e cauda. Parada, parece inquieta: fareja e sacode a cabeça.
+     Ações: acao('ataque') agacha e dá o bote com as duas garras, a bocarra escancarada;
+            acao('revelar') sai encolhida do chão, se ergue de braços abertos e urra para o alto com o olho em brasa. */
   (NS.formasFilho = NS.formasFilho || {}).fera_pelo = {
     nome: 'Fera de pelo (bocarra vertical)',
     criar: (F, s) => {
@@ -7654,10 +7938,24 @@
 
       /* ---------- animação inquieta: fareja, sacode a cabeça, estala a bocarra, cauda chicoteando ---------- */
       const ra = K.rngDe(K.semente + 77), des = ra() * 10;
-      let fase = 0, ritmo = 0, prox = .8, alvo = [0, 0, 0], cr = [0, 0, 0], fareja = 0, estalo = 0;
+      let fase = 0, ritmo = 0, prox = .8, alvo = [0, 0, 0], cr = [0, 0, 0], fareja = 0, estalo = 0, acA = null;
       const ap = (o, k2, v, vel, dt) => { o[k2] += (v - o[k2]) * Math.min(1, dt * vel); };
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.35 : 1.9 }; };
+      const ei0 = mOlho.emissiveIntensity;
       const anim = (dt, t, andando) => {
         const tt = t + des;
+        // pesos das ações: agachar, bote, encolhida (revelar), erguida com urro
+        let agA = 0, bote = 0, enc = 0, urro = 0, vel = 7;
+        if (acA) {
+          acA.t += dt; const u = acA.t; vel = 24;
+          if (acA.tipo === 'ataque') { agA = faixa(u, 0, .2) * (1 - faixa(u, .2, .34)); bote = faixa(u, .2, .36) * (1 - faixa(u, .8, 1.3)); }
+          else { enc = 1 - faixa(u, .3, .62); urro = faixa(u, .42, .7) * (1 - faixa(u, 1.35, 1.88)); }
+          if (u >= acA.dur) acA = null;
+        }
+        const tremeU = urro > .3 ? Math.sin(tt * 47) * .04 * urro : 0;
         const resp = Math.sin(tt * 2.4) * .6 + Math.sin(tt * 5.1) * .15;
         peito.scale.set(1 + resp * .025, 1, 1 + resp * .035);
         nuc.pulso(tt); luz.intensity = .35 + nuc.mat.emissiveIntensity * .15;
@@ -7667,33 +7965,43 @@
         for (let i = 0; i < 3; i++) cr[i] += (alvo[i] - cr[i]) * Math.min(1, dt * 18);
         fareja = Math.max(0, fareja - dt); estalo = Math.max(0, estalo - dt);
         const fz = fareja > 0 ? Math.sin(tt * 34) * .05 : 0;
-        cab.rotation.y = cr[0]; cab.rotation.z = cr[1] * .6; cab.rotation.x = -.2 + cr[2] * .5 + fz;
-        pesc.rotation.y = cr[0] * .3; pesc.rotation.x = -.55 + fz * .5 + Math.sin(tt * 1.3) * .04;
-        const abre = estalo > 0 ? Math.abs(Math.sin(estalo * 14)) : .65 + Math.sin(tt * .8) * .15 + (fareja > 0 ? -.3 : 0);
+        const acaoK = Math.max(agA, bote, enc, urro), livre = 1 - acaoK;
+        cab.rotation.y = cr[0] * livre; cab.rotation.z = cr[1] * .6 * livre + tremeU; cab.rotation.x = -.2 + (cr[2] * .5 + fz) * livre + agA * .3 - bote * .35 + enc * .5 - urro * .5;
+        pesc.rotation.y = cr[0] * .3 * livre; pesc.rotation.x = -.55 + fz * .5 + Math.sin(tt * 1.3) * .04 - agA * .1 - bote * .25 + enc * .3 - urro * .2;
+        let abre = estalo > 0 ? Math.abs(Math.sin(estalo * 14)) : .65 + Math.sin(tt * .8) * .15 + (fareja > 0 ? -.3 : 0);
+        abre = abre * (1 - acaoK) + acaoK * (agA * .2 + bote * 1.45 + enc * .1 + urro * 1.5) + (bote + urro > .6 ? Math.sin(tt * 38) * .06 : 0);
         maxila.rotation.x = -.15 - abre * .45; mand.rotation.x = .15 + abre * .6;
+        mOlho.emissiveIntensity = ei0 * (1 + urro * 1.6 + bote * .8) * (enc > .5 ? .25 : 1);
         ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 4);
         if (andando) fase += dt * 4.2;
         const sn = Math.sin(fase), R = ritmo;
         pernas.forEach((p, i) => {
           const s2 = i ? -sn : sn, lev = Math.max(0, Math.sin(fase + (i ? Math.PI : 0) + 1.3));
-          ap(p.coxa.rotation, 'x', -s2 * .4 * R + Math.sin(tt * .7 + i * 2) * .03 * (1 - R), 10, dt);
-          ap(p.joelho.rotation, 'x', -lev * .35 * R, 10, dt);
-          ap(p.jarrete.rotation, 'x', lev * .5 * R, 10, dt);
+          const dobra = agA * .45 + enc * .55 + bote * .15;
+          ap(p.coxa.rotation, 'x', -s2 * .4 * R + Math.sin(tt * .7 + i * 2) * .03 * (1 - R) - dobra - bote * (i ? .25 : -.1), vel, dt);
+          ap(p.joelho.rotation, 'x', -lev * .35 * R + dobra * 1.1, vel, dt);
+          ap(p.jarrete.rotation, 'x', lev * .5 * R - dobra * .55, vel, dt);
         });
-        corpo.position.y = -R * Math.abs(Math.cos(fase)) * .05 + (1 - R) * resp * .008;
-        corpo.rotation.z = R * sn * .05 + (1 - R) * Math.sin(tt * .9) * .025;
-        peito.rotation.x = .78 + R * .1 + Math.sin(tt * 2.4) * .015; peito.rotation.y = -R * sn * .12 + (1 - R) * cr[0] * .15;
+        corpo.position.y = -R * Math.abs(Math.cos(fase)) * .05 + (1 - R) * resp * .008 - agA * .12 - enc * .16 + bote * .05;
+        corpo.position.z = bote * .38 - agA * .05;
+        corpo.rotation.z = R * sn * .05 + (1 - R) * Math.sin(tt * .9) * .025 + tremeU * .3;
+        peito.rotation.x = .78 + R * .1 + Math.sin(tt * 2.4) * .015 + agA * .3 + bote * .32 + enc * .55 - urro * .32; peito.rotation.y = (-R * sn * .12 + (1 - R) * cr[0] * .15) * livre;
         bracos.forEach((b, i) => {
           const s2 = i ? sn : -sn, tique = Math.sin(tt * 11 + i * 3) > .96 ? .25 : 0;
-          ap(b.ombro.rotation, 'x', -1.15 + R * s2 * .5 + (1 - R) * (Math.sin(tt * .9 + i) * .06 + tique), 7, dt);
-          ap(b.cotov.rotation, 'x', -.6 - R * Math.max(0, s2) * .4 + Math.sin(tt * 1.7 + i) * .05, 7, dt);
-          b.dedos.forEach((d, j) => { d.rotation.z = -b.sd * (.25 + .35 * (.5 + .5 * Math.sin(tt * 2.6 + j * .7 + i * 2))); });
+          // ataque: braços para trás no agacho e depois para a frente com as garras abertas; revelar: abertos para o alto
+          ap(b.ombro.rotation, 'x', -1.15 + (R * s2 * .5 + (1 - R) * (Math.sin(tt * .9 + i) * .06 + tique)) * livre + agA * .55 - bote * (1.15 + i * .2) + enc * .5 - urro * 1.5, vel, dt);
+          ap(b.ombro.rotation, 'z', b.sd * (.4 - bote * .2 + urro * .55 - enc * .15), vel, dt);
+          ap(b.cotov.rotation, 'x', -.6 - R * Math.max(0, s2) * .4 + Math.sin(tt * 1.7 + i) * .05 - agA * .5 + bote * .45 - enc * .4 + urro * .3, vel, dt);
+          const abreG = Math.max(bote, urro);
+          b.dedos.forEach((d, j) => { d.rotation.z = -b.sd * ((.25 + .35 * (.5 + .5 * Math.sin(tt * 2.6 + j * .7 + i * 2))) * (1 - abreG) - abreG * .35 + agA * .5 + enc * .6); });
         });
-        cauda.forEach((c, i) => { c.rotation.x = (i ? .22 : 2.3) + Math.sin(tt * 2.2 - i * .7) * .08; c.rotation.z = Math.sin(tt * 1.6 - i * .6) * (.18 + R * .1) + Math.sin(tt * 7 - i) * .03 * (1 - R); });
+        // cauda: chicoteia mais forte no bote e no urro, encolhida no começo da revelação
+        const chicote = 1 + bote * 2.5 + urro * 1.5;
+        cauda.forEach((c, i) => { c.rotation.x = (i ? .22 : 2.3) + Math.sin(tt * 2.2 - i * .7) * .08 - (i ? 0 : bote * .5 + urro * .4) + (i ? enc * .15 : 0); c.rotation.z = Math.sin(tt * (1.6 + bote * 5) - i * .6) * (.18 + R * .1) * chicote + Math.sin(tt * 7 - i) * .03 * (1 - R); });
       };
       anim(0, 0, false);
       const caixa = new T.Box3().setFromObject(g);
-      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .6, anim };
+      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .6, anim, acao };
     },
   };
 })();
@@ -8484,7 +8792,11 @@
    Vulto altíssimo e esquálido feito de lodo preto e brilhante: membros compridos pingando, dedos
    longos, cabelo em fios grudados sobre o rosto com dois olhos pálidos acesos, um trapo laranja podre
    num ombro, poça preta no chão, gotas que caem de verdade e fiapos de fumaça.
-   Modelo leve; cada exemplar sai um pouco diferente (semente tirada do ser). */
+   Modelo leve; cada exemplar sai um pouco diferente (semente tirada do ser).
+   Ações: acao('ataque') dá um bote torto para a frente, ergue um braço comprido acima da cabeça e o
+   desce como um chicote, enquanto o outro agarra, os olhos acendem forte e o lodo pinga de uma vez;
+   acao('revelar') começa derretido na poça e se ergue do lodo, esticando e oscilando até tomar forma,
+   com a cabeça subindo por último e os olhos se acendendo no fim. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
   let contador = 0;
@@ -8765,7 +9077,57 @@
         const pu = Math.pow(.5 + .5 * Math.sin(t * 1.2), 3);
         nucleo.mNuc.emissiveIntensity = 1.3 + pu * 2.2; nucleo.halo.material.opacity = .4 + pu * .6;
       };
-      return { g, alt: 2.6 * K, raioBase: .5, anim };
+      /* ================= ações únicas: ataque e revelar ================= */
+      let ac = null; const desfazer = [];
+      const soma = (o, k2, v) => { o[k2] += v; desfazer.push([o, k2, v]); };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.6 : 2.0, pingou: false }; };
+      const olho0 = mOlho.emissiveIntensity, hs0 = .07, halos = cab.children.filter(c => c.isSprite);
+      const animTudo = (dt, t, andando) => {
+        while (desfazer.length) { const [o, k2, v] = desfazer.pop(); o[k2] -= v; }
+        anim(dt, t, andando);
+        mOlho.emissiveIntensity = olho0; halos.forEach(h => h.scale.set(hs0, hs0, 1));
+        if (!ac) return;
+        ac.t += dt; const u = ac.t; if (u >= ac.dur) { ac = null; return; }
+        const tr = Math.sin(t * 53) * Math.sin(t * 21);
+        let brilho = 0;
+        if (ac.tipo === 'ataque') {
+          const chic = bracos[1], agarra = bracos[0];
+          soma(chic.omb.rotation, 'x', qd(u, [[0, 0], [.3, -2.9], [.42, -2.6], [.58, -1.15], [1.0, -1.0], [1.6, 0]]));
+          soma(chic.omb.rotation, 'z', chic.sx * qd(u, [[0, 0], [.3, .35], [.58, -.1], [1.6, 0]]));
+          soma(chic.cot.rotation, 'x', qd(u, [[0, 0], [.3, -.9], [.48, -.7], [.6, .1], [1.0, 0], [1.6, 0]]));
+          soma(agarra.omb.rotation, 'x', qd(u, [[0, 0], [.25, -.4], [.55, -1.35], [1.05, -1.25], [1.6, 0]]));
+          soma(agarra.cot.rotation, 'x', qd(u, [[0, 0], [.55, -.35], [1.6, 0]]));
+          [chic, agarra].forEach(b => b.dedos.forEach(d => soma(d.rotation, 'x', qd(u, [[0, 0], [.3, .3], [.55, .35], [.7, -.6], [1.1, -.5], [1.6, 0]]))));
+          soma(tronco.rotation, 'x', qd(u, [[0, 0], [.3, -.15], [.58, .42], [1.05, .36], [1.6, 0]]) + tr * .02);
+          soma(tronco.rotation, 'y', qd(u, [[0, 0], [.3, .25], [.58, -.2], [1.6, 0]]));
+          soma(corpo.position, 'z', qd(u, [[0, 0], [.3, -.05], [.6, .38], [1.05, .34], [1.6, 0]]));
+          soma(corpo.position, 'y', qd(u, [[0, 0], [.6, -.08], [1.6, 0]]));
+          pernas.forEach((p, i) => { soma(p.qd.rotation, 'x', i ? qd(u, [[0, 0], [.6, -.55], [1.05, -.5], [1.6, 0]]) : qd(u, [[0, 0], [.6, .3], [1.6, 0]])); soma(p.jo.rotation, 'x', i ? qd(u, [[0, 0], [.6, .5], [1.6, 0]]) : qd(u, [[0, 0], [.6, .15], [1.6, 0]])); });
+          soma(cab.rotation, 'x', qd(u, [[0, 0], [.3, -.25], [.6, -.45], [1.1, -.4], [1.6, 0]]));
+          soma(cab.rotation, 'y', -cab.rotation.y * qd(u, [[0, 0], [.3, 1], [1.2, 1], [1.6, 0]]));
+          soma(cab.rotation, 'z', qd(u, [[0, 0], [.6, .4], [1.2, .35], [1.6, 0]]));
+          brilho = qd(u, [[0, 0], [.4, 1], [1.2, .8], [1.6, 0]]);
+          // o lodo das pontas cai todo de uma vez no golpe
+          if (!ac.pingou && u > .58) { ac.pingou = true; gotas.forEach(gt => { if (!gt.solta) { gt.solta = true; gt.vy = .6 + Math.random() * .8; } }); }
+        } else {
+          // ergue-se da poça: achatado e largo, estica, passa do ponto e assenta
+          const sobe = qd(u, [[0, 0], [.1, 0], [.95, 1.08], [1.2, .96], [1.45, 1.01], [1.7, 1]]);
+          const ky = .06 + .94 * sobe, kx = 1 + .75 * Math.max(0, 1 - sobe) * (1 + Math.sin(t * 9) * .08);
+          soma(corpo.scale, 'y', ky - 1); soma(corpo.scale, 'x', kx - 1); soma(corpo.scale, 'z', kx - 1);
+          soma(corpo.rotation, 'z', Math.sin(t * 6) * .06 * Math.max(0, 1 - sobe));
+          const cabeca = qd(u, [[0, 1], [.7, 1], [1.25, 0], [2, 0]]);
+          soma(cab.rotation, 'x', cabeca * .9); soma(cab.rotation, 'z', qd(u, [[0, 0], [1.25, 0], [1.4, .5], [2, 0]]));
+          soma(tronco.rotation, 'x', cabeca * .35);
+          bracos.forEach(b => { soma(b.cot.rotation, 'x', -cabeca * .4); });
+          brilho = qd(u, [[0, -1], [1.15, -1], [1.3, 1.3], [1.6, .5], [2, 0]]);
+          fumacas.forEach(f => { f.sp.material.opacity = Math.min(.7, f.sp.material.opacity + Math.max(0, 1 - sobe) * .3); });
+        }
+        mOlho.emissiveIntensity = Math.max(0, olho0 * (1 + brilho * 1.6)); halos.forEach(h => h.scale.setScalar(Math.max(0, hs0 * (1 + brilho * 1.8))));
+      };
+      animTudo(0, 0, false);
+      return { g, alt: 2.6 * K, raioBase: .5, anim: animTudo, acao };
     },
   };
 })();
@@ -8774,7 +9136,9 @@
 /* marionetista.js · forma de Filho: titereiro alto e esquelético de casaco longo em farrapos e gravata
    de laço, rosto de caveira gritando, mãos ossudas (uma segura uma batuta fina como agulha); fios
    vermelhos sobem dos dedos e do alto até bonecos-cadáveres de macacão laranja pendurados em volta.
-   Formato: ACF3D.formasFilho.marionetista = { nome, criar(F, s) → { g, alt, raioBase, anim } } */
+   Formato: ACF3D.formasFilho.marionetista = { nome, criar(F, s) → { g, alt, raioBase, anim, acao } }
+   Ações: acao('ataque') arranca os fios para baixo e arremessa os bonecos para a frente;
+          acao('revelar') os bonecos estão caídos e sobem um a um num tranco, ele ergue a cabeça e grita. */
 (() => {
   'use strict';
   const NS = window.ACF3D = window.ACF3D || {};
@@ -9176,8 +9540,26 @@
       const PA = V(), PB2 = V();
 
       /* ---------- animação ---------- */
-      let desl = 0, fase = 0, puxaAnt = 0;
+      let desl = 0, fase = 0, puxaAnt = 0, acA = null;
+      // ações únicas (ataque, revelar): curvas suaves de 0 a 1 e uma mola que passa do ponto
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const mola = x => x <= 0 ? 0 : 1 - Math.exp(-x * 9) * Math.cos(x * 24);
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.9 }; };
       const anim = (dt, t, andando) => {
+        let wA = 0, yA = 0, trA = 0, bowR = 0, gritoR = 0, uR = -1;
+        if (acA) {
+          acA.t += dt; const u = acA.t;
+          if (acA.tipo === 'ataque') {
+            wA = faixa(u, 0, .22) * (1 - faixa(u, .24, .36));                 // ergue os braços, prepara
+            yA = faixa(u, .24, .38) * (1 - faixa(u, .85, 1.4));               // arranca os fios
+            trA = u > .24 ? Math.exp(-(u - .24) * 4) * Math.sin((u - .24) * 30) : 0; // tremor dos bonecos
+          } else {
+            uR = u; bowR = 1 - faixa(u, .28, .62);                              // curvado, depois ergue
+            gritoR = faixa(u, .42, .66) * (1 - faixa(u, 1.3, 1.88));
+          }
+          if (u >= acA.dur) acA = null;
+        }
         desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 3);
         // andar de passos longos e arrastados; parado, oscila como quem conduz uma orquestra
         if (andando) fase += dt * 3.2;
@@ -9186,20 +9568,23 @@
         pernas[0].cot.rotation.x = Math.max(0, -Math.cos(fase)) * .7 * desl + .05; pernas[1].cot.rotation.x = Math.max(0, Math.cos(fase)) * .7 * desl + .05;
         pernas.forEach(p => { p.bota.rotation.x = -p.cot.rotation.x * .4; });
         corpo.position.y = -Math.abs(Math.sin(fase)) * .04 * desl;
-        alto.rotation.x = -.1 + desl * .12 + Math.sin(t * .6) * .02; alto.rotation.z = Math.sin(t * .5) * .03 + Math.sin(fase) * .04 * desl;
+        alto.rotation.x = -.1 + desl * .12 + Math.sin(t * .6) * .02 - wA * .16 + yA * .4 + bowR * .45 - gritoR * .16; alto.rotation.z = Math.sin(t * .5) * .03 + Math.sin(fase) * .04 * desl;
         // a batuta desenha um oito no ar, com acentos bruscos
         const ac = Math.pow(Math.max(0, Math.sin(t * 1.4)), 6) * .08;
-        ik(bracos[0].br, bracos[0].alvo.clone().add(V(Math.sin(t * .9) * .12, Math.sin(t * 1.8) * .07 - ac, Math.cos(t * .9) * .05)), bracos[0].polo);
+        // ataque: a batuta sobe e corta para baixo e para a frente; revelar: braços caídos que se erguem
+        ik(bracos[0].br, bracos[0].alvo.clone().add(V(Math.sin(t * .9) * .12 + yA * .22 - bowR * .1 - gritoR * .18, Math.sin(t * 1.8) * .07 - ac + wA * .12 - yA * .62 - bowR * .75 + gritoR * .2, Math.cos(t * .9) * .05 + yA * .42 + bowR * .1)), bracos[0].polo);
         // a mão aberta sobe e desce, os dedos estalam
         const puxa = Math.max(0, Math.sin(t * .8)) * .1 + (Math.sin(t * 2.7) > .9 ? .05 : 0);
-        ik(bracos[1].br, bracos[1].alvo.clone().add(V(0, puxa + Math.sin(t * .5) * .03, Math.sin(t * .7) * .04)), bracos[1].polo);
-        bracos[1].m.curvar([.15 + Math.sin(t * 3.1) * .12, .1 + Math.sin(t * 2.3 + 1) * .15, .15 + Math.sin(t * 2.9 + 2) * .12, .2 + Math.sin(t * 3.7 + 3) * .15, .1], .03, t);
+        // ataque: a mão aberta sobe e dá um tranco para baixo e para trás, fechando o punho
+        ik(bracos[1].br, bracos[1].alvo.clone().add(V(-yA * .3 - bowR * .2 + gritoR * .1, puxa + Math.sin(t * .5) * .03 + wA * .16 - yA * .55 - bowR * .8 + gritoR * .3, Math.sin(t * .7) * .04 - yA * .12 + bowR * .12)), bracos[1].polo);
+        const fecha = Math.max(yA, wA * .2);
+        bracos[1].m.curvar([.15 + Math.sin(t * 3.1) * .12, .1 + Math.sin(t * 2.3 + 1) * .15, .15 + Math.sin(t * 2.9 + 2) * .12, .2 + Math.sin(t * 3.7 + 3) * .15, .1].map(k => k + (1 - k) * fecha * .95), .03, t);
         bracos[0].m.curvar([.7, .8, .85, .9, .5], .02, t);
         const tranco = Math.max(0, (puxa - puxaAnt) / Math.max(dt, 1e-3)) * .05; puxaAnt = puxa;
         // cabeça jogada para trás, gritando, com espasmos
         const esp = Math.sin(t * 6.1) > .97 ? .2 : 0;
-        cab.rotation.set(-.38 + Math.sin(t * .7) * .05 - esp * .5, Math.sin(t * .4) * .15 + esp, Math.sin(t * .55) * .08);
-        mand.rotation.x = .7 + Math.sin(t * 1.3) * .12 + esp;
+        cab.rotation.set(-.38 + Math.sin(t * .7) * .05 - esp * .5 + yA * .45 + bowR * 1.0 - gritoR * .35, Math.sin(t * .4) * .15 + esp, Math.sin(t * .55) * .08 + bowR * .25);
+        mand.rotation.x = .7 + Math.sin(t * 1.3) * .12 + esp + yA * .25 + gritoR * .3 - bowR * .45 + (yA + gritoR > .5 ? Math.sin(t * 40) * .05 : 0);
         // casaco: abas balançam e se arrastam
         const pc = casacoM.geometry.attributes.position;
         for (let k = 0; k < pc.count; k++) { const bx = baseC[k * 3], by = baseC[k * 3 + 1], bz = baseC[k * 3 + 2]; if (by > 1.0) continue; const f = 1 - by; const an = Math.atan2(bx, bz); pc.setXYZ(k, bx + Math.sin(t * 1.3 + an * 3 + by * 4) * .015 * f, by, bz + Math.sin(t * 1.1 + an * 4) * .012 * f - desl * .12 * f * f); }
@@ -9207,14 +9592,20 @@
         // bonecos: pêndulos que sacodem quando a mão puxa; membros soltos e tiques
         bonecos.forEach((b, i) => {
           const lado = b.ctl === 'e' ? 1 : b.ctl === 'd' ? .6 : .2;
-          b.piv.position.y = b.y0 + .02 + (b.ctl === 'e' ? puxa * 1.2 : b.ctl === 'd' ? ac * 1.5 : 0);
-          b.piv.rotation.x = Math.sin(t * 1.1 + b.f) * .08 + desl * .15 * Math.sin(t * 2 + b.f);
-          b.piv.rotation.z = Math.sin(t * .9 + b.f * 2) * .07;
-          const tq = (Math.sin(t * 4.3 + b.f * 3) > .93 ? .5 : 0) + tranco * lado;
-          b.bo.bE.o.rotation.x = -.2 - tq + Math.sin(t * 1.7 + b.f) * .1; b.bo.bD.o.rotation.x = -.2 - tq * .7 + Math.sin(t * 1.5 + b.f) * .1;
-          b.bo.bE.j.rotation.x = -.3 - tq * .6; b.bo.bD.j.rotation.x = -.3 - tq * .4;
-          b.bo.pE.o.rotation.x = Math.sin(t * 1.3 + b.f) * .15 - tq * .3; b.bo.pD.o.rotation.x = Math.sin(t * 1.3 + b.f + 2) * .15;
-          b.bo.cabB.rotation.set(.35 + Math.sin(t * .8 + b.f) * .15 + tq * .3, Math.sin(t * .5 + b.f) * .3, Math.sin(t * .6 + b.f) * .25);
+          // revelar: cada boneco começa caído e mole e é puxado para cima num tranco, um depois do outro
+          const caido = uR < 0 ? 0 : 1 - mola((uR - .22 - i * .11) * 1.1);
+          // ataque: os fios sobem de uma vez e os bonecos são lançados para a frente, braços estendidos
+          const voa = yA * (.8 + .2 * Math.sin(i * 2.3)), sac = trA * (.6 + (i % 3) * .2);
+          b.piv.position.y = b.y0 + .02 + (b.ctl === 'e' ? puxa * 1.2 : b.ctl === 'd' ? ac * 1.5 : 0) - wA * .12 + voa * .42 + sac * .06 - caido * .62;
+          b.piv.position.z = b.z0 + voa * (.5 - b.z0 * .4); b.piv.position.x = b.x0 * (1 - voa * .22);
+          b.piv.rotation.x = Math.sin(t * 1.1 + b.f) * .08 + desl * .15 * Math.sin(t * 2 + b.f) - voa * .85 + sac * .25 + caido * .3;
+          b.piv.rotation.z = Math.sin(t * .9 + b.f * 2) * .07 + caido * (i % 2 ? .5 : -.5);
+          const tq = (Math.sin(t * 4.3 + b.f * 3) > .93 ? .5 : 0) + tranco * lado + voa * 1.3 + Math.abs(sac) * .8;
+          b.bo.bE.o.rotation.x = -.2 - tq + Math.sin(t * 1.7 + b.f) * .1 + caido * .2; b.bo.bD.o.rotation.x = -.2 - tq * .7 + Math.sin(t * 1.5 + b.f) * .1 + caido * .2;
+          b.bo.bE.o.rotation.z = -voa * .5; b.bo.bD.o.rotation.z = voa * .5;
+          b.bo.bE.j.rotation.x = -.3 - tq * .6 * (1 - voa) + caido * .3; b.bo.bD.j.rotation.x = -.3 - tq * .4 * (1 - voa) + caido * .3;
+          b.bo.pE.o.rotation.x = Math.sin(t * 1.3 + b.f) * .15 - tq * .3 + voa * .5; b.bo.pD.o.rotation.x = Math.sin(t * 1.3 + b.f + 2) * .15 - voa * .3;
+          b.bo.cabB.rotation.set(.35 + Math.sin(t * .8 + b.f) * .15 + tq * .3 - voa * 1.1 + caido * .9, Math.sin(t * .5 + b.f) * .3, Math.sin(t * .6 + b.f) * .25 + caido * .5);
         });
         // fios
         pares.forEach((p, i) => {
@@ -9224,9 +9615,10 @@
         });
         geoF.attributes.position.needsUpdate = true;
         nuc.pulso(t);
+        const sN = 1 + yA * .25 + gritoR * .35; nuc.g.scale.set(sN, sN, sN);
       };
       anim(0, 0, false);
-      return { g, alt: 2.5, raioBase: .55, anim };
+      return { g, alt: 2.5, raioBase: .55, anim, acao };
     },
   };
 })();
@@ -9391,7 +9783,10 @@
   }
   /* Homem alto e magro de máscara pálida sorridente (olhos fechados), cabelo castanho bagunçado, cachecol
      vermelho, camisa larga com suspensórios, calça folgada, botas gastas e dedos pálidos compridos demais.
-     Tamanho de gente (1,95 m) e modelo limpo. Educação inquietante: cabeça inclinada e um aceno lento dos dedos. */
+     Tamanho de gente (1,95 m) e modelo limpo. Educação inquietante: cabeça inclinada e um aceno lento dos dedos.
+     Ações: acao('ataque') a cabeça endireita de estalo, ele dá um passo e agarra com a mão de dedos compridos
+            enquanto a outra desce de cima; acao('revelar') a cabeça pende quebrada para o lado e volta ao lugar
+            aos trancos, a mão sobe no aceno e ele faz uma reverência educada. */
   (NS.formasFilho = NS.formasFilho || {}).mascara_sorriso = {
     nome: 'Máscara sorridente (homem de cachecol)',
     criar: (F, s) => {
@@ -9561,9 +9956,32 @@
       let fase = 0, ritmo = 0, incl = .3, alvoIncl = .3, prox = 3;
       const ap = (o, k2, v, vel, dt) => { o[k2] += (v - o[k2]) * Math.min(1, dt * vel); };
       const D = bracos[1], E = bracos[0];
+      let acA = null;
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const mix = (o, k2, v, w) => { o[k2] = o[k2] * (1 - w) + v * w; };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
       const anim = (dt, t, andando) => {
         const tt = t + des;
         nuc.pulso(tt);
+        // pesos das ações: endireitar, agarrar, golpe de cima (ataque); pescoço quebrado, aceno e reverência (revelar)
+        let reto = 0, agarra = 0, fecha = 0, ergue = 0, desce = 0, quebra = 0, acena = 0, reveren = 0;
+        if (acA) {
+          acA.t += dt; const u = acA.t;
+          if (acA.tipo === 'ataque') {
+            reto = u < .1 ? 0 : 1 - faixa(u, 1.0, 1.4);
+            agarra = faixa(u, .1, .32) * (1 - faixa(u, .95, 1.4)); fecha = faixa(u, .38, .5) * (1 - faixa(u, .95, 1.3));
+            ergue = faixa(u, .05, .25) * (1 - faixa(u, .3, .45)); desce = faixa(u, .3, .45) * (1 - faixa(u, .95, 1.4));
+          } else {
+            // a cabeça volta em três trancos secos
+            const p = faixa(u, .25, 1.0), deg = Math.floor(p * 3) / 3 + sua((p * 3 % 1 - .75) * 4) / 3;
+            quebra = u < .25 ? 1 : 1 - Math.min(1, deg);
+            acena = faixa(u, .8, 1.1) * (1 - faixa(u, 1.6, 1.9));
+            reveren = faixa(u, 1.05, 1.35) * (1 - faixa(u, 1.55, 1.9));
+          }
+          if (u >= acA.dur) acA = null;
+        }
         peito.scale.set(1 + Math.sin(tt * 1.1) * .01, 1, 1 + Math.sin(tt * 1.1) * .015);
         // a cabeça inclina devagar e às vezes troca de lado, como quem observa com carinho
         prox -= dt; if (prox <= 0) { prox = 3 + ra() * 4; alvoIncl = (ra() < .7 ? 1 : -1) * (.25 + ra() * .2); }
@@ -9589,12 +10007,40 @@
         ap(E.ombro.rotation, 'x', R * sn * .25 + (1 - R) * Math.sin(tt * .5) * .02, 5, dt); ap(E.ombro.rotation, 'z', -.07, 5, dt);
         ap(E.cotov.rotation, 'x', -.12 - R * .1, 5, dt);
         E.dedos.forEach((d, i) => { d.userData.seg.forEach((sg, j) => { sg.rotation.z = d.userData.pol ? .1 : (.05 + j * .08 + Math.sin(tt * .7 + i) * .05) * 1; }); if (!d.userData.pol) d.rotation.x = (i - 1.5) * .17; });
+        // ações por cima da pose: o rosto sorridente fica parado enquanto o corpo faz o resto
+        if (reto > 0 || quebra > 0 || reveren > 0) {
+          const k = Math.max(reto, quebra);
+          cab.rotation.z = cab.rotation.z * (1 - k) + quebra * 1.25 + (reto > 0 ? -.12 * agarra : 0);
+          cab.rotation.x = cab.rotation.x * (1 - k) + quebra * .35 - reto * .12 + reveren * .25;
+          cab.rotation.y *= 1 - k;
+          pesc.rotation.z = quebra * .3;
+        } else pesc.rotation.z = 0;
+        peito.rotation.x = .06 + agarra * .22 + reveren * .45 - quebra * .05;
+        corpo.position.z = agarra * .28;
+        // ataque: a mão esquerda avança aberta e fecha na altura do pescoço da vítima
+        if (agarra > 0) {
+          mix(E.ombro.rotation, 'x', -1.45, agarra); mix(E.ombro.rotation, 'z', .12, agarra); mix(E.cotov.rotation, 'x', -.15, agarra);
+          E.pulso.rotation.x = -.3 * agarra;
+          E.dedos.forEach((d, i) => { d.userData.seg.forEach((sg, j) => { sg.rotation.z = d.userData.pol ? .1 + fecha * .6 : (.05 + j * .08) * (1 - agarra) - agarra * .15 * (1 - fecha) + fecha * (.55 + j * .3); }); if (!d.userData.pol) d.rotation.x = (i - 1.5) * (.17 + agarra * .2 * (1 - fecha)); });
+        }
+        // a mão do aceno sobe e desce em golpe, dedos esticados como lâminas
+        const golpe = Math.max(ergue, desce);
+        if (golpe > 0) {
+          mix(D.ombro.rotation, 'x', ergue > desce ? -2.7 : -.85, golpe); mix(D.ombro.rotation, 'z', ergue > desce ? .4 : -.45, golpe);
+          mix(D.cotov.rotation, 'x', ergue > desce ? -.9 : -.2, golpe);
+          D.pulso.rotation.set(-.2 * (1 - golpe) - golpe * .3, -1.2 * (1 - golpe), .15);
+          D.dedos.forEach(d => d.userData.seg.forEach(sg => { sg.rotation.z = sg.rotation.z * (1 - golpe) + golpe * .05; }));
+        }
+        // revelar: depois que a cabeça encaixa, o aceno fica mais alto e a outra mão vai ao peito na reverência
+        if (acena > 0) { mix(D.ombro.rotation, 'z', .85, acena); mix(D.ombro.rotation, 'x', -.55, acena); }
+        if (reveren > 0) { mix(E.ombro.rotation, 'x', -.75, reveren); mix(E.ombro.rotation, 'z', .25, reveren); mix(E.cotov.rotation, 'x', -1.6, reveren); }
+        if (quebra > .5) { mix(D.ombro.rotation, 'x', .05, quebra); mix(D.ombro.rotation, 'z', .08, quebra); mix(D.cotov.rotation, 'x', -.1, quebra); }
         // pontas do cachecol balançam
         pontas.forEach((el, pi) => el.forEach((e, j) => { e.rotation.x = (j ? 0 : -.08 - pi * .05) + Math.sin(tt * 1.3 - j * .7 + pi) * (.03 + R * .12) - R * .15 * (j ? 0 : 1); e.rotation.z = (j ? 0 : [.04, -.05][pi]) + Math.sin(tt * .9 - j * .5 + pi * 2) * .03; }));
       };
       anim(0, 0, false);
       const caixa = new T.Box3().setFromObject(g);
-      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .36, anim };
+      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .36, anim, acao };
     },
   };
 })();
@@ -9603,7 +10049,10 @@
 /* Forma de Filho: figura de terno podre com uma moldura dourada no lugar da cabeça.
    Terno e sobretudo marrom-dourado apodrecido, escorrendo e em farrapos; mãos de garra abertas;
    a moldura barroca guarda uma foto antiga de aniversário de família (pintura inventada) cujas pessoas
-   sorriem com os olhos sangrando. A pintura muda: os olhos se mexem juntos, os sorrisos crescem. */
+   sorriem com os olhos sangrando. A pintura muda: os olhos se mexem juntos, os sorrisos crescem.
+   Ações: acao('ataque') a pintura grita (bocas escancaradas, tela avermelhada), a moldura avança e as mãos
+          se fecham num abraço de garras; acao('revelar') a foto surge do escuro, todos se viram de uma vez para
+          quem olha, os sorrisos se abrem, as velas sobem e os braços se abrem em convite. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
 
@@ -9725,7 +10174,7 @@
         x.strokeStyle = 'rgba(30,18,8,.25)'; x.lineWidth = 2; for (let xx = 10; xx < PW; xx += 28) { x.beginPath(); x.moveTo(xx, 0); x.lineTo(xx, 240); x.stroke(); }
         // pessoas
         gente.forEach((p, i) => {
-          const k = p.k, vira = e.vira === i ? e.viraA : 0;
+          const k = p.k, vira = e.vira === i ? e.viraA : e.virados ? (i % 2 ? 1 : -1) * 1.5 : 0;
           x.save(); x.translate(p.x, p.y);
           x.fillStyle = p.roupa; x.beginPath(); x.moveTo(-60 * k, 200); x.quadraticCurveTo(-58 * k, 52 * k, 0, 46 * k); x.quadraticCurveTo(58 * k, 52 * k, 60 * k, 200); x.fill();
           if (p.cab === 'barba') { x.fillStyle = '#e8e0d0'; x.beginPath(); x.moveTo(-12 * k, 48 * k); x.lineTo(0, 90 * k); x.lineTo(12 * k, 48 * k); x.fill(); x.fillStyle = '#3a1010'; x.fillRect(-4 * k, 52 * k, 8 * k, 40 * k); }
@@ -9746,12 +10195,22 @@
             const ex = sx * 10 * k, ey = -4 * k;
             x.fillStyle = '#5a0606'; const lag = (10 + e.lagrima * 26 + i * 3) * k; x.fillRect(ex - 2 * k, ey, 4 * k, lag); x.beginPath(); x.arc(ex, ey + lag, 2.6 * k, 0, 7); x.fill();
             x.fillStyle = '#050202'; x.beginPath(); x.ellipse(ex, ey, 6.5 * k, 5 * k * (e.pisca === i ? .15 : 1), 0, 0, 7); x.fill();
-            x.fillStyle = '#ffe8d0'; x.beginPath(); x.arc(ex + e.olhoX * 3 * k, ey + e.olhoY * 2 * k, 1.5 * k, 0, 7); x.fill();
+            x.fillStyle = '#ffe8d0'; x.beginPath(); x.arc(ex + e.olhoX * 3 * k, ey + e.olhoY * 2 * k, 1.5 * k * (1 + e.encara * 1.1), 0, 7); x.fill();
           });
           // sorriso largo demais
           const sw = (13 + e.sorriso * 9) * k, sh = (5 + e.sorriso * 7) * k;
           x.fillStyle = '#1a0505'; x.beginPath(); x.moveTo(-sw, 12 * k); x.quadraticCurveTo(0, 12 * k + sh * 2.2, sw, 12 * k); x.quadraticCurveTo(0, 12 * k + sh * .6, -sw, 12 * k); x.fill();
           x.strokeStyle = '#e8dcc0'; x.lineWidth = 1; for (let d = -sw + 3; d < sw - 2; d += 3.2 * k) { x.beginPath(); x.moveTo(d, 13 * k + sh * .3 * (1 - Math.abs(d / sw))); x.lineTo(d, 15 * k + sh * .9 * (1 - Math.abs(d / sw))); x.stroke(); }
+          // grito: a boca vira um buraco comprido que desce até o queixo, os olhos se arregalam
+          if (e.grito > 0) {
+            const gw = (7 + e.grito * 6) * k, gh = (6 + e.grito * 26) * k;
+            x.globalAlpha = Math.min(1, e.grito * 1.6);
+            x.fillStyle = p.pele; x.beginPath(); x.ellipse(0, 22 * k, 24 * k, 16 * k, 0, 0, 7); x.fill();
+            x.fillStyle = '#080202'; x.beginPath(); x.ellipse(0, 12 * k + gh * .45, gw, gh * .55, 0, 0, 7); x.fill();
+            x.strokeStyle = '#e8dcc0'; x.lineWidth = 1.2; for (let d = -gw * .8; d < gw * .8; d += 3 * k) { x.beginPath(); x.moveTo(d, 12 * k + gh * .02 + Math.abs(d) * .3); x.lineTo(d, 12 * k + gh * .14 + Math.abs(d) * .3); x.stroke(); }
+            [-1, 1].forEach(sx => { x.fillStyle = '#020101'; x.beginPath(); x.ellipse(sx * 10 * k, -5 * k, 7.5 * k * (1 + e.grito * .3), 6 * k * (1 + e.grito * .6), 0, 0, 7); x.fill(); x.fillStyle = '#fff2e0'; x.beginPath(); x.arc(sx * 10 * k, -5 * k, (1 + e.grito * 1.2) * k, 0, 7); x.fill(); });
+            x.globalAlpha = 1;
+          }
           x.restore();
         });
         // mesa com toalha e bolo com velas
@@ -9768,9 +10227,11 @@
         const gV = x.createRadialGradient(256, 176, 120, 256, 176, 330); gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(10,4,2,.85)'); x.fillStyle = gV; x.fillRect(0, 0, PW, PH);
         for (let i = 0; i < 6; i++) { const x0 = 40 + i * 85, h = 30 + ((i * 37) % 60) + e.lagrima * 40; x.fillStyle = 'rgba(70,4,4,.75)'; x.fillRect(x0, 0, 4, h); x.beginPath(); x.arc(x0 + 2, h, 4, 0, 7); x.fill(); }
         x.drawImage(cRach, 0, 0);
+        if (e.verm > 0) { x.fillStyle = `rgba(150,8,4,${e.verm * .45})`; x.fillRect(0, 0, PW, PH); }
+        if (e.escuro > 0) { x.fillStyle = `rgba(4,2,1,${e.escuro})`; x.fillRect(0, 0, PW, PH); }
         texQ.needsUpdate = true;
       }
-      const est = { olhoX: 0, olhoY: 0, sorriso: .3, lagrima: 0, pisca: -1, vira: -1, viraA: 0, chama: [1, 1, 1, 1, 1] };
+      const est = { olhoX: 0, olhoY: 0, sorriso: .3, lagrima: 0, pisca: -1, vira: -1, viraA: 0, chama: [1, 1, 1, 1, 1], grito: 0, escuro: 0, verm: 0, virados: 0, encara: 0 };
       pintar(est);
 
       /* ---------- pernas e sapatos ---------- */
@@ -9868,21 +10329,51 @@
       const nuc = nucleo(tronco, -.1, .38, .12, .6, -.15);
 
       /* ---------- animação ---------- */
-      let fase = 0, tq = 0, tPint = 0, tOlhar = 0, alvoX = 0, alvoY = 0, tPisca = 2, tVira = 6, inclina = .1, alvoInc = .1;
+      let fase = 0, tq = 0, tPint = 0, tOlhar = 0, alvoX = 0, alvoY = 0, tPisca = 2, tVira = 6, inclina = .1, alvoInc = .1, acA = null;
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const matTela = tela.material, eTela = matTela.emissiveIntensity;
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.5 : 1.9 }; };
       const anim = (dt, t, andando) => {
         nuc.pulso(t);
+        // pesos das ações: grito e abraço (ataque); foto surgindo, todos se viram, convite (revelar)
+        let grito = 0, abraco = 0, avanca = 0, surge = 1, encara = 0, convite = 0, ativo = false;
+        if (acA) {
+          acA.t += dt; const u = acA.t; ativo = true;
+          if (acA.tipo === 'ataque') {
+            grito = faixa(u, .05, .3) * (1 - faixa(u, 1.05, 1.45));
+            avanca = faixa(u, .15, .4) * (1 - faixa(u, .95, 1.4));
+            abraco = faixa(u, .2, .5) * (1 - faixa(u, 1.0, 1.45));
+          } else {
+            surge = faixa(u, .05, .6);
+            encara = u > .55 ? 1 - faixa(u, 1.4, 1.85) : 0;            // todos se viram de estalo
+            convite = faixa(u, .5, .9) * (1 - faixa(u, 1.35, 1.85));
+          }
+          if (u >= acA.dur) acA = null;
+        }
         // braços abertos que "acolhem": abrem e fecham devagar, dedos dobrando como quem chama
         const ab = Math.sin(t * .45) * .12;
         bracos.forEach((B, i) => {
           B.b.rotation.z = B.sx * (.75 + ab) + (andando ? Math.sin(fase + i * 3) * .05 : 0);
           B.b.rotation.x = Math.sin(t * .6 + i) * .05;
           B.cot.rotation.z = -B.sx * (.35 - ab * .5);
-          B.dedos.forEach((d, j) => { d.rotation.x = -.35 - Math.max(0, Math.sin(t * 1.4 - j * .5 + i * 2)) * .7; });
+          B.dedos.forEach((d, j) => { d.rotation.x = -.35 - Math.max(0, Math.sin(t * 1.4 - j * .5 + i * 2)) * .7 * (1 - abraco) - abraco * (1.5 + (j === 4 ? -.6 : 0)) + convite * .3; });
+          // ataque: os braços vêm para a frente e se fecham em volta da vítima; revelar: abrem-se ainda mais
+          B.b.rotation.z = B.b.rotation.z * (1 - abraco) + B.sx * .3 * abraco + B.sx * convite * .35;
+          B.b.rotation.x += -abraco * 1.25;
+          B.b.rotation.y = -B.sx * abraco * .35;
+          B.cot.rotation.z = B.cot.rotation.z * (1 - abraco) - B.sx * 1.05 * abraco;
+          B.cot.rotation.x = -.35 - abraco * .25;
         });
         // a moldura se inclina como uma cabeça curiosa, às vezes de estalo
         tq -= dt; if (tq <= 0) { tq = 1.5 + R() * 3; alvoInc = (R() - .5) * .5; }
         inclina += (alvoInc - inclina) * Math.min(1, dt * (R() < .08 ? 30 : 2));
-        quadro.rotation.z = inclina; quadro.rotation.x = Math.sin(t * .7) * .05; quadro.rotation.y = Math.sin(t * .33) * .12;
+        const tremeQ = grito > .4 ? Math.sin(t * 52) * .025 * grito : 0;
+        quadro.rotation.z = inclina * (1 - grito) + tremeQ; quadro.rotation.x = Math.sin(t * .7) * .05 * (1 - grito) - avanca * .32; quadro.rotation.y = Math.sin(t * .33) * .12 * (1 - Math.max(grito, encara));
+        quadro.position.z = avanca * .12; quadro.position.y = .66 + grito * .03 * Math.sin(t * 37);
+        tronco.rotation.x = -.03 + avanca * .22;
+        corpo.position.z = avanca * .2;
         // farrapos e pingos
         trapos.forEach((p, i) => { p.rotation.x = Math.sin(t * 1.6 + i) * (andando ? .25 : .07); p.rotation.z = Math.sin(t * 1.1 + i * 2) * .05; });
         pingos.forEach(P => { P.f += dt * .25; if (P.f > 1) P.f = 0; P.p.scale.y = P.comp * (.3 + P.f * .9); });
@@ -9893,7 +10384,12 @@
         tVira -= dt; if (tVira <= 0) { if (est.vira >= 0) { est.vira = -1; tVira = 4 + R() * 6; } else { est.vira = R() * 4 | 0; est.viraA = R() < .5 ? -1 : 1; tVira = .6 + R(); } }
         est.sorriso = .35 + .35 * (.5 + .5 * Math.sin(t * .23)) + (est.vira >= 0 ? .3 : 0);
         est.lagrima = (t * .05) % 1;
-        tPint -= dt; if (tPint <= 0) { tPint = .14; for (let i = 0; i < 5; i++) est.chama[i] = .75 + R() * .45; pintar(est); }
+        // ações na pintura: grito avermelhado; na revelação a foto sai do escuro e todos encaram, sorrindo
+        est.grito = grito; est.verm = grito * (.75 + Math.sin(t * 23) * .25); est.escuro = 1 - surge; est.encara = encara;
+        est.virados = acA && acA.tipo === 'revelar' && acA.t < .55 ? 1 : 0;   // de costas até o estalo
+        if (encara > 0) { est.vira = -1; est.olhoX = 0; est.olhoY = 0; est.pisca = -1; est.sorriso = est.sorriso * (1 - encara) + 1.15 * encara; tVira = Math.max(tVira, 1.5); }
+        matTela.emissiveIntensity = eTela * (1 + grito * 2.5 + encara * 1.2) * (.25 + surge * .75);
+        tPint -= dt; if (tPint <= 0) { tPint = ativo ? .05 : .14; for (let i = 0; i < 5; i++) est.chama[i] = (.75 + R() * .45) * (1 + convite * .7 + grito * .4); pintar(est); }
         if (andando) {
           // passos duros e compridos, ombros quase parados
           fase += dt * 4.5; const a = Math.sin(fase);
@@ -9905,7 +10401,7 @@
         }
         tronco.scale.x = 1 + Math.sin(t * 1.1) * .01;
       };
-      return { g, alt: 2.32, raioBase: .5, anim };
+      return { g, alt: 2.32, raioBase: .5, anim, acao };
     },
   };
 })();
@@ -9915,6 +10411,10 @@
    avermelhado, enrolada em tiras de pano vermelho e rosa bordado e em muitos braços humanos pálidos
    que a abraçam de todos os lados; dois braços se estendem para a frente com as mãos abertas.
    Fotografias antigas em sépia (inventadas, sem pessoas reais) presas ao pano.
+   Ações: acao('ataque') abre os dois braços da frente bem largos e fecha num abraço que esmaga,
+   deslizando para a frente enquanto todos os braços do corpo apertam juntos; acao('revelar') começa
+   toda encolhida, os braços apertados, e se desenrola: os braços do corpo afrouxam, os da frente se
+   abrem para cima num convite e a cabeça se ergue, inclinada, com o sorriso triste.
    Formato: ACF3D.formasFilho.muitos_bracos = { nome, criar(F, s) → { g, alt, raioBase, anim } } */
 (() => {
   'use strict';
@@ -10115,7 +10615,7 @@
         const ph = (t * .72) % 1, k = Math.exp(-Math.pow((ph - .1) / .05, 2)) + .6 * Math.exp(-Math.pow((ph - .3) / .06, 2));
         luzM.emissiveIntensity = 1.1 + k * 1.5 + Math.sin(t * .5) * .2; h.material.opacity = .35 + k * .4; esf.scale.set(1 + k * .07, 1 + k * .07, .8 + k * .06);
       };
-      return { g, pulso, moldura: moldA };
+      return { g, pulso, moldura: moldA, mat: luzM };
     }
     // utilidades de pintura
     const pinta = {
@@ -10407,15 +10907,59 @@
         // os braços da frente alcançam e recuam, os dedos se abrem e fecham
         alcance.forEach((a, i) => {
           const r = .5 + .5 * Math.sin(t * .7 + i * 1.3), al = a.alvo.clone().add(V(a.sx * .04 * r, Math.sin(t * .9 + i) * .03, .1 * r + desl * .12));
+          if (AC.w > 0) al.lerp(V(a.sx * AC.x, AC.y, AC.z), AC.w);
           ik(a.br, al, a.polo);
-          a.m.curvar([.1 + .35 * (1 - r), .12 + .38 * (1 - r), .14 + .4 * (1 - r), .16 + .45 * (1 - r), .05], .05, t);
+          const fe = 1 - AC.abre;
+          a.m.curvar([(.1 + .35 * (1 - r)) * fe + AC.fecha, (.12 + .38 * (1 - r)) * fe + AC.fecha, (.14 + .4 * (1 - r)) * fe + AC.fecha, (.16 + .45 * (1 - r)) * fe + AC.fecha, .05], .05 + AC.w * .05, t);
         });
         soltas.rotation.x = -desl * .05; soltas.children.forEach((c, i) => { c.rotation.z = Math.sin(t * 1.1 + i) * .015; });
         fotos.forEach(f => { f.pend.rotation.z = f.z0 + Math.sin(t * 1.3 + f.f) * .06 + desl * Math.sin(t * 3 + f.f) * .05; });
         nuc.pulso(t);
+        acaoPose(t);
       };
+      /* ---------- ações: ataque (abraço que esmaga) e revelar (se desenrola) ---------- */
+      let ac = null, tAnt = 0;
+      const AC = { w: 0, x: 0, y: 0, z: 0, abre: 0, fecha: 0 };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.7 : 1.9 }; };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      function acaoPose(t) {
+        const dt = Math.min(.1, Math.max(0, t - tAnt)); tAnt = t;
+        corpo.position.z = 0; AC.w = 0; AC.abre = 0; AC.fecha = 0;
+        if (!ac) return;
+        ac.t += dt; const u = ac.t; if (u >= ac.dur) { ac = null; return; }
+        const tr = Math.sin(t * 43) * Math.sin(t * 13);
+        let aperto = 0, cx = 0, cy = 0, cz = 0;
+        if (ac.tipo === 'ataque') {
+          const abre = qd(u, [[0, 0], [.32, 1], [.58, 0], [1.7, 0]]), fecha = qd(u, [[0, 0], [.34, 0], [.56, 1], [1.15, 1], [1.7, 0]]);
+          AC.w = qd(u, [[0, 0], [.2, 1], [1.2, 1], [1.7, 0]]);
+          AC.x = .9 * abre + .07 * fecha + .3 * (1 - abre - fecha); AC.y = 1.62 * abre + 1.4 * fecha + 1.45 * (1 - abre - fecha); AC.z = .28 * abre + .84 * fecha + .5 * (1 - abre - fecha);
+          AC.abre = abre; AC.fecha = fecha * .55;
+          corpo.position.z = qd(u, [[0, 0], [.3, -.05], [.56, .42], [1.15, .38], [1.7, 0]]);
+          corpo.rotation.x += qd(u, [[0, 0], [.3, -.08], [.56, .2], [1.15, .17], [1.7, 0]]);
+          aperto = qd(u, [[0, 0], [.3, -.6], [.56, 1], [1.15, 1], [1.7, 0]]) * (1 + tr * .15);
+          cz = fecha * .32; cx = -abre * .2 + fecha * .1; cy = -cab.rotation.y * Math.max(abre, fecha);
+        } else {
+          const enc = qd(u, [[0, 1], [.15, 1], [.75, 0], [1.9, 0]]), conv = qd(u, [[0, 0], [.4, 0], [.85, 1], [1.45, 1], [1.9, 0]]);
+          AC.w = Math.max(enc, conv);
+          const s2 = enc + conv || 1;
+          AC.x = (.1 * enc + .75 * conv) / s2; AC.y = (1.42 * enc + 1.82 * conv) / s2; AC.z = (.22 * enc + .45 * conv) / s2;
+          AC.fecha = enc * .6; AC.abre = conv;
+          aperto = enc * 1.6 - conv * 1.2;
+          corpo.position.y -= enc * .1; corpo.rotation.x += enc * .14;
+          tronco.scale.y *= 1 - enc * .04;
+          cx = enc * .55 - conv * .22; cz = conv * (.35 + tr * .03); cy = -cab.rotation.y * Math.max(enc, conv);
+          lagrimas.forEach(l => l.l.scale.multiplyScalar(1 + conv * .6));
+        }
+        // todos os braços do corpo apertam (ou afrouxam) juntos
+        tronco.scale.x *= 1 - aperto * .035; tronco.scale.z *= 1 - aperto * .035;
+        bracos.forEach((b, i) => { const k = aperto * (1 + Math.sin(i * 2.1) * .2); b.g.scale.x *= 1 - k * .06; b.g.scale.z *= 1 - k * .06; b.g.rotation.y += b.giro * k * .08; });
+        cab.rotation.x += cx; cab.rotation.y += cy; cab.rotation.z += cz;
+        fotos.forEach(f => { f.pend.rotation.z += Math.sin(t * 9 + f.f) * .25 * Math.abs(aperto) * .5; });
+        nuc.mat.emissiveIntensity += Math.max(0, aperto) * 1.2;
+      }
       anim(0, 0, false);
-      return { g, alt: 2.36, raioBase: .55, anim };
+      return { g, alt: 2.36, raioBase: .55, anim, acao };
     },
   };
 })();
@@ -10425,7 +10969,9 @@
    Pele cinza-esverdeada enrugada, braços compridos demais enrolados no corpo, dedos que descem até o chão;
    olhos grandes e molhados de pupila em ampulheta nos ombros, nas costas e nos joelhos; no alto, um rosto
    que é só uma boca em anel de dentes com um olho dentro, e um couro cabeludo cheio de olhinhos.
-   Parada, as pálpebras piscam fora de ritmo e as pupilas se viram para a frente. */
+   Parada, as pálpebras piscam fora de ritmo e as pupilas se viram para a frente.
+   Ações: acao('ataque') arregala e acende todos os olhos na vítima, avança o corpo e chicoteia os dedos compridos
+          para a frente; acao('revelar') encolhida e de olhos fechados, abre todos os olhos de uma vez e encara. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
 
@@ -10629,9 +11175,31 @@
 
       /* ---------- animação ---------- */
       const alvoMundo = new T.Vector3(), tmp = new T.Vector3();
-      let fase = 0, quadro = 0, tPose = 0, poseA = 0;
+      let fase = 0, quadro = 0, tPose = 0, poseA = 0, acA = null;
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const eOlho = olhoM.emissiveIntensity, eOlhinho = olhinho.emissiveIntensity, FRENTE = new T.Vector3(0, 1.1, 3.5);
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.4 : 1.9 }; };
       const anim = (dt, t, andando) => {
         nuc.pulso(t);
+        // pesos das ações: olhos arregalados e travados na frente, corpo avançando, dedos em chicote, olhos fechados
+        let arregala = 0, trava = 0, bote = 0, chicote = 0, fechados = 0, enrola = 0, acende = 0, uA = -1;
+        if (acA) {
+          acA.t += dt; const u = acA.t; uA = u;
+          if (acA.tipo === 'ataque') {
+            arregala = faixa(u, 0, .12) * (1 - faixa(u, 1.0, 1.35)); trava = arregala; acende = arregala;
+            bote = faixa(u, .15, .38) * (1 - faixa(u, .85, 1.3));
+            chicote = faixa(u, .22, .42) * (1 - faixa(u, .8, 1.25));
+          } else {
+            fechados = u < .45 ? 1 : 0;                                         // tudo fechado até o estalo
+            enrola = 1 - faixa(u, .45, .85);
+            arregala = u < .45 ? 0 : (u < .62 ? 1.3 : 1.3 - faixa(u, .62, .95) * .3) * (1 - faixa(u, 1.45, 1.85));
+            trava = u < .45 ? 0 : 1 - faixa(u, 1.4, 1.85);
+            acende = u < .45 ? 0 : Math.max(1 - faixa(u, .5, 1.1) * .5, 0) * (1 - faixa(u, 1.4, 1.85)) * 1.4;
+          }
+          if (u >= acA.dur) acA = null;
+        }
         // respira devagar, como algo grande e parado
         const resp = Math.sin(t * .8) * .5 + Math.sin(t * 2.1) * .15;
         tronco.scale.set(1 + resp * .02, 1 + resp * .012, 1 + resp * .025);
@@ -10641,18 +11209,27 @@
           O.pisca -= dt;
           if (O.pisca <= 0 && O.fecha === 0) { O.fecha = .2; O.pisca = .8 + R() * 5; if (R() < .15) O.pisca = .15; }
           if (O.fecha > 0) { O.fecha -= dt; O.aberto = Math.abs(O.fecha - .1) / .1; if (O.fecha <= 0) { O.fecha = 0; O.aberto = 1; } }
-          O.sup.rotation.x = -.95 * O.aberto - .05; O.inf.rotation.x = .75 * O.aberto + .05;
+          // nas ações as pálpebras obedecem a todos de uma vez (fechadas, ou arregaladas além do normal)
+          const ab = fechados ? .02 + Math.max(0, Math.sin(t * 40 + i)) * .04 : arregala > 0 ? Math.max(O.aberto, arregala) : O.aberto;
+          O.sup.rotation.x = -.95 * ab - .05; O.inf.rotation.x = .75 * ab + .05;
           O.saca -= dt; if (O.saca <= 0) { O.saca = .3 + R() * 1.6; O.alvo.set((R() - .5) * 1.4, 1.1 + (R() - .5) * .7, 3 + R()); if (R() < .45) O.alvo.set(0, 1.4, 4); }
+          if (trava > 0) { O.alvo.copy(FRENTE); O.saca = Math.max(O.saca, .5); }
+          O.glob.scale.setScalar(1 + Math.max(0, arregala - 1) * .5 + (arregala > 0 && !fechados ? .06 : 0));
           // a pupila vira para a frente, mas sem passar do limite da órbita
           alvoMundo.copy(O.alvo); g.localToWorld(alvoMundo); O.raiz.worldToLocal(alvoMundo).normalize();
           if (alvoMundo.z < .25) { alvoMundo.z = .25; alvoMundo.normalize(); }
-          O.olhar.lerp(alvoMundo, Math.min(1, dt * (O.saca > 1.2 ? 4 : 14))); tmp.copy(O.olhar).normalize();
+          O.olhar.lerp(alvoMundo, Math.min(1, dt * (trava > 0 ? 22 : O.saca > 1.2 ? 4 : 14))); tmp.copy(O.olhar).normalize();
           O.glob.lookAt(O.raiz.localToWorld(tmp));
         });
         baba1.scale.y = 1 + Math.sin(t * .9) * .15;
-        pequenos.forEach((P, i) => { const p = Math.sin(t * 1.3 + P.f) > .985; P.me.scale.y = (p ? .1 : 1) * P.me.scale.x; P.me.rotation.y = Math.sin(t * .7 + P.f) * .5; P.me.rotation.x = Math.sin(t * .9 + P.f * 2) * .3; });
-        // dedos: tremores raros
-        maos.forEach((M, j) => M.dedos.forEach((d, i) => { d.rotation.x = Math.sin(t * .5 + i + j) * .03 + (Math.sin(t * 6.7 + i * 3 + j) > .96 ? .25 : 0); }));
+        // olhinhos: na revelação abrem um pouco depois dos grandes, em cascata
+        pequenos.forEach((P, i) => { const p = Math.sin(t * 1.3 + P.f) > .985 || (uA >= 0 && fechados) || (uA >= 0 && uA < .45 + (i % 7) * .025 && enrola > 0); P.me.scale.y = (p ? .1 : 1) * P.me.scale.x; P.me.rotation.y = Math.sin(t * .7 + P.f) * .5 * (1 - trava); P.me.rotation.x = Math.sin(t * .9 + P.f * 2) * .3 * (1 - trava); });
+        olhoM.emissiveIntensity = eOlho * (1 + acende * 4); olhinho.emissiveIntensity = eOlhinho * (1 + acende * 3);
+        // dedos: tremores raros; no ataque, os dedos compridos chicoteiam para a frente e se abrem
+        maos.forEach((M, j) => {
+          M.mao.rotation.x = -chicote * .5;
+          M.dedos.forEach((d, i) => { d.rotation.x = Math.sin(t * .5 + i + j) * .03 + (Math.sin(t * 6.7 + i * 3 + j) > .96 ? .25 : 0) - chicote * (1.15 + i * .08 + Math.sin(t * 25 + i) * .05); d.rotation.z = (i - 1.5) * .06 + chicote * (i - 2) * .22 * M.sx; });
+        });
         if (andando) {
           // anda em "quadros": congela, salta para outra pose, congela de novo
           tPose -= dt; if (tPose <= 0) { tPose = .18 + R() * .25; poseA = R() * 6.283; quadro++; }
@@ -10662,8 +11239,14 @@
           tPose = 0; corpo.position.y *= .8; corpo.rotation.z *= .8; corpo.rotation.x *= .8;
           cab.rotation.y = Math.sin(t * .2) * .08 + (Math.sin(t * 3.1) > .995 ? .4 : 0);
         }
+        // corpo: no ataque avança e se inclina sobre a vítima; na revelação começa enrolado e se abre
+        corpo.position.z = bote * .3;
+        tronco.rotation.x = .18 + bote * .3 + enrola * .35;
+        cab.rotation.x = -.1 - bote * .15 + enrola * .55 - (arregala > 1 ? .12 : 0);
+        if (trava > 0) cab.rotation.y *= 1 - trava;
+        if (arregala > 0 && uA >= 0) cab.position.x = Math.sin(t * 61) * .006 * arregala;
       };
-      return { g, alt: 1.82, raioBase: .62, anim };
+      return { g, alt: 1.82, raioBase: .62, anim, acao };
     },
   };
 })();
@@ -10671,7 +11254,10 @@
 /* ===== forma: orelhas ===== */
 /* Forma de Filho: figura altíssima de túnica cinza esfarrapada, cabeça careca lisa sem rosto e duas orelhas
    humanas enormes. Uma mão ossuda em concha atrás da orelha, o outro braço comprido e pálido pendendo.
-   Parada, vira a cabeça devagar, congela de repente e as orelhas tremem. */
+   Parada, vira a cabeça devagar, congela de repente e as orelhas tremem.
+   Ações: acao('ataque') a cabeça vira de estalo para a vítima, as orelhas se abrem e o braço comprido pendente
+          sobe e avança com a mão aberta, que se fecha; acao('revelar') imóvel de cabeça baixa e orelhas murchas,
+          as orelhas se abrem num tremor, a cabeça sobe devagar e trava inclinada, escutando quem olha. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
 
@@ -10860,8 +11446,29 @@
       const estica = (me, a, b, r0, r1) => { const d = W2.subVectors(b, a), L = d.length(); me.position.copy(a); me.quaternion.setFromUnitVectors(UP, d.normalize()); me.scale.set(r0 * 2, L, r1 * 2); };
       let estado = 'para', tEst = 2.2, de = { y: 0, x: -.2, z: 0 }, para = { y: 0, x: -.2, z: 0 }, cur = { y: 0, x: -.2, z: 0 }, dur = 1, prog = 1, fase = 0;
       const tremor = [0, 0];
+      let acA = null;
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
       const anim = (dt, t, andando) => {
         nuc.pulso(t);
+        // pesos das ações: virar de estalo, agarrar, fechar a mão (ataque); cabeça baixa, orelhas abrindo, escutar (revelar)
+        let estalo = 0, agarra = 0, fecha = 0, baixa = 0, abreO = 0, murcha = 0, escuta = 0;
+        if (acA) {
+          acA.t += dt; const u = acA.t; tEst = Math.max(tEst, .6);
+          if (acA.tipo === 'ataque') {
+            estalo = faixa(u, 0, .1) * (1 - faixa(u, 1.05, 1.4)); abreO = estalo;
+            agarra = faixa(u, .15, .42) * (1 - faixa(u, .95, 1.4)); fecha = faixa(u, .45, .58) * (1 - faixa(u, .95, 1.3));
+          } else {
+            murcha = 1 - faixa(u, .3, .45);                                  // orelhas murchas até abrirem de uma vez
+            abreO = faixa(u, .3, .45) * (1 - faixa(u, 1.5, 1.9));
+            baixa = 1 - faixa(u, .5, 1.05);                                   // a cabeça sobe devagar
+            escuta = faixa(u, .95, 1.1) * (1 - faixa(u, 1.5, 1.9));           // e trava inclinada para quem olha
+            if (u > .3 && u < .5) { tremor[0] = 1; tremor[1] = 1; }
+          }
+          if (u >= acA.dur) acA = null;
+        }
         // vira devagar, congela; às vezes um estalo rápido para o lado de um som
         tEst -= dt;
         if (tEst <= 0) {
@@ -10873,16 +11480,19 @@
         }
         if (prog < 1) { prog = Math.min(1, prog + dt / dur); const e = prog * prog * (3 - 2 * prog); ['y', 'x', 'z'].forEach(k => { cur[k] = de[k] + (para[k] - de[k]) * e; }); }
         else if (Math.sin(t * 9) > .97 && R() < .05) tremor[R() < .5 ? 0 : 1] = .7;
-        pesc.rotation.y = cur.y * .45; cab.rotation.y = cur.y * .55; cab.rotation.x = cur.x; cab.rotation.z = cur.z;
+        const kA = Math.max(estalo, baixa, escuta), livre = 1 - kA;
+        pesc.rotation.y = cur.y * .45 * livre; cab.rotation.y = cur.y * .55 * livre;
+        cab.rotation.x = cur.x * livre + kA * -.2 + estalo * .25 + baixa * 1.0 + escuta * .05; cab.rotation.z = cur.z * livre + escuta * .45 - estalo * .2;
+        pesc.rotation.x = .38 + estalo * .3 + baixa * .35;
         // orelhas: tremidas rápidas que somem
-        orelhas.forEach((o, i) => { tremor[i] = Math.max(0, tremor[i] - dt * 3); const sx = i ? 1 : -1; o.rotation.y = sx * -.5 + Math.sin(t * 40 + i) * .12 * tremor[i]; o.rotation.z = sx * -.08 + Math.sin(t * 33) * .06 * tremor[i]; });
+        orelhas.forEach((o, i) => { tremor[i] = Math.max(0, tremor[i] - dt * 3); const sx = i ? 1 : -1; o.rotation.y = sx * -.5 + Math.sin(t * 40 + i) * .12 * tremor[i] + sx * (murcha * .75 - abreO * .3); o.rotation.z = sx * -.08 + Math.sin(t * 33) * .06 * tremor[i] - sx * murcha * .3; o.scale.setScalar(1.25 * (1 - murcha * .25 + abreO * .22)); });
         // antebraço erguido: do cotovelo até o punho que acompanha a cabeça
         g.updateMatrixWorld(true);
         W1.copy(cotovelo); punho.getWorldPosition(W2); bE.worldToLocal(W2); const pP = W2.clone();
         estica(ossoA, V(cotovelo.x + .014, cotovelo.y, cotovelo.z), V(pP.x + .011, pP.y, pP.z), .034, .03);
         estica(ossoB, V(cotovelo.x - .016, cotovelo.y, cotovelo.z - .012), V(pP.x - .009, pP.y, pP.z - .01), .026, .022);
         maoE.dedos.forEach((d, i) => { d.rotation.x = .3 + Math.sin(t * .7 + i) * .05 + (prog < 1 ? .15 : 0); });
-        maoP.dedos.forEach((d, i) => { d.rotation.x = Math.sin(t * .9 + i * .8) * .08 + (Math.sin(t * 5.3 + i) > .97 ? .3 : 0); });
+        maoP.dedos.forEach((d, i) => { d.rotation.x = (Math.sin(t * .9 + i * .8) * .08 + (Math.sin(t * 5.3 + i) > .97 ? .3 : 0)) * (1 - agarra) - agarra * .25 * (1 - fecha) + fecha * 1.3 + escuta * Math.max(0, Math.sin(t * 14 + i * 1.3)) * .3; });
         // respiração lenta, panos balançando
         const resp = Math.sin(t * .7);
         mantoM.scale.set(1 + resp * .012, 1, 1 + resp * .015);
@@ -10892,8 +11502,16 @@
           fase += dt * 2.2; tronco.rotation.x = .12 + Math.sin(fase) * .02; tronco.rotation.z = Math.sin(fase * .5) * .03;
           bP.rotation.x = .15 + Math.sin(fase) * .08;
         } else { tronco.rotation.x += (.05 - tronco.rotation.x) * .05; tronco.rotation.z *= .95; bP.rotation.x += (.05 + Math.sin(t * .5) * .03 - bP.rotation.x) * .05; }
+        // ataque: o braço comprido sobe para a frente e o corpo se debruça sobre a vítima
+        if (agarra > 0 || baixa > 0 || escuta > 0) {
+          bP.rotation.x = bP.rotation.x * (1 - agarra) - 1.25 * agarra; bP.rotation.z = -.13 - agarra * .2;
+          maoP.m.rotation.x = .05 - agarra * .6;
+          const wT = Math.max(agarra, baixa, escuta);
+          tronco.rotation.x = tronco.rotation.x * (1 - wT) + agarra * .3 + baixa * .18 + escuta * .06;
+        } else bP.rotation.z = -.13;
+        corpo.position.z = agarra * .3;
       };
-      return { g, alt: 2.62, raioBase: .55, anim };
+      return { g, alt: 2.62, raioBase: .55, anim, acao };
     },
   };
 })();
@@ -11304,7 +11922,11 @@
 /* Forma de Filho: quadrúpede de retalhos.
    Corpo enorme e corcunda feito de retalhos de pano e pele (vermelho e bege) com costuras em cruz,
    cabeça redonda de boneco pendurada baixa, membros desiguais (duas patas pesadas e dois braços
-   finos com garras), tiras de pano pingando. Anda de quatro, pesado e torto. */
+   finos com garras), tiras de pano pingando. Anda de quatro, pesado e torto.
+   Ações: acao('ataque') empina, ergue a pata pesada e o braço de garras e desaba para a frente
+   batendo a pata no chão, com a boca costurada se rasgando; acao('revelar') despenca de cima
+   (como quem cai do forro) com os membros pendurados, amassa no chão e a cabeça chicoteia para
+   cima com a boca aberta. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
   (NS.formasFilho = NS.formasFilho || {}).retalhos_quadrupede = {
@@ -11542,8 +12164,9 @@
       // linha solta pendurada da boca
       { const { p } = naCab(.22, -.4, .88, .01); const q = tubo([p, p.clone().add(V3(.02, -.1, .03)), p.clone().add(V3(-.02, -.22, .02)), p.clone().add(V3(.01, -.32, .04))], .005, 10, 4); cabI.add(new T.Mesh(guardar(q), mLinha)); }
       // rasgo largo onde seria a boca, costurado com linhas compridas que mal seguram
-      { const { p, n } = naCab(.05, -.36, .93, -.01); const bo = F.G(); bo.position.copy(p); bo.quaternion.setFromUnitVectors(V3(0, 0, 1), n); bo.rotation.z += .12; cabI.add(bo);
-        const gap = new T.Mesh(guardar(new T.SphereGeometry(.1, 20, 12)), mat({ color: '#030000', emissive: '#140000', emissiveIntensity: 1, roughness: .6 })); gap.scale.set(2.1, .5, .5); gap.position.z = -.012; bo.add(gap); // brasa vermelha lá dentro bo.add(gap);
+      let bocaG = null, mGap = null;
+      { const { p, n } = naCab(.05, -.36, .93, -.01); const bo = bocaG = F.G(); bo.position.copy(p); bo.quaternion.setFromUnitVectors(V3(0, 0, 1), n); bo.rotation.z += .12; cabI.add(bo);
+        const gap = new T.Mesh(guardar(new T.SphereGeometry(.1, 20, 12)), mGap = mat({ color: '#030000', emissive: '#140000', emissiveIntensity: 1, roughness: .6 })); gap.scale.set(2.1, .5, .5); gap.position.z = -.012; bo.add(gap); // brasa vermelha lá dentro bo.add(gap);
         for (let i = -3; i <= 3; i++) { const l = new T.Mesh(guardar(new T.CylinderGeometry(.005, .005, .075, 4)), mLinha); l.position.set(i * .052, 0, .028); l.rotation.z = (R() - .5) * .5; bo.add(l); }
         for (let i = 0; i < 5; i++) { const d = new T.Mesh(guardar(new T.ConeGeometry(.012, .05, 5)), mat({ color: '#cfc4a8', roughness: .5 })); d.position.set(-.13 + i * .065 + (R() - .5) * .02, -.012, .025); d.rotation.x = Math.PI; bo.add(d); }
       }
@@ -11680,6 +12303,7 @@
         torso.scale.set(1 + resp * .02, 1 + resp * .025 + soluco * .04, 1);
         corpo.position.set(0, -.04 * pesoE * kAnda + Math.sin(t * 1.15) * .015 - soluco * .03, Math.sin(fase * 6.283 * 2) * .04 * kAnda);
         corpo.rotation.set(Math.sin(fase * 6.283) * .03 * kAnda, Math.sin(fase * 6.283) * .05 * kAnda, -.08 * pesoE * kAnda + .03 * pesoD * kAnda + Math.sin(t * .5) * .015);
+        const ex = acaoCorpo(dt, t);
         corpo.updateMatrix();
         // membros por IK (ombro preso ao corpo, mão/pé no alvo)
         membros.forEach(m => {
@@ -11697,16 +12321,67 @@
         // cabeça pendurada: balança como um peso e dá trancos de lado
         const tr = tique(t, 6.1, .5, 1.2), tr2 = tique(t, 9.7, .3, 4);
         cab.rotation.set(.12 + Math.sin(t * .9) * .07 + Math.sin(fase * 12.56) * .05 * kAnda - tr2 * .25, Math.sin(t * .43) * .25 + tr * .7, Math.sin(t * .7) * .08 + tr * .35);
-        olhoV.scale.setScalar(.8 + .3 * Math.abs(Math.sin(t * 2.3)) + tr * .6);
+        olhoV.scale.setScalar(.8 + .3 * Math.abs(Math.sin(t * 2.3)) + tr * .6 + ex.olho);
+        cab.rotation.x += ex.cx; cab.rotation.y *= 1 - ex.fixa; cab.rotation.z += ex.cz;
+        bocaG.scale.set(1 + ex.boca * .15, 1 + ex.boca * 2.2, 1 + ex.boca * .9);
+        mGap.emissive.setRGB(.008 + ex.boca * .05, ex.boca * .002, 0);
         // tiras balançando (as dos membros acompanham o osso)
         tiras.forEach(ti => { if (ti.seg) { ti.seg.updateMatrix(); ti.piv.position.copy(ti.loc).applyMatrix4(ti.seg.matrix); } });
         tiras.forEach((ti, i) => { ti.piv.rotation.x = Math.sin(t * 1.4 * ti.k + ti.f) * .1 + Math.sin(fase * 12.56 + ti.f) * .12 * kAnda; ti.piv.rotation.z = Math.sin(t * 1.1 * ti.k + ti.f * 2) * .07; });
         // núcleo: pulso lento
         const pu = Math.pow(.5 + .5 * Math.sin(t * 1.3), 3);
-        nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.2; nucleo.halo.material.opacity = .45 + pu * .55;
+        nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.2 + ex.nuc; nucleo.halo.material.opacity = Math.min(1, .45 + pu * .55 + ex.nuc * .2);
       };
+      /* ---------- ações únicas (ataque e revelar), aplicadas antes do IK ---------- */
+      let ac = null;
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.6 : 1.9 }; };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const EX = { cx: 0, cz: 0, fixa: 0, boca: 0, olho: 0, nuc: 0 };
+      const mb = n => membros.find(m => m.nome === n);
+      function acaoCorpo(dt, t) {
+        Object.keys(EX).forEach(k => { EX[k] = 0; });
+        if (!ac) return EX;
+        ac.t += dt; const u = ac.t; if (u >= ac.dur) { ac = null; return EX; }
+        const tr = Math.sin(t * 57) * Math.sin(t * 19);
+        if (ac.tipo === 'ataque') {
+          // empina, ergue a pata pesada e o braço de garras, e desaba para a frente
+          const emp = qd(u, [[0, 0], [.32, 1], [.5, -.35], [.62, -.45], [1.05, -.35], [1.6, 0]]);
+          const avan = qd(u, [[0, 0], [.32, -.1], [.52, .45], [1.05, .4], [1.6, 0]]);
+          corpo.rotation.x += -emp * .32; corpo.position.y += Math.max(0, emp) * .22 - Math.max(0, -emp) * .12; corpo.position.z += avan;
+          const pata = mb('dE'), garra = mb('dD');
+          pata.alvo.y += qd(u, [[0, 0], [.34, 2.1], [.46, 1.6], [.56, 0], [1.05, 0], [1.6, 0]]);
+          pata.alvo.z += qd(u, [[0, 0], [.34, .55], [.56, .85], [1.05, .75], [1.6, 0]]);
+          pata.alvo.x += qd(u, [[0, 0], [.34, -.3], [.56, -.15], [1.6, 0]]);
+          garra.alvo.y += qd(u, [[0, 0], [.3, 1.7], [.5, 1.1], [.66, .55], [1.05, .4], [1.6, 0]]);
+          garra.alvo.z += qd(u, [[0, 0], [.3, .1], [.6, 1.15], [1.05, 1.0], [1.6, 0]]);
+          garra.alvo.x += qd(u, [[0, 0], [.3, -.25], [.6, .35], [1.05, .3], [1.6, 0]]);
+          ['tE', 'tD'].forEach(n => { mb(n).alvo.z += avan * .55; });
+          EX.cx = qd(u, [[0, 0], [.3, -.55], [.55, -.75], [1.05, -.6], [1.6, 0]]);
+          EX.fixa = qd(u, [[0, 0], [.3, 1], [1.2, 1], [1.6, 0]]);
+          EX.cz = tr * .08 * qd(u, [[0, 0], [.5, 1], [1.2, 0]]);
+          EX.boca = qd(u, [[0, 0], [.3, .35], [.55, 1], [1.05, .85], [1.6, 0]]) * (1 + tr * .08);
+          EX.nuc = qd(u, [[0, 0], [.55, 2.5], [1.6, 0]]);
+          EX.olho = qd(u, [[0, 0], [.5, 1.2], [1.6, 0]]);
+        } else {
+          // despenca de cima: membros pendurados, impacto amassado, cabeça chicoteia
+          const alto = qd(u, [[0, 2.1], [.05, 2.1], [.36, 0], [1.9, 0]]);
+          const queda = u < .36 ? alto : 0;
+          const amassa = qd(u, [[0, 0], [.34, 0], [.42, 1], [.62, .55], [1.0, .15], [1.5, 0]]);
+          corpo.position.y += queda - amassa * .28; corpo.rotation.x += amassa * .08 - (queda > 0 ? .15 : 0);
+          membros.forEach((m, i) => { m.alvo.y += queda * (m.pesado ? .82 : .7) + (queda > 0 ? Math.sin(t * 9 + i * 2) * .1 : 0); m.alvo.x += queda * .12 * Math.sign(m.repouso.x); });
+          torso.scale.y *= 1 - amassa * .12; torso.scale.x *= 1 + amassa * .09; torso.scale.z *= 1 + amassa * .05;
+          const chic = qd(u, [[0, 0], [.38, 0], [.48, 1], [.62, .85], [1.3, .75], [1.9, 0]]);
+          EX.cx = queda > 0 ? .5 : -chic * .95;
+          EX.fixa = Math.max(queda > 0 ? 1 : 0, chic);
+          EX.cz = chic * (.25 + tr * .15) + qd(u, [[0, 0], [.38, 0], [.45, -.6], [.6, .2], [1.9, 0]]);
+          EX.boca = qd(u, [[0, 0], [.42, 0], [.6, 1], [1.4, .9], [1.9, 0]]) * (1 + tr * .1);
+          EX.nuc = chic * 2.5; EX.olho = chic * 1.4;
+        }
+        return EX;
+      }
       anim(0, 0, false);
-      return { g, alt: 2.4, raioBase: .95, anim };
+      return { g, alt: 2.4, raioBase: .95, anim, acao };
     },
   };
 })();
@@ -12041,7 +12716,9 @@
 /* Forma de Filho: homem magro de texto impresso.
    A pele e os músculos expostos são feitos de linhas miúdas de letras sobre fibras de tendão; olhos e boca
    brilham em branco, a cabeça pende para trás, calça velha e pés descalços. O corpo "falha": o texto rasteja
-   pela pele e, de tempos em tempos, a figura some por um instante e volta deslocada. */
+   pela pele e, de tempos em tempos, a figura some por um instante e volta deslocada.
+   Ações: acao('ataque') falha e reaparece já em cima, cabeça baixada, boca escancarada e braços estendidos;
+          acao('revelar') a figura se escreve do nada: as letras acendem, piscam e a pele se fecha. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
 
@@ -12305,10 +12982,30 @@
 
       /* ---------- animação ---------- */
       const mats = [halo, pele, peleM, pano, couro, brilhoOlho, fundoBoca, dente, escuro, ...tiras.map(f => f.material)];
-      let fase = 0, prox = 1.2 + R() * 2, falha = 0, tique = 0, alvoCab = 0, cabY = .1;
+      let fase = 0, prox = 1.2 + R() * 2, falha = 0, tique = 0, alvoCab = 0, cabY = .1, acA = null;
       corpo.scale.setScalar(1.04);
+      // ações únicas: curvas suaves de 0 a 1
+      const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+      const faixa = (u, a, b) => sua((u - a) / (b - a));
+      const ePele = pele.emissiveIntensity, ePeleM = peleM.emissiveIntensity;
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') { acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.4 : 1.9 }; falha = 0; } };
       const anim = (dt, t, andando) => {
         nuc.pulso(t);
+        // pesos das ações
+        let bote = 0, pisca = 0, escreve = 1, acende = 0, olha = 0, uA = -1, tipoA = '';
+        if (acA) {
+          acA.t += dt; const u = acA.t; uA = u; tipoA = acA.tipo; prox = Math.max(prox, .8);
+          if (acA.tipo === 'ataque') {
+            bote = u < .16 ? 0 : 1 - faixa(u, .95, 1.25);                     // salta de uma vez para a pose de bote
+            pisca = (u < .18 || (u > .92 && u < 1.28)) ? 1 : 0;                 // falha na ida e na volta
+            acende = bote * .8;
+          } else {
+            escreve = faixa(u, .1, 1.05);                                      // de invisível a inteiro
+            acende = faixa(u, 0, .3) * (1 - faixa(u, 1.1, 1.85));              // letras em brasa
+            olha = faixa(u, .55, .75) * (1 - faixa(u, 1.3, 1.8));              // a cabeça desce e encara
+          }
+          if (u >= acA.dur) acA = null;
+        }
         // respiração irregular e tremida
         const resp = Math.sin(t * 1.4) * .6 + Math.sin(t * 3.7) * .25 + (Math.sin(t * .31) > .8 ? Math.sin(t * 19) * .3 : 0);
         tronco.scale.set(1 + resp * .018, 1, 1 + resp * .03);
@@ -12334,7 +13031,22 @@
           tronco.rotation.x = -.04 + Math.sin(t * .6) * .02;
           bracos.forEach((B, i) => { B.b.rotation.x = -.14 + Math.sin(t * .8 + i * 2) * .06; });
         }
-        tiras.forEach((f, i) => { f.rotation.x = -.45 + Math.sin(t * 1.7 + i * 2) * .15 + (falha > 0 ? (R() - .5) * .8 : 0); });
+        // ataque: corpo à frente, tronco curvado, braços esticados para a vítima, cabeça baixa encarando, boca escancarada
+        {
+          const k = Math.max(bote, olha * .9);
+          corpo.position.z = bote * .42; tronco.rotation.x += bote * .42;
+          bracos.forEach((B, i) => {
+            B.b.rotation.x += (-1.45 + i * .18 - B.b.rotation.x) * bote; B.b.rotation.z = B.sx * ((B.sx > 0 ? .1 : .2) - bote * .25);
+            if (!andando || bote > 0) B.cot.rotation.x = (B.sx > 0 ? -.25 : -.45) * (1 - bote) - .12 * bote;
+            B.dedos.forEach((d, j) => { d.rotation.x = d.rotation.x * (1 - bote) - bote * (.35 + Math.sin(t * 30 + j) * .08); d.rotation.z = (j === 4 ? 0 : -B.sx * .15) + B.sx * bote * (j - 2) * .12; });
+          });
+          cab.rotation.x += (.18 - cab.rotation.x) * k; cab.rotation.y *= 1 - k; cab.rotation.z = cab.rotation.z * (1 - k) + Math.sin(t * 43) * .05 * k;
+          mand.rotation.x += (.95 - mand.rotation.x) * k;
+        }
+        pele.emissiveIntensity = ePele * (1 + acende * 6); peleM.emissiveIntensity = ePeleM * (1 + acende * 6);
+        brilhoOlho.emissiveIntensity = 2.6 * (1 + acende * .8);
+        if (acende > 0) texR.offset.y += dt * acende * 2.5;
+        tiras.forEach((f, i) => { f.rotation.x = -.45 + Math.sin(t * 1.7 + i * 2) * .15 + (falha > 0 || pisca ? (R() - .5) * .8 : 0); });
         // o texto rasteja pela pele
         texR.offset.y += dt * .35; texR.offset.x = Math.sin(t * .4) * .1;
         // falha: some por um instante, volta deslocado
@@ -12347,8 +13059,22 @@
           texR.offset.y += R() * .5;
           if (falha <= 0) { mats.forEach(m0 => { m0.opacity = 1; if (m0 !== halo) m0.transparent = false; }); corpo.position.x = 0; cab.position.x = 0; tronco.position.x = 0; }
         } else rasteja.opacity = .35 + Math.max(0, Math.sin(t * 2.3)) * .3;
+        // ações: a falha da ida e da volta do bote; na revelação, a pele vai se escrevendo aos trancos
+        if (uA >= 0) {
+          let op = 1;
+          if (tipoA === 'revelar') op = R() < escreve * 1.15 ? Math.min(1, escreve * 1.25) : escreve * .25;
+          else if (pisca) op = R() < .4 ? .04 : .2 + R() * .4;
+          mats.forEach(m0 => { m0.transparent = op < 1 && m0 !== halo ? true : m0 === halo; m0.opacity = op; });
+          rasteja.opacity = Math.min(1, .5 + acende * .5);
+          const tremor = pisca ? .08 : (1 - escreve) * .05;
+          corpo.position.x = (R() - .5) * tremor; cab.position.x = (R() - .5) * tremor * .6;
+          // sinal ruim: o corpo estica e encolhe de lado enquanto se escreve
+          const ruim = tipoA === 'revelar' ? (1 - escreve) : pisca * .5;
+          corpo.scale.set(1.04 * (1 + (R() - .5) * .7 * ruim), 1.04 * (1 + (R() - .5) * .12 * ruim), 1.04);
+          if (!acA) { mats.forEach(m0 => { m0.opacity = 1; if (m0 !== halo) m0.transparent = false; }); corpo.position.x = 0; cab.position.x = 0; corpo.scale.setScalar(1.04); pele.emissiveIntensity = ePele; peleM.emissiveIntensity = ePeleM; }
+        }
       };
-      return { g, alt: 1.9, raioBase: .38, anim };
+      return { g, alt: 1.9, raioBase: .38, anim, acao };
     },
   };
 })();
@@ -12700,8 +13426,92 @@
         // correntes balançam com atraso
         correntes.forEach((elos, ci) => elos.forEach((e, j) => { e.rotation.x = Math.sin(tt * 2.1 - j * .6 + ci) * (.08 + R * .25) + (ci < 2 ? .55 - R * .1 : 0); e.rotation.z = Math.sin(tt * 1.7 - j * .5 + ci * 2) * (.05 + R * .15); }));
       };
-      anim(0, 0, false);
-      return { g, alt: ALT, raioBase: .95, anim };
+      /* ---------- ações únicas: acao('ataque') e acao('revelar') ----------
+         ataque: junta os punhos algemados acima da cabeça e desce os dois de uma vez no chão à frente:
+         onda de poeira, rachadura no piso e lascas voando. revelar: ergue-se de uma postura encolhida,
+         abre os braços esticando as correntes, joga a cabeça para trás num urro e pisa forte. */
+      const mRacha = (() => {
+        const [cr, xr] = K.tela(256, 256), rr = K.rngDe(77); xr.clearRect(0, 0, 256, 256); xr.lineCap = 'round';
+        const raio = (x0, y0, a, l, w, n) => { let px = x0, py = y0; for (let i = 0; i < l; i++) { const nx = px + Math.cos(a) * 6, ny = py + Math.sin(a) * 6; xr.strokeStyle = 'rgba(8,4,3,.95)'; xr.lineWidth = w * (1 - i / l); xr.beginPath(); xr.moveTo(px, py); xr.lineTo(nx, ny); xr.stroke(); px = nx; py = ny; a += (rr() - .5) * .7; if (n < 2 && rr() < .1) raio(px, py, a + (rr() - .5) * 1.4, l * .5, w * .6, n + 1); } };
+        for (let i = 0; i < 9; i++) raio(128, 128, i / 9 * Math.PI * 2 + rr() * .4, 12 + rr() * 8, 4.5, 0);
+        const gr = xr.createRadialGradient(128, 128, 0, 128, 128, 40); gr.addColorStop(0, 'rgba(10,6,4,.85)'); gr.addColorStop(1, 'rgba(10,6,4,0)'); xr.fillStyle = gr; xr.fillRect(0, 0, 256, 256);
+        return F.guardar(new T.MeshBasicMaterial({ map: K.tex(cr), transparent: true, opacity: 0, depthWrite: false }));
+      })();
+      const racha = malha(g, new T.PlaneGeometry(2.4, 2.4), mRacha, [0, .015, 1.4], [-Math.PI / 2, 0, 0]); racha.visible = false; racha.scale.setScalar(.01);
+      const mOnda = F.guardar(new T.MeshBasicMaterial({ color: L('#5e544a'), transparent: true, opacity: 0, depthWrite: false }));
+      const ondaG = malha(g, new T.RingGeometry(.78, 1, 48), mOnda, [0, .025, 1.4], [-Math.PI / 2, 0, 0]); ondaG.visible = false; ondaG.scale.setScalar(.01);
+      // lascas do piso (uma malha instanciada)
+      const NL = 14, lascas = new T.InstancedMesh(F.guardar(new T.TetrahedronGeometry(.07, 0)), mat({ cor: '#4a443e', r: .9, flat: true }), NL); lascas.frustumCulled = false; g.add(lascas);
+      const LS = Array.from({ length: NL }, () => ({ p: new T.Vector3(), v: new T.Vector3(), r: new T.Euler(), w: new T.Vector3(), vivo: false, k: .6 + Math.random() * .9 }));
+      const LM = new T.Matrix4(), LQ = new T.Quaternion(), LE = new T.Vector3(), PI0 = new T.Vector3(), PI1 = new T.Vector3();
+      const sumirLascas = () => { LM.makeScale(0, 0, 0); for (let i = 0; i < NL; i++) lascas.setMatrixAt(i, LM); lascas.instanceMatrix.needsUpdate = true; };
+      sumirLascas();
+      let ac = null; const desfazer = [];
+      const soma = (o, k2, v) => { o[k2] += v; desfazer.push([o, k2, v]); };
+      // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
+      const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.8 : 2.0, bateu: false }; };
+      const impacto = (pos, forca) => {
+        racha.position.set(pos.x, .015, pos.z); racha.visible = true; racha.userData.t = 0; racha.userData.k = forca;
+        ondaG.position.set(pos.x, .025, pos.z); ondaG.visible = true; ondaG.userData.t = 0; ondaG.userData.k = forca;
+        LS.forEach(l => { l.vivo = true; l.p.set(pos.x + (Math.random() - .5) * .5, .05, pos.z + (Math.random() - .5) * .5); const a = Math.random() * Math.PI * 2; l.v.set(Math.cos(a) * (1 + Math.random() * 2) * forca, (2.5 + Math.random() * 3) * forca, Math.sin(a) * (1 + Math.random() * 2) * forca); l.w.set(Math.random() * 9, Math.random() * 9, Math.random() * 9); });
+      };
+      const animTudo = (dt, t, andando) => {
+        while (desfazer.length) { const [o, k2, v] = desfazer.pop(); o[k2] -= v; }
+        anim(dt, t, andando);
+        // efeitos do impacto (continuam depois da ação)
+        if (racha.visible) { racha.userData.t += dt; const u = racha.userData.t; mRacha.opacity = Math.min(1, u * 8) * Math.max(0, 1 - Math.max(0, u - 1.6) / 1.2); racha.scale.setScalar((.5 + Math.min(1, u * 6) * .5) * racha.userData.k * esc / .9); if (u > 2.8) racha.visible = false; }
+        if (ondaG.visible) { ondaG.userData.t += dt; const u = ondaG.userData.t / 1.1; ondaG.scale.setScalar((.3 + u * 2.6) * ondaG.userData.k * esc / .9); mOnda.opacity = .45 * Math.pow(Math.max(0, 1 - u), 1.5); if (u >= 1) ondaG.visible = false; }
+        let vivas = 0;
+        LS.forEach((l, i) => { if (!l.vivo) return; vivas++; l.v.y -= 9.8 * dt; l.p.addScaledVector(l.v, dt); l.r.x += l.w.x * dt; l.r.y += l.w.y * dt; if (l.p.y < .03) { l.p.y = .03; l.v.multiplyScalar(.3); l.v.y = Math.abs(l.v.y) * .3; if (l.v.length() < .2) l.vivo = false; } LQ.setFromEuler(l.r); LE.setScalar(l.k); LM.compose(l.p, LQ, LE); lascas.setMatrixAt(i, LM); });
+        if (vivas) lascas.instanceMatrix.needsUpdate = true; else if (lascas.userData.tinha) sumirLascas();
+        lascas.userData.tinha = vivas > 0;
+        if (!ac) return;
+        ac.t += dt; const u = ac.t;
+        if (u >= ac.dur) { ac = null; return; }
+        const tr = Math.sin(t * 47) * Math.sin(t * 17);
+        if (ac.tipo === 'ataque') {
+          const ergue = qd(u, [[0, 0], [.36, 1], [.44, 1.04], [.56, 0], [1.25, 0], [1.8, 0]]);
+          const desce = qd(u, [[0, 0], [.4, 0], [.56, 1], [1.25, 1], [1.8, 0]]);
+          bracos.forEach(b => {
+            soma(b.ombro.rotation, 'x', -ergue * 2.45 - desce * .75);
+            soma(b.ombro.rotation, 'z', -b.sd * (ergue * .42 + desce * .3));
+            soma(b.cotov.rotation, 'x', -ergue * .5 + desce * .25);
+            b.dedos.forEach(d => soma(d.rotation, 'z', -b.sd * (ergue + desce) * .9));
+          });
+          soma(peito.rotation, 'x', -ergue * .3 + desce * .55 + (desce > .95 ? tr * .02 : 0));
+          soma(corpo.position, 'y', (ergue * .08 - desce * .32) * esc);
+          soma(corpo.position, 'z', desce * .25 * esc);
+          pernas.forEach(p => { soma(p.coxa.rotation, 'x', -desce * .55 + ergue * .05); soma(p.joelho.rotation, 'x', desce * .85); soma(p.tornozelo.rotation, 'x', -desce * .3); });
+          soma(cab.rotation, 'x', -ergue * .3 + desce * .1); soma(mand.rotation, 'x', ergue * .25 + desce * .45);
+          nuc.mat.emissiveIntensity += desce * 2.5;
+          if (!ac.bateu && u >= .55) { ac.bateu = true; bracos[0].pulso.getWorldPosition(PI0); bracos[1].pulso.getWorldPosition(PI1); g.worldToLocal(PI0.add(PI1).multiplyScalar(.5)); impacto(PI0, 1); }
+        } else {
+          const enc = qd(u, [[0, 1], [.15, 1], [.7, 0], [2, 0]]);
+          const abre = qd(u, [[0, 0], [.25, 0], [.75, 1], [1.5, 1], [2, 0]]);
+          const urro = qd(u, [[0, 0], [.55, 0], [.85, 1], [1.5, 1], [2, 0]]);
+          const pisa = qd(u, [[0, 0], [1.05, 0], [1.3, 1], [1.42, 0], [2, 0]]);
+          soma(peito.rotation, 'x', enc * .55 - urro * .32);
+          soma(corpo.position, 'y', -enc * .42 * esc + urro * .04 * esc);
+          pernas.forEach((p, i) => { soma(p.coxa.rotation, 'x', -enc * .7 - (i ? pisa * .6 : 0)); soma(p.joelho.rotation, 'x', enc * 1.1 + (i ? pisa * .8 : 0)); });
+          bracos.forEach(b => {
+            soma(b.ombro.rotation, 'x', enc * .4 - abre * .45);
+            soma(b.ombro.rotation, 'z', b.sd * abre * (1.15 + tr * .04));
+            soma(b.cotov.rotation, 'x', -abre * .55);
+            b.dedos.forEach(d => soma(d.rotation, 'z', -b.sd * abre * .9));
+          });
+          // correntes esticadas para fora quando os braços se abrem
+          correntes.forEach((elos, ci) => { if (ci < 2) elos.forEach(e => soma(e.rotation, 'x', -abre * .4)); });
+          soma(cab.rotation, 'x', enc * .2 - urro * .55); soma(cab.rotation, 'y', -cab.rotation.y * Math.max(enc, urro));
+          soma(cab.rotation, 'z', urro * tr * .05);
+          soma(mand.rotation, 'x', urro * (.6 + tr * .06));
+          peito.scale.multiplyScalar(1 + urro * .05);
+          nuc.mat.emissiveIntensity += urro * 3;
+          if (!ac.bateu && u >= 1.4) { ac.bateu = true; pernas[1].tornozelo.getWorldPosition(PI0); g.worldToLocal(PI0); PI0.z += .2 * esc; impacto(PI0, .6); }
+        }
+      };
+      animTudo(0, 0, false);
+      return { g, alt: ALT, raioBase: .95, anim: animTudo, acao };
     },
   };
 })();

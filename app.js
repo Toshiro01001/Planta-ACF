@@ -523,7 +523,7 @@ function recusaLocal(caminho, valor) {
   // interações das salas do 3D (portão, luz, piano…): qualquer um, no formato da regra
   if (caminho[0] === 'inter' && caminho.length === 2) return /^c\d{1,3}_\d{1,3}$/.test(caminho[1]) && valor && (valor.v === 0 || valor.v === 1) && typeof valor.ts === 'number' ? '' : 'Interação inválida.';
   // momento.js: encontro, câmeras de segurança, corpos e pilhas da lanterna são só do Mestre
-  if (['encontro', 'cameras', 'corpos', 'pilhas'].includes(caminho[0])) return 'Só o Mestre pode fazer isso.';
+  if (['encontro', 'cameras', 'corpos', 'pilhas', 'marcas'].includes(caminho[0])) return 'Só o Mestre pode fazer isso.';   // marcas: imersao.js
   if (aux && caminho.length === 1 && caminho[0] === 'chamado') return valor && valor.t === 'presenca' ? '' : 'Só o Mestre pode fazer isso.';
   // ferramentas que o Mestre divide com os auxiliares
   if (aux && ['cena', 'membrana', 'nex', 'parede', 'dividas', 'fil'].includes(caminho[0])) return '';
@@ -3172,11 +3172,15 @@ function baixar(nome, conteudo, tipo) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-$('#btnBackup').addEventListener('click', async () => {
+// o pacote do backup (o mesmo para o botão e para o backup automático do imersao.js)
+async function pacoteBackup() {
   const privado = { ...Priv.dados }; delete privado.tokens;
   // a Calculadora de NEX mora em "nexCalc" (Mestre e auxiliares): vai junto no backup
   const nexCalc = await Rede.once('nexCalc').catch(() => null);
-  const pacote = { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado, nexCalc };
+  return { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado, nexCalc };
+}
+$('#btnBackup').addEventListener('click', async () => {
+  const pacote = await pacoteBackup();
   baixar(`backup-caixa-${carimbo()}.json`, JSON.stringify(pacote, null, 1), 'application/json');
   Diario.registrar('sessao', `Backup baixado · ${dataCurta(Date.now())} ${hora(Date.now())}`);
 });
@@ -3189,6 +3193,11 @@ $('#arqBackup').addEventListener('change', async e => {
   if (!pacote || pacote.tipo !== 'planta-acf-backup' || !pacote.mapa || typeof pacote.mapa.tokens !== 'object') { alert('Este arquivo não é um backup da Planta da Caixa.'); return; }
   const qtd = Object.keys(pacote.mapa.tokens || {}).length;
   if (!confirm(`Restaurar o backup salvo em ${dataCurta(pacote.salvoEm)} às ${hora(pacote.salvoEm)}?\n\n${qtd} tokens, salas, ruído, dia, perseguição, funções e anotações voltam a esse ponto. Todos os jogadores verão o mapa mudar. O diário atual é mantido.`)) return;
+  restaurarPacote(pacote);
+});
+// devolve um pacote de backup (arquivo ou backup automático); quem chama já confirmou
+function restaurarPacote(pacote, origem) {
+  if (!mestre || !pacote || !pacote.mapa) return;
   const m = pacote.mapa;
   Diario.reiniciar = true;
   Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
@@ -3203,12 +3212,12 @@ $('#arqBackup').addEventListener('change', async e => {
   delete seg._diario;
   if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
   Segredos.substituir(seg);
-  Diario.registrar('sessao', `Backup restaurado (salvo em ${dataCurta(pacote.salvoEm)} ${hora(pacote.salvoEm)})`);
+  Diario.registrar('sessao', `Backup ${origem ? origem + ' ' : ''}restaurado (salvo em ${dataCurta(pacote.salvoEm)} ${hora(pacote.salvoEm)})`);
   selecionar(null);
   montarAndar();
   atualizarTudo();
   aviso('Backup restaurado.');
-});
+}
 
 /* =========================================================
    RESTAURAR O SITE (apaga o que foi feito nos testes)
@@ -6327,6 +6336,8 @@ window.ACF = {
   redesenharCartao: () => { if (salaSel) desenharCartao(); },
   redesenharChat: () => { if (Chat.aberto) Chat.desenhar(); },
   diario: (k, t) => { try { Diario.registrar(k, t); } catch (e) {} },
+  // backup (imersao.js: backup automático da tela do Mestre)
+  pacoteBackup: () => pacoteBackup(), restaurarPacote: (p, o) => restaurarPacote(p, o),
   escolherCor: (id, ancora) => Cores.escolher(id, ancora),
   podeCor,
   hash, alertaMestre,
