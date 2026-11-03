@@ -69,7 +69,8 @@ const Aud = {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     try {
       if (!this.ctx) {
-        this.ctx = new AC(); this.saida = this.ctx.createGain(); this.saida.gain.value = .9; this.saida.connect(this.ctx.destination);
+        // um AudioContext só para o site inteiro (ACF.Som.ctx)
+        this.ctx = (A() && A().Som && A().Som.pronto && A().Som.pronto()) || new AC(); this.saida = this.ctx.createGain(); this.saida.gain.value = .9; this.saida.connect(this.ctx.destination);
         const n = this.ctx.sampleRate * 2, b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0);
         for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
         this.branco = b;
@@ -95,11 +96,13 @@ const Aud = {
     const f = c.createBiquadFilter(); f.type = tipo; f.frequency.setValueAtTime(bp, t); if (f2) f.frequency.exponentialRampToValueAtTime(f2, t + dur); f.Q.value = q;
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + ataque); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     s.connect(f); f.connect(g); g.connect(dest); s.start(t, Math.random()); s.stop(t + dur + .05);
+    s.onended = () => { try { s.disconnect(); f.disconnect(); g.disconnect(); } catch (e) {} };   // a cadeia curta sai do grafo quando acaba
   },
   tom(t, dest, { f = 60, f2, tipo = 'sine', v = .2, ataque = .01, dur = .3 }) {
     const c = this.ctx, o = c.createOscillator(); o.type = tipo; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + ataque); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + .05);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
   },
   // sons dos Filhos (passos, arrasto, respiração) num ponto do espaço
   criatura(tipo, x, y, z, vol = 1) {
@@ -126,11 +129,11 @@ const Aud = {
       const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 150; lp.connect(g);
       let prox = this.ctx.currentTime + .2;
       const id = setInterval(() => { if (!this.ctx) return; const t = this.ctx.currentTime; while (prox < t + .3) { this.tom(prox, lp, { f: 56, f2: 40, v: .5, ataque: .01, dur: .16 }); this.tom(prox + .26, lp, { f: 50, f2: 36, v: .32, ataque: .01, dur: .14 }); prox += .95; } }, 150);
-      this.loop = { g, id };
+      this.loop = { g, id, lp };
     } else if (!on && this.loop) {
       const l = this.loop; this.loop = null;
       l.g.gain.setTargetAtTime(0, this.ctx.currentTime, 1.3);
-      setTimeout(() => { clearInterval(l.id); try { l.g.disconnect(); } catch (e) {} }, 5000);
+      setTimeout(() => { clearInterval(l.id); try { l.g.disconnect(); l.lp.disconnect(); } catch (e) {} }, 5000);
     }
   },
 };
@@ -765,7 +768,7 @@ function blocoMestre() {
   if (!souMestre() || I().espiar) { if (b) b.hidden = true; return; }
   if (!b) {
     b = document.createElement('section'); b.className = 'bloco mestre-only mom-bloco'; b.id = 'blocoMomento'; b.dataset.aba = 'sessao';
-    const ref = $('#blocoPersgM'); ref ? ref.parentNode.insertBefore(b, ref.nextSibling) : $('#painel').appendChild(b);
+    const ref = $('#blocoRuidoM'); ref ? ref.parentNode.insertBefore(b, ref.nextSibling) : $('#painel').appendChild(b);
     const ab = ($('#abasMestre button.ativo') || {}).dataset; if (ab && ab.aba) b.classList.toggle('fora-da-aba', ab.aba !== 'sessao');
   }
   b.hidden = false;

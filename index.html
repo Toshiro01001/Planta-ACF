@@ -279,31 +279,6 @@
       <button id="btnProtocolo" class="btn-protocolo" disabled>Iniciar Protocolo Filho da O.R.F.E.U.</button>
     </section>
 
-    <section class="bloco mestre-only" id="blocoPersgM" data-aba="sessao" hidden>
-      <h2>Perseguição (Mestre)</h2>
-      <div id="persgSetup">
-        <p class="mini">Marque quem participa, preencha a iniciativa (ou role no 🎲) e o deslocamento por turno. Os jogadores podem rolar no site: o resultado aparece aqui.</p>
-        <div id="setupPersg" class="setup-persg"></div>
-        <div class="ferramentas">
-          <div class="lote-filhos"><button id="btnIniFilhos" class="btn-fantasma">🎲 Rolar iniciativa de todos os Filhos</button><label>bônus <input id="bonusFilhos" type="number" value="0"></label></div>
-          <button id="btnPedirIni" class="btn-fantasma">Pedir iniciativa aos jogadores</button>
-          <button id="btnIniciarPersg" class="btn-roxo">Iniciar perseguição</button>
-        </div>
-      </div>
-      <div id="persgAtiva" hidden>
-        <p class="mini"><b id="persgRodada">Rodada 1</b> · a ordem vai da maior iniciativa para a menor.</p>
-        <ol id="ordemPersg" class="ordem-persg"></ol>
-        <label class="chave"><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
-        <div class="crono-mestre"><label>⏱ Tempo por vez <input id="tempoVez" type="number" min="0" step="5" placeholder="0"> s</label><button id="btnReiniciarCrono" class="btn-fantasma">Reiniciar tempo</button></div>
-        <p class="mini">0 ou vazio desliga o cronômetro. Ele recomeça a cada "Próximo turno".</p>
-        <div class="ferramentas">
-          <button id="btnProxTurno" class="btn-roxo">Próximo turno</button>
-          <button id="btnRefazerVez" class="btn-fantasma">Refazer rota de quem está na vez</button>
-          <button id="btnEncerrarPersg" class="btn-fantasma perigo">Encerrar perseguição</button>
-        </div>
-      </div>
-    </section>
-
     <section class="bloco mestre-only" id="blocoLojaM" data-aba="sessao" hidden>
       <h2>Loja do Maurício</h2>
       <label class="chave"><input type="checkbox" id="chkLojaAberta"><span>Loja aberta aos jogadores</span></label>
@@ -431,7 +406,33 @@
     </section>
     <section class="bloco mestre-only" id="blocoMesaInv" data-aba="mesa" hidden><h2>Cena de investigação</h2><div id="mesaInv"></div></section>
     <section class="bloco mestre-only" id="blocoMesaTeste" data-aba="mesa" hidden><h2>Pedir teste</h2><div id="mesaTeste"></div></section>
-    <section class="bloco mestre-only" id="blocoSahPers" data-aba="mesa" hidden><h2>Perseguição (Sobrevivendo ao Horror)</h2><div id="sahPers"></div></section>
+    <section class="bloco mestre-only" id="blocoSahPers" data-aba="mesa" hidden>
+      <h2>Perseguição (Sobrevivendo ao Horror)</h2>
+      <div id="sahPers"></div>
+      <h3>Participantes e ordem</h3>
+      <div id="persgSetup">
+        <p class="mini">Marque quem entra, diga quem é presa (🐇) ou caçador (🐺), preencha a iniciativa (ou role no 🎲) e o deslocamento por vez. Os jogadores podem rolar a iniciativa no site: o resultado aparece aqui. A mesma lista vale para o teste estendido e para a vez no mapa e no 3D.</p>
+        <div id="setupPersg" class="setup-persg"></div>
+        <label class="mesa-campo">Fora do mapa (um por linha; termine com " caçador" ou " presa")<textarea id="sahPnpc" rows="2" placeholder="Melancolia caçador"></textarea></label>
+        <div class="ferramentas">
+          <div class="lote-filhos"><button id="btnIniFilhos" class="btn-fantasma">🎲 Rolar iniciativa de todos os Filhos</button><label>bônus <input id="bonusFilhos" type="number" value="0"></label></div>
+          <button id="btnPedirIni" class="btn-fantasma">Pedir iniciativa aos jogadores</button>
+          <button id="btnIniciarPersg" class="btn-roxo">Iniciar perseguição</button>
+        </div>
+      </div>
+      <div id="persgAtiva" hidden>
+        <p class="mini"><b id="persgRodada">Rodada 1</b> · a ordem vai da maior iniciativa para a menor. Quando a vez de todos termina, a rodada seguinte começa e o site pede os testes.</p>
+        <ol id="ordemPersg" class="ordem-persg"></ol>
+        <label class="chave"><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
+        <div class="crono-mestre"><label>⏱ Tempo por vez <input id="tempoVez" type="number" min="0" step="5" placeholder="0"> s</label><button id="btnReiniciarCrono" class="btn-fantasma">Reiniciar tempo</button></div>
+        <p class="mini">0 ou vazio desliga o cronômetro. Ele recomeça a cada "Próximo turno".</p>
+        <div class="ferramentas">
+          <button id="btnProxTurno" class="btn-roxo">Próximo turno</button>
+          <button id="btnRefazerVez" class="btn-fantasma">Refazer rota de quem está na vez</button>
+          <button id="btnEncerrarPersg" class="btn-fantasma perigo">Encerrar perseguição</button>
+        </div>
+      </div>
+    </section>
     <section class="bloco mestre-only" id="blocoSahFurt" data-aba="mesa" hidden><h2>Furtividade (Sobrevivendo ao Horror)</h2><div id="sahFurt"></div></section>
     <section class="bloco mestre-only" id="blocoSahMedo" data-aba="mesa" hidden><h2>Medo em jogo</h2><div id="sahMedo"></div></section>
     <section class="bloco mestre-only" id="blocoSahSort" data-aba="mesa" hidden><h2>Tabelas do Sobrevivendo ao Horror</h2><div id="sahSort"></div></section>

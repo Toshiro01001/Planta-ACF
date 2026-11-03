@@ -103,6 +103,8 @@
 
   // ★ favoritos: estrela no título; os marcados sobem para o topo do painel
   let favs = ls.get('acf-favs', {});
+  // o bloco "Perseguição (Mestre)" virou parte do "Perseguição (Sobrevivendo ao Horror)": a ★ antiga migra
+  if (favs.blocoPersgM) { delete favs.blocoPersgM; favs.blocoSahPers = true; ls.set('acf-favs', favs); }
   const pontoFav = barra;
   const ordemOriginal = new Map($$('.painel > .bloco').map((b, i) => [b.id, i]));
   const aplicarFavs = () => {

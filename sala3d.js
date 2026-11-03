@@ -80,6 +80,8 @@
   /* ================= opções de jogo (neste aparelho): gráficos, câmera, mouse, áudio e atalhos ================= */
   const CFG_PAD = {
     escala: 1, sombras: 'auto', brilho: 'auto', aberr: 'auto', grao: true, vinheta: true, nevoa: 1, poeira: true, fps: 0, verFps: false,
+    // Modo Desempenho: 'auto' liga sozinho quando a qualidade automática (imersao.js) chega ao degrau 3
+    desempenho: 'auto',
     fov: 75, balanco: true, terceira: false, nomes: true, baloes: true,
     sens: 1, invY: false,
     volAmb: 1, volVoz: 1, teclas: {},
@@ -91,6 +93,34 @@
   const CFG = Object.assign({}, CFG_PAD, lsG('acf-s3d-cfg', {}) || {});
   CFG.teclas = Object.assign({}, (lsG('acf-s3d-cfg', {}) || {}).teclas || {});
   const salvarCfg = () => lsS('acf-s3d-cfg', CFG);
+  /* ----- memória ao fechar: o three.js r128 põe um ouvinte 'dispose' em toda textura, material, geometria e alvo de
+     render que manda para a GPU, inclusive nas texturas vazias internas dele (vivem para sempre) e nos materiais de
+     cache das fábricas. Esse ouvinte segura o renderer fechado e, por ele, a cena inteira (40 MB a mais depois de
+     fechar). Enquanto o 3D está aberto, guardamos quem recebeu o ouvinte; ao fechar, dispose() em todos: o ouvinte sai e
+     o que for usado de novo volta para a GPU sozinho. ----- */
+  const REG = new Set(); let regOn = false;
+  function registrarDescarte(T) {
+    regOn = true;
+    if (registrarDescarte.ok || !T) return; registrarDescarte.ok = true;
+    [T.Texture, T.Material, T.BufferGeometry, T.WebGLRenderTarget].forEach(C => {
+      if (!C || !C.prototype) return; const pr = C.prototype, orig = pr.addEventListener; if (!orig) return;
+      pr.addEventListener = function (tipo, f) { if (tipo === 'dispose' && regOn) REG.add(this); return orig.call(this, tipo, f); };
+    });
+  }
+  function soltarRegistrados() {
+    REG.forEach(o => { try { const l = o._listeners && o._listeners.dispose; if (l && l.length) o.dispose(); } catch (e) {} });
+    REG.clear(); regOn = false;
+  }
+  /* ----- Modo Desempenho: desliga câmeras de segurança (render targets), sombras, bloom, poeira/fumaça, ambiente
+     que reage, partículas; a visão da criatura fica em meia resolução. Os módulos leem a configuração pelo
+     "cfgEfetivo": com o modo ligado, as chaves abaixo valem o valor leve, sem mexer no que a pessoa escolheu. ----- */
+  const LEVE = { cameras: false, sombras: false, brilho: false, aberr: false, poeira: false, fumaca: false, ambiente: false, visaoMeia: true, particulas: false, desempenhoAtivo: true };
+  let degrauQual = 0;   // degrau da qualidade automática (imersao.js avisa)
+  const desempenhoAtivo = () => CFG.desempenho === true || (CFG.desempenho === 'auto' && degrauQual >= 3);
+  const cfgEfetivo = new Proxy(CFG, {
+    get(t, k) { if (desempenhoAtivo() && k in LEVE) return LEVE[k]; return t[k]; },
+    set(t, k, v) { t[k] = v; return true; },
+  });
   // ações do teclado e a tecla padrão de cada uma (setas sempre andam; Enter sempre abre o chat; Esc sempre volta)
   const ACOES = [
     ['frente', 'Andar para a frente', 'w', 'mov'], ['tras', 'Andar para trás', 's', 'mov'], ['esq', 'Passo para a esquerda', 'a', 'mov'], ['dir', 'Passo para a direita', 'd', 'mov'],
@@ -293,7 +323,7 @@
           geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
           geo.setIndex(new T.BufferAttribute(idx, 1));
           geo.computeBoundingSphere(); descartes.push(geo);
-          const me = new T.Mesh(geo, mat); me.receiveShadow = true; pai.add(me); out.push(me);
+          const me = new T.Mesh(geo, mat); me.receiveShadow = true; me.matrixAutoUpdate = false; pai.add(me); out.push(me);
         });
         porMat.clear();
         return out;
@@ -315,7 +345,20 @@
     itens.forEach((it, i) => {
       if (it.t === 'porta' || !naVersao(it, ver)) return;   // no 3D novo, as portas de verdade são as dos corredores
       const fab = F.P[it.t]; if (!fab) return;
+      const nAnim = F.anim ? F.anim.length : 0;
       let o; try { o = fab({ sem: i + 1, ...it }); } catch (e) { console.warn('3D:', it.t, e); return; }
+      if (F.anim && F.anim.length !== nAnim) {
+        // o objeto tem animação por quadro: roda as animações dele algumas vezes e descobre quais peças NÃO mudam
+        // (banca do Maurício, terminal: só o personagem e as luzes se mexem; as prateleiras entram na malha estática)
+        o.userData.din = true;
+        try {
+          const novos = F.anim.slice(nAnim);
+          const amostra = () => { const m = new Map(); o.updateMatrixWorld(true); o.traverse(x => { if (x.isMesh) { const mt = x.material; m.set(x, x.matrixWorld.elements.join(',') + '|' + x.visible + '|' + (Array.isArray(mt) ? 'multi' : mt.uuid + '/' + mt.opacity + '/' + mt.emissiveIntensity + '/' + (mt.color ? mt.color.getHex() : '') + '/' + (mt.emissive ? mt.emissive.getHex() : '') + '/' + (mt.map ? mt.map.version : '')) + '|' + (x.geometry.attributes.position ? x.geometry.attributes.position.version : 0) + '|' + (x.geometry.attributes.uv ? x.geometry.attributes.uv.version : 0)); } }); return m; };
+          const a0 = amostra(), estaticas = new Set(a0.keys());
+          [.13, .41, .9, 1.7, 2.63, 4.07, 6.2].forEach(t => { novos.forEach(f => { try { f(1 / 30, t); } catch (e) {} }); const a1 = amostra(); estaticas.forEach(x => { if (a1.get(x) !== a0.get(x)) estaticas.delete(x); }); });
+          o.userData.estaticas = estaticas;
+        } catch (e) {}
+      }
       o.position.set(it.x || 0, it.h0 || 0, it.z || 0);
       o.rotation.y = (it.r || 0) * Math.PI / 180;
       if (it.s) o.scale.setScalar(it.s);
@@ -324,6 +367,195 @@
       if (it.t === 'campo_infinito') o.userData.campo = { r0: it.r0 || 1.3, r1: it.r1 || 2.6, ext: it.ext || 7, per: it.per || 'vontade', dt: it.dt || 20 };
       pai.add(o);
     });
+  }
+  /* ----- malha estática por material: as peças paradas viram UMA malha por material -----
+     Cada objeto continua na cena (hierarquia, userData, posição, caixa de colisão, raio do clique, contorno do
+     Disfarce): só deixa de ser desenhado (a esfera de recorte dele fica "sempre fora" da câmera) e a cópia fundida
+     é desenhada no lugar. Ficam de fora os objetos animados por quadro, os interativos (interacoes3d.js) e os itens
+     que aparecem e somem (item_chao). Um móvel que alguém mexer depois (barricada da fuga) é tirado da fusão na hora
+     (vigiarFusao). Resultado: centenas de chamadas de desenho a menos por sala e por andar. */
+  const SEM_FUSAO = new Set(['item_chao', 'item_m', 'documento_sala', 'campo_infinito']);
+  const FUNDIR = lsG('acf-s3d-fusao', true) !== false;   // desligável para depuração: localStorage acf-s3d-fusao = false
+  const fundivel = (me, mat) => {
+    const geo = me.geometry;
+    if (!geo || !geo.attributes || !geo.attributes.position || !mat || Array.isArray(mat) || (geo.morphAttributes && Object.keys(geo.morphAttributes).length) || !me.visible) return false;
+    if (geo.attributes.position.count > 30000 || mat.transparent && mat.opacity < .999 && geo.attributes.position.count > 4000) return false;
+    if (me.matrixWorld.determinant() < 0) return false;   // espelhado: a ordem dos triângulos inverteria
+    if (!me.matrixWorld.elements.every(Number.isFinite)) return false;
+    if (!geo.userData.posOk) { const pa = geo.attributes.position.array; for (let i = 0; i < pa.length; i++) if (!Number.isFinite(pa[i])) return false; geo.userData.posOk = true; }   // posição inválida não entra na fusão (NaN no raio)
+    return true;
+  };
+  // materiais lisos (cor só, sem textura, sem brilho, opacos) viram UM material por (rugosidade, metal, lado) com a cor
+  // pintada nos vértices: o resultado na tela é o mesmo (cor × branco) e dezenas de materiais viram uma chamada só
+  const chaveLisa = mat => {
+    if (!mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial || mat.map || mat.emissiveMap || mat.alphaMap || mat.normalMap || mat.roughnessMap || mat.metalnessMap || mat.aoMap || mat.bumpMap || mat.displacementMap || mat.envMap) return null;
+    if (mat.transparent || mat.opacity < 1 || mat.alphaTest || mat.wireframe || mat.flatShading || mat.vertexColors || mat.depthWrite === false || mat.depthTest === false) return null;
+    if (mat.emissive && (mat.emissive.r || mat.emissive.g || mat.emissive.b) && mat.emissiveIntensity) return null;
+    if (mat.onBeforeCompile && mat.onBeforeCompile.toString().length > 40) return null;
+    return `liso|${mat.side}|${Math.round(mat.roughness * 20)}|${Math.round(mat.metalness * 20)}|${mat.envMapIntensity}`;
+  };
+  // materiais que brilham iguais (lâmpadas, telas pequenas: cada peça criava o seu, "unico") desenham com o primeiro
+  // deles; o brilho de todos é animado em conjunto pela sala (emissivos), então a aparência não muda
+  const RX_TELA = /(^|_)(tv|crt|telao|telas?|monitor|terminal|computador|notebook|tela)(_|$)/;
+  const chaveEmissiva = mat => {
+    if (!mat.isMeshStandardMaterial || mat.map || mat.emissiveMap || mat.alphaMap || mat.normalMap || !mat.emissive || !(mat.emissive.r || mat.emissive.g || mat.emissive.b)) return null;
+    return `em|${mat.color.getHex()}|${mat.emissive.getHex()}|${mat.emissiveIntensity}|${mat.side}|${mat.transparent ? mat.opacity : 1}|${Math.round(mat.roughness * 20)}|${Math.round(mat.metalness * 20)}|${mat.userData.mult ?? 1}|${mat.depthWrite}`;
+  };
+  // funde a lista de malhas (já com matrixWorld em dia) por material, pondo as cópias em pai; devolve as malhas novas
+  function fundirMalhas(T, malhas, pai, desc, out) {
+    pai.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(pai.matrixWorld).invert(), porMat = new Map(), lisos = new Map(), emis = new Map();
+    if (!inv.elements.every(Number.isFinite)) return [];
+    malhas.forEach(me => {
+      const mat = me.material; if (!fundivel(me, mat)) return;
+      const k = chaveLisa(mat);
+      let chave = mat;
+      if (!k && !me.userData.tela) { const ke = chaveEmissiva(mat); if (ke) { chave = emis.get(ke); if (!chave) { chave = mat; emis.set(ke, mat); } } }
+      if (k) { chave = lisos.get(k); if (!chave) { chave = new T.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: mat.roughness, metalness: mat.metalness, side: mat.side, envMapIntensity: mat.envMapIntensity }); chave.userData.liso = true; lisos.set(k, chave); desc.push(chave); } }
+      if (!porMat.has(chave)) porMat.set(chave, []); porMat.get(chave).push(me);
+    });
+    const nm = new T.Matrix3(), m4 = new T.Matrix4(), v = new T.Vector3(), novas = [];
+    porMat.forEach((lista, mat) => {
+      if (lista.length < 2) return;
+      const liso = !!mat.userData.liso;
+      const temCor = liso || lista.some(me => me.geometry.attributes.color);
+      let nv = 0, ni = 0;
+      lista.forEach(me => { const ge = me.geometry; nv += ge.attributes.position.count; ni += ge.index ? ge.index.count : ge.attributes.position.count; });
+      if (nv > 600000) return;
+      const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), cor = temCor ? new Float32Array(nv * 3) : null, idx = new Uint32Array(ni);
+      let ov = 0, oi = 0, semNormal = false;
+      lista.forEach(me => {
+        const ge = me.geometry, p = ge.attributes.position, nAt = ge.attributes.normal, uAt = ge.attributes.uv, cAt = ge.attributes.color, c = p.count;
+        m4.multiplyMatrices(inv, me.matrixWorld); nm.getNormalMatrix(m4);
+        for (let i = 0; i < c; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(m4); pos[(ov + i) * 3] = v.x; pos[(ov + i) * 3 + 1] = v.y; pos[(ov + i) * 3 + 2] = v.z;
+          if (nAt) { v.fromBufferAttribute(nAt, i).applyMatrix3(nm).normalize(); nor[(ov + i) * 3] = v.x; nor[(ov + i) * 3 + 1] = v.y; nor[(ov + i) * 3 + 2] = v.z; }
+          if (uAt) { uv[(ov + i) * 2] = uAt.getX(i); uv[(ov + i) * 2 + 1] = uAt.getY(i); }
+          if (cor) { const mc = liso ? me.material.color : null, r0 = mc ? mc.r : 1, g0 = mc ? mc.g : 1, b0 = mc ? mc.b : 1; if (cAt) { cor[(ov + i) * 3] = cAt.getX(i) * r0; cor[(ov + i) * 3 + 1] = cAt.getY(i) * g0; cor[(ov + i) * 3 + 2] = cAt.getZ(i) * b0; } else { cor[(ov + i) * 3] = r0; cor[(ov + i) * 3 + 1] = g0; cor[(ov + i) * 3 + 2] = b0; } }
+        }
+        if (!nAt) semNormal = true;
+        if (ge.index) { const a = ge.index.array; for (let i = 0; i < a.length; i++) idx[oi + i] = a[i] + ov; oi += a.length; }
+        else { for (let i = 0; i < c; i++) idx[oi + i] = ov + i; oi += c; }
+        ov += c;
+        // a malha original fica viva (clique, contorno, caixa) mas nunca é desenhada: esfera de recorte "sempre fora"
+        if (!ge.userData.origem) {
+          const gw = new T.BufferGeometry(); gw.attributes = ge.attributes; gw.index = ge.index; gw.groups = ge.groups; gw.drawRange = ge.drawRange;
+          if (!ge.boundingBox) ge.computeBoundingBox(); gw.boundingBox = ge.boundingBox;
+          if (!ge.boundingSphere) ge.computeBoundingSphere(); gw.boundingSphere = new T.Sphere(ge.boundingSphere.center.clone(), -1e9);
+          gw.userData.origem = ge; me.geometry = gw; me.frustumCulled = true;
+        }
+        if (out) out.fundidas++;
+      });
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+      if (cor) geo.setAttribute('color', new T.BufferAttribute(cor, 3));
+      geo.setIndex(new T.BufferAttribute(idx, 1));
+      if (semNormal) geo.computeVertexNormals();
+      geo.computeBoundingSphere(); geo.computeBoundingBox(); desc.push(geo);
+      if (!ni || !Number.isFinite(geo.boundingSphere.radius)) { geo.dispose(); lista.forEach(me => { const gw = me.geometry; if (gw && gw.userData.origem) me.geometry = gw.userData.origem; }); return; }   // vazia ou inválida: não entra, as originais voltam a ser desenhadas
+      const fm = new T.Mesh(geo, mat); fm.matrixAutoUpdate = false; fm.updateMatrix(); fm.userData.t = '_fundido'; fm.userData.n = lista.length; fm.raycast = () => {};
+      fm.receiveShadow = lista[0].receiveShadow; fm.castShadow = lista[0].castShadow; fm.renderOrder = lista[0].renderOrder;
+      pai.add(fm); novas.push(fm);
+    });
+    return novas;
+  }
+  // devolve as malhas originais ao desenho e tira as cópias fundidas
+  function desfundir(lista, pai) {
+    lista.forEach(me => { const gw = me.geometry; if (gw && gw.userData.origem) me.geometry = gw.userData.origem; });
+    [...pai.children].forEach(ch => { if (ch.userData.t === '_fundido') { pai.remove(ch); try { ch.geometry.dispose(); } catch (e) {} } });
+  }
+  // decalques (sangue nos corredores): cada mancha tinha a própria textura de 256 px; 16 manchas vão para um atlas
+  // de 1024 px e viram uma malha só (a aparência é a mesma: a mesma imagem, só que num cantinho de uma textura maior)
+  // (o mesmo vale para quadros, cartazes e placas de uma sala: cada um com a sua imagem de 256 ou 512 px)
+  function atlasDecalques(T, grupo, desc, so) {
+    const grupos = new Map();
+    (so || malhasDe(grupo)).forEach(o => {
+      const mt = o.material, g = o.geometry;
+      if (!o.isMesh || !mt || Array.isArray(mt) || !mt.isMeshStandardMaterial || !mt.map || !mt.map.image || mt.emissiveMap || mt.alphaMap || mt.normalMap || mt.roughnessMap || mt.metalnessMap) return;
+      if (mt.emissive && (mt.emissive.r || mt.emissive.g || mt.emissive.b) && mt.emissiveIntensity) return;
+      const im = mt.map.image, w = im.width, h = im.height;
+      if (!(w > 0 && h > 0 && w <= 512 && h <= 512) || mt.map.wrapS !== T.ClampToEdgeWrapping || mt.map.repeat.x !== 1 || mt.map.repeat.y !== 1 || mt.map.offset.x || mt.map.offset.y || mt.map.rotation) return;
+      if (g.userData.origem || g.attributes.position.count !== 4 || !g.attributes.uv || mt.vertexColors || mt.alphaTest) return;
+      const uv = g.attributes.uv; for (let i = 0; i < 4; i++) { const x = uv.getX(i), y = uv.getY(i); if (x < 0 || x > 1 || y < 0 || y > 1) return; }
+      const cel = Math.max(w, h) > 256 ? 512 : 256;
+      const k = [cel, mt.transparent ? 1 : 0, mt.depthWrite ? 1 : 0, mt.side, Math.round(mt.roughness * 20), Math.round(mt.metalness * 20), mt.polygonOffset ? mt.polygonOffsetFactor : 'n', mt.color.getHex(), mt.map.encoding, mt.opacity].join('|');
+      if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(o);
+    });
+    let total = 0;
+    grupos.forEach(planos => {
+      const im0 = planos[0].material.map.image, tam = Math.max(im0.width, im0.height) > 256 ? 512 : 256, ATL = 1024, POR = ATL / tam, N = POR * POR;
+      for (let i0 = 0; i0 < planos.length; i0 += N) {
+        const lote = planos.slice(i0, i0 + N); if (lote.length < 2) break;
+        const cv = document.createElement('canvas'); cv.width = cv.height = ATL; const cx = cv.getContext('2d');
+        const m0 = lote[0].material, tex = new T.CanvasTexture(cv); tex.encoding = m0.map.encoding; tex.anisotropy = m0.map.anisotropy; desc.push(tex);
+        const mat = new T.MeshStandardMaterial({ color: m0.color.clone(), map: tex, transparent: m0.transparent, opacity: m0.opacity, depthWrite: m0.depthWrite, polygonOffset: m0.polygonOffset, polygonOffsetFactor: m0.polygonOffsetFactor, polygonOffsetUnits: m0.polygonOffsetUnits, roughness: m0.roughness, metalness: m0.metalness, side: m0.side }); desc.push(mat);
+        lote.forEach((me, j) => {
+          const u = j % POR, v = Math.floor(j / POR), im = me.material.map.image, w = im.width, h = im.height;
+          cx.drawImage(im, u * tam, v * tam);   // no tamanho original: nenhuma reamostragem
+          const g2 = me.geometry.clone(), uv = g2.attributes.uv;
+          for (let i = 0; i < uv.count; i++) uv.setXY(i, (u * tam + uv.getX(i) * w) / ATL, 1 - (v * tam + h * (1 - uv.getY(i))) / ATL);
+          uv.needsUpdate = true; desc.push(g2); me.geometry = g2; me.material = mat;
+        });
+        total += lote.length;   // a fusão em malha fica para o passo seguinte (fundirMalhas), agora com o material em comum
+      }
+    });
+    return total;
+  }
+  const malhasDe = o => { const l = []; o.traverse(x => { if (x.isMesh && !x.isInstancedMesh && !x.isSkinnedMesh) l.push(x); }); return l; };
+  // objetos de uma sala (filhos diretos de g): os parados entram na fusão
+  // impressão de cada malha de um objeto (posição, visibilidade, material e geometria): o que muda entre duas amostras
+  // é peça que se mexe
+  const impressaoMalhas = o => { const m = new Map(); o.updateMatrixWorld(true); o.traverse(x => { if (x.isMesh) { const mt = x.material; m.set(x, x.matrixWorld.elements.join(',') + '|' + x.visible + '|' + (Array.isArray(mt) ? 'multi' : mt.uuid + '/' + mt.opacity + '/' + mt.emissiveIntensity + '/' + (mt.color ? mt.color.getHex() : '') + '/' + (mt.emissive ? mt.emissive.getHex() : '') + '/' + (mt.map ? mt.map.uuid + mt.map.version : '')) + '|' + x.geometry.uuid + (x.geometry.attributes.position ? x.geometry.attributes.position.version : 0)); } }); return m; };
+  // peças paradas de um objeto interativo: as folhas (portas, gavetas), a tela do vídeo e, quando a peça responde
+  // sozinha (aoInter), tudo o que muda entre aberto e fechado ficam de fora; o resto (carcaça, prateleiras) funde
+  function paradasInterativo(o, IN) {
+    const u = o.userData, fora = new Set();
+    o.traverse(x => { if (x !== o && x.userData && (x.userData.folha || x.userData.aoInter)) x.traverse(y => fora.add(y)); });
+    if (u.tela && u.tela.traverse) u.tela.traverse(y => fora.add(y));
+    if (u.aoInter) {
+      const it = IN && IN.lista.find(e => e.obj === o); if (!it) return null;
+      try {
+        const a0 = impressaoMalhas(o);
+        [1, 0, .5].forEach(v => { u.aoInter(v, true, null); const a1 = impressaoMalhas(o); a1.forEach((k, x) => { if (a0.get(x) !== k) fora.add(x); }); });
+        u.aoInter(it.ult ?? 0, true, null);
+        const a2 = impressaoMalhas(o); a2.forEach((k, x) => { if (a0.get(x) !== k) fora.add(x); });
+      } catch (e) { return null; }
+    }
+    const ms = []; o.traverse(x => { if (x.isMesh && !x.isInstancedMesh && !x.isSkinnedMesh && !fora.has(x)) ms.push(x); });
+    return ms;
+  }
+  function fundirEstaticos(T, g, desc, IN) {
+    const out = { candidatos: 0, fundidas: 0, novas: 0 }, malhas = [], objs = [];
+    g.updateMatrixWorld(true);
+    g.children.forEach(o => {
+      const u = o.userData || {}, t = String(u.t || '');
+      if ((u.din && !u.estaticas) || t === '_fundido' || SEM_FUSAO.has(t)) return;
+      let dinamico = false; let ms = [];
+      if (u.int || u.aoInter) { if (u.din && !u.estaticas) return; ms = paradasInterativo(o, IN); if (!ms) return; if (u.estaticas) ms = ms.filter(x => u.estaticas.has(x)); }
+      else o.traverse(x => { if (x.userData && (x.userData.aoInter || x.userData.folha || x.userData.temFolha)) dinamico = true; if (x.isMesh && !x.isInstancedMesh && !x.isSkinnedMesh && (!u.estaticas || u.estaticas.has(x))) ms.push(x); });
+      if (dinamico || !ms.length) return;
+      const tela = RX_TELA.test(t) || !!u.tela || !!u.int;   // (interativo: cada peça fica com o próprio material, que acende e apaga sozinho)
+      ms.forEach(me => { if (tela) me.userData.tela = 1; malhas.push(me); out.candidatos++; });
+      o.userData.fundido = true; objs.push({ o, pose: [o.position.x, o.position.y, o.position.z, o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w, o.visible] });
+    });
+    try { atlasDecalques(T, g, desc, malhas); } catch (e) { console.warn('3D atlas:', e); }
+    out.novas = fundirMalhas(T, malhas, g, desc, out).length;
+    g.userData.fusao = { objs, malhas, T, desc, IN };
+    return out;
+  }
+  // um objeto fundido mudou de lugar (barricada, Mestre mexeu): sai da fusão e a sala é fundida de novo sem ele
+  function vigiarFusao(g) {
+    const f = g.userData.fusao; if (!f) return false;
+    let mexeu = false;
+    f.objs.forEach(({ o, pose }) => {
+      if (o.position.x !== pose[0] || o.position.y !== pose[1] || o.position.z !== pose[2] || o.quaternion.x !== pose[3] || o.quaternion.y !== pose[4] || o.quaternion.z !== pose[5] || o.quaternion.w !== pose[6] || o.visible !== pose[7]) { o.userData.din = true; o.userData.fundido = false; mexeu = true; }
+    });
+    if (!mexeu) return false;
+    desfundir(f.malhas, g); g.userData.fusao = null;
+    fundirEstaticos(f.T, g, f.desc, f.IN);
+    return true;
   }
   const dentroDe = (r, x, z) => x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3];
   function obstaculos(T, pai) {
@@ -394,14 +626,17 @@
       }
     }
     const vaoDe = v => v ? [v.centro - CORR_W / 2, v.centro + CORR_W / 2] : null;
-    Object.values(S).forEach(s => {
+    // casca de uma sala (piso, paredes, teto): refeita sozinha quando a cena dessa sala muda (remontagem por assinatura)
+    function casca(s) {
+      (s.casca || []).forEach(me => { if (me.parent) me.parent.remove(me); try { me.geometry.dispose(); } catch (e) {} });
+      s.casca = [];
       const c = s.cena || {}, piso = c.piso || {}, par = c.parede || {}, teto = c.teto || {}, KR = SALA_M / (c.lado || 7.071);
       const mPiso = F.m(piso.c || tema.sala.piso, { tex: piso.tex || 'concreto', rep: [(piso.rep || 3) * KR, (piso.rep || 3) * KR], r: piso.r ?? .85 });
       const mPar = F.m(par.c || tema.sala.parede, { tex: par.tex || 'concreto', rep: [(par.rep || 2) * KR, 1], r: .9 });
       const mRod = F.m(par.rodape || '#2b2b2b');
       const lt = criarLote(T, ctx.descartes);
       lt.plano(mPiso, s.x1 - s.x0, s.z1 - s.z0, s.cx, 0, s.cz, -Math.PI / 2);
-      lt.montar(raiz);
+      s.casca.push(...lt.montar(raiz));
       const lados = {
         n: [true, s.z0 - ESP / 2, s.x0 - ESP, s.x1 + ESP, vaoDe(s.vaos.n), 1],
         s: [true, s.z1 + ESP / 2, s.x0 - ESP, s.x1 + ESP, vaoDe(s.vaos.s), -1],
@@ -409,13 +644,16 @@
         e: [false, s.x1 + ESP / 2, s.z0, s.z1, vaoDe(s.vaos.e), -1],
       };
       Object.entries(lados).forEach(([lado, [eixoX, fixo, de, ate, vao, sinal]]) => {
-        const g = new T.Group(); raiz.add(g);
-        const l2 = criarLote(T, ctx.descartes); parede(l2, mPar, mRod, eixoX, fixo, de, ate, vao, sinal); l2.montar(g);
+        const g = s.paredes[lado] || new T.Group(); if (!g.parent) raiz.add(g);
+        const l2 = criarLote(T, ctx.descartes); parede(l2, mPar, mRod, eixoX, fixo, de, ate, vao, sinal); s.casca.push(...l2.montar(g));
         s.paredes[lado] = g;
       });
       const lt3 = criarLote(T, ctx.descartes);
       lt3.plano(F.m(teto.c || tema.sala.teto, { tex: teto.tex || 'concreto', rep: [2 * KR, 2 * KR] }), s.x1 - s.x0, s.z1 - s.z0, s.cx, ALT, s.cz, Math.PI / 2);
-      lt3.montar(tetos);
+      s.casca.push(...lt3.montar(tetos));
+    }
+    Object.values(S).forEach(s => {
+      casca(s);
       // véus nos vãos: escondem a sala de quem não pode vê-la (escuro que não deixa ver dentro)
       Object.entries(s.vaos).forEach(([lado, v]) => {
         const veu = new T.Mesh(F.guardar(new T.PlaneGeometry(CORR_W + .02, VAO_H + .02)), F.m('#000000', { r: 1 }));
@@ -429,6 +667,28 @@
         veu.visible = false; veus.add(veu); s.veus.push(veu);
       });
     });
+    // paredes fundidas por lado e fileira/coluna (a casa de bonecas esconde um lado inteiro de uma fileira de uma vez):
+    // 100 paredes com rodapé (281 malhas) viram ~20 grupos de poucas malhas
+    const PF = { n: [], s: [], w: [], e: [] };
+    let malhasParedes = [];
+    const linhaDe = s => Math.round((s.cz - S[1].cz) / (S[6].cz - S[1].cz)), colunaDe = s => Math.round((s.cx - S[1].cx) / (S[2].cx - S[1].cx));
+    function refundirParedes() {
+      if (!FUNDIR) return;
+      try {
+        ['n', 's', 'w', 'e'].forEach(l => PF[l].forEach(g => { desfundir([], g); }));
+        desfundir(malhasParedes, raiz); malhasParedes = [];
+        ['n', 's', 'w', 'e'].forEach(l => {
+          for (let i = 0; i < 5; i++) {
+            let g = PF[l][i]; if (!g) { g = new T.Group(); g.userData.pf = l + i; raiz.add(g); PF[l][i] = g; }
+            const lista = []; Object.values(S).forEach(s => { if ((l === 'n' || l === 's' ? linhaDe(s) : colunaDe(s)) === i) malhasDe(s.paredes[l]).forEach(me => lista.push(me)); });
+            lista.forEach(me => malhasParedes.push(me));
+            g.userData.ref = Object.values(S).find(s => (l === 'n' || l === 's' ? linhaDe(s) : colunaDe(s)) === i);
+            fundirMalhas(T, lista, g, ctx.descartes);
+          }
+        });
+      } catch (e) { console.warn('3D fusão paredes:', e); }
+    }
+    refundirParedes();
 
     /* ----- corredores ("backrooms": papel de parede amarelo, carpete úmido, forro e lâmpadas) ----- */
     const mParC = F.m(tema.parede, { tex: 'papel_parede', rep: [5, 1], r: .9 });
@@ -440,6 +700,7 @@
     const mCarne = F.m('#8a2a2e', { tex: 'carne', rep: [2, 1], r: .4, e: '#200004', ei: .3 });
     const ltC = criarLote(T, ctx.descartes), ltCT = criarLote(T, ctx.descartes);
     const virtCorr = [];      // luzes virtuais dos corredores
+    const paineisTeto = [];   // lâmpadas do forro: fundidas numa malha por material
     const decalques = new T.Group(); raiz.add(decalques);
     const cpos = (q, ao, lin, y) => q.h ? new T.Vector3(ao, y, lin) : new T.Vector3(lin, y, ao);
     CS.forEach((c, k) => {
@@ -461,7 +722,7 @@
         const morta = sorte < tema.mortas, pisca = !morta && sorte < tema.mortas + tema.pisca;
         const mat = morta ? mPainelMorto : pisca ? mPainelPisca : mPainel;
         const pp = cpos(q, ao, q.linha, CORR_H - .012);
-        const pm = new T.Mesh(F.guardar(new T.PlaneGeometry(.55, .55)), mat); pm.rotation.x = Math.PI / 2; pm.position.copy(pp); raiz.add(pm);
+        const pm = new T.Mesh(F.guardar(new T.PlaneGeometry(.55, .55)), mat); pm.rotation.x = Math.PI / 2; pm.position.copy(pp); raiz.add(pm); paineisTeto.push(pm);
         if (!morta) { const l = new T.PointLight(tema.luz, .85, 5.2, 2); virtCorr.push({ l, p: cpos(q, ao, q.linha, CORR_H - .3), base: .85, pisca, f: rr() * 9, corr: true }); }
       }
       // sangue (mais nos andares de baixo)
@@ -497,6 +758,7 @@
       }
     });
     ltC.montar(raiz); ltCT.montar(tetos);
+    if (FUNDIR) { try { fundirMalhas(T, paineisTeto, raiz, ctx.descartes); atlasDecalques(T, decalques, ctx.descartes); fundirMalhas(T, malhasDe(decalques), decalques, ctx.descartes); } catch (e) { console.warn('3D fusão corredores:', e); } }
 
     /* ----- portas dos corredores (estado público, ao vivo) ----- */
     const animPortas = [];
@@ -514,35 +776,36 @@
       if (typeof v === 'string' && v.startsWith('k:')) return 'tk';
       return ['t', 'tk', 'd', 'c'].includes(v) ? v : 'f';
     };
+    // materiais das portas vêm da fábrica do andar (F): iguais em todas as portas, a fusão desenha todas de uma vez
     function montarPorta(P, e) {
       P.grp.clear(); P.desc.forEach(x => { try { x.dispose(); } catch (er) {} }); P.desc = []; P.anim = [];
       const Fp = NSX.criarFabrica(T, P.anim, [], P.desc, { alt: ALT }), g = P.grp, W = CORR_W;
-      const metalP = Fp.m('#737a83', { r: .55, me: .25, tex: 'metal', rep: [1, 2] });
+      const metalP = F.m('#737a83', { r: .55, me: .25, tex: 'metal', rep: [1, 2] });
       [-1, 1].forEach(s => Fp.bx(g, .22, CORR_H, .1, mBatente, 0, 0, s * (W / 2 - .05)));
       Fp.bx(g, .22, .14, W, mBatente, 0, CORR_H - .14, 0);
-      const alvo = Fp.bx(g, .14, CORR_H - .16, W - .1, Fp.m('#000000', { unico: true, op: 0 }), 0, 0, 0); alvo.userData.porta = P.c.ci;   // área de clique
+      const alvo = Fp.bx(g, .14, CORR_H - .16, W - .1, F.m('#000000', { op: 0 }), 0, 0, 0); alvo.userData.porta = P.c.ci; alvo.visible = false;   // área de clique (invisível: o clique não exige ser desenhada)
       if (e === 'a') { Fp.bx(g, .12, .1, W - .2, metalP, 0, CORR_H - .24, 0); return; }
       if (e === 'd') {
-        const r = NSX.rng(P.c.ci * 7 + 1), mc = Fp.m('#6a665f', { tex: 'concreto', r: 1 }), mf = Fp.m('#3b3a38', { r: .9 });
+        const r = NSX.rng(P.c.ci * 7 + 1), mc = F.m('#6a665f', { tex: 'concreto', r: 1 }), mf = F.m('#3b3a38', { r: .9 });
         for (let i = 0; i < 20; i++) { const w = .25 + r() * .55, h = .2 + r() * .5, y = Math.max(0, (1 - Math.abs(r() - .5) * 2) * 1.4 * r()); const b = Fp.bx(g, w, h, .25 + r() * .5, i % 4 ? mc : mf, (r() - .5) * 1.2, y, (r() - .5) * (W - .3)); b.rotation.set(r() * .6, r() * 3, r() * .6); }
         const viga = Fp.bx(g, .16, .16, W + .5, metalP, .2, 1.1, 0); viga.rotation.x = .5; viga.rotation.y = .3; return;
       }
       if (e === 'c') {
-        const mcarne = Fp.m('#b07070', { unico: true, tex: 'carne', r: .35, e: '#1a0002', ei: .4 });
+        const mcarne = F.m('#b07070', { unico: true, tex: 'carne', r: .35, e: '#1a0002', ei: .4 });
         const pw = new T.Group(); g.add(pw); Fp.bx(pw, .28, CORR_H, W - .06, mcarne, 0, 0, 0);
         const r = NSX.rng(11); for (let i = 0; i < 8; i++) Fp.sf(pw, .12 + r() * .18, mcarne, (r() - .5) * .25, .3 + r() * 1.8, (r() - .5) * (W - .4), 12).scale.set(.55, 1, 1);
         P.anim.push((dt, t) => { const k = 1 + Math.max(0, Math.sin(t * 5.2)) * .04 + Math.max(0, Math.sin(t * 5.2 - 1.2)) * .02; pw.scale.set(k, 1, 1 + (k - 1) * .4); });
         return;
       }
       // porta de aço dupla, rebitada, com puxadores dos dois lados
-      const aco = Fp.m('#5a5e62', { tex: 'porta_aco', r: .6, me: .45 }), puxa = Fp.m('#a8aeb4', { me: .8, r: .3 }), escuro = Fp.m('#1a1a1a', { me: .5 });
+      const aco = F.m('#5a5e62', { tex: 'porta_aco', r: .6, me: .45 }), puxa = F.m('#a8aeb4', { me: .8, r: .3 }), escuro = F.m('#1a1a1a', { me: .5 });
       [-1, 1].forEach(s => {
         Fp.bx(g, .09, CORR_H - .16, W / 2 - .06, aco, 0, 0, s * (W / 4 - .01));
         [-1, 1].forEach(lx => Fp.bx(g, .04, .5, .035, puxa, lx * .07, .95, s * .13));
         [.35, CORR_H - .65].forEach(yy => Fp.bx(g, .12, .22, .06, escuro, 0, yy, s * (W / 2 - .07)));
       });
       Fp.bx(g, .1, CORR_H - .16, .02, escuro, 0, 0, 0);
-      Fp.bx(g, .1, .12, W - .08, Fp.m('#d4a017', { r: .7 }), 0, .25, 0);
+      Fp.bx(g, .1, .12, W - .08, F.m('#d4a017', { r: .7 }), 0, .25, 0);
       if (e === 't' || e === 'tk') [-1, 1].forEach(s => {
         const tx = Fp.textoTex(e === 'tk' ? '🔢\nTECLADO' : '🔒\nTRANCADA', { w: 256, h: 192, cor: '#ffd36b', fundo: '#1a1408' });
         const pm = Fp.pl(g, .5, .38, Fp.m('#ffffff', { unico: true, mapa: tx, r: .9 }), s * .051, 1.6, 0); pm.rotation.y = s * Math.PI / 2;
@@ -568,12 +831,27 @@
       });
     }));
     const COR_BOTAO = { f: '#ff2020', p: '#ff2020', a: '#20ff60', t: '#ffb020', tk: '#ffb020', d: '#ffb020', c: '#ffb020' };
+    // as portas paradas (todas menos a de carne, que pulsa) viram poucas malhas, refeitas quando uma porta muda de estado
+    const portasFund = new T.Group(); raiz.add(portasFund); let malhasPortas = [];
+    function refundirPortas() {
+      if (!FUNDIR) return;
+      try {
+        desfundir(malhasPortas, portasFund); malhasPortas = [];
+        portas.forEach(P => { if (P && !P.anim.length) malhasDe(P.grp).forEach(me => malhasPortas.push(me)); });
+        fundirMalhas(T, malhasPortas, portasFund, ctx.descartes);
+      } catch (e) { console.warn('3D fusão portas:', e); }
+    }
     function atualizarPortas() {
+      let mudou = false;
       portas.forEach(P => {
-        if (!P) return; const e = estadoPorta(P.c.ci); if (e === P.v) return; P.v = e; montarPorta(P, e);
+        if (!P) return; const e = estadoPorta(P.c.ci); if (e === P.v) return; P.v = e; montarPorta(P, e); mudou = true;
         P.botoes.forEach(b => { const l = b.userData.luzBotao; if (l) { l.material.emissive.set(COR_BOTAO[e] || '#ff2020'); l.userData.pisca = e === 'p'; } });
       });
+      if (mudou) refundirPortas();
     }
+    // botões e lâmpadas de alerta: um material por porta (as 4 lâmpadas e os 2 botões de uma porta mudam juntos mesmo)
+    portas.forEach(P => { if (!P) return; P.botoes.forEach(b => { const l = b.userData.luzBotao; if (!l) return; const k = b.children.length === 2 ? 'matB' : 'matL'; if (!P[k]) P[k] = l.material; else l.material = P[k]; }); });
+    if (FUNDIR) { try { const lb = []; portas.forEach(P => P && P.botoes.forEach(b => malhasDe(b).forEach(me => { me.userData.tela = 1; lb.push(me); }))); fundirMalhas(T, lb, raiz, ctx.descartes); } catch (e) { console.warn('3D fusão botões:', e); } }   // (tela = 1: a cor do brilho muda com a porta, cada porta fica com o seu material)
     atualizarPortas();
 
     /* ----- luzes: cada sala com sua luz; o Mestre muda (mapa/luz) ----- */
@@ -625,6 +903,7 @@
       const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN };
       carregadas.set(p, c);
       if (NS().inter) NS().inter.aplicar(c, true);
+      if (FUNDIR) { try { c.fusao = fundirEstaticos(T, g, desc, IN); } catch (e) { console.warn('3D fusão:', e); } }
       atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
     }
     // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
@@ -711,6 +990,35 @@
     }
     // remontar uma sala (versão Rei/Mãe trocada, cena nova)
     function recarregar(p) { if (carregadas.has(p)) { descarregar(p); carregar(p); } }
+    // a cena desta sala mudou (importada ou revelada com o 3D aberto): só ela é refeita, sem remontar o andar
+    // corte de detalhe na vista de fora (casa de bonecas, andar inteiro): objeto não fundido que fica pequeno na tela
+    // (raio na tela abaixo de DET_PX pixels, uns 8 px de diâmetro: some sem se notar) sai da câmera pela camada 1 (o
+    // visible é da animação e das interações; a camada não é mexida por mais ninguém). Volta sozinho quando a câmera
+    // chega perto ou sai da vista de fora.
+    const DET_PX = 4;
+    const vC = new T.Vector3();
+    // por malha (não por objeto): um console grande tem dezenas de peças animadas de poucos pixels cada
+    function detalhe(modo) {
+      const cam = V && V.camera, corta = modo === 'fora' && cam && cam.isPerspectiveCamera;
+      const DET = corta ? DET_PX / ((innerHeight / 2) / Math.tan(cam.fov * Math.PI / 360)) : 0;
+      carregadas.forEach(c => c.g.children.forEach(o => {
+        const u = o.userData; if (u.t === '_fundido' || o.isLight) return;
+        if (!corta && !u._det) return;
+        let algum = false;
+        o.traverse(x => {
+          if (!(x.isMesh || x.isSprite || x.isPoints || x.isLine)) return;
+          let fora = false;
+          if (corta) {
+            const g = x.geometry, bs = g && g.boundingSphere;
+            if (bs && bs.radius > 0) { vC.copy(bs.center).applyMatrix4(x.matrixWorld); const r = bs.radius * x.matrixWorld.getMaxScaleOnAxis(); fora = r < 1.2 && r / Math.max(.1, cam.position.distanceTo(vC)) < DET; }
+          }
+          if (fora !== !!x.userData._det) { x.userData._det = fora; x.layers.set(fora ? 1 : 0); }
+          if (fora) algum = true;
+        });
+        u._det = algum;
+      }));
+    }
+    function recarregarCena(p) { const s = S[p]; if (!s) return; s.cena = cenaDe(s.cn); casca(s); refundirParedes(); recarregar(p); visAntes = ''; }
 
     /* ----- conjunto fixo de luzes (não recompila os materiais quando as salas entram e saem) ----- */
     const POOL = celular ? 6 : 10, pool = [];
@@ -820,16 +1128,18 @@
         if (!fora) { ps.n.visible = ps.s.visible = ps.w.visible = ps.e.visible = true; return; }
         ps.n.visible = dz > -2; ps.s.visible = dz < 2; ps.w.visible = dx > -2; ps.e.visible = dx < 2;
       });
+      // os grupos fundidos seguem a mesma regra, por fileira (n/s) e coluna (w/e)
+      ['n', 's', 'w', 'e'].forEach(l => PF[l].forEach(g => { const s = g.userData.ref; if (!s) return; const dx = cx - s.cx, dz = cz - s.cz; g.visible = !fora || (l === 'n' ? dz > -2 : l === 's' ? dz < 2 : l === 'w' ? dx > -2 : dx < 2); }));
     }
 
     setTimeout(() => { try { sincExpo(); } catch (e) {} }, 0);
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos, campos,
-      livre3D, area3D, atualizarPortas, recarregar, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
+      livre3D, area3D, atualizarPortas, recarregar, recarregarCena, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
-        tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); }   // !(>0) também pega NaN
+        tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); if (FUNDIR) carregadas.forEach(c => { try { if (vigiarFusao(c.g)) c.fusao = c.g.userData.fusao && { refeita: true }; } catch (e) {} }); try { detalhe(modo); } catch (e) {} }   // !(>0) também pega NaN
         carregadas.forEach(c => { for (let i = 0; i < c.anim.length; i++) c.anim[i](dt, t); });
         portas.forEach(P => { if (P) for (let i = 0; i < P.anim.length; i++) P.anim[i](dt, t); });
         for (let i = 0; i < ctx.animMundo.length; i++) ctx.animMundo[i](dt, t);
@@ -1008,6 +1318,8 @@
         let dr = o.rot - o.t.g.rotation.y; while (dr > Math.PI) dr -= Math.PI * 2; while (dr < -Math.PI) dr += Math.PI * 2;
         o.t.g.rotation.y += dr * Math.min(1, dt * 10);
         o.t.anim(dt, t, o.andando > 0);
+        // LOD das formas detalhadas (filhos3d.js): a distância é a da câmera, corrigida pelo campo de visão
+        if (o.t.lod && camPos) { const dc = Math.hypot(camPos.x - o.x, camPos.z - o.z, camPos.y - 1.2); o.t.lod(dc * (V && V.camera ? V.camera.fov / 70 : 1)); }
         // o próprio token não aparece na vista de dentro (você é a câmera)
         // no modo Jogo, se a parede empurrou a câmera para colada no token, ele some para não tampar a tela
         o.t.g.visible = !(id === eu && (primeiraP(modo) || (modo === 'jogo' && camPos && Math.hypot(camPos.x - o.x, camPos.z - o.z) < .75)));
@@ -1041,23 +1353,28 @@
     function preparar() {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try {
-        if (!ctx) { ctx = new AC(); saida = ctx.createGain(); saida.gain.value = 0; saida.connect(ctx.destination); branco = buf('branco'); marrom = buf('marrom'); }
+        // um AudioContext só para o site inteiro (ACF.Som.ctx): os módulos de som compartilham o mesmo
+        if (!ctx) { const A = ACF(); ctx = (A && A.Som && A.Som.pronto && A.Som.pronto()) || new AC(); saida = ctx.createGain(); saida.gain.value = 0; saida.connect(ctx.destination); branco = buf('branco'); marrom = buf('marrom'); }
         if (ctx.state === 'suspended') ctx.resume().catch(() => {});
       } catch (e) { ctx = null; }
     }
     // pecinhas
     const ruido = (o, b, destino) => { const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(destino); s.start(0, Math.random() * 1.9); o.fontes.push(s); return s; };
-    const filtro = (tipo, f, q, destino) => { const x = ctx.createBiquadFilter(); x.type = tipo; x.frequency.value = f; if (q) x.Q.value = q; x.connect(destino); return x; };
-    const ganho = (v, destino) => { const g = ctx.createGain(); g.gain.value = v; g.connect(destino); return g; };
+    let nosAtual = null;   // nós (filtros, ganhos, delays) da voz sendo montada: soltos junto com ela
+    const anotar = x => { if (nosAtual) nosAtual.push(x); return x; };
+    const filtro = (tipo, f, q, destino) => { const x = ctx.createBiquadFilter(); x.type = tipo; x.frequency.value = f; if (q) x.Q.value = q; x.connect(destino); return anotar(x); };
+    const ganho = (v, destino) => { const g = ctx.createGain(); g.gain.value = v; g.connect(destino); return anotar(g); };
     const osc = (o, tipo, f, destino) => { const s = ctx.createOscillator(); s.type = tipo; s.frequency.value = f; s.connect(destino); s.start(); o.fontes.push(s); return s; };
     const lfo = (o, f, amp, param) => { const s = osc(o, 'sine', f, ganho(amp, param)); return s; };
     // um "toque" curto (gota, batida, bip, estalo)
     function toque(t, destino, { f = 800, f2, tipo = 'sine', v = .1, ataque = .005, dur = .2, ruidoBP }) {
       const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + ataque); g.gain.exponentialRampToValueAtTime(.0001, t + dur); g.connect(destino);
       let s;
-      if (ruidoBP) { s = ctx.createBufferSource(); s.buffer = branco; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = ruidoBP; bp.Q.value = 2; s.connect(bp); bp.connect(g); }
+      if (ruidoBP) { s = ctx.createBufferSource(); s.buffer = branco; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = ruidoBP; bp.Q.value = 2; s.connect(bp); bp.connect(g); s.__bp = bp; }
       else { s = ctx.createOscillator(); s.type = tipo; s.frequency.setValueAtTime(f, t); if (f2) s.frequency.exponentialRampToValueAtTime(f2, t + dur); s.connect(g); }
       s.start(t, ruidoBP ? Math.random() : 0); s.stop(t + dur + .05);
+      const bp = ruidoBP ? s.__bp : null;
+      s.onended = () => { try { s.disconnect(); g.disconnect(); if (bp) bp.disconnect(); } catch (e) {} };
     }
     // repetição com intervalo (fixo ou sorteado)
     const ritmo = (o, intervalo, fn) => { let prox = ctx.currentTime + .3 + Math.random() * .5; o.ticks.push(t => { while (prox < t + .25) { fn(prox); prox += typeof intervalo === 'function' ? intervalo() : intervalo; } }); };
@@ -1074,7 +1391,7 @@
         ritmo(o, () => 3 + Math.random() * 6, t => { g.gain.setTargetAtTime(.075, t, .12); g.gain.setTargetAtTime(.012, t + 1.4, .5); });
       },
       gotas(o, s) {
-        const eco = ctx.createDelay(1); eco.delayTime.value = .23; const fb = ganho(.32, eco); eco.connect(fb); eco.connect(s); const ent = ganho(1, s); ent.connect(eco);
+        const eco = anotar(ctx.createDelay(1)); eco.delayTime.value = .23; const fb = ganho(.32, eco); eco.connect(fb); eco.connect(s); const ent = ganho(1, s); ent.connect(eco);
         ritmo(o, () => .5 + Math.random() * 1.8, t => toque(t, ent, { f: 1100 + Math.random() * 700, f2: 380, v: .07, dur: .16 }));
       },
       coracao(o, s) { const lp = filtro('lowpass', 160, 0, s); ritmo(o, 1.05, t => { toque(t, lp, { f: 58, f2: 40, v: .5, ataque: .01, dur: .16 }); toque(t + .27, lp, { f: 50, f2: 36, v: .32, ataque: .01, dur: .14 }); }); },
@@ -1087,7 +1404,7 @@
       },
       neutra(o, s) { ruido(o, marrom, filtro('lowpass', 400, 0, ganho(.035, s))); },
       eco(o, s) {
-        const eco = ctx.createDelay(1.5); eco.delayTime.value = .6; const fb = ganho(.4, eco); eco.connect(fb); eco.connect(s);
+        const eco = anotar(ctx.createDelay(1.5)); eco.delayTime.value = .6; const fb = ganho(.4, eco); eco.connect(fb); eco.connect(s);
         const bp = filtro('bandpass', 220, 4, ganho(.06, s)); bp.connect(eco); ruido(o, branco, bp); lfo(o, .05, 120, bp.frequency);
       },
       relogio(o, s) { let par = 0; ritmo(o, 1, t => toque(t, s, { ruidoBP: (par++ % 2) ? 3000 : 2300, v: .05, dur: .03 })); },
@@ -1104,14 +1421,16 @@
     const normal = som => (Array.isArray(som) ? som : [som]).map(x => typeof x === 'string' ? [x, 1] : Array.isArray(x) ? [x[0], x[1] ?? 1] : x && x.p ? [x.p, x.v ?? 1] : null).filter(x => x && PRESETS[x[0]]);
     function criarVoz(k, som) {
       const g = ctx.createGain(); g.gain.value = 0; g.connect(saida);
-      const o = { fontes: [], ticks: [] };
+      const o = { fontes: [], ticks: [], nos: [] };
+      nosAtual = o.nos;
       normal(som).forEach(([nome, v]) => { try { PRESETS[nome](o, ganho(v, g)); } catch (e) { console.warn('som 3D:', nome, e); } });
+      nosAtual = null;
       const voz = { g, o }; vozes.set(k, voz); return voz;
     }
     function soltar(k) {
       const v = vozes.get(k); if (!v) return; vozes.delete(k);
       const t = ctx.currentTime; v.g.gain.setTargetAtTime(0, t, .3);
-      setTimeout(() => { v.o.fontes.forEach(s => { try { s.stop(); } catch (e) {} }); try { v.g.disconnect(); } catch (e) {} }, 1600);
+      setTimeout(() => { v.o.fontes.forEach(s => { try { s.stop(); s.disconnect(); } catch (e) {} }); v.o.nos.forEach(x => { try { x.disconnect(); } catch (e) {} }); try { v.g.disconnect(); } catch (e) {} }, 1600);
     }
     return {
       preparar,
@@ -1131,9 +1450,10 @@
       tick() { if (!ctx) return; const t = ctx.currentTime; vozes.forEach(v => v.o.ticks.forEach(f => f(t))); },
       // passo de quem anda (só neste aparelho)
       passo(forte) { if (!ctx || !ligado || (ACF() && ACF().mudo)) return; const t = ctx.currentTime; toque(t, saida, { ruidoBP: 160 + Math.random() * 80, v: forte ? .55 : .32, dur: .08 }); toque(t, saida, { f: 72, f2: 44, v: forte ? .3 : .18, ataque: .004, dur: .1 }); },
-      pausar() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); },
+      // o contexto é compartilhado com o site inteiro: pausar e parar só calam a saída deste módulo
+      pausar() { if (ctx && saida) saida.gain.setTargetAtTime(0, ctx.currentTime, .05); },
       retomar() { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); },
-      parar() { [...vozes.keys()].forEach(soltar); if (ctx) setTimeout(() => { if (!V && ctx) ctx.suspend().catch(() => {}); }, 1800); },
+      parar() { [...vozes.keys()].forEach(soltar); if (ctx && saida) saida.gain.setTargetAtTime(0, ctx.currentTime, .2); },
     };
   })();
 
@@ -1170,9 +1490,9 @@
     // opções gráficas (⚙): brilho (bloom), aberração, grão e vinheta
     const aplicar = () => {
       const auto = (v, p) => v === 'auto' ? p : !!v;
-      usarBrilho = auto(CFG.brilho, alta);
+      usarBrilho = auto(cfgEfetivo.brilho, alta);
       final.uniforms.uBrilho.value = usarBrilho ? .75 : 0;
-      final.uniforms.uAberr.value = auto(CFG.aberr, alta) ? .006 : 0;
+      final.uniforms.uAberr.value = auto(cfgEfetivo.aberr, alta) ? .006 : 0;
       final.uniforms.uGrao.value = CFG.grao ? .055 : 0;
       final.uniforms.uVinheta.value = CFG.vinheta ? 1.15 : .5;
     };
@@ -1182,6 +1502,7 @@
       tamanho(W, H, dpr) { w = Math.max(1, Math.floor(W * dpr)); h = Math.max(1, Math.floor(H * dpr)); rtCena.setSize(w, h); rtA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); rtB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); final.uniforms.uRes.value.set(w, h); },
       render(cena, cam, t) {
         ren.setRenderTarget(rtCena); ren.render(cena, cam);
+        this.ultCalls = ren.info.render.calls; this.ultTri = ren.info.render.triangles;
         if (usarBrilho) {
           brilho.uniforms.t.value = rtCena.texture; passar(brilho, rtA);
           borrao.uniforms.t.value = rtA.texture; borrao.uniforms.dir.value.set(1 / (w >> 2), 0); passar(borrao, rtB);
@@ -1196,6 +1517,23 @@
 
   /* ================= o visualizador (tela cheia) ================= */
   let V = null;
+  // liga ou desliga o Modo Desempenho na vista aberta (sombras, pós, poeira, fumaça; câmeras e visão leem o cfgEfetivo)
+  function aplicarDesempenho() {
+    if (!V) return;
+    const on = desempenhoAtivo(), auto = (v, p) => v === 'auto' ? p : !!v;
+    try {
+      const sombras = on ? false : auto(CFG.sombras, V.alta) && V.sombras0;
+      V.lanterna.castShadow = sombras; V.ren.shadowMap.enabled = sombras;
+      V.pos.aplicar();
+      V.poeira.visible = on ? false : !!CFG.poeira;
+      const M = window.ACF_MOMENTO, Vi = M && M.Vista;
+      if (Vi && Vi.fumaca) Vi.fumaca.forEach(x => { x.visible = !on && auto(CFG.fumaca, true); });
+      if (Vi && Vi.beam && Vi.beam.pts) Vi.beam.pts.visible = !on;
+      const Q = window.ACF_IMERSAO && ACF_IMERSAO.Qual;
+      if (Q && Q.ap === V.api && Q.aplicado != null) Q.aplicar(Q.aplicado);
+      if (V.d) V.d.classList.toggle('s3d-leve', on);
+    } catch (e) { console.warn('3D desempenho:', e); }
+  }
   const ehToque = () => matchMedia('(pointer: coarse)').matches;
   const quemSou = () => { const a = ACF(); return a.mestre ? 'mestre' : a.aux ? 'aux' : 'jog'; };
 
@@ -1540,10 +1878,11 @@
     const palco = $('.s3d-palco', d);
     const celular = Math.min(innerWidth, innerHeight) < 700 || ehToque();
     const alta = lsG('acf-s3d-qualidade', celular ? 'baixa' : 'alta') === 'alta';
+    registrarDescarte(T);
     const ren = new T.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     ren.setPixelRatio(1);
-    const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, alta ? 2 : 1.25) * (+CFG.escala || 1));
-    const sombras = CFG.sombras === 'auto' ? alta : !!CFG.sombras;
+    const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x
+    const sombras = (CFG.sombras === 'auto' ? alta : !!CFG.sombras) && !desempenhoAtivo();
     ren.outputEncoding = T.sRGBEncoding; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.25;
     ren.shadowMap.enabled = sombras; ren.shadowMap.type = T.PCFSoftShadowMap;
     palco.appendChild(ren.domElement);
@@ -1586,16 +1925,16 @@
     const lanterna = new T.SpotLight('#fff1d8', 0, 16, .48, .55, 1.4); lanterna.castShadow = sombras; lanterna.shadow.mapSize.set(1024, 1024); lanterna.shadow.bias = -.0006; lanterna.shadow.camera.near = .1;
     cenaT.add(lanterna, lanterna.target);
     // poeira no ar
-    const nP = !CFG.poeira ? 1 : celular ? 140 : 320, posP = new Float32Array(nP * 3), rP = NS().rng(5);
+    const nP = !cfgEfetivo.poeira ? 1 : celular ? 140 : 320, posP = new Float32Array(nP * 3), rP = NS().rng(5);
     for (let i = 0; i < nP; i++) { posP[i * 3] = (rP() - .5) * 12; posP[i * 3 + 1] = rP() * ALT; posP[i * 3 + 2] = (rP() - .5) * 12; }
     const geoP = new T.BufferGeometry(); geoP.setAttribute('position', new T.BufferAttribute(posP, 3));
     const poeira = new T.Points(geoP, new T.PointsMaterial({ color: '#d8d0c0', size: .018, transparent: true, opacity: .35, depthWrite: false })); cenaT.add(poeira);
-    descartes.push(geoP, poeira.material);
+    descartes.push(geoP, poeira.material); poeira.visible = !!cfgEfetivo.poeira;
 
     const pos = criarPos(T, ren, alta);
     V = { op, a, ren, cena: cenaT, cam: est, camera: cam, mundo, tok, descartes, amb, lanterna: op.manter ? op.manter.lanterna : false, rodando: true, raf: 0, d,
       teclas: new Set(), correr: false, joy: null, quem, ctrl: ctrlJog, ctrlMestre: op.manter ? op.manter.ctrl : null, autoAlvo: null, pos, envRT, alta, celular,
-      sig: assinatura(a), escondido: null, ultMov: 0, movendo: false, ultToast: 0 };
+      sig: assinatura(a), escondido: null, ultMov: 0, movendo: false, ultToast: 0, sombras0: CFG.sombras === 'auto' ? alta : !!CFG.sombras };
     if (op.ctrl && ctrlJog === op.ctrl) V.ctrlMestre = op.ctrl;
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
     pintarBarra();
@@ -1608,15 +1947,18 @@
     /* ---------- controles: arrastar gira/olha; pinça e roda aproximam; toque escolhe ---------- */
     const pts = new Map(); let dist0 = 0, ini0 = null;
     const el = ren.domElement; el.style.touchAction = 'none';
-    el.addEventListener('contextmenu', e => e.preventDefault());
-    el.addEventListener('pointerdown', e => {
+    // os ouvintes do canvas saem ao fechar (abort): senão o canvas, preso pelo contexto WebGL a qualquer objeto que uma
+    // extensão guardou, segurava esta função inteira (cena, mundo, tokens) na memória
+    const abEl = new AbortController(), on = (t, f, o) => el.addEventListener(t, f, Object.assign({ signal: abEl.signal }, o || {})); V.abEl = abEl;
+    on('contextmenu', e => e.preventDefault());
+    on('pointerdown', e => {
       if (e.pointerType === 'mouse' && botaoMouse(e)) return;
       el.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
       ini0 = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
       if (pts.size === 2) { const [p, q] = [...pts.values()]; dist0 = Math.hypot(p[0] - q[0], p[1] - q[1]); }
     });
-    el.addEventListener('mousemove', e => { if (document.pointerLockElement === el && imersivo(est.modo)) olharDelta(e.movementX, e.movementY, .0024); });
-    el.addEventListener('pointermove', e => {
+    on('mousemove', e => { if (document.pointerLockElement === el && imersivo(est.modo)) olharDelta(e.movementX, e.movementY, .0024); });
+    on('pointermove', e => {
       if (document.pointerLockElement === el) return;
       if (!pts.has(e.pointerId)) return;
       const [px, py] = pts.get(e.pointerId); const dx = e.clientX - px, dy = e.clientY - py; pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -1637,8 +1979,8 @@
       }
       ini0 = null; pts.delete(e.pointerId); if (pts.size < 2) dist0 = 0;
     };
-    el.addEventListener('pointerup', solta); el.addEventListener('pointercancel', solta);
-    el.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY * .01); }, { passive: false });
+    on('pointerup', solta); on('pointercancel', solta);
+    on('wheel', e => { e.preventDefault(); zoom(e.deltaY * .01); }, { passive: false });
     function zoom(k) { if (primeiraP(est.modo)) est.fov = Math.max(35, Math.min(100, est.fov + k * 8)); else if (est.modo === 'jogo') est.dj = Math.max(1.2, Math.min(7, (est.dj || 3.2) * (1 + k * .12))); else est.r = Math.max(3, Math.min(MAPA.total * 1.2, est.r * (1 + k * .12))); }
     function olharDelta(dx, dy, k = .005) {
       k *= CFG.sens || 1; const tp = !primeiraP(est.modo);
@@ -1835,7 +2177,7 @@
       V.raf = requestAnimationFrame(quadro);
       if (!(agora > 0)) agora = performance.now();
       if (CFG.fps > 0 && agora - t0 < 1000 / CFG.fps - 2) return;   // limite de quadros (Opções)
-      if (CFG.verFps) { fpsN++; if (agora - fpsT > 1000) { const f = $('#s3dFps'); if (f) { f.hidden = false; f.textContent = Math.round(fpsN * 1000 / (agora - fpsT)) + ' fps'; } fpsN = 0; fpsT = agora; } }
+      if (CFG.verFps) { fpsN++; if (agora - fpsT > 1000) { const f = $('#s3dFps'); if (f) { f.hidden = false; const inf = ren.info.render, ms = fpsN ? (agora - fpsT) / fpsN : 0; f.textContent = `${Math.round(fpsN * 1000 / (agora - fpsT))} fps · ${ms.toFixed(1)} ms\n${V.hudCalls || inf.calls} calls · ${Math.round((V.hudTri || inf.triangles) / 1000)}k tri · degrau ${degrauQual}${desempenhoAtivo() ? ' · leve' : ''}`; } fpsN = 0; fpsT = agora; } }
       const dt = Math.max(0, Math.min(.05, (agora - t0) / 1000)) || 0; t0 = agora; tt += dt;
       const andou = mover(dt); if (!andou) talvezFechar();
       // token controlado: se o Mestre (ou o mapa 2D) o mover, a câmera vai junto
@@ -1906,6 +2248,7 @@
       if (V.choque > 0) { V.choque = Math.max(0, V.choque - dt); pos.final.uniforms.uAberr.value = .006 + V.choque * .03; } else if (V.choque === 0) { V.choque = -1; pos.aplicar(); }
       for (const x of EXT()) if (x.quadro) { try { x.quadro(dt, tt); } catch (e) { if (!x._erro) { x._erro = 1; console.warn('3D extensão:', e); } } }
       pos.render(cenaT, cam, tt);
+      if (CFG.verFps) { V.hudCalls = pos.ultCalls; V.hudTri = pos.ultTri; }
       posicionarBaloes();
       // HUD algumas vezes por segundo
       tHud -= dt;
@@ -1930,12 +2273,17 @@
     alvo.set(est.ax, 1, est.az);
     // extensões (momento.js): recebem as peças da vista
     ctx.extraSalas = new Set();
-    V.api = { T, A, a, cena: cenaT, camera: cam, ren, est, mundo, tok, pos, lanterna, celular, alta, CFG, ALT, SALA_M, ctx, Som, poeira,
+    V.api = { T, A, a, cena: cenaT, camera: cam, ren, est, mundo, tok, pos, lanterna, celular, alta, CFG: cfgEfetivo, ALT, SALA_M, ctx, Som, poeira,
+      leve: desempenhoAtivo, degrau(n) { const antes = desempenhoAtivo(); degrauQual = n | 0; if (antes !== desempenhoAtivo()) aplicarDesempenho(); },
       get V() { return V; }, toast, primeiraP, imersivo, extraSalas: ctx.extraSalas, descartes,
       planta3D: (x, y) => planta3D(a, x, y), plantaDe3D: (x, z) => plantaDe3D(a, x, z), salaNoPonto3D: (x, z) => salaNoPonto3D(a, x, z),
       fabrica: () => { const F = NS().criarFabrica(T, [], [], descartes, { alt: ALT }); F.T = T; return F; },
       quemVe: id => !!tok.mapa.get(id) };
     EXT().forEach(x => { try { x.iniciar && x.iniciar(V.api); } catch (e) { console.warn('3D extensão:', e); } });
+    // pré-aquecimento: a sala de partida entra na cena e todos os shaders dela são compilados antes do 1º quadro
+    // (em vez de travarem no meio do primeiro passo); os dados 3D aquecem os deles logo depois
+    try { mundo.atualizar(0, 0, est.px, est.pz, est.modo, cam.position); ren.compile(cenaT, cam); } catch (e) {}
+    setTimeout(() => { if (V && window.ACF_DADOS3D && ACF_DADOS3D.preparar) ACF_DADOS3D.preparar(); }, 1500);
     V.raf = requestAnimationFrame(quadro);
     V.retomar = () => { if (V && !V.rodando) { V.rodando = true; t0 = performance.now(); V.raf = requestAnimationFrame(quadro); } };
   }
@@ -2362,7 +2710,8 @@
         ${sel('fumaca', auto, 'Fumaça e névoa baixa que se movem')}
         ${sel('cameras', [['auto', 'Automático'], ['alta', 'Ligadas (imagem melhor)'], ['baixa', 'Ligadas (leve)'], ['false', 'Desligadas']], 'Câmeras de segurança nos monitores')}
         ${sel('fps', [[0, 'Sem limite'], [60, '60 por segundo'], [30, '30 por segundo (economiza bateria)']], 'Limite de quadros')}
-        ${chave('verFps', 'Mostrar quadros por segundo')}</section>`;
+        ${sel('desempenho', [['auto', 'Automático (liga no degrau 3 da qualidade automática)'], ['true', 'Ligado'], ['false', 'Desligado']], 'Modo Desempenho (sem câmeras, sombras, bloom, poeira e fumaça; visão da criatura em meia resolução)')}
+        ${chave('verFps', 'Mostrar desempenho (fps, ms, chamadas, triângulos, degrau)')}</section>`;
     } else if (abaOp === 'camera') {
       h += `<section>${chave('terceira', 'Modo Jogo em terceira pessoa (o padrão é primeira pessoa)')}
         ${faixa('fov', 55, 105, 1, 'Campo de visão', v => v + '°')}
@@ -2398,7 +2747,7 @@
     const depois = k => {
       salvarCfg();
       if (REABRE.has(k)) { reabrir(); return; }
-      if (V) { V.pos.aplicar(); if (k === 'fov' && primeiraP(V.cam.modo)) definirModo(V.cam.modo); if (k === 'terceira') definirModo(V.ctrl ? 'jogo' : V.cam.modo); if (k === 'verFps' && !CFG.verFps) $('#s3dFps').hidden = true; dica(); }
+      if (V) { V.pos.aplicar(); if (k === 'desempenho') aplicarDesempenho(); if (k === 'fov' && primeiraP(V.cam.modo)) definirModo(V.cam.modo); if (k === 'terceira') definirModo(V.ctrl ? 'jogo' : V.cam.modo); if (k === 'verFps' && !CFG.verFps) $('#s3dFps').hidden = true; dica(); }
     };
     $('[data-op-x]', o).onclick = () => { o.hidden = true; };
     o.querySelectorAll('[data-aba-op]').forEach(b => b.onclick = () => { abaOp = b.dataset.abaOp; desenharOpcoes(); });
@@ -2551,16 +2900,24 @@
       try { V.mundo.descartar(); } catch (e) {}
       try { V.pos.descartar(); } catch (e) {}
       try { V.envRT.dispose(); } catch (e) {}
+      try { if (V.lanterna.shadow && V.lanterna.shadow.map) V.lanterna.shadow.map.dispose(); } catch (e) {}
       V.descartes.forEach(x => { try { x.dispose && x.dispose(); } catch (e) {} });
+      V.descartes.length = 0;
+      // o que sobrou na cena (efeitos, extensões, materiais fora da lista): tudo solto
+      try { V.cena.traverse(o => { if (o.geometry && o.geometry.dispose) o.geometry.dispose(); [].concat(o.material || []).forEach(m => { if (!m) return; Object.values(m).forEach(v => { if (v && v.isTexture) v.dispose(); }); m.dispose(); }); }); V.cena.clear(); } catch (e) {}
+      try { V.ren.renderLists.dispose(); } catch (e) {}
+      soltarRegistrados();
+      try { if (V.abEl) V.abEl.abort(); } catch (e) {}
       try { V.ren.dispose(); V.ren.forceContextLoss && V.ren.forceContextLoss(); } catch (e) {}
       V.ren.domElement.remove();
+      V.api = null; V.mundo = null; V.tok = null;
       V = null;
     }
     if (trocando) return;
     if (document.pointerLockElement) document.exitPointerLock();
     const gv = $('#s3dGaveta'); if (gv) gv.hidden = true; fecharMenu(); devolverTudo(); limparBaloes(); Efeitos.limpar(); Hab.limpar();
     const el = $('#s3dElev'); if (el) el.hidden = true;
-    if (window.ACF_DADOS3D) window.ACF_DADOS3D.encerrar();
+    if (window.ACF_DADOS3D) { window.ACF_DADOS3D.encerrar(); if (!lsG('acf-dados3d-2d', false) && window.ACF_DADOS3D.liberar) window.ACF_DADOS3D.liberar(); }
     Som.atualizar([]); Som.parar();
     const d = $('#s3d'); if (d) { d.hidden = true; ['#s3dJoy', '#s3dPainel', '#s3dOpcoes', '#s3dCodigo', '#s3dFresta', '#s3dPrompt'].forEach(s => { const x = $(s, d); if (x) x.hidden = true; }); }
     document.body.classList.remove('s3d-aberta');
@@ -2576,10 +2933,20 @@
     for (let p = 1; p <= 25; p++) { const cn = 25 * (a - 1) + p; partes.push(q === 'aux' && !A.salaRevelada(cn) ? '0' : imp(cenaDe(cn))); }
     return partes.join('|');
   }
+  // remontagem por assinatura: só as salas cuja impressão mudou (cena importada, sala revelada ao auxiliar) são refeitas;
+  // o renderer, o andar e os tokens ficam (remontar tudo criava outro WebGLRenderer e milhares de objetos de uma vez)
+  function remontarMudadas(a) {
+    const nova = assinatura(a), antes = V.sig.split('|'), depois = nova.split('|');
+    V.sig = nova;
+    depois.forEach((h, i) => { if (h !== antes[i]) { try { V.mundo.recarregarCena(i + 1); } catch (e) { console.warn('3D remontar sala:', i + 1, e); } } });
+  }
   let tVigia = null, varAntes = '';
+  // acelerador com prazo: roda no máximo a cada 120 ms, mas garantidamente 120 ms depois da primeira mudança
+  // (reagendar a cada chegada deixava os outros tokens parados enquanto o tráfego não desse uma pausa)
   function vigiar() {
-    clearTimeout(tVigia);
+    if (tVigia) return;
     tVigia = setTimeout(() => {
+      tVigia = null;
       if (!V) return;
       const A = ACF(), a = V.a, e = A.estado || {};
       // jogador: se o token mudou de andar, o 3D vai junto; se saiu do mapa, fecha
@@ -2596,7 +2963,7 @@
       }
       if (V.quem === 'aux' && A.aux) { const rb = (e.tokens || {})[A.aux]; if (!V.ctrl && rb && rb.a === a) V.ctrl = A.aux; if (V.ctrl === A.aux && (!rb || rb.a !== a)) { V.ctrl = null; if (V.cam.modo === 'jogo') definirModo('fora'); } }
       if (V.ctrl && !(e.tokens || {})[V.ctrl]) { V.ctrl = null; V.ctrlMestre = null; }
-      if (assinatura(a) !== V.sig) { abrir(25 * (a - 1) + 13, { a, manter: true, andar: V.cam.largo }); return; }
+      if (assinatura(a) !== V.sig) remontarMudadas(a);
       const va = JSON.stringify(e.var3d || {});
       if (va !== varAntes) { const antes = varAntes; varAntes = va; if (antes) Object.keys({ ...JSON.parse(antes || '{}'), ...(e.var3d || {}) }).forEach(k => { const p = +k.slice(1) - 25 * (a - 1); if (p >= 1 && p <= 25) V.mundo.recarregar(p); }); }
       V.mundo.atualizarPortas();

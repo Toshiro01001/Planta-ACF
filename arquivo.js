@@ -904,11 +904,15 @@ function desenharMesaArq() {
     <div class="mesa-linha"><button data-arqm="docs" class="btn-protocolo">📜 Abrir o Arquivo</button><button data-arqm="visoes-m" data-novo="1">👁 Mandar visão</button></div>`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; $$('[data-arqm]', c).forEach(b => b.onclick = () => abrir(b.dataset.arqm, !!b.dataset.novo)); }
 }
-let agendado = false, ultimoRev = '', ultimoPal = '';
+let agendado = false, ultimoRev = '', ultimoPal = '', arqSujo = true;
+// o Arquivo não lê os tokens: quando só alguém andou, nada a refazer (a marca das salas também tem o seu intervalo)
 function redesenhar() {
+  if (!(A.soTokens && A.soTokens())) arqSujo = true;
   if (agendado) return; agendado = true;
   requestAnimationFrame(() => {
     agendado = false;
+    if (!arqSujo) return;
+    arqSujo = false;
     try {
       ligarPalpites(); ligarVisoes(); ligarCofres();
       atualizarBadge(); desenharMesaArq(); marcarSalas();

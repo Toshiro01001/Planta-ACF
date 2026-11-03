@@ -4,7 +4,10 @@
    aparece na tela de quem rolou e os dados caem numa bandeja com física de verdade (cannon.js).
    O resultado mostrado é SEMPRE o que o site sorteou: a física roda primeiro, sem desenhar; quando os dados
    param, os números das faces são trocados para que a face de cima seja a sorteada; depois a queda é
-   mostrada. Dados: d4, d6, d8, d10, d12 e d20. */
+   mostrada. Dados: d4, d6, d8, d10, d12 e d20.
+   Desempenho: um WebGLRenderer só, criado uma vez e reaproveitado em todas as rolagens (criar um contexto e
+   compilar os shaders a cada rolagem era o maior custo de CPU das telas 3D); materiais Lambert; os shaders são
+   pré-aquecidos quando o 3D abre (ACF_DADOS3D.preparar). O contexto só é liberado depois de 3 min sem rolar e com o 3D fechado. */
 (() => {
   'use strict';
   const URL_CANNON = 'https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js';
@@ -104,6 +107,64 @@
     const t = new T.CanvasTexture(cv); t.encoding = T.sRGBEncoding; t.anisotropy = 4;
     return t;
   }
+  // texturas dos números: as mesmas em todas as rolagens (cor da cobaia + número + faces)
+  const cacheTex = new Map();
+  function texCache(T, txt, cor, fundo, f, cantos) {
+    const k = [txt, cor, fundo, f, cantos ? cantos.map(c => c.join(':')).join('|') : ''].join('/');
+    let t = cacheTex.get(k);
+    if (!t) { t = texNumero(T, txt, cor, fundo, f, cantos); if (cacheTex.size > 160) { cacheTex.forEach(x => x.dispose()); cacheTex.clear(); } cacheTex.set(k, t); }
+    return t;
+  }
+
+  /* ---------- o renderizador: um só, reaproveitado ---------- */
+  let R = null, tLiberar = 0;
+  function renderer(lado) {
+    const T = window.THREE;
+    if (!R) {
+      const ren = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      ren.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); ren.outputEncoding = T.sRGBEncoding;
+      const cena = new T.Scene(), cam = new T.PerspectiveCamera(42, 1, .1, 60);
+      cam.position.set(0, 11, 3.6); cam.lookAt(0, 0, .25);
+      cena.add(new T.HemisphereLight('#e8dcff', '#1a0f24', .75));
+      const sol = new T.DirectionalLight('#fff4e8', .9); sol.position.set(-4, 10, 6); cena.add(sol);
+      const fixos = [], B = 4.4;
+      const feltro = new T.MeshLambertMaterial({ color: '#1c1028' }); fixos.push(feltro);
+      const chao = new T.Mesh(new T.PlaneGeometry(B * 2 + .4, B * 2 + .4), feltro); chao.rotation.x = -Math.PI / 2; chao.matrixAutoUpdate = false; chao.updateMatrix(); cena.add(chao); fixos.push(chao.geometry);
+      const borda = new T.MeshLambertMaterial({ color: '#3a2650' }); fixos.push(borda);
+      [[0, -B - .2, B * 2 + .8, .4], [0, B + .2, B * 2 + .8, .4], [-B - .2, 0, .4, B * 2 + .8], [B + .2, 0, .4, B * 2 + .8]].forEach(([x, z, w, d]) => { const m = new T.Mesh(new T.BoxGeometry(w, .5, d), borda); m.position.set(x, .25, z); m.matrixAutoUpdate = false; m.updateMatrix(); cena.add(m); fixos.push(m.geometry); });
+      const dadosG = new T.Group(); cena.add(dadosG);
+      R = { ren, cena, cam, dadosG, fixos, lado: 0 };
+    }
+    if (lado && R.lado !== lado) { R.ren.setSize(lado, lado); R.lado = lado; }
+    clearTimeout(tLiberar);
+    return R;
+  }
+  // solta o contexto: só depois de 3 min sem rolar e com o 3D fechado (nunca por rolagem)
+  function agendarLiberar() {
+    clearTimeout(tLiberar);
+    tLiberar = setTimeout(() => { if (atual || (window.Sala3D && window.Sala3D.aberta)) { agendarLiberar(); return; } liberar(); }, 180000);
+  }
+  function liberar() {
+    if (!R) return;
+    const r = R; R = null; preparado = false;
+    try { r.fixos.forEach(x => x.dispose()); } catch (e) {}
+    cacheTex.forEach(t => t.dispose()); cacheTex.clear();
+    try { r.ren.dispose(); r.ren.forceContextLoss && r.ren.forceContextLoss(); } catch (e) {}
+    try { r.ren.domElement.remove(); } catch (e) {}
+  }
+  // pré-aquece os shaders (chamado quando o 3D abre): a primeira rolagem não trava a tela
+  let preparado = false;
+  function preparar() {
+    const T = window.THREE; if (!T || preparado) return;
+    try {
+      const r = renderer(0), F = forma(20);
+      const mats = F.faces.map((_, i) => new T.MeshLambertMaterial({ map: texCache(T, String(i + 1), '#ffffff', '#7c4dff', 20) }));
+      const m = new T.Mesh(F.geo, mats); r.dadosG.add(m);
+      r.ren.compile(r.cena, r.cam);
+      r.dadosG.remove(m); mats.forEach(x => x.dispose());
+      preparado = true; agendarLiberar();
+    } catch (e) {}
+  }
 
   /* ---------- a janelinha ---------- */
   let atual = null;
@@ -122,9 +183,10 @@
     if (!atual) return;
     const a = atual; atual = null;
     cancelAnimationFrame(a.raf); clearTimeout(a.tFim);
-    try { a.ren.dispose(); a.ren.forceContextLoss && a.ren.forceContextLoss(); } catch (e) {}
+    if (R) R.dadosG.clear();
     a.descartes.forEach(d => { try { d.dispose(); } catch (e) {} });
-    const o = document.getElementById('dados3d'); if (o) { o.hidden = true; o.classList.remove('d3-fim'); const p = o.querySelector('.d3-palco'); if (p) p.innerHTML = ''; }
+    agendarLiberar();
+    const o = document.getElementById('dados3d'); if (o) { o.hidden = true; o.classList.remove('d3-fim'); }
   }
 
   async function rolar(det) {
@@ -182,34 +244,25 @@
       d.val = val;
     });
 
-    /* desenho */
-    const ren = new T.WebGLRenderer({ antialias: true, alpha: true });
-    ren.setPixelRatio(Math.min(2, devicePixelRatio || 1)); ren.setSize(lado, lado); ren.outputEncoding = T.sRGBEncoding;
-    palco.innerHTML = ''; palco.appendChild(ren.domElement);
-    const cena = new T.Scene(), cam = new T.PerspectiveCamera(42, 1, .1, 60);
-    cam.position.set(0, 11, 3.6); cam.lookAt(0, 0, .25);
-    cena.add(new T.HemisphereLight('#e8dcff', '#1a0f24', .75));
-    const sol = new T.DirectionalLight('#fff4e8', .9); sol.position.set(-4, 10, 6); cena.add(sol);
+    /* desenho: o renderizador, a cena, a bandeja e as luzes são os mesmos em todas as rolagens */
+    const r = renderer(lado), ren = r.ren, cena = r.cena, cam = r.cam;
+    if (ren.domElement.parentNode !== palco) palco.appendChild(ren.domElement);
     const descartes = [];
-    const feltro = new T.MeshStandardMaterial({ color: '#1c1028', roughness: 1 }); descartes.push(feltro);
-    const chao = new T.Mesh(new T.PlaneGeometry(B * 2 + .4, B * 2 + .4), feltro); chao.rotation.x = -Math.PI / 2; cena.add(chao); descartes.push(chao.geometry);
-    const borda = new T.MeshStandardMaterial({ color: '#3a2650', roughness: .6, metalness: .2 }); descartes.push(borda);
-    [[0, -B - .2, B * 2 + .8, .4], [0, B + .2, B * 2 + .8, .4], [-B - .2, 0, .4, B * 2 + .8], [B + .2, 0, .4, B * 2 + .8]].forEach(([x, z, w, d]) => { const m = new T.Mesh(new T.BoxGeometry(w, .5, d), borda); m.position.set(x, .25, z); cena.add(m); descartes.push(m.geometry); });
     const A = window.ACF || {}, eu = A.meu || A.aux, ser = eu && A.SER && A.SER[eu];
     const corDado = (ser && ser.cor) || '#7c4dff';
     dados.forEach(d => {
       const mats = d.F.faces.map((F, i) => {
         let t;
-        if (d.f === 4) { const cantos = F.ids.map(vi => { const p = d.F.verts[vi].clone().sub(F.cen); return [.5 + p.dot(F.u) / F.R * .5, .5 + p.dot(F.v) / F.R * .5, String(d.val[vi])]; }); t = texNumero(T, '', '#ffffff', corDado, 4, cantos); }
-        else t = texNumero(T, String(d.val[i]), '#ffffff', corDado, d.f);
-        const m = new T.MeshStandardMaterial({ map: t, roughness: .35, metalness: .1 }); descartes.push(t, m); return m;
+        if (d.f === 4) { const cantos = F.ids.map(vi => { const p = d.F.verts[vi].clone().sub(F.cen); return [.5 + p.dot(F.u) / F.R * .5, .5 + p.dot(F.v) / F.R * .5, String(d.val[vi])]; }); t = texCache(T, '', '#ffffff', corDado, 4, cantos); }
+        else t = texCache(T, String(d.val[i]), '#ffffff', corDado, d.f);
+        const m = new T.MeshLambertMaterial({ map: t }); descartes.push(m); return m;
       });
-      d.mesh = new T.Mesh(d.F.geo, mats); cena.add(d.mesh); d.mats = mats;
+      d.mesh = new T.Mesh(d.F.geo, mats); r.dadosG.add(d.mesh); d.mats = mats;
     });
 
     o.hidden = false; o.classList.remove('d3-fim');
     const res = o.querySelector('.d3-res'); res.textContent = '';
-    const a = atual = { ren, descartes, raf: 0, tFim: 0 };
+    const a = atual = { descartes, raf: 0, tFim: 0 };
     const nQ = Math.max(...dados.map(d => d.quadros.length)), t0 = performance.now();
     const desenhar = () => {
       if (atual !== a) return;
@@ -236,5 +289,5 @@
     if (!window.THREE && window.Sala3D && window.Sala3D.carregarThree) { try { await window.Sala3D.carregarThree(); } catch (er) { return; } }
     if (window.THREE) rolar(e.detail || {}).catch(err => console.warn('dados 3D:', err));
   });
-  window.ACF_DADOS3D = { rolar, encerrar, ligado };
+  window.ACF_DADOS3D = { rolar, encerrar, ligado, preparar, liberar, get renderer() { return R; } };
 })();

@@ -53,7 +53,7 @@ const stats = { panners: 0, loops: 0, unicos: 0, baixados: [], legendas: [] };
 function preparar() {
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   try {
-    if (!ctx) { ctx = new AC(); saida = ctx.createGain(); saida.gain.value = 0; saida.connect(ctx.destination); }
+    if (!ctx) { ctx = (A() && A().Som && A().Som.pronto && A().Som.pronto()) || new AC(); saida = ctx.createGain(); saida.gain.value = 0; saida.connect(ctx.destination); }
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   } catch (e) { ctx = null; }
   carregarIndice();
@@ -127,7 +127,7 @@ function loopDe(f, k) {
 function soltar(f) {
   if (!f || f.solto) return; f.solto = true;
   try { f.g.gain.setTargetAtTime(0, ctx.currentTime, .4); } catch (e) {}
-  setTimeout(() => { Object.values(f.loops).forEach(l => { try { l.s.stop(); } catch (e) {} try { l.g.disconnect(); } catch (e) {} }); try { f.g.disconnect(); f.p.disconnect(); } catch (e) {} }, 2200);
+  setTimeout(() => { Object.values(f.loops).forEach(l => { try { l.s.stop(); l.s.disconnect(); } catch (e) {} try { l.g.disconnect(); } catch (e) {} }); try { f.g.disconnect(); f.p.disconnect(); } catch (e) {} }, 2200);
 }
 // som único (voz, ataque, revelação) num ponto do espaço
 function tocarEm(forma, k, X, Y, Z, ganho = 1) {
@@ -135,7 +135,7 @@ function tocarEm(forma, k, X, Y, Z, ganho = 1) {
   const p = panner(); por(p, X, Y, Z, false); p.connect(saida);
   const s = ctx.createBufferSource(); s.buffer = b; const g = ctx.createGain(); g.gain.value = ganho;
   s.connect(g); g.connect(p); s.start();
-  s.onended = () => { try { g.disconnect(); p.disconnect(); } catch (e) {} };
+  s.onended = () => { try { s.disconnect(); g.disconnect(); p.disconnect(); } catch (e) {} };
   stats.unicos++;
   return true;
 }

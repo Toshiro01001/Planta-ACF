@@ -807,6 +807,7 @@ const Amb = {
     o.type = tipo; o.frequency.setValueAtTime(f, t); if (fFim) o.frequency.exponentialRampToValueAtTime(fFim, t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(destino); o.start(t); o.stop(t + dur + 0.05);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };   // sem isso, cada pulso ficava pendurado na saída
   },
   vol: 0.85,
   lfo(c, alvo, f, prof, base) { const l = c.createOscillator(), g = c.createGain(); l.frequency.value = f; g.gain.value = prof; l.connect(g); g.connect(alvo); if (base !== undefined) alvo.value = base; l.start(); this.nos.push(l, g); },
@@ -1657,8 +1658,8 @@ function tudo() {
   verRecompensa();
   verAmbiente();
   desenharInvestigacao();
-  desenharMesaMestre();
-  desenharMesaAux();
+  // os blocos da aba Mesa não leem os tokens: quando só alguém andou, ficam como estão (e o que o Mestre escolheu neles também)
+  if (mesaSuja) { mesaSuja = false; desenharMesaMestre(); desenharMesaAux(); }
   atualizarBotaoRegras();
   const oe = $('#escudoMestre'); if (oe && !oe.hidden && oe.dataset.modo !== (modoJog() ? 'jog' : 'mestre')) oe.hidden = true;
 }
@@ -1669,9 +1670,9 @@ function desenharMesaAux() {
 }
 // a trilha acompanha a troca de andar (que não passa pelo estado do mapa)
 setInterval(() => { try { if ((est().trilha || {}).on) verAmbiente(); } catch (e) {} }, 1500);
-let agendado = false;
-function agendar() { if (agendado) return; agendado = true; requestAnimationFrame(() => { agendado = false; try { tudo(); } catch (e) { console.warn('mesa:', e); } }); }
-A.aoMudar(agendar);
+let agendado = false, mesaSuja = true;
+function agendar(so) { if (so !== 'tok') mesaSuja = true; if (agendado) return; agendado = true; requestAnimationFrame(() => { agendado = false; try { tudo(); } catch (e) { console.warn('mesa:', e); } }); }
+A.aoMudar(() => agendar(A.soTokens && A.soTokens() ? 'tok' : null));
 document.addEventListener('acf-perfil', () => setTimeout(agendar, 50));
 document.addEventListener('acf-ativa', agendar);
 document.addEventListener('acf-segredos', () => { if (A.mestre) setTimeout(desenharMesaInt, 30); });

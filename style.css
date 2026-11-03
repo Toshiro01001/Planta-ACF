@@ -414,7 +414,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .minha-vez { margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(139,92,246,.15); border: 1px solid var(--roxo); }
 .minha-vez p { margin: 0 0 8px; font-weight: 600; }
 .setup-persg { display: grid; gap: 4px; margin-bottom: 10px; max-height: 320px; overflow-y: auto; }
-.setup-linha { display: grid; grid-template-columns: 18px 24px 1fr 52px 30px 44px 14px; gap: 5px; align-items: center; font-size: 13px; }
+.setup-linha { display: grid; grid-template-columns: 18px 24px 1fr 30px 52px 30px 60px; gap: 5px; align-items: center; font-size: 13px; }
+.setup-linha .setup-lim { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.setup-linha .setup-lim input { flex: 1; min-width: 0; }
+.setup-linha .lado { background: #0b0910; border: 1px solid var(--linha); border-radius: 4px; padding: 0; height: 26px; font-size: 15px; line-height: 1; cursor: pointer; }
+.setup-linha .lado.presa { border-color: #4b8a5a; } .setup-linha .lado.cacador { border-color: #b3121b; }
 .setup-linha .bola { width: 22px; height: 22px; border-width: 2px; }
 .setup-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .setup-nome small { display: block; font-family: var(--mono); font-size: 10px; color: #3ddc97; }
@@ -3497,7 +3501,7 @@ body:has(#cartao:not([hidden])) .expo-chip { display: none; }
   #btnFecharChat, .dados-topo .fechar, .fx-fechar, .escudo .fechar, [data-esc="fechar"] { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
   #btnAjuda { min-width: 34px; }
   .hud-recolher { width: 36px; height: 30px; margin-left: 20px; font-size: 16px; }
-  .setup-linha { grid-template-columns: 24px 24px minmax(0, 1fr) 56px 36px 48px 14px; }
+  .setup-linha { grid-template-columns: 24px 24px minmax(0, 1fr) 34px 56px 36px 62px; }
   .setup-linha input.ck { width: 22px; height: 22px; margin: 0; }
   .setup-linha .ini, .setup-linha .lim { min-height: 32px; }
   .setup-linha .dado-mini { min-width: 34px; min-height: 32px; }
@@ -4040,6 +4044,15 @@ body.s3d-aberta .alertas-mestre { z-index: 9550; }
 @keyframes s3dPisca { 50% { opacity: .5; } }
 .s3d-fps { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px); z-index: 4; font: 11px var(--mono); color: #8dffb0; background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 5px; pointer-events: none; }
 .s3d-fps[hidden] { display: none; }
+/* HUD de desempenho (Opções › Gráficos › Mostrar desempenho): fps e ms numa linha, chamadas, triângulos e degrau na
+   outra; no topo esquerdo, logo abaixo do nome da sala (canto livre em 360, 412 e 1280: os botões e o decibelímetro
+   ficam à direita, os botões de ação embaixo). A dica de atalhos desce para dar lugar. */
+.s3d-fps { left: max(12px, env(safe-area-inset-left)); bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 54px); max-width: calc(100% - 140px); white-space: pre-line; line-height: 1.35; letter-spacing: .01em; }
+@media (max-width: 440px) { .s3d-fps { top: calc(max(10px, env(safe-area-inset-top)) + 78px); } }
+@media (max-width: 440px) { .s3d:has(#s3dBtPainel:not([hidden])) .s3d-fps { top: calc(max(10px, env(safe-area-inset-top)) + 96px); } }
+.s3d:has(#s3dFps:not([hidden])) .s3d-dica { margin-top: 38px; }
+@media (max-width: 380px) { .s3d:has(#s3dFps:not([hidden])) .s3d-dica { margin-top: 56px; } }
+.s3d.s3d-leve .s3d-fps { color: #ffd98d; }
 /* interface escondida (H): só o mundo, a mira e os balões */
 .s3d.s3d-sem-hud .s3d-topo, .s3d.s3d-sem-hud .s3d-barra, .s3d.s3d-sem-hud .s3d-dica, .s3d.s3d-sem-hud .s3d-db, .s3d.s3d-sem-hud .s3d-metros, .s3d.s3d-sem-hud .s3d-hab, .s3d.s3d-sem-hud .s3d-joy { display: none !important; }
 /* efeitos no mapa 2D, em cima do token */

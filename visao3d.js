@@ -1040,7 +1040,7 @@ vec3 estilo(vec2 uv, vec2 q){
       }
       const [W, H, dpr] = this.tam || [innerWidth, innerHeight, 1];
       const q = IMR() && IMR().Qual && IMR().Qual.aplicado != null ? IMR().Qual.aplicado : 0;
-      const k = (ap.celular ? .7 : 1) * (q >= 3 ? .85 : 1);
+      const k = (ap.celular ? .7 : 1) * (q >= 3 ? .85 : 1) * (ap.CFG.visaoMeia ? .5 : 1);   // Modo Desempenho: meia resolução
       const w = Math.max(64, Math.floor(W * dpr * k)), h = Math.max(64, Math.floor(H * dpr * k));
       const ch = w + 'x' + h;
       if (ch === this.rtCh && this.rt) return;

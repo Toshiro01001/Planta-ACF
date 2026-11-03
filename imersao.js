@@ -97,12 +97,14 @@ const Som = {
     const f = c.createBiquadFilter(); f.type = tipo; f.frequency.setValueAtTime(bp, t); if (f2) f.frequency.exponentialRampToValueAtTime(f2, t + dur); f.Q.value = q;
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + ataque); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     s.connect(f); f.connect(g); g.connect(dest); s.start(t, Math.random()); s.stop(t + dur + .05);
+    s.onended = () => { try { s.disconnect(); f.disconnect(); g.disconnect(); } catch (e) {} };   // a cadeia curta sai do grafo quando acaba
   },
   tom(t, dest, { f = 60, f2, tipo = 'sine', v = .2, ataque = .01, dur = .3 }) {
     const c = this.ctx(); if (!c) return;
     const o = c.createOscillator(); o.type = tipo; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
     const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + ataque); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + .05);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
   },
   // posição do ouvinte: no 3D, a câmera
   ouvinteNaCamera(ap) {
@@ -282,12 +284,13 @@ const Qual = {
     this.nivel = this.ligado() && s && agora() - num(s.ts) < 3 * 86400000 ? clamp(Math.round(num(s.n)), 0, DEGRAUS.length - 1) : 0;
     this.aplicar(this.nivel);
   },
-  fechar() { this.ap = null; this.aplicado = null; },
+  fechar() { this.ap = null; this.aplicado = null; this.luzes = []; },   // (as luzes seguravam a cena fechada na memória)
   manual(k, pad) { const v = this.ap.CFG[k]; return v !== undefined && String(v) !== String(pad); },
   aplicar(n) {
     const ap = this.ap; if (!ap) return;
     const d = DEGRAUS[n], ant = this.aplicado;
     this.nivel = n; this.aplicado = n;
+    if (typeof ap.degrau === 'function') ap.degrau(n);   // sala3d.js: o Modo Desempenho automático liga no degrau 3
     // resolução (só com a escala no padrão: a do jogador manda)
     const esc = this.manual('escala', 1) ? 1 : d.esc;
     this.resolucao(esc);
@@ -374,6 +377,7 @@ const Amb = {
   },
   pisca(t, sem, k) { const on = Math.sin(t * 31 + sem * 7) > -.1 && Math.sin(t * 9.3 + sem) > -.55 && Math.random() > .12; return on ? 1 - k * .35 * Math.random() : .05 + (1 - k) * .4; },
   quadro(ap, dw, t) {
+    if (ap.CFG.ambiente === false) { if (this.fontes.size) { this.fontes.clear(); if (this.matsTela.size) this.restaurarTelas(); } return; }   // Modo Desempenho
     this.t03 -= dw;
     if (this.t03 <= 0) { this.t03 = .3; this.vigiarFilhos(ap); }
     const agoraMs = agora();
@@ -442,9 +446,10 @@ const Amb = {
     for (let i = 0; i < 9; i++) g.gain.setValueAtTime(Math.random() < .35 ? .015 : .1 + Math.random() * .06, t + .06 + i * .1);
     g.gain.exponentialRampToValueAtTime(.0001, t + 1.15);
     bp.connect(g); g.connect(p);
-    [['sawtooth', 60], ['square', 120], ['sawtooth', 180]].forEach(([tp, f]) => { const o = c.createOscillator(); o.type = tp; o.frequency.value = f * (1 + (Math.random() - .5) * .01); o.connect(bp); o.start(t); o.stop(t + 1.2); });
+    const os = [['sawtooth', 60], ['square', 120], ['sawtooth', 180]].map(([tp, f]) => { const o = c.createOscillator(); o.type = tp; o.frequency.value = f * (1 + (Math.random() - .5) * .01); o.connect(bp); o.start(t); o.stop(t + 1.2); return o; });
     for (let i = 0; i < 4; i++) Som.ruido(t + .1 + Math.random() * .8, p, { tipo: 'highpass', bp: 3200, v: .09, ataque: .003, dur: .04 + Math.random() * .05 });
-    setTimeout(() => { try { p.disconnect(); } catch (e) {} }, 1800);
+    // a cadeia inteira sai do grafo quando acaba (antes só o panner saía: osciladores, filtro e ganho ficavam pendurados)
+    setTimeout(() => { [...os, bp, g, p].forEach(x => { try { x.disconnect(); } catch (e) {} }); }, 1800);
   },
 };
 

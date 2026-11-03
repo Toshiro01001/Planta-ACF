@@ -240,19 +240,31 @@ body.hud-limpo #blocoRuidoM .quebras { padding: 10px; background: var(--pn-bg2);
 body.hud-limpo #blocoRuidoM .quebras-botoes { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; margin-top: 8px; }
 body.hud-limpo #blocoRuidoM .quebras-botoes button { min-height: 42px; border-radius: 10px; }
 
-/* Perseguição do Mestre: um cartão por participante */
+/* Perseguição (bloco único, aba Mesa): um cartão por participante.
+   Celular: duas linhas (participa · bola · nome · presa/caçador | iniciativa · 🎲 · deslocamento); computador: uma linha */
 body.hud-limpo #setupPersg { display: grid; gap: 5px; max-height: none; overflow: visible; }
-body.hud-limpo #setupPersg .setup-linha { grid-template-columns: 22px 28px minmax(0, 1fr) 54px 40px 50px 12px; gap: 6px; min-height: 48px; padding: 4px 8px; background: var(--pn-bg2); border: 1px solid var(--pn-borda); border-radius: 10px; }
+body.hud-limpo #setupPersg .setup-linha { grid-template-columns: 30px 28px minmax(0, 1fr) 40px 64px; grid-template-areas: "ck bola nome nome lado" ". ini ini dado lim"; gap: 4px 6px; min-height: 48px; padding: 4px 8px; background: var(--pn-bg2); border: 1px solid var(--pn-borda); border-radius: 10px; }
+body.hud-limpo #setupPersg .setup-linha .ck { grid-area: ck; } body.hud-limpo #setupPersg .setup-linha .bola { grid-area: bola; }
+body.hud-limpo #setupPersg .setup-linha .setup-nome { grid-area: nome; } body.hud-limpo #setupPersg .setup-linha .lado { grid-area: lado; }
+body.hud-limpo #setupPersg .setup-linha .ini { grid-area: ini; } body.hud-limpo #setupPersg .setup-linha .dado-mini { grid-area: dado; }
+body.hud-limpo #setupPersg .setup-linha .setup-lim { grid-area: lim; display: flex; align-items: center; gap: 3px; min-width: 0; }
+body.hud-limpo #setupPersg .setup-linha .setup-lim input { flex: 1; min-width: 0; }
+body.hud-limpo #setupPersg .setup-linha .lado { min-height: 38px; padding: 0; border-radius: 8px; font-size: 18px; line-height: 1; background: var(--pn-bg2); border: 1px solid var(--pn-borda); }
+body.hud-limpo #setupPersg .setup-linha .lado.presa { border-color: #4b8a5a; background: rgba(75,138,90,.18); }
+body.hud-limpo #setupPersg .setup-linha .lado.cacador { border-color: #b3121b; background: rgba(179,18,27,.18); }
 body.hud-limpo #setupPersg .setup-linha:has(.ck:not(:checked)) { opacity: .5; }
 body.hud-limpo #setupPersg .setup-linha .bola { width: 26px; height: 26px; }
 body.hud-limpo #setupPersg .setup-linha input[type="number"] { min-height: 38px; border-radius: 8px; text-align: center; }
 body.hud-limpo #setupPersg .setup-linha .ck { width: 20px; height: 20px; accent-color: var(--roxo); }
 body.hud-limpo #setupPersg .setup-linha .dado-mini { min-height: 38px; border-radius: 8px; }
-body.hud-limpo #setupPersg .setup-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
-body.hud-limpo #blocoPersgM .crono-mestre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
-body.hud-limpo #blocoPersgM .lote-filhos { display: flex; gap: 6px; align-items: center; }
-body.hud-limpo #blocoPersgM .lote-filhos button { flex: 1; min-height: 44px; }
-body.hud-limpo #blocoPersgM .lote-filhos input { width: 54px; min-height: 38px; }
+body.hud-limpo #setupPersg .setup-nome { min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.2; }
+body.hud-limpo #setupPersg .setup-nome small { display: block; color: var(--texto-dim); font-size: 11px; }
+body.hud-limpo #blocoSahPers .crono-mestre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+body.hud-limpo #blocoSahPers .lote-filhos { display: flex; gap: 6px; align-items: center; }
+body.hud-limpo #blocoSahPers .lote-filhos button { flex: 1; min-height: 44px; }
+body.hud-limpo #blocoSahPers .lote-filhos input { width: 54px; min-height: 38px; }
+/* cartão-atalho (ex.: Perseguição na aba Sessão): o bloco de outra aba fica visível enquanto está aberto como folha */
+.painel section.bloco.fora-da-aba.pn-atalho.pn-aberto { display: block !important; }
 
 /* Encontros, sons e câmeras */
 body.hud-limpo .mom-bloco input:not([type="checkbox"]), body.hud-limpo .mom-bloco select { min-height: 40px; background: #0b0910; color: var(--texto); border: 1px solid var(--linha); border-radius: 8px; padding: 6px 9px; font: 14px var(--corpo); }
@@ -329,8 +341,9 @@ body.hud-limpo #painel .sah-part > label:has(input[type="checkbox"]:not(:checked
 body.hud-limpo #painel .sah-part > label select { margin-left: auto; min-height: 34px; padding: 2px 4px; font-size: 12.5px; max-width: 92px; }
 body.hud-limpo #painel .mesa-campo { display: grid; gap: 4px; margin: 6px 0; font-size: 12px; color: var(--texto-dim); }
 body.hud-limpo #painel .mesa-campo select, body.hud-limpo #painel .mesa-campo input, body.hud-limpo #painel .mesa-campo textarea { width: 100%; min-height: 40px; }
+/* o painel tem uns 330 px também no computador: o nome fica com a linha de cima inteira em todas as larguras */
 @media (min-width: 861px) {
-  body.hud-limpo #setupPersg .setup-linha { grid-template-columns: 20px 26px minmax(0, 1fr) 46px 36px 44px 10px; gap: 4px; padding: 4px 6px; }
+  body.hud-limpo #setupPersg .setup-linha { gap: 4px 6px; padding: 4px 6px; }
 }
 body.hud-limpo #painel .ferramentas > button:only-child { grid-column: 1 / -1; }
 body.hud-limpo #blocoMinha > .pn-cab { grid-column: 1 / -1; }
@@ -343,9 +356,8 @@ body.hud-limpo #painel .amb-vol > button { flex: none; }
 body.hud-limpo #painel .bloco :is(button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="file"])) { min-height: 40px; }
 body.hud-limpo #painel .bloco input[type="range"] { height: 40px; }
 body.hud-limpo #painel .sah-part input[type="checkbox"] { width: 18px; height: 18px; flex: none; }
-body.hud-limpo #setupPersg .setup-linha { grid-template-columns: 30px 28px minmax(0, 1fr) 54px 40px 50px 12px; }
 body.hud-limpo #setupPersg .setup-linha .ck { width: 26px; height: 26px; }
-@media (min-width: 861px) { body.hud-limpo #setupPersg .setup-linha { grid-template-columns: 26px 26px minmax(0, 1fr) 46px 36px 44px 10px; } body.hud-limpo #setupPersg .setup-linha .ck { width: 22px; height: 22px; } }
+@media (min-width: 861px) { body.hud-limpo #setupPersg .setup-linha .ck { width: 22px; height: 22px; } }
 /* caixa "participa" da perseguição: alvo de 30 x 40 px desenhado como chip */
 body.hud-limpo #setupPersg .setup-linha .ck { -webkit-appearance: none; appearance: none; width: 30px; height: 40px; margin: 0; border-radius: 8px; cursor: pointer;
   background: center / 22px 22px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect x='1' y='1' width='20' height='20' rx='5' fill='%230b0910' stroke='%234b3b6e' stroke-width='2'/%3E%3C/svg%3E"); }
