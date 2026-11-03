@@ -157,13 +157,15 @@
   let ac = null, saida = null;
   function preparerSom() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    try { if (!ac) { ac = new AC(); saida = ac.createGain(); saida.gain.value = .5; saida.connect(ac.destination); } if (ac.state === 'suspended') ac.resume().catch(() => {}); } catch (e) { ac = null; }
+    try { if (!ac) { ac = (ACF() && ACF().Som && ACF().Som.pronto && ACF().Som.pronto()) || new AC(); saida = ac.createGain(); saida.gain.value = .5; saida.connect(ac.destination); } if (ac.state === 'suspended') ac.resume().catch(() => {}); } catch (e) { ac = null; }
   }
   const mudo = () => { try { if (ACF() && ACF().mudo) return true; return JSON.parse(localStorage.getItem('acf-s3d-som') ?? 'true') === false; } catch (e) { return false; } };
   function nota(t, f, dur, v, tipo = 'sine', dest = saida) {
     const o = ac.createOscillator(), g = ac.createGain(); o.type = tipo; o.frequency.setValueAtTime(f, t);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + .05); return o;
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + .05);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
+    return o;
   }
   function chiado(t, dur, v, f = 1800, q = 1, dest = saida) {
     const n = Math.floor(ac.sampleRate * dur), b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
@@ -171,6 +173,7 @@
     const s = ac.createBufferSource(); s.buffer = b; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
     const g = ac.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     s.connect(bp); bp.connect(g); g.connect(dest); s.start(t);
+    s.onended = () => { try { s.disconnect(); bp.disconnect(); g.disconnect(); } catch (e) {} };
   }
   const SONS = {
     piano(t, d) { const base = [220, 261.6, 311.1, 370, 415.3, 523.3]; for (let i = 0; i < 5; i++) { const f = base[Math.floor(Math.random() * base.length)]; nota(t + i * .32, f, 1.6, .16, 'triangle', d); nota(t + i * .32, f * 2.003, 1.0, .04, 'sine', d); } },
@@ -182,7 +185,7 @@
     gravador(t, d) { chiado(t, 1.2, .08, 3000, .4, d); nota(t, 90, 1.2, .05, 'sawtooth', d); },
     campainha(t, d) { nota(t, 880, .4, .12, 'triangle', d); nota(t + .15, 660, .6, .1, 'triangle', d); },
     interruptor(t, d) { chiado(t, .04, .5, 3500, 2, d); },
-    porta(t, d, v) { const o = ac.createOscillator(), bp = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(v ? 70 : 110, t); o.frequency.linearRampToValueAtTime(v ? 110 : 60, t + .7); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 6; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.1, t + .1); g.gain.exponentialRampToValueAtTime(.0001, t + .8); o.connect(bp); bp.connect(g); g.connect(d); o.start(t); o.stop(t + .9); if (!v) chiado(t + .7, .12, .5, 400, 1, d); },
+    porta(t, d, v) { const o = ac.createOscillator(), bp = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(v ? 70 : 110, t); o.frequency.linearRampToValueAtTime(v ? 110 : 60, t + .7); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 6; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.1, t + .1); g.gain.exponentialRampToValueAtTime(.0001, t + .8); o.connect(bp); bp.connect(g); g.connect(d); o.start(t); o.stop(t + .9); o.onended = () => { try { o.disconnect(); bp.disconnect(); g.disconnect(); } catch (e) {} }; if (!v) chiado(t + .7, .12, .5, 400, 1, d); },
     metal(t, d) { for (let i = 0; i < 7; i++) chiado(t + i * .05 + Math.random() * .03, .09, .25, 2500 + Math.random() * 1500, 4, d); chiado(t + .45, .2, .35, 700, 2, d); },
     gaveta(t, d) { chiado(t, .35, .2, 900, 1.5, d); chiado(t + .33, .06, .4, 500, 2, d); },
   };
@@ -193,6 +196,7 @@
     if (k <= 0) return;
     const g = ac.createGain(); g.gain.value = k; g.connect(saida);
     try { f(ac.currentTime + .02, g, v); } catch (e) {}
+    setTimeout(() => { try { g.disconnect(); } catch (e) {} }, 6000);   // o som mais longo dura 3,5 s
   }
 
   /* ---------- traje vestido sobre a miniatura ---------- */

@@ -1369,6 +1369,8 @@ const Vista = {
     document.removeEventListener('pointerdown', this.fora, true);
     REG.obj.clear(); REG.cob.forEach(e => this.tirarCob(e)); REG.cob.clear();
     Efx.vivas = [];
+    // o quadro anterior guardava os tokens (malhas, animação): sem isso a cena inteira ficava presa depois de fechar
+    this.tokAnt = new Map(); this.obAnt = new Map(); this.sumidos = []; this.crescer = []; this.cresc = new Map(); this.realces = [];
     LIXO.splice(0).forEach(x => { try { x.dispose(); } catch (e) {} });
     TX.forEach(t => { try { t.dispose(); } catch (e) {} }); TX.clear();
     this.ap = null; this.grupo = null;

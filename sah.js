@@ -61,7 +61,11 @@ function perderPV(n) {
 /* =========================================================
    1. PERSEGUIÇÃO (SaH p. 90 e 91)
    estado.persSaH = { on, id, rod, dt, meta, maxF, pericia, eventos, ev, part{}, dtMenos, log[] }
-   part[pid] = { nome, lado: 'presa'|'cacador', npc, s, f, fim, esforco, usadas{}, pen{rod: n} }
+   part[pid] = { nome, lado: 'presa'|'cacador', npc, tk, s, f, fim, esforco, usadas{}, pen{rod: n} }
+   É UMA perseguição só com a do mapa e do 3D (mapa/persg, app.js): o bloco "Perseguição (Sobrevivendo ao Horror)"
+   da aba Mesa tem as regras do livro em cima e a seção "Participantes e ordem" (iniciativa e deslocamento) embaixo.
+   "Iniciar perseguição" (app.js) chama iniciarCom() com a mesma lista; a rodada nova do 3D chama proximaRodada();
+   encerrar chama encerrar(). Participantes vindos de tokens guardam tk: quem não vê o token lê "???".
    ========================================================= */
 const ACOES_P = {
   correr: { n: 'Correr', d: 'Teste normal da perícia da perseguição.' },
@@ -88,6 +92,8 @@ const EV_PERS = [
   [20, 20, 'atalho', 'Um caminho escondido pela vegetação.', 'sobrevivencia', 20],
 ];
 const pers = () => est().persSaH || {};
+// nome como ESTE aparelho pode ler: um Filho (ou NPC) que veio do mapa e não está à vista aparece como ???
+function nomeVis(x) { if (!x.tk || A.mestre) return x.nome; const tk = (A.estado.tokens || {})[x.tk]; if (!tk) return x.nome; return A.visivelPara && !A.visivelPara(tk) ? '???' : (A.rotulo ? A.rotulo(tk) : x.nome); }
 const meuPart = () => { const p = pers(); return p.on && A.meu ? (p.part || {})[A.meu] : null; };
 const respId = (p, rod) => `pers-${p.id}-${rod || p.rod}`;
 const pips = (n, max, cls) => Array.from({ length: max }, (_, i) => `<i class="${i < n ? cls : ''}"></i>`).join('');
@@ -107,7 +113,7 @@ function faixas() {
     const meu = meuPart();
     partes.push(`<div class="sah-faixa sah-pers" data-sf="pers"><div class="inv-linha"><span class="inv-k">🏃 Perseguição</span><b>Rodada ${int(p.rod)}</b><span class="inv-urg">${esc(nomePer(p.pericia || 'atletismo'))} DT ${dtRodada(p)}${int(p.dtMenosRod) === int(p.rod) ? ' (obstáculo: −5)' : ''} · ${int(p.meta)} sucessos antes de ${int(p.maxF)} falhas</span>${meu && !estadoPart(meu, p) && !A.mestre ? '<button class="sah-btn" data-sf="agir">Agir nesta rodada</button>' : ''}</div>
       ${ev && ev.tipo ? `<p class="sah-ev">${ev.tipo === 'obstaculo' ? '⚠ Obstáculo' : '↪ Atalho'}: ${esc(ev.txt)} <b>${esc(nomePer(ev.per))} DT ${int(ev.dt)}</b> ${ev.tipo === 'obstaculo' ? '(falhou: −2O no teste da rodada)' : '(opcional; passou: +2O, falhou: −2O)'}</p>` : ev ? `<p class="sah-ev">${esc(ev.txt)}</p>` : ''}
-      <ul class="sah-lista">${ps.map(([id, x]) => `<li class="${id === A.meu ? 'eu' : ''}"><span>${x.lado === 'presa' ? '🐇' : '🐺'} ${esc(x.nome)}</span><span class="sah-pips"><span class="ok">${pips(int(x.s), int(p.meta), 'on')}</span><span class="ruim">${pips(int(x.f), int(p.maxF), 'on')}</span></span><small>${esc(estadoPart(x, p))}</small></li>`).join('')}</ul></div>`);
+      <ul class="sah-lista">${ps.map(([id, x]) => `<li class="${id === A.meu ? 'eu' : ''}"><span>${x.lado === 'presa' ? '🐇' : '🐺'} ${esc(nomeVis(x))}</span><span class="sah-pips"><span class="ok">${pips(int(x.s), int(p.meta), 'on')}</span><span class="ruim">${pips(int(x.f), int(p.maxF), 'on')}</span></span><small>${esc(estadoPart(x, p))}</small></li>`).join('')}</ul></div>`);
   }
   if (f.on) {
     const ps = Object.entries(f.part || {});
@@ -247,16 +253,12 @@ function blocoPers() {
   const c = $('#sahPers'); if (!c || !semFoco(c)) return;
   const p = pers();
   if (!p.on) {
-    c.innerHTML = `<p class="mini">Teste estendido de Atletismo (SaH p. 90): quem junta os sucessos antes das falhas vence. Presas que vencem escapam; caçadores que vencem alcançam. Cada jogador escolhe a ação e rola na própria tela; o site conta os sucessos. NPCs e ameaças você marca à mão.</p>
+    c.innerHTML = `<p class="mini">Teste estendido de Atletismo (SaH p. 90): quem junta os sucessos antes das falhas vence. Presas que vencem escapam; caçadores que vencem alcançam. Cada jogador escolhe a ação e rola na própria tela; o site conta os sucessos. NPCs e ameaças você rola pelo 🎲 de cada um. A mesma perseguição vale no mapa e no 3D: marque quem entra em "Participantes e ordem" e toque em Iniciar perseguição.</p>
       <div class="sah-grade">
       <label class="mesa-campo">DT pela velocidade de quem está do outro lado <select id="sahPdt">${DT_PERS.map(([v, t]) => `<option value="${v}"${v === 20 ? ' selected' : ''}>${v} · ${esc(t)}</option>`).join('')}</select></label>
       <label class="mesa-campo">Tamanho <select id="sahPtam">${TAM_PERS.map(([a, b, t], i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
       <label class="mesa-campo">Perícia <select id="sahPper"><option value="atletismo">Atletismo (a pé)</option><option value="pilotagem">Pilotagem (veículo)</option><option value="adestramento">Adestramento (montaria)</option></select></label></div>
-      <p class="mesa-k">PARTICIPANTES</p>
-      <div class="sah-part">${cobaias().map(x => `<label class="sah-part-l"><input type="checkbox" data-pp="${x.id}" checked> ${esc(x.nome)} <select data-pl="${x.id}"><option value="presa">presa</option><option value="cacador">caçador</option></select></label>`).join('')}</div>
-      <label class="mesa-campo">NPCs e ameaças (um por linha; termine com " caçador" ou " presa")<textarea id="sahPnpc" rows="2" placeholder="Melancolia caçador"></textarea></label>
-      <label class="chave"><input type="checkbox" id="sahPev" checked><span>Eventos a cada rodada (Tabela 2.3, d20)</span></label>
-      <button data-sp="ini" class="btn-protocolo">Começar perseguição</button>`;
+      <label class="chave"><input type="checkbox" id="sahPev" checked><span>Eventos a cada rodada (Tabela 2.3, d20)</span></label>`;
     return;
   }
   const rod = int(p.rod);
@@ -266,23 +268,50 @@ function blocoPers() {
     <div class="sah-tab">${ps.map(([id, x]) => `<div class="sah-tab-l"><span>${x.lado === 'presa' ? '🐇' : '🐺'} <b>${esc(x.nome)}</b>${x.npc ? ' <small>NPC</small>' : ''}<br><small>${esc(estadoPart(x, p) || (int(x.aplic) === rod ? 'agiu: ' + ((ACOES_P[(x.ult || {}).acao] || {}).n || '') : x.npc ? '' : 'aguardando'))}</small></span>
       <span class="sah-pips"><span class="ok">${pips(int(x.s), int(p.meta), 'on')}</span><span class="ruim">${pips(int(x.f), int(p.maxF), 'on')}</span></span>
       <span class="sah-ctl"><button data-sp="s" data-id="${esc(id)}" title="+1 sucesso">+S</button><button data-sp="f" data-id="${esc(id)}" title="+1 falha">+F</button><button data-sp="desf" data-id="${esc(id)}" title="Desfazer o último">↶</button>${x.npc ? `<button data-sp="npc" data-id="${esc(id)}" title="Rolar pelo NPC">🎲</button>` : ''}${(x.ult || {}).acao === 'atrapalhar' && int(x.aplic) === rod && (x.ult || {}).alvo ? `<button data-sp="atr-ok" data-id="${esc(id)}">Atrapalhou ✓</button>` : ''}</span></div>`).join('')}</div>
-    <div class="mesa-linha"><input id="sahPnpcBon" type="text" placeholder="NPC: dados e bônus, ex.: 3 10" style="width:150px"><button data-sp="rod" class="pri">Próxima rodada</button><button data-sp="ev">Rolar evento</button><button data-sp="semev">Sem evento</button><button data-sp="fim" class="perigo">Encerrar</button></div>
-    <label class="mesa-campo">DT da rodada seguinte <input id="sahPdt2" type="number" value="${int(p.dt)}" style="width:70px"></label>`;
+    <div class="mesa-linha"><input id="sahPnpcBon" type="text" placeholder="NPC: dados e bônus, ex.: 3 10" style="width:150px"><button data-sp="rod" class="pri">Próxima rodada</button><button data-sp="ev">Rolar evento</button><button data-sp="semev">Sem evento</button></div>
+    <label class="mesa-campo">DT da rodada seguinte <input id="sahPdt2" type="number" value="${int(p.dt)}" style="width:70px"></label>
+    <p class="mini">A rodada e a vez andam juntas: "Próxima rodada" recomeça a ordem da vez; o "Próximo turno" do último da ordem abre a rodada seguinte e pede os testes. Encerrar fica em "Participantes e ordem".</p>`;
 }
+// começa o teste estendido com a lista da perseguição do mapa (app.js): [{ id (token), ser, tipo, nome, lado }]
+// + os nomes de fora do mapa escritos na caixa (#sahPnpc). Lê DT, tamanho, perícia e eventos dos campos do bloco.
+function iniciarCom(lista) {
+  if (!A.mestre) return false;
+  const tam = TAM_PERS[int(($('#sahPtam') || { value: 1 }).value)] || TAM_PERS[1];
+  const part = {};
+  (lista || []).forEach(x => {
+    if (!x || !x.id) return;
+    const lado = x.lado === 'cacador' ? 'cacador' : 'presa';
+    if (x.tipo === 'cobaia' && x.ser) part[x.ser] = { nome: nomeDe(x.ser) || x.nome, lado, s: 0, f: 0, tk: x.id };
+    else part[x.id] = { nome: x.nome || x.id, lado, npc: true, s: 0, f: 0, tk: x.id };
+  });
+  const caixa = $('#sahPnpc');
+  String((caixa && caixa.value) || '').split('\n').map(x => x.trim()).filter(Boolean).forEach(l => { const m = /^(.*?)(?:\s+(ca[cç]ador|presa))?$/i.exec(l); part['npc' + chave()] = { nome: m[1], lado: /ca[cç]ador/i.test(m[2] || '') ? 'cacador' : 'presa', npc: true, s: 0, f: 0 }; });
+  if (!Object.keys(part).length) return false;
+  const novo = { on: true, junto: true, id: chave(), rod: 1, dt: int(($('#sahPdt') || { value: 20 }).value) || 20, meta: tam[0], maxF: tam[1], pericia: ($('#sahPper') || { value: 'atletismo' }).value || 'atletismo', eventos: !$('#sahPev') || $('#sahPev').checked, part, ts: Date.now() };
+  if (novo.eventos) novo.ev = sortearEvPers(1);
+  A.definir(['persSaH'], novo);
+  A.diario && A.diario('pers', `Perseguição começou (DT ${novo.dt}, ${novo.meta}/${novo.maxF})`);
+  return true;
+}
+// rodada seguinte do teste estendido (chamada pela rodada nova do mapa; ou pelo botão, quando não há perseguição no mapa)
+function proximaRodada(rod) {
+  const p = pers(); if (!p.on) return;
+  rod = int(rod) || int(p.rod) + 1;
+  A.definir(['persSaH', 'rod'], rod);
+  const dt2 = $('#sahPdt2'); A.definir(['persSaH', 'dt'], (dt2 && int(dt2.value)) || int(p.dt));
+  if (p.eventos) A.definir(['persSaH', 'ev'], sortearEvPers(rod));
+  A.alertaMestre(`Perseguição: rodada ${rod}. Os jogadores veem "Agir nesta rodada" e rolam os testes.`);
+}
+function encerrar() {
+  const p = pers(); if (!p.on) return;
+  const res = Object.values(p.part || {}).map(x => `${x.nome}: ${estadoPart(x, p) || int(x.s) + 'S/' + int(x.f) + 'F'}`).join(' · ');
+  A.diario && A.diario('pers', 'Perseguição encerrada: ' + res);
+  A.definir(['persSaH'], { on: false, id: p.id, fim: Date.now(), res });
+}
+// a perseguição do mapa acabou por outro caminho (atalho, teste, outra tela): o teste estendido que nasceu junto acaba também
+function vigiarJunto() { const p = pers(); if (A.mestre && p.on && p.junto && !((est().persg || {}).on)) encerrar(); }
 async function aoClicarPers(b) {
   const a = b.dataset.sp, p = pers();
-  if (a === 'ini') {
-    const tam = TAM_PERS[int($('#sahPtam').value)] || TAM_PERS[1];
-    const part = {};
-    $$('#sahPers [data-pp]').forEach(i => { if (i.checked) { const id = i.dataset.pp; part[id] = { nome: nomeDe(id), lado: $(`#sahPers [data-pl="${id}"]`).value, s: 0, f: 0 }; } });
-    $('#sahPnpc').value.split('\n').map(x => x.trim()).filter(Boolean).forEach(l => { const m = /^(.*?)(?:\s+(ca[cç]ador|presa))?$/i.exec(l); part['npc' + chave()] = { nome: m[1], lado: /ca[cç]ador/i.test(m[2] || '') ? 'cacador' : 'presa', npc: true, s: 0, f: 0 }; });
-    if (!Object.keys(part).length) { A.aviso('Marque pelo menos um participante.'); return; }
-    const novo = { on: true, id: chave(), rod: 1, dt: int($('#sahPdt').value), meta: tam[0], maxF: tam[1], pericia: $('#sahPper').value, eventos: $('#sahPev').checked, part, ts: Date.now() };
-    if (novo.eventos) novo.ev = sortearEvPers(1);
-    A.definir(['persSaH'], novo);
-    A.diario && A.diario('pers', `Perseguição começou (DT ${novo.dt}, ${novo.meta}/${novo.maxF})`);
-    return;
-  }
   if (!p.on) return;
   const id = b.dataset.id, x = id && (p.part || {})[id];
   if (a === 's' && x) A.definir(['persSaH', 'part', id], { ...x, s: int(x.s) + 1, hist: [...(x.hist || []), 's'] });
@@ -297,19 +326,12 @@ async function aoClicarPers(b) {
   }
   if (a === 'atr-ok' && x) { const alvo = x.ult.alvo, y = (p.part || {})[alvo]; if (y) { A.definir(['persSaH', 'part', alvo, 'pen'], { ...(y.pen || {}), [int(p.rod) + 1]: 2 }); A.aviso(`${y.nome} sofre −2O no teste da próxima rodada.`); } }
   if (a === 'rod') {
-    const rod = int(p.rod) + 1;
-    A.definir(['persSaH', 'rod'], rod);
-    A.definir(['persSaH', 'dt'], int($('#sahPdt2').value) || int(p.dt));
-    if (p.eventos) A.definir(['persSaH', 'ev'], sortearEvPers(rod));
+    // com a perseguição no mapa, a rodada nova recomeça a ordem da vez (app.js chama proximaRodada de volta)
+    if ((est().persg || {}).on && A.novaRodadaPersg) A.novaRodadaPersg(); else proximaRodada();
     // NPCs ficam "aguardando" de novo
   }
   if (a === 'ev') A.definir(['persSaH', 'ev'], sortearEvPers(int(p.rod)));
   if (a === 'semev') A.definir(['persSaH', 'ev'], { rod: int(p.rod), r: 0, txt: 'Sem evento nesta rodada.' });
-  if (a === 'fim' && confirm('Encerrar a perseguição? A faixa some para todos.')) {
-    const res = Object.values(p.part || {}).map(x => `${x.nome}: ${estadoPart(x, p) || int(x.s) + 'S/' + int(x.f) + 'F'}`).join(' · ');
-    A.diario && A.diario('pers', 'Perseguição encerrada: ' + res);
-    A.definir(['persSaH'], { on: false, id: p.id, fim: Date.now(), res });
-  }
 }
 function sortearEvPers(rod) { const r = d20(); const e = EV_PERS.find(x => r >= x[0] && r <= x[1]); return { rod, r, tipo: e[2], txt: e[3], per: e[4], dt: e[5] }; }
 
@@ -577,9 +599,10 @@ function verAviso() { const a = est().avisoSaH; if (!a || num(a.ts) <= avisoVist
    ========================================================= */
 function semFoco(c) { const a = document.activeElement; return !(a && c.contains(a) && a.matches('input:not([type=checkbox]):not([type=radio]), select, textarea')); }
 function desenharMestre() { if (!A.mestre) return; blocoPers(); blocoFurt(); blocoMedo(); blocoSorteios(); botaoEvInv(); }
-let ag = null;
-function agendar() { clearTimeout(ag); ag = setTimeout(() => { faixas(); ouvirPers(); ouvirFurt(); desenharMestre(); verMedo(); verAviso(); }, 60); }
-A.aoMudar(agendar);
+let ag = null, sahSujo = true;
+// os blocos do Mestre (perseguição, furtividade, medo, sorteios) não leem os tokens: só redesenham quando outra coisa mudou
+function agendar(so) { if (so !== 'tok') sahSujo = true; clearTimeout(ag); ag = setTimeout(() => { vigiarJunto(); faixas(); ouvirPers(); ouvirFurt(); if (sahSujo) { sahSujo = false; desenharMestre(); } verMedo(); verAviso(); }, 60); }
+A.aoMudar(() => agendar(A.soTokens && A.soTokens() ? 'tok' : null));
 document.addEventListener('acf-perfil', () => setTimeout(agendar, 60));
 document.addEventListener('acf-ativa', agendar);
 document.addEventListener('click', e => {
@@ -600,5 +623,7 @@ window.ACF_SAH = { sortear, tabelaHtml,
   pers, furt, meuPart, dtRodada, estadoPart, ACOES_P, ACOES_F, nomePer,
   jaAgiu: () => { const p = pers(); return !!(p.on && ls.get('acf-resp-' + respId(p), false)); },
   jaAgiuFurt: () => { const f = furt(); return !!(f.on && ls.get('acf-resp-' + respF(f), false)); },
-  abrirAcaoPers, abrirAcaoFurt };
+  abrirAcaoPers, abrirAcaoFurt,
+  // perseguição única (app.js): começa, avança a rodada e encerra o teste estendido junto com a do mapa
+  iniciarCom, proximaRodada, encerrar };
 })();

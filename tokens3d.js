@@ -1774,6 +1774,8 @@
       else if (s.tipo === 'espectro') t = espectro(F, s);
       else t = npc(F, s);
     }
+    // LOD (filhos3d.js): cobaias, robôs e criaturas genéricas também ganham os 3 níveis por distância
+    if (NS.prepararLOD && !t.lod) { try { NS.prepararLOD(F, t); } catch (e) {} }
     // base redonda na cor do token (como a base de uma miniatura)
     const base = new T.Group();
     const R = t.raioBase || (s.tipo === 'filho' ? .55 : .32);

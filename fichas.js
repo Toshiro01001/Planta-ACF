@@ -607,9 +607,12 @@ function gravar(path, valor, imediato) {
   const at = F.atual;
   if (!at || !at.editavel) return;
   setPath(at.d, path, valor);
-  clearTimeout(at.pend[path]);
-  const enviar = () => { delete at.pend[path]; A.Rede.set(caminho(at.ref) + '/' + path.replace(/\./g, '/'), valor === '' ? '' : valor).catch(() => A.aviso('O servidor recusou a gravação da ficha.')); };
-  if (imediato) enviar(); else at.pend[path] = setTimeout(enviar, 450);
+  // os campos mexidos na mesma espera vão juntos, numa só gravação (update), em vez de um set por campo
+  at.lote = at.lote || {};
+  at.lote[path.replace(/\./g, '/')] = valor === '' ? '' : valor;
+  clearTimeout(at.pend._lote);
+  const enviar = () => { delete at.pend._lote; const l = at.lote || {}; at.lote = {}; if (!Object.keys(l).length) return; A.Rede.update(caminho(at.ref), l).catch(() => A.aviso('O servidor recusou a gravação da ficha.')); };
+  if (imediato) enviar(); else at.pend._lote = setTimeout(enviar, 450);
 }
 function setPath(o, path, v) {
   const ps = path.split('.');
@@ -1824,7 +1827,8 @@ async function aplicarNaAtiva(lista) {
   if (!F.ativaRef || !F.ativaD) return false;
   const ref = F.ativaRef;
   try {
-    await Promise.all(lista.map(([c, v]) => A.Rede.set(caminho(ref) + '/' + c.replace(/\./g, '/'), v === undefined ? null : v)));
+    const upd = {}; lista.forEach(([c, v]) => { upd[c.replace(/\./g, '/')] = v === undefined ? null : v; });
+    await A.Rede.update(caminho(ref), upd);
   } catch (e) { A.aviso('O servidor recusou a alteração na ficha.'); return false; }
   if (F.atual && F.atual.d && !F.atual.ref.gm && F.atual.ref.chave === ref.chave) {
     lista.forEach(([c, v]) => setPath(F.atual.d, c, v === undefined ? null : v));

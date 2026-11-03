@@ -138,6 +138,9 @@ const FUGA = { sangue: 'morte', morte: 'energia', energia: 'conhecimento', conhe
 const EL_SALA = { S: 'sangue', M: 'morte', C: 'conhecimento', E: 'energia', F: 'medo' };
 // estados do modelo 3D: o momento (genérico) → nome do estado da forma (dados do Mestre)
 const MOMENTOS3D = [['padrao', 'Normal'], ['anda', 'Andando'], ['cobaia', 'Com cobaia na sala'], ['conectar', 'Conectado'], ['transmissao', 'Transmitindo'], ['flash', 'Durante o Flash']];
+// formas do 3D (filhos3d.js) com o estado 'candelabro' (fingir ser um lustre no teto); o cartão ganha o botão
+const FORMAS_CANDELABRO = ['aranha_gaiola'];
+const formaTk = (id, tk) => tk.fm || (est().formas || {})[tk.s] || (est().formas || {})[id] || '';
 // objetos da biblioteca do 3D para a Forma de Objeto
 const OBJETOS = [['cadeira', 'Cadeira'], ['cadeira_plastico', 'Cadeira de plástico'], ['caixote', 'Caixote (baú)'], ['maca', 'Maca com rodas (carrinho)'], ['armario', 'Armário'], ['armario_metal', 'Armário de metal'], ['estante', 'Estante'], ['manequim', 'Manequim'], ['mesa', 'Mesa']];
 const DETALHES = [['', 'Nenhum (cópia perfeita)'], ['espelho', 'Retrato espelhado'], ['fhp', 'Número FHP trocado'], ['aro', 'Cor do anel um tom diferente']];
@@ -881,6 +884,7 @@ function estadoTk(tk) {
   if (tk.fo) l.push(['🪑', 'objeto: ' + (OBJETOS.find(o => o[0] === tk.fo) || ['', tk.fo])[1].toLowerCase()]);
   if (tk.cp && SERd(tk.cp)) l.push(['🎭', 'copiando ' + SERd(tk.cp).nome + (tk.cpd ? ' · ' + (DETALHES.find(d => d[0] === tk.cpd) || ['', tk.cpd])[1].toLowerCase() : '')]);
   if (tk.oc) l.push(['👻', 'oculto dos jogadores']);
+  if (tk.cd) l.push(['🕯', 'fingindo ser um candelabro (sem anel nem nome para os jogadores)']);
   if (tk.ln && flashAtivo(tk)) l.push(['📸', 'visível a todos: Flash']);
   if (tk.am) l.push(['🤝', 'amigável para os jogadores']);
   if (tk.el && EL[tk.el]) l.push([EL[tk.el][2], 'forma rolada: ' + EL[tk.el][1]]);
@@ -909,6 +913,7 @@ function htmlCartao(id, tk) {
     if (tk.dc) acoes.push('<button type="button" data-fil-falsos>📡 Tirar as imagens falsas</button>');
     if (c && pas(c, 'abraco')) acoes.push('<button type="button" data-fil-abraco>🤱 Abraço: cobaia agarrada</button>');
     if (c && (c.ocult === 'sempre' || c.ocult === 'teto' || c.ocult === 'parede')) acoes.push(`<button type="button" data-fil-revelar>${tk.rv ? '🙈 Esconder de novo' : '👁 Revelar nesta sala'}</button>`);
+    if (!tk.dc && FORMAS_CANDELABRO.includes(formaTk(id, tk))) acoes.push(`<button type="button" data-fil-candelabro class="${tk.cd ? 'on' : ''}" title="No 3D: sobe ao teto e finge ser um candelabro; os jogadores não veem o anel nem o nome">${tk.cd ? '⬇ Descer do teto' : '🕯 Fingir candelabro'}</button>`);
     if (!tk.dc) acoes.push(`<button type="button" data-fil-editar>⚙ Editar características</button>`);
   }
   if (acoes.length) h += `<div class="fc-acoes">${acoes.join('')}</div>`;
@@ -922,6 +927,8 @@ function ligarCartao(c, id) {
   const ba = $('[data-fil-abraco]', c); if (ba) ba.onclick = () => escolher('Abraço: cobaia agarrada', Object.keys(A().SER).filter(k => SERd(k).tipo === 'cobaia').map(k => [k, SERd(k).nome]), cob => { gravarEstado(['repert', id, cob], agora()); A().aviso(`As frases de ${SERd(cob).nome} entram no repertório.`); });
   const br = $('[data-fil-revelar]', c); if (br) br.onclick = () => { const tk = tokens()[id]; if (!tk) return; const n = { ...tk }; if (tk.rv) delete n.rv; else n.rv = chaveLugar(tk); A().definir(['tokens', id], n); };
   const be = $('[data-fil-editar]', c); if (be) be.onclick = () => { const tk = tokens()[id]; if (tk) Editor.abrir(tk.s); };
+  // candelabro: tk.cd liga o estado 'candelabro' da forma; ao tirar, o motor segura o estado 'solto' por uns segundos (o 3D toca a descida)
+  const bc = $('[data-fil-candelabro]', c); if (bc) bc.onclick = () => { const tk = tokens()[id]; if (!tk) return; const n = { ...tk }; if (tk.cd) delete n.cd; else n.cd = 1; A().definir(['tokens', id], n); };
   const bx = $('[data-fil-falsos]', c); if (bx) bx.onclick = () => { const tk = tokens()[id]; if (tk && tk.dc) Motor.tirarFalsos(tk.dc, 'o Mestre tirou'); };
 }
 
@@ -1287,7 +1294,12 @@ function blocoMestre() {
   if (b.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return;
   const filhos = filhosLista(), tks = tokens();
   const n = filhos.filter(s => cfgDe(s.id)).length, ns = Object.values(etq().salas || {}).filter(t => t && Object.values(t).some(Boolean)).length;
-  const noMapa = id => Object.values(tks).filter(t => t && t.s === id && !t.dc).length;
+  const contaMapa = {}; Object.values(tks).forEach(t => { if (t && !t.dc) contaMapa[t.s] = (contaMapa[t.s] || 0) + 1; });   // uma passada (era uma por Filho)
+  const noMapa = id => contaMapa[id] || 0;
+  // só tokens andaram e a contagem por Filho no mapa é a mesma: o bloco já está certo
+  const chaveMapa = Object.entries(contaMapa).map(e => e.join(':')).join(',');
+  if (A().soTokens && A().soTokens() && b.__mapa === chaveMapa && b.dataset.h) return;
+  b.__mapa = chaveMapa;
   const elDeSer = id => { const c = cfgDe(id); return c && c.el ? c.el : ''; };
   const filtros = [['', 'Todos']].concat(ELEMENTOS.filter(e => e[0] !== 'medo').map(e => [e[0], e[2], e[1]]), [['mapa', '📍', 'No mapa']]);
   const lista = filhos.filter(s => !fpFiltro || (fpFiltro === 'mapa' ? noMapa(s.id) : elDeSer(s.id) === fpFiltro || (fpFiltro && elDeSer(s.id) === '1d4')));
@@ -1542,7 +1554,7 @@ function importar(arq) {
    Como o robô dos auxiliares, depende da tela do Mestre aberta.
    ========================================================= */
 const Motor = {
-  ant: {}, antCob: {}, atk: {}, cenaAnt: null, limpo: 0, vistasAcoes: new Set(), respVistas: new Set(), barulho: {}, visJ: {}, movTs: {},
+  ant: {}, antCob: {}, atk: {}, cdAnt: {}, desceu: {}, cenaAnt: null, limpo: 0, vistasAcoes: new Set(), respVistas: new Set(), barulho: {}, visJ: {}, movTs: {},
   rodar() {
     if (!souMestre() || I().espiar || !I().Priv.pronto) return;
     const tks = tokens(), c0 = cena();
@@ -1564,7 +1576,10 @@ const Motor = {
       // ataque (Controle) revela a ocultação especial nesta sala; o primeiro estado visto só é anotado
       const fts = tk.fx && tk.fx.t === 'atk' ? tk.fx.ts || 0 : 0;
       if (this.atk[id] === undefined) this.atk[id] = fts;
-      else if (fts > this.atk[id]) { this.atk[id] = fts; if (c && c.ocult && c.ocult !== 'pisca' && c.ocult !== 'lente') n.rv = lugar; if (c && pas(c, 'amigavel')) gravarEstado(['atacou', id], fts); }
+      else if (fts > this.atk[id]) { this.atk[id] = fts; if (c && c.ocult && c.ocult !== 'pisca' && c.ocult !== 'lente') n.rv = lugar; if (c && pas(c, 'amigavel')) gravarEstado(['atacou', id], fts); delete n.cd; }
+      // saiu do disfarce de candelabro (botão ou ataque): o estado 'solto' vale por uns segundos para o 3D tocar a descida
+      if (this.cdAnt[id] && !n.cd) this.desceu[id] = agora();
+      this.cdAnt[id] = !!n.cd;
       const oc = !!c && !n.fo && ((c.ocult === 'teto' || c.ocult === 'sempre') ? n.rv !== lugar : c.ocult === 'parede' ? !!(cnTk(tk) && tagsSala(cnTk(tk)).quadros) && n.rv !== lugar : false);
       if (oc) n.oc = 1; else delete n.oc;
       if (c && c.ocult === 'pisca') n.pi = 1; else delete n.pi;
@@ -1667,6 +1682,8 @@ const Motor = {
     A().alertaMestre(`🎲 ${rotuloGM(n)} entrou: ${c.rolagem.dado || '1d4'} = ${r.total}, forma de ${nomeEl}.`);
   },
   estado3d(id, n, c) {
+    if (n.cd) return 'candelabro';
+    if (this.desceu[id] && agora() - this.desceu[id] < 8000) return 'solto';
     const st = c && c.st3d; if (!st || typeof st !== 'object') return '';
     if (st.flash && flashAtivo(n)) return st.flash;
     if (st.conectar && conectado(id)) return st.conectar;

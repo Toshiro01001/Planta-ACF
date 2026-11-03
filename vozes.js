@@ -50,7 +50,8 @@
   function contexto() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
     if (!ctx) {
-      ctx = new AC();
+      const A0 = window.ACF;
+      ctx = (A0 && A0.Som && A0.Som.pronto && A0.Som.pronto()) || new AC();   // um AudioContext só para o site inteiro
       ruido = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = ruido.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
@@ -60,9 +61,10 @@
   // o navegador só libera o som depois de um toque
   ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); }, { passive: true }));
 
+  const anotar = x => { const c = x.context; if (c && c.__nos) c.__nos.push(x); return x; };
   function curva(k) { const n = 512, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)); } return c; }
   function chiado(c, t0, dur, f, q, vol, destino, tipo = 'bandpass') {
-    const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    const s = anotar(c.createBufferSource()), fl = anotar(c.createBiquadFilter()), g = anotar(c.createGain());
     s.buffer = ruido; fl.type = tipo; fl.frequency.value = f; fl.Q.value = q;
     g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(.006, dur / 3)); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
     s.connect(fl); fl.connect(g); g.connect(destino); s.start(t0, Math.random() * .7); s.stop(t0 + dur + .02);
@@ -76,18 +78,20 @@
     const vol = Math.max(0, Math.min(1.2, op.vol ?? 1)) * (V.vol || .8) * .32;
     if (vol < .005) return 0;
     const t0 = c.currentTime + .03;
+    // tudo o que esta fala criar é solto do grafo quando ela acaba (senão cada frase ficava pendurada na saída)
+    const nos = []; c.__nos = nos;
     // cadeia de saída: abafado (máscara), rádio, distorção, eco
-    const saida = c.createGain(); saida.gain.value = vol;
+    const saida = anotar(c.createGain()); saida.gain.value = vol;
     let ponta = saida;
-    const corte = c.createBiquadFilter(); corte.type = 'lowpass'; corte.frequency.value = V.corte || 4200; corte.Q.value = V.corte && V.corte < 900 ? 2.2 : .7;
-    const pan = c.createStereoPanner ? c.createStereoPanner() : null; if (pan) pan.pan.value = Math.max(-1, Math.min(1, op.pan || 0));
-    if (V.distorcer) { const w = c.createWaveShaper(); w.curve = curva(V.distorcer); w.oversample = '2x'; ponta.connect(w); ponta = w; }
-    if (V.radio) { const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 420; ponta.connect(hp); ponta = hp; }
+    const corte = anotar(c.createBiquadFilter()); corte.type = 'lowpass'; corte.frequency.value = V.corte || 4200; corte.Q.value = V.corte && V.corte < 900 ? 2.2 : .7;
+    const pan = c.createStereoPanner ? anotar(c.createStereoPanner()) : null; if (pan) pan.pan.value = Math.max(-1, Math.min(1, op.pan || 0));
+    if (V.distorcer) { const w = anotar(c.createWaveShaper()); w.curve = curva(V.distorcer); w.oversample = '2x'; ponta.connect(w); ponta = w; }
+    if (V.radio) { const hp = anotar(c.createBiquadFilter()); hp.type = 'highpass'; hp.frequency.value = 420; ponta.connect(hp); ponta = hp; }
     ponta.connect(corte);
     let fim = corte;
     if (pan) { fim.connect(pan); fim = pan; }
     fim.connect(c.destination);
-    if (V.eco) { const dl = c.createDelay(1), fb = c.createGain(), wet = c.createGain(); dl.delayTime.value = .24; fb.gain.value = V.eco; wet.gain.value = .55; fim.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(c.destination); }
+    if (V.eco) { const dl = anotar(c.createDelay(1)), fb = anotar(c.createGain()), wet = anotar(c.createGain()); dl.delayTime.value = .24; fb.gain.value = V.eco; wet.gain.value = .55; fim.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(c.destination); }
 
     const sil = silabas(txt), pergunta = /\?\s*$/.test(String(txt)), grita = /!\s*$/.test(String(txt));
     const nSil = sil.filter(s => s.v).length;
@@ -107,25 +111,25 @@
       else if (!pergunta && fimFrase < 2) f *= .9;
       if (grita) f *= 1.08;
       const [F1, F2] = FORM[s.v] || FORM.a, fk = V.fk || 1;
-      const env = c.createGain();
+      const env = anotar(c.createGain());
       env.gain.setValueAtTime(.0001, t); env.gain.exponentialRampToValueAtTime(grita ? 1.25 : 1, t + .012); env.gain.setValueAtTime(grita ? 1.1 : .85, t + dur * .7); env.gain.exponentialRampToValueAtTime(.0001, t + dur);
-      const b1 = c.createBiquadFilter(), b2 = c.createBiquadFilter(), g1 = c.createGain(), g2 = c.createGain();
+      const b1 = anotar(c.createBiquadFilter()), b2 = anotar(c.createBiquadFilter()), g1 = anotar(c.createGain()), g2 = anotar(c.createGain());
       b1.type = b2.type = 'bandpass'; b1.frequency.value = F1 * fk; b2.frequency.value = F2 * fk; b1.Q.value = V.sussurro ? 4 : 7; b2.Q.value = V.sussurro ? 6 : 11;
       g1.gain.value = V.sussurro ? 2.2 : 1.6; g2.gain.value = V.sussurro ? 1.6 : 1.1;
       b1.connect(g1); b2.connect(g2); g1.connect(env); g2.connect(env); env.connect(saida);
       const fontes = [];
       if (V.sussurro) {
-        const s2 = c.createBufferSource(); s2.buffer = ruido; s2.connect(b1); s2.connect(b2); s2.start(t, Math.random() * .7); s2.stop(t + dur + .02); fontes.push(s2);
+        const s2 = anotar(c.createBufferSource()); s2.buffer = ruido; s2.connect(b1); s2.connect(b2); s2.start(t, Math.random() * .7); s2.stop(t + dur + .02); fontes.push(s2);
       } else {
         for (let i = 0; i < camadas; i++) {
-          const o = c.createOscillator(); o.type = V.onda || 'sawtooth';
+          const o = anotar(c.createOscillator()); o.type = V.onda || 'sawtooth';
           const fi = f * (1 + (i - (camadas - 1) / 2) * (V.desafina || 0));
           if (V.robo) o.frequency.setValueAtTime(fi, t);   // robô: sem deslizar
           else { o.frequency.setValueAtTime(fi * 1.03, t); o.frequency.exponentialRampToValueAtTime(fi, t + dur * .6); }
-          if (V.vib) { const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = V.vib; lg.gain.value = fi * (V.vibA || .02); l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur + .02); }
+          if (V.vib) { const l = anotar(c.createOscillator()), lg = anotar(c.createGain()); l.frequency.value = V.vib; lg.gain.value = fi * (V.vibA || .02); l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur + .02); }
           let src = o;
-          if (V.anel) { const am = c.createGain(), mod = c.createOscillator(); am.gain.value = 0; mod.frequency.value = V.anel; mod.connect(am.gain); o.connect(am); src = am; mod.start(t); mod.stop(t + dur + .02); }
-          const gc = c.createGain(); gc.gain.value = 1 / Math.sqrt(camadas); src.connect(gc); gc.connect(b1); gc.connect(b2);
+          if (V.anel) { const am = anotar(c.createGain()), mod = anotar(c.createOscillator()); am.gain.value = 0; mod.frequency.value = V.anel; mod.connect(am.gain); o.connect(am); src = am; mod.start(t); mod.stop(t + dur + .02); }
+          const gc = anotar(c.createGain()); gc.gain.value = 1 / Math.sqrt(camadas); src.connect(gc); gc.connect(b1); gc.connect(b2);
           o.start(t); o.stop(t + dur + .02); fontes.push(o);
         }
         if (V.sopro) chiado(c, t, dur, 1400, .7, .18 * V.sopro, saida, 'lowpass');
@@ -133,6 +137,8 @@
       t += dur * (V.robo ? 1.05 : .92);
     });
     if (V.radio) chiado(c, t0, t - t0 + .05, 3200, .5, .05, saida, 'bandpass');
+    c.__nos = null;
+    setTimeout(() => nos.forEach(x => { try { x.disconnect(); } catch (e) {} }), (t - t0 + (V.eco ? 3 : 1.6)) * 1000);
     return t - t0;
   }
   const testar = vozId => falar(vozId, 'Olá. Você me ouve daí? Tem alguém na sala.', { vol: 1 });

@@ -42,7 +42,6 @@
     blocoCenas: { ic: '🗂', t: 'Cenas prontas' },
     blocoNotas: { ic: '📝', t: 'Anotações das salas' },
     blocoRuidoM: { ic: '📢', t: 'Ruído e Protocolo', cat: 'cena' },
-    blocoPersgM: { ic: '🏃', t: 'Perseguição', cat: 'cena' },
     blocoMomento: { ic: '🎥', t: 'Encontros, sons e câmeras', cat: 'cena' },
     blocoLojaM: { ic: '🛒', t: 'Loja do Maurício', cat: 'recomp' },
     blocoPedidos: { ic: '📨', t: 'Pedidos', cat: 'ctrl' },
@@ -63,7 +62,7 @@
     blocoMesaCena: { ic: '📜', t: 'Cena e escudo', cat: 'cena', d: 'nova cena · escudo do Mestre' },
     blocoMesaInv: { ic: '🔎', t: 'Cena de investigação', cat: 'testes' },
     blocoMesaTeste: { ic: '🎯', t: 'Pedir teste', cat: 'testes' },
-    blocoSahPers: { ic: '🏃', t: 'Perseguição SaH', cat: 'sah', d: 'teste estendido de Atletismo' },
+    blocoSahPers: { ic: '🏃', t: 'Perseguição (Sobrevivendo ao Horror)', cat: 'sah', d: 'teste estendido · vez no mapa e no 3D' },
     blocoSahFurt: { ic: '🤫', t: 'Furtividade SaH', cat: 'sah', d: 'visibilidade por rodada' },
     blocoSahMedo: { ic: '😱', t: 'Medo em jogo', cat: 'sah', d: 'visões · insanidade' },
     blocoSahSort: { ic: '📊', t: 'Tabelas do SaH', cat: 'sah', d: 'sortear na hora' },
@@ -85,6 +84,9 @@
     blocoMesaParede: { ic: '🧱', t: 'Parede de Desejos', cat: 'recomp' }
   };
   const reg = b => REG[b.id] || { ic: '▪', t: txt($('h2', b)).replace(/^[☆★]\s*/, '') || b.id };
+  // cartões-atalho: o bloco mora numa aba, mas ganha um cartão noutra (abre o MESMO bloco, sem duplicar)
+  // aba → lista de [id do bloco, id do bloco depois do qual o cartão entra]
+  const ATALHOS = { sessao: [['blocoSahPers', 'blocoRuidoM']] };
   const tituloDe = b => reg(b).t || txt($('h2', b)).replace(/^[☆★]\s*/, '');
 
   /* ---------- estado vivo de cada bloco: lista de [ícone, texto, classe] ---------- */
@@ -107,7 +109,6 @@
     blocoCenas: b => { const k = n('#listaCenas li:not(.vazio)', b); return [['🗂', k ? k + (k > 1 ? ' cenas' : ' cena') : 'nenhuma']]; },
     blocoNotas: b => { const k = n('#listaNotas li', b); return [['📝', k ? k + ' notas' : 'nenhuma neste andar']]; },
     blocoRuidoM: () => { const q = txt('#qtdQuebras') || '0'; return [['📅', 'Dia ' + (txt('#cicloDia') || '1')], ['💥', q + '/3 quebras', +q >= 3 ? 'alerta' : ''], ...(!($('#alertaRuido') || {}).hidden ? [['🚨', 'limite rompido', 'alerta']] : [])]; },
-    blocoPersgM: b => { const at = $('#persgAtiva', b); if (at && !at.hidden) return [['▶', txt('#persgRodada') || 'em andamento', 'vivo'], ['👥', n('#ordemPersg li', b) + ' na ordem']]; return [['⏸', 'parada'], ['👥', n('#setupPersg .ck:checked', b) + ' marcados']]; },
     blocoMomento: b => { const on = $$('[data-mc]', b).filter(i => i.type === 'checkbox'); const cams = n('.mom-cam', b); return [['🎥', on.filter(i => i.checked).length + '/' + on.length + ' ligados'], ['📹', cams + (cams === 1 ? ' câmera' : ' câmeras')]]; },
     blocoLojaM: () => [[marcado('#chkLojaAberta') ? '🟢' : '🔒', marcado('#chkLojaAberta') ? 'aberta' : 'fechada', marcado('#chkLojaAberta') ? 'vivo' : ''], ['🪙', ((($('#cofreM') || {}).value) || 0) + ' maiores · ' + ((($('#cofrem') || {}).value) || 0) + ' menores']],
     blocoPedidos: b => { const k = n('#listaPedidos li:not(.vazio)', b); return [['📨', k ? k + ' pedidos' : 'nenhum', k ? 'alerta' : '']]; },
@@ -124,6 +125,7 @@
     blocoFilhosM: b => [['🩸', txt('.fp-sub', b).split('·')[0] || 'Filhos']],
     blocoMesaSessao: b => { const k = $$('p.mesa-k', b).map(x => x.textContent).find(t => /tens/i.test(t)) || ''; const v = (k.match(/(\d+)\s*%/) || [])[1]; return [['😰', 'tensão ' + (v || 0) + '%', +v >= 50 ? 'alerta' : ''], ['🔦', 'holofote'], ['❓', 'dilema']]; },
     blocoMesaRetratos: b => [['🖼', n('#mesaHudMeu input:checked', b) + ' na sua tela'], ['👤', n('#mesaHudJog input:checked', b) + ' nos jogadores']],
+    blocoSahPers: b => { const at = $('#persgAtiva', b); if (at && !at.hidden) return [['▶', txt('#persgRodada') || 'em andamento', 'vivo'], ['👥', n('#ordemPersg li', b) + ' na ordem']]; return [['⏸', 'parada'], ['👥', n('#setupPersg .ck:checked', b) + ' marcados']]; },
     blocoMesaInv: b => { const on = /encerr|parar/i.test(txt('.btn-protocolo', b)); return [[on ? '▶' : '⏸', on ? 'em andamento' : 'parada', on ? 'vivo' : ''], ['🔍', 'pistas DT 15/20']]; },
     blocoMesaTeste: b => [['🎯', n('.mesa-alvos input:checked, .mesa-alvos .on', b) + ' alvos'], ['📝', ($('#mesaTesteTxt') || {}).value || 'perícia livre']],
     blocoMesaBau: b => [['🧳', n('#bauLog li, #bauLog .bau-it', b) + ' entregues']],
@@ -174,8 +176,16 @@
     if (!lancOn()) return;
     posicionar();
     const aba = abaAtual(), busc = painel.classList.contains('buscando');
-    blocos().forEach(b => b.classList.toggle('pn-fixo', ehFixo(b) && disponivel(b)));
-    const lista = blocos().filter(b => disponivel(b) && !ehFixo(b));
+    // uma consulta dos blocos e um resumo por bloco em cada desenho (eram refeitos várias vezes)
+    const todos = blocos(), rs = new Map(), resumoDe = b => { if (!rs.has(b)) rs.set(b, resumo(b)); return rs.get(b); };
+    todos.forEach(b => b.classList.toggle('pn-fixo', ehFixo(b) && disponivel(b)));
+    const lista = todos.filter(b => disponivel(b) && !ehFixo(b));
+    if (!busc) (ATALHOS[aba] || []).forEach(([id, depois]) => {
+      const b = document.getElementById(id);
+      if (!b || b.hidden || lista.includes(b) || b.classList.contains('fora-busca')) return;
+      const k = lista.findIndex(x => x.id === depois);
+      lista.splice(k >= 0 ? k + 1 : 0, 0, b);
+    });
     // filtros por categoria (só quando há duas ou mais categorias na aba)
     const cats = [...new Set(lista.map(b => reg(b).cat).filter(Boolean))];
     const usarCats = !busc && cats.length >= 2 && lista.length >= 6;
@@ -188,7 +198,7 @@
     const vis = cat ? lista.filter(b => reg(b).cat === cat) : lista;
     // linha de resumo em mono
     const favs = vis.filter(b => b.classList.contains('fav')).length;
-    const alertas = vis.filter(b => resumo(b).some(x => x[2] === 'alerta')).length;
+    const alertas = vis.filter(b => resumoDe(b).some(x => x[2] === 'alerta')).length;
     const sub = busc ? `${vis.length} ${vis.length === 1 ? 'bloco encontrado' : 'blocos encontrados'}` :
       `${vis.length} ${vis.length === 1 ? 'ferramenta' : 'ferramentas'}${cat ? ' · ' + CATS[cat][1] : ''}${favs ? ' · ' + favs + ' ★' : ''}${alertas ? ' · ' + alertas + ' pedindo atenção' : ''}`;
     $('.pn-sub', lanc).textContent = sub;
@@ -202,7 +212,7 @@
     vis.forEach(b => {
       const c = $(`[data-pn-abre="${b.id}"]`, cx); if (!c) return;
       const t = tituloDe(b) + (busc && b.dataset.aba && $('#abasMestre') && !$('#abasMestre').hidden ? ` · ${b.dataset.aba === 'sessao' ? 'Sessão' : b.dataset.aba === 'registro' ? 'Registro' : b.dataset.aba[0].toUpperCase() + b.dataset.aba.slice(1)}` : '');
-      const r = resumo(b), h = htmlChips(r);
+      const r = resumoDe(b), h = htmlChips(r);
       const tt = $('.pn-card-t', c); if (tt.textContent !== t) tt.textContent = t;
       const ch = $('.pn-chips', c); if (ch.dataset.h !== h) { ch.innerHTML = h; ch.dataset.h = h; }
       const dir = b.classList.contains('fav') ? '★' : '›'; const d = $('.pn-card-dir', c); if (d.textContent !== dir) d.textContent = dir;
@@ -245,6 +255,7 @@
     if (!aberto) scrollAntes = painel.scrollTop;
     aberto = b;
     eraFechado = b.classList.contains('fechado'); b.classList.remove('fechado');
+    b.classList.toggle('pn-atalho', b.classList.contains('fora-da-aba') && !painel.classList.contains('buscando'));
     b.classList.add('pn-aberto'); painel.classList.add('pn-folha'); body.classList.add('pn-folha-on');
     melhorar(b); cabecalho(b);
     const ab = $('#abasMestre', painel), abVis = ab && !ab.hidden && getComputedStyle(ab).display !== 'none';
@@ -258,7 +269,7 @@
   function fechar(trocando) {
     if (!aberto) return;
     const b = aberto; aberto = null;
-    b.classList.remove('pn-aberto');
+    b.classList.remove('pn-aberto', 'pn-atalho');
     if (eraFechado) b.classList.add('fechado');
     if (!trocando) {
       painel.classList.remove('pn-folha'); body.classList.remove('pn-folha-on');
@@ -316,6 +327,7 @@
     blocoMesaSessao: { modo: 'abas', raiz: '#mesaSessao', rot: { 'HOLOFOTE': '🔦 Holofote', 'COBAIA DA SESSÃO': '🏆 Cobaia', 'DILEMA': '❓ Dilema' }, rotRe: [[/^TENS/, t => '😰 Tensão ' + ((t.match(/\d+\s*%/) || [''])[0])]], chave: t => /^TENS/.test(t) ? 'TENSÃO' : t },
     blocoMesaAmb: { modo: 'dobras', raiz: '#mesaAmb', fechadas: ['TRILHA POR ANDAR', 'SONS PRÓPRIOS'] },
     blocoMomento: { modo: 'dobras', fechadas: ['Câmeras de segurança'] },
+    blocoSahPers: { modo: 'dobras', fechadas: ['Filhos na perseguição', 'Fuga dos jogadores'] },
     blocoApagao: { modo: 'nada' },
     blocoMesaExpo: { modo: 'dobras', raiz: '#mesaExpo' }
   };
@@ -405,7 +417,8 @@
   /* ---------- observa redesenhos (mesa.js, filhos.js etc. trocam o innerHTML) ---------- */
   const pend = new Set(); let tm = 0;
   const mo = new MutationObserver(ms => {
-    ms.forEach(m => { if (m.type === 'attributes') pend.add(painel); const b = m.target.closest ? (m.target.matches && m.target.matches('#painel > .bloco') ? m.target : m.target.closest('#painel > .bloco')) : null; if (b) pend.add(b); else if (m.target === painel) pend.add(painel); });
+    // hidden regravado com o mesmo valor (x.hidden = true num bloco já escondido) também gera registro: não conta
+    ms.forEach(m => { if (m.type === 'attributes' && (m.oldValue !== null) === m.target.hasAttribute('hidden')) return; if (m.type === 'attributes') pend.add(painel); const b = m.target.closest ? (m.target.matches && m.target.matches('#painel > .bloco') ? m.target : m.target.closest('#painel > .bloco')) : null; if (b) pend.add(b); else if (m.target === painel) pend.add(painel); });
     if (!tm) tm = setTimeout(() => { tm = 0; const l = [...pend]; pend.clear(); l.forEach(b => { if (b === painel) return; melhorar(b); if (b === aberto) cabecalho(b); }); if (l.includes(painel)) desenharLanc(); }, 60);
   });
 
@@ -422,14 +435,14 @@
     if (!lancOn()) return;
     if (aberto) {
       // o bloco aberto sumiu (perfil, aba, fim de perseguição): volta à lista
-      if (aberto.hidden || !painel.contains(aberto) || (aberto.classList.contains('fora-da-aba') && !painel.classList.contains('buscando'))) { fechar(); return; }
+      if (aberto.hidden || !painel.contains(aberto) || (aberto.classList.contains('fora-da-aba') && !painel.classList.contains('buscando') && !aberto.classList.contains('pn-atalho'))) { fechar(); return; }
       cabecalho(aberto);
     } else desenharLanc();
   }
   function iniciar() {
-    mo.observe(painel, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    mo.observe(painel, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'], attributeOldValue: true });
     aplicar();
-    setInterval(tique, 1200);
+    setInterval(() => { if (!document.hidden) tique(); }, 1200);
     document.addEventListener('acf-perfil', () => setTimeout(() => { fechar(); aplicar(); }, 30));
     document.addEventListener('acf-pn', () => setTimeout(aplicar, 0));
     const busca = $('#painelBusca');

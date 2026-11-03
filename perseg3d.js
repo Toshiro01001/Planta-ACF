@@ -822,6 +822,7 @@ const Vista = {
     if (this.poeira) { this.poeira.forEach(m => { try { m.geometry.dispose(); m.material.dispose(); } catch (e) {} }); this.poeira = null; }
     try { ap.cena.remove(this.grupo); } catch (e) {}
     this.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
+    this.st = new Map(); this.desc = [];   // o estado por token guardava as malhas: sem isso a cena ficava presa depois de fechar
     const l = $('#psLinha'); if (l) l.remove();
     if (ap.V && ap.V.d) ap.V.d.classList.remove('ps-linha');
     this.ap = null;
@@ -980,19 +981,21 @@ const OPCOES = [
   ['replay', '🎞 Replay no fim', 'abre o replay visto de cima na sua tela; você decide se mostra a todos'],
   ['linha', '👥 Linha de iniciativa no 3D', 'retratos no topo: quem age, quem vem depois e ??? para o Filho oculto'],
 ];
+// seção "Filhos na perseguição" do bloco único "Perseguição (Sobrevivendo ao Horror)" (aba Mesa).
+// O h3 fica fora do div, como filho direto do bloco, para virar seção recolhível (paineis.js)
 function blocoMestre() {
-  const b = $('#blocoPersgM'); if (!b) return;
-  let c = $('#psFilhos', b);
-  if (!souMestre() || I().espiar) { if (c) c.remove(); return; }
+  const b = $('#blocoSahPers'); if (!b) return;
+  let c = $('#psFilhos', b), h = $('#psFilhosH', b);
+  if (!souMestre() || I().espiar) { if (c) c.remove(); if (h) h.remove(); return; }
   if (!c) {
+    h = document.createElement('h3'); h.id = 'psFilhosH'; h.textContent = 'Filhos na perseguição'; b.appendChild(h);
     c = document.createElement('div'); c.id = 'psFilhos'; c.className = 'ps-bloco'; b.appendChild(c);
     c.addEventListener('change', e => { const i = e.target.closest('[data-psc]'); if (i) A().definir(['cfg', 'perseg', i.dataset.psc], i.checked ? null : false); });
     c.addEventListener('click', e => { const x = e.target.closest('[data-ps]'); if (x) Piloto.clique(e); });
   }
   if (c.contains(document.activeElement) && document.activeElement.matches('input')) return;
   const vid = Piloto.podeUsar();
-  const html = `<h3>Filhos na perseguição</h3>
-    ${vid ? `<div class="ps-b-vez"><span>🐾 Vez de <b>${esc(nomeTk(tokens()[vid]))}</b></span><button type="button" class="btn-roxo" data-ps="mover">Mover Filho</button></div>` : ''}
+  const html = `${vid ? `<div class="ps-b-vez"><span>🐾 Vez de <b>${esc(nomeTk(tokens()[vid]))}</b></span><button type="button" class="btn-roxo" data-ps="mover">Mover Filho</button></div>` : ''}
     <div class="lista-apagao ps-chips">${OPCOES.map(([k, n, d]) => `<label class="chave" title="${esc(d)}"><input type="checkbox" data-psc="${k}" ${cfgP(k) !== false ? 'checked' : ''}><span>${esc(n)}</span></label>`).join('')}</div>
     <p class="mini">O piloto só sugere: a rota aparece no 3D e no mapa, e você confirma ou move à mão. Ele escolhe o alvo pelos sentidos cadastrados (audição, faro, trilha, vibração, visão…) e anda até o deslocamento da vez, respeitando portas, paredes, água, metal e a Zona Neutra. Valem para todos (em <code>mapa/cfg/perseg</code>).</p>`;
   if (c.dataset.h !== html) { c.dataset.h = html; c.innerHTML = html; }

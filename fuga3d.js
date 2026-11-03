@@ -1249,18 +1249,21 @@ const CSS_ESC = s => (window.CSS && CSS.escape ? CSS.escape(s) : String(s).repla
 /* =========================================================
    MESTRE: seção "Fuga dos jogadores" no bloco Perseguição
    ========================================================= */
+// seção "Fuga dos jogadores" do bloco único "Perseguição (Sobrevivendo ao Horror)" (aba Mesa).
+// O h3 fica fora do div, como filho direto do bloco, para virar seção recolhível (paineis.js)
 function blocoMestre() {
-  const pai = $('#blocoPersgM'); let b = $('#fugaCfgM');
-  if (!souMestre() || !pai || I().espiar) { if (b) b.hidden = true; return; }
-  if (!b) { b = document.createElement('div'); b.id = 'fugaCfgM'; b.className = 'fuga-cfg'; pai.appendChild(b); }
-  else if (b.parentNode !== pai) pai.appendChild(b);
-  b.hidden = false;
+  const pai = $('#blocoSahPers'); let b = $('#fugaCfgM'), h = $('#fugaCfgMH');
+  if (!souMestre() || !pai || I().espiar) { if (b) b.hidden = true; if (h) h.hidden = true; return; }
+  if (!b) {
+    h = document.createElement('h3'); h.id = 'fugaCfgMH'; h.textContent = 'Fuga dos jogadores'; pai.appendChild(h);
+    b = document.createElement('div'); b.id = 'fugaCfgM'; b.className = 'fuga-cfg'; pai.appendChild(b);
+  } else if (b.parentNode !== pai) { pai.appendChild(h); pai.appendChild(b); }
+  b.hidden = false; if (h) h.hidden = false;
   if (b.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
   const chip = (k, txt) => `<label class="chave"><input type="checkbox" data-fg="${k}" ${opc(k) ? 'checked' : ''}><span>${txt}</span></label>`;
   const radio = (k, v, txt) => `<label class="chave"><input type="radio" name="fg-${k}" data-fgr="${k}" value="${v}" ${opc(k) === v ? 'checked' : ''}><span>${txt}</span></label>`;
   const nB = barricadas().length;
-  const html = `<h3>Fuga dos jogadores</h3>
-    <p class="mini">O que as cobaias podem fazer no 3D para fugir. Teste do livro: criar e arrombar barricada é Força DT ${DT_FORCA} (SaH p. 90 e 91). O resto é da casa.</p>
+  const html = `<p class="mini">O que as cobaias podem fazer no 3D para fugir. Teste do livro: criar e arrombar barricada é Força DT ${DT_FORCA} (SaH p. 90 e 91). O resto é da casa.</p>
     ${chip('rota', 'Rota com custo: na vez do jogador, tocar no chão do 3D mostra o caminho e os metros')}
     ${chip('pega', '"Ele te pega aqui": até onde o Filho visível chega no próximo turno (nunca de oculto)')}
     <p class="fuga-grupo-t">👀 Olhar para trás (2 s) custa</p>

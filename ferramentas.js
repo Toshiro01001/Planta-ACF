@@ -1009,7 +1009,7 @@ function tudo() {
 A.aoMudar(tudo);
 document.addEventListener('acf-tudo', tudo);
 document.addEventListener('acf-segredos', tudo);
-setInterval(() => { if (A.mestre || A.aux) tudo(); }, 3000);   // reserva: nada fica preso esperando
+setInterval(() => { if ((A.mestre || A.aux) && !document.hidden) tudo(); }, 3000);   // reserva: nada fica preso esperando (aba escondida: espera)
 document.addEventListener('acf-perfil', () => setTimeout(tudo, 60));
 setTimeout(tudo, 900);
 window.ACF_FERRAMENTAS = { abrirNex, abrirParede, publicarNex, nexAtual, exportarSenhas, aplicarNex };

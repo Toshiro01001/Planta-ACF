@@ -2509,7 +2509,13 @@
    Ações: acao('ataque') a gaiola dá um tranco para a frente, a luz de dentro estoura e as duas pernas
    da frente se erguem e cravam os espetos no chão à frente; acao('revelar') a gaiola desce do teto com
    as pernas dobradas junto dela, dá um solavanco nas correntes e as pernas se desdobram uma a uma,
-   cravando no chão, enquanto a luz se acende. */
+   cravando no chão, enquanto a luz se acende.
+   Estados: estado('candelabro') ela sobe até o teto e finge ser um candelabro: as pernas se recolhem em
+   arcos simétricos como braços de lustre, cada ponta vira um castiçal com vela acesa (luz quente fraca,
+   só emissiva), uma coroa de velas acende no alto da gaiola, o núcleo roxo quase apaga e ela fica imóvel,
+   só com um balanço mínimo; para quem joga, a base com o anel e o nome somem enquanto dura o estado.
+   estado('solto') (o padrão) desfaz o disfarce: ela desce do teto com acao('revelar'). Um ataque ou uma
+   revelação durante o disfarce também o desfazem. */
 (() => {
   const NS = window.ACF3D = window.ACF3D || {};
   (NS.formasFilho = NS.formasFilho || {}).aranha_gaiola = {
@@ -2519,7 +2525,9 @@
       const V3 = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), CIMA = V3(0, 1, 0);
       const mat = o => guardar(new T.MeshStandardMaterial(o));
       const R = rng(707);
-      const TETO = 4.0, CENTRO = 3.0;
+      // altura do teto: a que o motor da sala passa (F.ALT) ou 4 m
+      const TETO = (typeof F.ALT === 'number' && F.ALT >= 3 ? F.ALT : 4.0), CENTRO = 3.0;
+      const SOBE = Math.min(.3, TETO - 3.7);   // quanto a gaiola sobe no disfarce de candelabro
 
       /* ================= utilidades ================= */
       function tubo(pts, raio, seg = 12, rad = 6, fechado = false) {
@@ -2675,24 +2683,49 @@
         Object.values(me).forEach(o => g.add(o)); me.j3.scale.setScalar(.7);
         pernas.push(Object.assign(me, { hip, ombro, pe0, alvo: pe0.clone(), H: V3(), O: V3(), K: V3(), A: V3(), ang, sx, i }));
       }));
+      /* ================= castiçais e velas do disfarce de candelabro ================= */
+      // por perna: um copinho de ferro na ponta do espeto, uma vela de cera e a chama (emissiva + halo); escala 0 fora do disfarce
+      const mCera = mat({ color: '#e6d9bd', roughness: .55, emissive: '#3a2a10', emissiveIntensity: .35 });
+      const mChama = mat({ color: '#ffe0a0', emissive: '#ffb040', emissiveIntensity: 2.2, roughness: .4 });
+      const [cHv, xHv] = tela(64, 64); { const gr = xHv.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,215,150,.9)'); gr.addColorStop(.4, 'rgba(255,160,70,.3)'); gr.addColorStop(1, 'rgba(255,130,40,0)'); xHv.fillStyle = gr; xHv.fillRect(0, 0, 64, 64); }
+      const mHaloV = guardar(new T.SpriteMaterial({ map: F.texCanvas(cHv), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+      const qCopo = guardar(torno(t => [.028 + .03 * t * t, t * .05], 6, 10)), qVela = guardar(new T.CylinderGeometry(.018, .022, .14, 10));
+      const qChama = guardar(new T.SphereGeometry(.028, 10, 8)); qChama.scale(1, 1.9, 1); qChama.translate(0, .03, 0);
+      const vela = (pai, h = 0) => { const v = F.G(); v.position.y = h; pai.add(v);
+        const copo = new T.Mesh(qCopo, mFerroE); v.add(copo);
+        const cera = new T.Mesh(qVela, mCera); cera.position.y = .11; v.add(cera);
+        const chama = new T.Mesh(qChama, mChama); chama.position.y = .19; v.add(chama);
+        const hv = new T.Sprite(mHaloV); hv.scale.set(.32, .4, 1); hv.position.y = .22; v.add(hv);
+        v.scale.setScalar(.0001); return { v, chama, hv, f: R() * 6.283 }; };
+      const velas = pernas.map(p => { const o = vela(g); p.vela = o; return o; });
+      // coroa de seis velas no alto da gaiola
+      const coroa = []; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .5, o = vela(corpo, Y(3.5)); o.v.position.set(Math.sin(a) * .34, Y(3.47), Math.cos(a) * .34); coroa.push(o); }
       const ORDEM = [0, 5, 2, 7, 4, 1, 6, 3];
       pernas.forEach((p, k) => { p.ordem = ORDEM.indexOf(pernas.indexOf(p)); });
       const ligar = (o, a, b) => { o.position.copy(a); const d = V3().subVectors(b, a); const L = d.length(); o.quaternion.setFromUnitVectors(CIMA, d.multiplyScalar(1 / L)); o.scale.set(1, L, 1); };
 
       /* ================= animação ================= */
       let fase = 0, kAnda = 0;
-      const tmp = V3(), perp = V3();
+      // disfarce de candelabro: modo pedido e o peso suave (0 = solta, 1 = candelabro)
+      let modo = 'solto', kCand = 0;
+      const meus = new Set();   // o que esta forma criou direto em g; o resto (base, anel, nome) é do site
+      const tmp = V3(), perp = V3(), tmpC = V3();
       const anim = (dt, t, andando) => {
-        kAnda += ((andando ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
+        kCand += ((modo === 'candelabro' ? 1 : 0) - kCand) * Math.min(1, dt * 2.2);
+        const kC = kCand * kCand * (3 - 2 * kCand), kL = 1 - kC;   // peso do disfarce e do "solta"
+        const kV = Math.max(.0001, Math.min(1, (kCand - .55) / .4));   // as velas só aparecem com os braços quase no lugar
+        kAnda += ((andando && kC < .5 ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
         fase += dt / 2.6 * kAnda;
-        // gaiola balança presa às correntes, mais quando anda
-        corpo.rotation.x = Math.sin(t * .9) * .025 + Math.sin(fase * 6.283 * 8) * .02 * kAnda + kAnda * .04;
-        corpo.rotation.z = Math.sin(t * .7 + 1) * .03 + tique(t, 7.3, .6, 1) * .05;
-        corpo.rotation.y = Math.sin(t * .23) * .08;
+        // gaiola balança presa às correntes, mais quando anda; quase parada no disfarce
+        const bal = 1 - kC * .85;
+        corpo.rotation.x = (Math.sin(t * .9) * .025 + Math.sin(fase * 6.283 * 8) * .02 * kAnda + kAnda * .04) * bal;
+        corpo.rotation.z = (Math.sin(t * .7 + 1) * .03 + tique(t, 7.3, .6, 1) * .05 * kL) * bal;
+        corpo.rotation.y = Math.sin(t * .23) * .08 * bal;
         acaoCorpo(dt, t);
+        corpo.position.y += SOBE * kC;
         corpo.updateMatrix();
-        // luz tremulando como lamparina, às vezes quase apaga
-        const pisca = .78 + .14 * Math.sin(t * 9 + Math.sin(t * 23)) + .08 * Math.sin(t * 31) - tique(t, 6.7, .25, 2) * .6;
+        // luz tremulando como lamparina, às vezes quase apaga; no disfarce, chama firme de vela
+        const pisca = (.78 + .14 * Math.sin(t * 9 + Math.sin(t * 23)) + .08 * Math.sin(t * 31) - tique(t, 6.7, .25, 2) * .6) * kL + (.9 + .06 * Math.sin(t * 7.3)) * kC;
         const pk = Math.max(0, pisca * AC.luz);
         luz.intensity = .9 * pk; mLuz.emissiveIntensity = 1.6 * pk; halo.material.opacity = Math.min(1, (.55 + .45 * pisca) * Math.min(1, AC.luz)); const hk = Math.min(1.35, Math.max(.3, AC.luz)); halo.scale.set(1.3 * hk, 1.6 * hk, 1);
         panos.forEach(pn => { pn.piv.rotation.x = Math.sin(t * .8 + pn.f) * .03; pn.piv.rotation.z = pn.z0 + Math.sin(t * .6 + pn.f * 2) * .03; });
@@ -2703,8 +2736,8 @@
           if (u < janela) { const v = u / janela, e = v * v * (3 - 2 * v); dz = passo * (-.5 + e); dy = Math.sin(v * Math.PI) * .7 + (v > .8 ? -.05 : 0); dx = Math.sin(v * Math.PI) * .25 * p.sx * 0; }
           else dz = passo * (.5 - (u - janela) / (1 - janela));
           dz *= kAnda; dy *= kAnda;
-          // parada: de vez em quando uma perna bate a ponta no chão, como dedos tamborilando
-          const toque = tique(t, 3.3 + k * .41, .35, k * 1.37) * (1 - kAnda);
+          // parada: de vez em quando uma perna bate a ponta no chão, como dedos tamborilando (não no disfarce)
+          const toque = tique(t, 3.3 + k * .41, .35, k * 1.37) * (1 - kAnda) * kL;
           p.alvo.set(p.pe0.x + dx, dy + toque * .28, p.pe0.z + dz);
           acaoPerna(p);
           p.H.copy(p.hip).applyMatrix4(corpo.matrix); p.O.copy(p.ombro).applyMatrix4(corpo.matrix);
@@ -2714,17 +2747,43 @@
           // tornozelo: a 58% da canela, com uma dobra para fora
           tmp.subVectors(p.alvo, p.K); perp.set(p.alvo.x, 0, p.alvo.z).normalize();
           p.A.copy(p.K).addScaledVector(tmp, .58).addScaledVector(perp, .22).y += .12;
+          if (kC > .001) {
+            // braço de lustre: sai do ombro, desce num arco e sobe de novo até o castiçal, em oito ângulos iguais
+            const aC = p.sx * (p.i + .5) * Math.PI / 4, sa = Math.sin(aC), ca = Math.cos(aC), yC = CENTRO + SOBE;
+            p.K.lerp(tmpC.set(sa * 1.2, yC - .22 + (p.i % 2) * .05, ca * 1.2), kC);
+            p.A.lerp(tmpC.set(sa * 1.5, yC - .14, ca * 1.5), kC);
+            p.alvo.lerp(tmpC.set(sa * 1.55, yC + .22, ca * 1.55), kC);
+            perp.set(p.alvo.x, 0, p.alvo.z).normalize();
+          }
           ligar(p.coxa, p.H, p.O); ligar(p.femur, p.O, p.K); ligar(p.tibia, p.K, p.A); ligar(p.espeto, p.A, p.alvo);
           p.j1.position.copy(p.O); p.j2.position.copy(p.K); p.j3.position.copy(p.A);
           p.pino.position.copy(p.K); p.pino.quaternion.setFromUnitVectors(CIMA, perp.set(-p.alvo.z, 0, p.alvo.x).normalize());
+          // a vela na ponta do espeto (só aparece no disfarce)
+          const vl = p.vela; vl.v.position.copy(p.alvo); vl.v.scale.setScalar(kV);
         });
+        // chamas: tremulam de leve, cada uma no seu ritmo; a coroa da gaiola acende junto
+        const chamaK = .85 + .15 * Math.sin(t * 8.1 + Math.sin(t * 19));
+        velas.concat(coroa).forEach((vl, i) => { const f = chamaK + .12 * Math.sin(t * 11 + vl.f); vl.chama.scale.set(f, .9 + .2 * Math.sin(t * 13 + vl.f), f); vl.hv.material.opacity = .9 * kV; });
+        coroa.forEach(vl => vl.v.scale.setScalar(kV));
+        mChama.emissiveIntensity = 2.2 * chamaK;
+        // núcleo roxo: pulsa; no disfarce quase apaga para não denunciar
         const pu = Math.pow(.5 + .5 * Math.sin(t * 1.25), 3);
-        nucleo.mNuc.emissiveIntensity = 1.4 + pu * 2.4 + AC.nuc; nucleo.hl.material.opacity = Math.min(1, .45 + pu * .55 + AC.nuc * .2);
+        nucleo.mNuc.emissiveIntensity = (1.4 + pu * 2.4 + AC.nuc) * (1 - kC * .97); nucleo.hl.material.opacity = Math.min(1, .45 + pu * .55 + AC.nuc * .2) * (1 - kC);
+        // para quem joga, a base com o anel e o nome (que o site pendura em g) somem no disfarce; o Mestre e o auxiliar continuam vendo
+        const A = window.ACF, esconder = kC > .6 && !(A && (A.mestre || A.aux));
+        g.children.forEach(ch => { if (meus.has(ch) || ch.userData.disfOv) return; const u = ch.userData;
+          if (esconder) { if (!u.cdEsc0) u.cdEsc0 = ch.scale.clone(); ch.scale.setScalar(.0001); u.cdLimpo = true; }
+          else if (u.cdLimpo) { ch.scale.copy(u.cdEsc0); u.cdLimpo = false; } });
+      };
+      /* ================= estado persistente: candelabro / solto ================= */
+      const estado = nome => {
+        if (nome === 'candelabro') { modo = 'candelabro'; ac = null; }
+        else if (nome === 'solto' && modo === 'candelabro') { modo = 'solto'; acao('revelar'); }
       };
       /* ================= ações únicas: ataque e revelar ================= */
       let ac = null;
       const AC = { luz: 1, nuc: 0, u: 0 };
-      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.6 : 2.0 }; };
+      const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') { modo = 'solto'; ac = { tipo, t: 0, dur: tipo === 'ataque' ? 1.6 : 2.0 }; } };
       // curva por quadros-chave [[tempo, valor], ...], suavizada entre os quadros
       const qd = (u, l) => { if (u <= l[0][0]) return l[0][1]; for (let i = 1; i < l.length; i++) if (u <= l[i][0]) { const f = (u - l[i - 1][0]) / (l[i][0] - l[i - 1][0]); return l[i - 1][1] + (l[i][1] - l[i - 1][1]) * f * f * (3 - 2 * f); } return l[l.length - 1][1]; };
       const frente = [pernas[0], pernas[4]], dobra = V3();
@@ -2766,8 +2825,9 @@
           p.alvo.lerp(dobra, 1 - abre);
         }
       }
+      g.children.forEach(ch => meus.add(ch));
       anim(0, 0, false);
-      return { g, alt: 3.9, raioBase: .6, anim, acao };
+      return { g, alt: 3.9, raioBase: .6, anim, acao, estado };
     },
   };
 })();
@@ -7763,6 +7823,8 @@
   /* Fera curvada de pelo branco-acinzentado empapado de sangue, costelas vermelhas expostas, chifres ao longo dos
      ombros, bocarra que se abre na vertical cheia de dentes, um olho vermelho aceso, braços longos de garras,
      pernas dobradas para trás e cauda. Parada, parece inquieta: fareja e sacode a cabeça.
+     Escala: o corpo inteiro é montado em metros de "fera pequena" e depois ampliado por ESCALA (1,35), ficando
+     com uns 3 m de altura curvada (as pontas do pelo passam disso); o tronco fica um pouco mais curvado.
      Ações: acao('ataque') agacha e dá o bote com as duas garras, a bocarra escancarada;
             acao('revelar') sai encolhida do chão, se ergue de braços abertos e urra para o alto com o olho em brasa. */
   (NS.formasFilho = NS.formasFilho || {}).fera_pelo = {
@@ -7770,6 +7832,7 @@
     criar: (F, s) => {
       const K = kit(F, s), { T, L, mat, tubo, bolha, malha, junta, juntar, por, pintar, fbm, sm } = K;
       const g = new T.Group(), r2 = K.rngDe(919);
+      const ESCALA = 1.35;   // ampliação do corpo inteiro (a base da miniatura não entra)
 
       /* ---------- texturas: mecha de pelo (recorte por alfa), pele por baixo, carne e osso ---------- */
       const [cp, xp] = K.tela(256, 256); xp.clearRect(0, 0, 256, 256);
@@ -7837,7 +7900,7 @@
       const peca = (pai, geo, nPelo, oPelo, mBase = mPele) => { const pg = pelo(geo, Math.round(nPelo * 1.5), oPelo); malha(pai, geo, mBase); if (pg.attributes.position.count) malha(pai, pg, mPelo); };
       const tomPele = (escuro = 0) => q => { const v = (.75 + fbm(q.x * 8, q.y * 8, q.z * 8) * .4) * (1 - escuro); return [v, v * .97, v * .94]; };
 
-      const corpo = junta(g, 0, 0, 0);
+      const corpo = junta(g, 0, 0, 0); corpo.scale.setScalar(ESCALA);
       const quadril = junta(corpo, 0, 1.12, 0);
       peca(quadril, tubo([[0, -.14, -.1], [0, .04, 0], [0, .2, .06]], [[.2, .18], [.23, .2], [.25, .22]], { nr: 16, nl: 10, cor: tomPele(), ruido: .02 }), 260, { len: .13, wid: .06, fluxo: [0, -1, -.4], cor: b => corPelo(.2 + Math.max(0, b.z) * 2)(b) });
 
@@ -7882,7 +7945,7 @@
       costelas.push(tubo([[0, .12, .225], [0, .3, .25], [0, .55, .235]], [.016, .02, .015], { nr: 6, nl: 10, cor: [.5, .22, .2] }));
       malha(peito, juntar(costelas), mCostela);
       const nuc = K.nucleo(peito, .055, [0, .37, .2], [0, 0, 0], { pernas: 8 });
-      const luz = new T.PointLight(L('#9a3cff'), .6, .65, 2); luz.position.set(0, .37, .24); peito.add(luz);
+      const luz = new T.PointLight(L('#9a3cff'), .6, .65 * ESCALA, 2); luz.position.set(0, .37, .24); peito.add(luz);
       // sangue escorrendo das costelas
       malha(peito, juntar(Array.from({ length: 7 }, () => { const xx = (r2() - .5) * .4, y0 = .15 + r2() * .35, l = .05 + r2() * .12; return tubo([[xx, y0, .24], [xx, y0 - l * .6, .245], [xx + (r2() - .5) * .01, y0 - l, .24]], [.006, .005, .009], { nr: 5, nl: 5, fim: 1 }); })), mSangue);
 
@@ -7967,7 +8030,7 @@
         const fz = fareja > 0 ? Math.sin(tt * 34) * .05 : 0;
         const acaoK = Math.max(agA, bote, enc, urro), livre = 1 - acaoK;
         cab.rotation.y = cr[0] * livre; cab.rotation.z = cr[1] * .6 * livre + tremeU; cab.rotation.x = -.2 + (cr[2] * .5 + fz) * livre + agA * .3 - bote * .35 + enc * .5 - urro * .5;
-        pesc.rotation.y = cr[0] * .3 * livre; pesc.rotation.x = -.55 + fz * .5 + Math.sin(tt * 1.3) * .04 - agA * .1 - bote * .25 + enc * .3 - urro * .2;
+        pesc.rotation.y = cr[0] * .3 * livre; pesc.rotation.x = -.6 + fz * .5 + Math.sin(tt * 1.3) * .04 - agA * .1 - bote * .25 + enc * .3 - urro * .2;
         let abre = estalo > 0 ? Math.abs(Math.sin(estalo * 14)) : .65 + Math.sin(tt * .8) * .15 + (fareja > 0 ? -.3 : 0);
         abre = abre * (1 - acaoK) + acaoK * (agA * .2 + bote * 1.45 + enc * .1 + urro * 1.5) + (bote + urro > .6 ? Math.sin(tt * 38) * .06 : 0);
         maxila.rotation.x = -.15 - abre * .45; mand.rotation.x = .15 + abre * .6;
@@ -7982,10 +8045,11 @@
           ap(p.joelho.rotation, 'x', -lev * .35 * R + dobra * 1.1, vel, dt);
           ap(p.jarrete.rotation, 'x', lev * .5 * R - dobra * .55, vel, dt);
         });
-        corpo.position.y = -R * Math.abs(Math.cos(fase)) * .05 + (1 - R) * resp * .008 - agA * .12 - enc * .16 + bote * .05;
-        corpo.position.z = bote * .38 - agA * .05;
+        // os dedos dos pés ficam no chão (o corpo ampliado sobe um pouco); o resto em escala
+        corpo.position.y = (.08 - R * Math.abs(Math.cos(fase)) * .05 + (1 - R) * resp * .008 - agA * .12 - enc * .16 + bote * .05) * ESCALA;
+        corpo.position.z = (bote * .38 - agA * .05) * ESCALA;
         corpo.rotation.z = R * sn * .05 + (1 - R) * Math.sin(tt * .9) * .025 + tremeU * .3;
-        peito.rotation.x = .78 + R * .1 + Math.sin(tt * 2.4) * .015 + agA * .3 + bote * .32 + enc * .55 - urro * .32; peito.rotation.y = (-R * sn * .12 + (1 - R) * cr[0] * .15) * livre;
+        peito.rotation.x = .84 + R * .1 + Math.sin(tt * 2.4) * .015 + agA * .3 + bote * .32 + enc * .55 - urro * .32; peito.rotation.y = (-R * sn * .12 + (1 - R) * cr[0] * .15) * livre;
         bracos.forEach((b, i) => {
           const s2 = i ? sn : -sn, tique = Math.sin(tt * 11 + i * 3) > .96 ? .25 : 0;
           // ataque: braços para trás no agacho e depois para a frente com as garras abertas; revelar: abertos para o alto
@@ -8001,7 +8065,7 @@
       };
       anim(0, 0, false);
       const caixa = new T.Box3().setFromObject(g);
-      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .6, anim, acao };
+      return { g, alt: +caixa.max.y.toFixed(2), raioBase: .8, anim, acao };
     },
   };
 })();
@@ -13520,4 +13584,290 @@
 (() => {
   const NS = window.ACF3D || {};
   Object.values(NS.formasFilho || {}).forEach(d => { const c = d.criar; d.criar = (F, s) => { NS.instalarBGU(); return c(F, s); }; });
+})();
+
+// LOD das formas detalhadas: três níveis por malha (detalhado < 8 m, médio 8-20 m, silhueta > 20 m), com histerese
+// (sem ida e volta na borda). A geometria de cada malha é trocada no lugar: a hierarquia, os ganchos anim/acao/estado,
+// os materiais e as InstancedMesh ficam iguais. Malhas que deformam vértices a cada quadro ficam sempre detalhadas.
+// Nível médio: ≤ 35% dos triângulos; silhueta: ≈ 12% e sem as peças miúdas. Decimação por agrupamento de vértices
+// (vertex clustering): rápida (uma passada por célula) e roda no aparelho quando a forma é montada.
+(() => {
+  const NS = window.ACF3D = window.ACF3D || {};
+  const LISOS = new Map();   // materiais lisos da silhueta, repartidos por todas as formas
+  const LOD = NS.lodFormas = { perto: 8, longe: 20, hist: 1.5, kMedio: .35, kLonge: .12, minTri: 16, ligado: true };
+  function triangulos(g) { return Math.floor((g.index ? g.index.count : g.attributes.position.count) / 3); }
+  // Decimação por colapso de arestas com erro quádrico (QEM, meia-aresta): o vértice que fica mantém posição, UV,
+  // cor e normal originais, então a aparência não muda, só perde detalhe. O erro é relativo à escala local (aresta
+  // média em volta do vértice): fios, pernas, correntes e cabelos simplificam ao longo do comprimento e não colapsam no
+  // diâmetro (era o que deixava pedaços soltos). Bordas abertas são protegidas. Garantia por peça conexa: se uma peça
+  // perde área (kArea) ou extensão, ela volta inteira com a geometria original. Peças miúdas (miudaMin) somem só na
+  // silhueta (> 20 m).
+  function decimar(T, g, k, miudaMin, kArea) {
+    const pa = g.attributes.position; if (pa.itemSize !== 3 || pa.isInterleavedBufferAttribute) return null;
+    for (const nm in g.attributes) if (g.attributes[nm].isInterleavedBufferAttribute) return null;
+    const P = pa.array, nv = pa.count, ix = g.index ? g.index.array : null, nt = triangulos(g);
+    const U = g.attributes.uv ? g.attributes.uv.array : null;
+    // solda por posição
+    const wid = new Int32Array(nv), ch = new Map(), mem = [];
+    for (let i = 0; i < nv; i++) { const kk = Math.round(P[i * 3] * 1e5) + ',' + Math.round(P[i * 3 + 1] * 1e5) + ',' + Math.round(P[i * 3 + 2] * 1e5); let w = ch.get(kk); if (w === undefined) { w = mem.length; ch.set(kk, w); mem.push([]); } wid[i] = w; mem[w].push(i); }
+    const W = mem.length, wp = new Float64Array(W * 3);
+    for (let w = 0; w < W; w++) { const i = mem[w][0]; wp[w * 3] = P[i * 3]; wp[w * 3 + 1] = P[i * 3 + 1]; wp[w * 3 + 2] = P[i * 3 + 2]; }
+    const C = new Int32Array(nt * 3);   // cantos (vértice original)
+    for (let t = 0; t < nt * 3; t++) C[t] = ix ? ix[t] : t;
+    const TW = new Int32Array(nt * 3); for (let t = 0; t < nt * 3; t++) TW[t] = wid[C[t]];
+    const vivo = new Uint8Array(nt);
+    // peças conexas (union-find nos soldados)
+    const pai = new Int32Array(W); for (let w = 0; w < W; w++) pai[w] = w;
+    const raiz = x => { while (pai[x] !== x) { pai[x] = pai[pai[x]]; x = pai[x]; } return x; };
+    for (let t = 0; t < nt; t++) { const a = raiz(TW[t * 3]), b = raiz(TW[t * 3 + 1]); if (a !== b) pai[b] = a; const c = raiz(TW[t * 3 + 2]), a2 = raiz(a); if (a2 !== c) pai[c] = a2; }
+    const pecaT = new Int32Array(nt); for (let t = 0; t < nt; t++) pecaT[t] = raiz(TW[t * 3]);
+    // área, caixa e triângulos por peça
+    const pc = new Map();
+    const nrm = (a, b, c, o) => { const ux = wp[b * 3] - wp[a * 3], uy = wp[b * 3 + 1] - wp[a * 3 + 1], uz = wp[b * 3 + 2] - wp[a * 3 + 2], vx = wp[c * 3] - wp[a * 3], vy = wp[c * 3 + 1] - wp[a * 3 + 1], vz = wp[c * 3 + 2] - wp[a * 3 + 2]; o[0] = uy * vz - uz * vy; o[1] = uz * vx - ux * vz; o[2] = ux * vy - uy * vx; return Math.hypot(o[0], o[1], o[2]); };
+    const nn = [0, 0, 0];
+    for (let t = 0; t < nt; t++) {
+      let q = pc.get(pecaT[t]); if (!q) pc.set(pecaT[t], q = { a0: 0, a1: 0, tris: [], lo: [1e9, 1e9, 1e9], hi: [-1e9, -1e9, -1e9], fora: false });
+      const a = TW[t * 3], b = TW[t * 3 + 1], c = TW[t * 3 + 2];
+      q.tris.push(t); if (a === b || b === c || a === c) continue;
+      q.a0 += nrm(a, b, c, nn) / 2; vivo[t] = 1;
+      for (const w of [a, b, c]) for (let e = 0; e < 3; e++) { const v = wp[w * 3 + e]; if (v < q.lo[e]) q.lo[e] = v; if (v > q.hi[e]) q.hi[e] = v; }
+    }
+    pc.forEach(q => { q.a1 = q.a0; });
+    if (miudaMin) pc.forEach(q => { if (Math.max(q.hi[0] - q.lo[0], q.hi[1] - q.lo[1], q.hi[2] - q.lo[2]) < miudaMin) { q.fora = true; q.tris.forEach(t => { vivo[t] = 0; }); } });
+    let vivos = 0; for (let t = 0; t < nt; t++) vivos += vivo[t];
+    const alvo = Math.floor(nt * k);
+    // quádricas, adjacência e escala local
+    const Q = new Float64Array(W * 10), vt = Array.from({ length: W }, () => []), esc = new Float64Array(W), escN = new Float64Array(W);
+    const addQ = (w, a, b, c, d, peso) => { const o = w * 10; Q[o] += peso * a * a; Q[o + 1] += peso * a * b; Q[o + 2] += peso * a * c; Q[o + 3] += peso * a * d; Q[o + 4] += peso * b * b; Q[o + 5] += peso * b * c; Q[o + 6] += peso * b * d; Q[o + 7] += peso * c * c; Q[o + 8] += peso * c * d; Q[o + 9] += peso * d * d; };
+    const arestas = new Map();
+    for (let t = 0; t < nt; t++) {
+      if (!vivo[t]) continue;
+      const a = TW[t * 3], b = TW[t * 3 + 1], c = TW[t * 3 + 2], L = nrm(a, b, c, nn);
+      vt[a].push(t); vt[b].push(t); vt[c].push(t);
+      const nx = nn[0] / L, ny = nn[1] / L, nz = nn[2] / L, d = -(nx * wp[a * 3] + ny * wp[a * 3 + 1] + nz * wp[a * 3 + 2]);
+      for (const w of [a, b, c]) addQ(w, nx, ny, nz, d, L / 2);
+      for (const [u, v] of [[a, b], [b, c], [c, a]]) {
+        const l = Math.hypot(wp[u * 3] - wp[v * 3], wp[u * 3 + 1] - wp[v * 3 + 1], wp[u * 3 + 2] - wp[v * 3 + 2]);
+        esc[u] += l; escN[u]++; esc[v] += l; escN[v]++;
+        const kk = u < v ? u * W + v : v * W + u; const e = arestas.get(kk); if (e) e.n++; else arestas.set(kk, { u, v, n: 1, t });
+      }
+    }
+    for (let w = 0; w < W; w++) esc[w] = escN[w] ? esc[w] / escN[w] : 1;
+    // bordas abertas: plano perpendicular com peso alto
+    arestas.forEach(e => {
+      if (e.n !== 1) return; const t = e.t, a = TW[t * 3], b = TW[t * 3 + 1], c = TW[t * 3 + 2], L = nrm(a, b, c, nn); if (!L) return;
+      const ex = wp[e.v * 3] - wp[e.u * 3], ey = wp[e.v * 3 + 1] - wp[e.u * 3 + 1], ez = wp[e.v * 3 + 2] - wp[e.u * 3 + 2];
+      let px = ey * nn[2] - ez * nn[1], py = ez * nn[0] - ex * nn[2], pz = ex * nn[1] - ey * nn[0]; const pl = Math.hypot(px, py, pz); if (!pl) return;
+      px /= pl; py /= pl; pz /= pl; const d = -(px * wp[e.u * 3] + py * wp[e.u * 3 + 1] + pz * wp[e.u * 3 + 2]), peso = 20 * (ex * ex + ey * ey + ez * ez);
+      addQ(e.u, px, py, pz, d, peso); addQ(e.v, px, py, pz, d, peso);
+    });
+    const erro = (w1, w2, x) => { const o1 = w1 * 10, o2 = w2 * 10, X = wp[x * 3], Y = wp[x * 3 + 1], Z = wp[x * 3 + 2]; const q = i => Q[o1 + i] + Q[o2 + i];
+      return q(0) * X * X + 2 * q(1) * X * Y + 2 * q(2) * X * Z + 2 * q(3) * X + q(4) * Y * Y + 2 * q(5) * Y * Z + 2 * q(6) * Y + q(7) * Z * Z + 2 * q(8) * Z + q(9); };
+    // fila de prioridade (heap binário) com invalidação preguiçosa
+    const ver = new Int32Array(W), morto = new Uint8Array(W), H = [];
+    const sobe = i => { const x = H[i]; while (i > 0) { const p = (i - 1) >> 1; if (H[p][0] <= x[0]) break; H[i] = H[p]; i = p; } H[i] = x; };
+    const desce = i => { const n = H.length, x = H[i]; for (;;) { let m = i * 2 + 1; if (m >= n) break; if (m + 1 < n && H[m + 1][0] < H[m][0]) m++; if (H[m][0] >= x[0]) break; H[i] = H[m]; i = m; } H[i] = x; };
+    const poe = (u, v) => {
+      const s2 = Math.max(1e-12, Math.min(esc[u], esc[v]) ** 2);
+      const cuv = erro(u, v, v), cvu = erro(u, v, u);
+      H.push(cuv <= cvu ? [Math.max(0, cuv) / s2, u, v, ver[u], ver[v]] : [Math.max(0, cvu) / s2, v, u, ver[v], ver[u]]); sobe(H.length - 1);
+    };
+    arestas.forEach(e => poe(e.u, e.v));
+    const n0 = [0, 0, 0], n1 = [0, 0, 0];
+    let guarda = nt * 80 + 1000;
+    while (vivos > alvo && H.length && guarda-- > 0) {
+      const top = H[0], last = H.pop(); if (H.length) { H[0] = last; desce(0); }
+      const [, a, b, va, vb] = top;
+      if (morto[a] || morto[b] || ver[a] !== va || ver[b] !== vb) continue;
+      // a -> b: confere dobra de normais nos triângulos que só têm a
+      let ok = true;
+      for (const t of vt[a]) {
+        if (!vivo[t]) continue; const o = t * 3; const x = TW[o], y = TW[o + 1], z = TW[o + 2];
+        if (x === b || y === b || z === b) continue;
+        const L0 = nrm(x, y, z, n0); const L1 = nrm(x === a ? b : x, y === a ? b : y, z === a ? b : z, n1);
+        if (L1 < L0 * .05 || (n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2]) < .3 * L0 * L1) { ok = false; break; }
+      }
+      if (!ok) continue;
+      // a peça não pode perder área (kArea) nem encolher a caixa: o vértice da ponta não entra para dentro
+      const q = pc.get(pecaT[vt[a].find(t => vivo[t]) ?? vt[b][0]]);
+      if (q) {
+        let dA = 0;
+        for (const t of vt[a]) {
+          if (!vivo[t]) continue; const o = t * 3, x = TW[o], y = TW[o + 1], z = TW[o + 2], L0 = nrm(x, y, z, n0) / 2;
+          if (x === b || y === b || z === b) dA -= L0; else dA += nrm(x === a ? b : x, y === a ? b : y, z === a ? b : z, n1) / 2 - L0;
+        }
+        if (q.a1 + dA < q.a0 * kArea) continue;
+        const em = Math.max(q.hi[0] - q.lo[0], q.hi[1] - q.lo[1], q.hi[2] - q.lo[2]); let borda = false;
+        for (let e = 0; e < 3 && !borda; e++) { const ex = q.hi[e] - q.lo[e]; if (ex < em * .02) continue; const pa_ = wp[a * 3 + e], pb_ = wp[b * 3 + e];
+          if (pa_ <= q.lo[e] + ex * .01 && pb_ > q.lo[e] + ex * .1) borda = true; if (pa_ >= q.hi[e] - ex * .01 && pb_ < q.hi[e] - ex * .1) borda = true; }
+        if (borda) continue;
+        q.a1 += dA;
+      }
+      // colapsa
+      for (const t of vt[a]) {
+        if (!vivo[t]) continue; const o = t * 3;
+        if (TW[o] === b || TW[o + 1] === b || TW[o + 2] === b) { vivo[t] = 0; vivos--; continue; }
+        for (let j = 0; j < 3; j++) if (TW[o + j] === a) {
+          TW[o + j] = b;
+          // o canto passa para um vértice original de b (o de UV mais próximo, para não esticar a textura)
+          const ci = C[o + j]; let melhor = mem[b][0], dm = 1e18;
+          if (U) for (const m of mem[b]) { const du = U[m * 2] - U[ci * 2], dv = U[m * 2 + 1] - U[ci * 2 + 1], dd = du * du + dv * dv; if (dd < dm) { dm = dd; melhor = m; } }
+          C[o + j] = melhor;
+        }
+        vt[b].push(t);
+      }
+      for (let i = 0; i < 10; i++) Q[b * 10 + i] += Q[a * 10 + i];
+      morto[a] = 1; vt[a] = []; ver[b]++;
+      vt[b] = vt[b].filter(t => vivo[t]);
+      const viz = new Set(); for (const t of vt[b]) for (let j = 0; j < 3; j++) { const w = TW[t * 3 + j]; if (w !== b) viz.add(w); }
+      viz.forEach(w => { ver[w]++; });
+      viz.forEach(w => { for (const t of vt[w]) { if (!vivo[t]) continue; for (let j = 0; j < 3; j++) { const x = TW[t * 3 + j]; if (x !== w && x < w || x === b) poe(Math.min(x, w), Math.max(x, w)); } } });
+    }
+    if (LOD.dbg) LOD.dbg.push(['qem', nt, vivos, alvo, H.length]);
+    // garantia por peça: área e extensão
+    pc.forEach(q => {
+      if (q.fora) return; let a1 = 0; const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+      q.tris.forEach(t => { if (!vivo[t]) return; const a = TW[t * 3], b = TW[t * 3 + 1], c = TW[t * 3 + 2]; a1 += nrm(a, b, c, nn) / 2; for (const w of [a, b, c]) for (let e = 0; e < 3; e++) { const v = wp[w * 3 + e]; if (v < lo[e]) lo[e] = v; if (v > hi[e]) hi[e] = v; } });
+      const em = Math.max(q.hi[0] - q.lo[0], q.hi[1] - q.lo[1], q.hi[2] - q.lo[2]);
+      let bom = a1 >= q.a0 * kArea; for (let e = 0; e < 3 && bom; e++) { const e0 = q.hi[e] - q.lo[e]; if (e0 > em * .02 && hi[e] - lo[e] < e0 * .88) bom = false; }
+      if (!bom) { q.tris.forEach(t => { vivo[t] = 2; }); if (LOD.dbg) LOD.dbg.push(['volta', q.tris.length, +(a1 / q.a0).toFixed(2)]); }   // volta a original
+    });
+    // monta a geometria: vértices originais usados, com todos os atributos (normais incluídas)
+    const usado = new Int32Array(nv).fill(-1), novo = [], idx = []; let tf = 0;
+    for (let t = 0; t < nt; t++) {
+      if (!vivo[t]) continue;
+      for (let j = 0; j < 3; j++) { const i = vivo[t] === 2 ? (ix ? ix[t * 3 + j] : t * 3 + j) : C[t * 3 + j]; if (usado[i] < 0) { usado[i] = novo.length; novo.push(i); } idx.push(usado[i]); }
+      tf++;
+    }
+    if (tf > nt * .92 && !miudaMin) return null;
+    if (!tf) { const v = new T.BufferGeometry(); v.setAttribute('position', new T.BufferAttribute(new Float32Array(0), 3)); v.setIndex([]); v.boundingSphere = new T.Sphere(new T.Vector3(), -1); return v; }
+    const r = new T.BufferGeometry();
+    for (const nm in g.attributes) { const at = g.attributes[nm], is = at.itemSize, src = at.array, dst = new src.constructor(novo.length * is); novo.forEach((i, j) => { for (let e = 0; e < is; e++) dst[j * is + e] = src[i * is + e]; }); r.setAttribute(nm, new T.BufferAttribute(dst, is, at.normalized)); }
+    r.setIndex(novo.length > 65535 ? new T.BufferAttribute(new Uint32Array(idx), 1) : new T.BufferAttribute(new Uint16Array(idx), 1));
+    if (!r.attributes.normal) r.computeVertexNormals();
+    r.computeBoundingSphere(); r.computeBoundingBox();
+    return r;
+  }
+  // prepara os níveis de todas as malhas de uma forma montada ({ g, anim, ... }) e instala r.lod(dist)
+  NS.prepararLOD = function (F, r) {
+    const T = F.T || window.THREE; if (!T || !r || !r.g || !LOD.ligado) return r;
+    const malhas = [];
+    let alt = r.alt || 2;
+    r.g.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.isSprite) return;
+      const g = o.geometry; if (!g || !g.attributes || !g.attributes.position || g.morphAttributes && Object.keys(g.morphAttributes).length) return;
+      { const pa = g.attributes.position.array; for (let i = 0; i < pa.length; i++) if (!isFinite(pa[i])) return; }   // posição inválida: fica como está, sem LOD
+      if (Array.isArray(o.material)) return;   // vários materiais na mesma geometria (grupos): fica detalhada
+      if (triangulos(g) < LOD.minTri) { malhas.push({ o, g, niveis: [g, g, g], v0: g.attributes.position.version }); return; }   // miúda: não decima, mas entra na silhueta
+      let m = null, l = null;
+      try { m = decimar(T, g, LOD.kMedio, 0, .8); l = decimar(T, g, LOD.kLonge, alt * .015, .65) || m; } catch (e) { m = l = null; }
+      if (l && m && l !== m && triangulos(l) >= triangulos(m)) { l.dispose(); l = m; }   // a silhueta nunca pesa mais que o médio
+      if (m) F.guardar(m); if (l && l !== m) F.guardar(l);
+      malhas.push({ o, g, niveis: [g, m || g, l || m || g], v0: g.attributes.position.version });
+    });
+    const tri = [0, 0, 0];
+    malhas.forEach(x => { for (let i = 0; i < 3; i++) tri[i] += x.niveis ? triangulos(x.niveis[i]) : triangulos(x.g); });
+    // silhueta (> 20 m): as malhas do nível de longe fundidas por material (poucas chamadas de desenho por forma).
+    // A malha fundida é REASSADA a partir das matrizes atuais da animação (até ~15 vezes por segundo, só enquanto a
+    // forma está longe): a pose é a mesma dos outros níveis, peça que some (visible) colapsa, e o material é o mesmo
+    // objeto (opacidade, brilho e piscadas continuam iguais).
+    let silhuetas = [];
+    const VAZIA = new T.BufferGeometry(); VAZIA.setAttribute('position', new T.BufferAttribute(new Float32Array(0), 3)); VAZIA.boundingSphere = new T.Sphere(new T.Vector3(), -1); F.guardar(VAZIA);
+    const visCadeia = o => { for (let p = o; p && p !== r.g; p = p.parent) if (!p.visible) return false; return true; };
+    const inv = new T.Matrix4(), nm = new T.Matrix3(), m4 = new T.Matrix4(), v = new T.Vector3();
+    try {
+      const porMat = new Map();
+      // materiais lisos (só cor, opacos, sem textura nem brilho) que a animação NÃO muda: um material só por
+      // (rugosidade, metal, lado), com a cor pintada nos vértices (a mesma conta do shader: cor × cor do vértice)
+      const imp = m => [m.color ? m.color.getHex() : '', m.emissive ? m.emissive.getHex() : '', m.emissiveIntensity, m.opacity, m.transparent, m.visible, m.map && m.map.uuid].join('|');
+      const mats = new Set(); malhas.forEach(x => { if (x.o.material && !Array.isArray(x.o.material)) mats.add(x.o.material); });
+      const imp0 = new Map(); mats.forEach(m => imp0.set(m, imp(m)));
+      const mudam = new Set();
+      if (typeof r.anim === 'function') {
+        [.37, 1.3, 2.9, 4.4, 6.1].forEach((t, i) => { try { r.anim(1 / 30, t, i % 2 === 1); } catch (e) {} mats.forEach(m => { if (imp(m) !== imp0.get(m)) mudam.add(m); }); });
+        try { r.anim(1 / 30, 0, false); } catch (e) {}
+        mats.forEach(m => { if (imp(m) !== imp0.get(m)) mudam.add(m); });
+      }
+      const liso = m => {
+        if (mudam.has(m) || !m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.map || m.emissiveMap || m.alphaMap || m.normalMap || m.roughnessMap || m.metalnessMap || m.aoMap || m.bumpMap || m.envMap) return null;
+        if (m.transparent || m.opacity < 1 || m.alphaTest || m.wireframe || m.flatShading || m.depthWrite === false || m.onBeforeCompile && String(m.onBeforeCompile).length > 40) return null;
+        if (m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b) && m.emissiveIntensity) return null;
+        const k = `${m.side}|${Math.round(m.roughness * 20)}|${Math.round(m.metalness * 20)}|${m.fog}`;
+        let L = LISOS.get(k); if (!L) { L = new T.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: Math.round(m.roughness * 20) / 20, metalness: Math.round(m.metalness * 20) / 20, side: m.side }); L.userData.lisoSil = true; LISOS.set(k, L); }
+        return L;
+      };
+      malhas.forEach(x => { if (!x.niveis || triangulos(x.niveis[2]) === 0 || Array.isArray(x.o.material)) return; x.naSil = true; const m = liso(x.o.material) || x.o.material; x.matSil = m; if (!porMat.has(m)) porMat.set(m, []); porMat.get(m).push(x); });
+      porMat.forEach((lista, mat) => {
+        let nv = 0, ni = 0; lista.forEach(x => { const g = x.niveis[2]; nv += g.attributes.position.count; ni += g.index.count; });
+        const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), eLiso = !!mat.userData.lisoSil, cor = eLiso || lista.some(x => x.niveis[2].attributes.color) ? new Float32Array(nv * 3) : null, idx = new Uint32Array(ni);
+        let ov = 0, oi = 0; const partes = [];
+        lista.forEach(x => {
+          const g = x.niveis[2], ua = g.attributes.uv, ca = g.attributes.color, c = g.attributes.position.count;
+          for (let i = 0; i < c; i++) {
+            if (ua) { uv[(ov + i) * 2] = ua.getX(i); uv[(ov + i) * 2 + 1] = ua.getY(i); }
+            if (cor) { const mc = eLiso ? x.o.material.color : null, r0 = mc ? mc.r : 1, g0 = mc ? mc.g : 1, b0 = mc ? mc.b : 1; if (ca) { cor[(ov + i) * 3] = ca.getX(i) * r0; cor[(ov + i) * 3 + 1] = ca.getY(i) * g0; cor[(ov + i) * 3 + 2] = ca.getZ(i) * b0; } else { cor[(ov + i) * 3] = r0; cor[(ov + i) * 3 + 1] = g0; cor[(ov + i) * 3 + 2] = b0; } }
+          }
+          const a = g.index.array; for (let i = 0; i < a.length; i++) idx[oi + i] = a[i] + ov; oi += a.length;
+          partes.push({ x, ov, c }); ov += c;
+        });
+        const geo = new T.BufferGeometry();
+        const pA = new T.BufferAttribute(pos, 3), nA = new T.BufferAttribute(nor, 3); pA.setUsage(T.DynamicDrawUsage); nA.setUsage(T.DynamicDrawUsage);
+        geo.setAttribute('position', pA); geo.setAttribute('normal', nA); geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+        if (cor) geo.setAttribute('color', new T.BufferAttribute(cor, 3));
+        geo.setIndex(new T.BufferAttribute(idx, 1)); F.guardar(geo);
+        const me = new T.Mesh(geo, mat); me.visible = false; me.castShadow = lista[0].o.castShadow; me.renderOrder = lista[0].o.renderOrder; me.userData.silhueta = true; me.raycast = () => {};
+        me.userData.partes = partes; r.g.add(me); silhuetas.push(me);
+      });
+    } catch (e) { silhuetas.forEach(me => r.g.remove(me)); silhuetas = []; malhas.forEach(x => { x.naSil = false; }); }
+    // reassa as silhuetas na pose atual
+    function assar() {
+      r.g.updateMatrixWorld(true); if (Math.abs(r.g.matrixWorld.determinant()) < 1e-12) return; inv.copy(r.g.matrixWorld).invert();
+      silhuetas.forEach(me => {
+        const pos = me.geometry.attributes.position.array, nor = me.geometry.attributes.normal.array;
+        me.userData.partes.forEach(({ x, ov, c }) => {
+          const g = x.naSil && x.niveis[2], p = g && g.attributes.position, na = g && g.attributes.normal;
+          if (!x.naSil || !visCadeia(x.o) || x.o.material !== (me.material.userData.lisoSil ? x.o.material : me.material) || (me.material.userData.lisoSil && x.matSil !== me.material)) { for (let i = ov * 3; i < (ov + c) * 3; i++) pos[i] = 0; return; }
+          m4.multiplyMatrices(inv, x.o.matrixWorld);
+          const e = m4.elements; let ok = true; for (let j = 0; j < 16; j++) if (!isFinite(e[j])) { ok = false; break; }
+          if (!ok || Math.abs(m4.determinant()) < 1e-12) { for (let i = ov * 3; i < (ov + c) * 3; i++) pos[i] = 0; return; }   // escala zero (sumiu): colapsa
+          nm.getNormalMatrix(m4);
+          for (let i = 0; i < c; i++) {
+            const X = p.getX(i), Y = p.getY(i), Z = p.getZ(i), k = (ov + i) * 3;
+            pos[k] = e[0] * X + e[4] * Y + e[8] * Z + e[12]; pos[k + 1] = e[1] * X + e[5] * Y + e[9] * Z + e[13]; pos[k + 2] = e[2] * X + e[6] * Y + e[10] * Z + e[14];
+            if (na) { v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); nor[k] = v.x || 0; nor[k + 1] = v.y || 0; nor[k + 2] = v.z || 0; }
+          }
+          for (let i = ov * 3; i < (ov + c) * 3; i++) if (!isFinite(pos[i])) { for (let j = ov * 3; j < (ov + c) * 3; j++) pos[j] = 0; break; }   // conta inválida: a peça some neste quadro, nunca NaN
+        });
+        me.geometry.attributes.position.needsUpdate = true; me.geometry.attributes.normal.needsUpdate = true; me.geometry.computeBoundingSphere();
+      });
+    }
+    let tAssar = 0;
+    r.silhuetas = silhuetas;
+    r.tri = tri; r.nivelLOD = 0;
+    r.lod = function (dist) {
+      const n0 = r.nivelLOD;
+      // histerese: só troca ao passar a borda com folga
+      let n = n0;
+      if (dist > LOD.longe + (n0 < 2 ? LOD.hist : 0)) n = 2; else if (dist < LOD.longe - (n0 >= 2 ? LOD.hist : 0) && dist > LOD.perto + (n0 < 1 ? LOD.hist : 0)) n = 1; else if (dist < LOD.perto - (n0 >= 1 ? LOD.hist : 0)) n = 0;
+      if (n === n0) { if (n === 2 && silhuetas.length) { const ag = performance.now(); if (ag - tAssar > 66) { tAssar = ag; assar(); } } return n0; }
+      r.nivelLOD = n;
+      const sil = n === 2 && silhuetas.length > 0;
+      malhas.forEach(x => {
+        if (!x.niveis) return;
+        // a malha deforma vértices a cada quadro (a versão do atributo mudou): fica sempre detalhada
+        if (x.g.attributes.position.version !== x.v0) { x.niveis = null; x.naSil = false; x.o.geometry = x.g; return; }
+        // a peça que está na silhueta (ou que some de longe) troca para uma geometria vazia: não mexe no visible,
+        // que é da animação da forma
+        let geo = sil ? (x.naSil ? VAZIA : x.niveis[2]) : x.niveis[n];
+        if (triangulos(geo) === 0) geo = VAZIA;
+        if (x.o.geometry !== geo) x.o.geometry = geo;
+      });
+      if (sil) { tAssar = performance.now(); assar(); }
+      silhuetas.forEach(me => { me.visible = sil; });
+      return n;
+    };
+    return r;
+  };
+  // toda forma passa pelo preparo (o BufferGeometryUtils já foi instalado pela camada de baixo)
+  Object.values(NS.formasFilho || {}).forEach(d => { const c = d.criar; if (!c || c.__lod) return; d.criar = (F, s) => { const r = c(F, s); try { NS.prepararLOD(F, r); } catch (e) { console.warn('3D LOD:', e); } return r; }; d.criar.__lod = 1; });
 })();

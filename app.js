@@ -21,6 +21,8 @@ const H  = W;                       // altura total
 const TV = new URLSearchParams(location.search).has('tv');   // tela da mesa
 const $  = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+// atribui innerHTML só se a string mudou (o DOM já está igual); devolve true quando redesenhou
+const porHtml = (el, html) => { if (!el) return false; if (el.__html === html && (html === '' || el.firstChild)) return false; el.__html = html; el.innerHTML = html; return true; };
 const SER = Object.fromEntries(SERES.map(s => [s.id, s]));
 
 /* ---------- Geometria das salas ---------- */
@@ -187,7 +189,28 @@ const Store = {
   db: null, auth: null,
 
   aoMudar(fn) { this.ouvintes.push(fn); },
-  avisar() { this.ouvintes.forEach(fn => fn(this.state)); },
+  // várias chegadas no mesmo instante viram um só aviso (no máximo um redesenho por quadro); o ramo que mudou
+  // fica em "mudou" (Set) para quem quiser redesenhar só o que precisa. Aba escondida: o quadro não vem, vale o prazo.
+  sujo: new Set(), mudou: null, agendado: false, tAviso: null,
+  avisar(ramo) {
+    this.sujo.add(ramo || '*');
+    if (this.agendado) return;
+    this.agendado = true;
+    const rodar = () => { if (!this.agendado) return; this.agendado = false; clearTimeout(this.tAviso); this.tAviso = null; this.avisarAgora(); };
+    // aba escondida: sem quadros e com os timers freados pelo navegador; roda logo depois da tarefa atual
+    if (document.hidden) { Promise.resolve().then(rodar); return; }
+    this.tAviso = setTimeout(rodar, 40);
+    try { requestAnimationFrame(rodar); } catch (e) {}
+  },
+  avisarAgora() {
+    this.agendado = false; clearTimeout(this.tAviso); this.tAviso = null;
+    const s = this.sujo; this.sujo = new Set(); this.mudou = s;
+    try { this.ouvintes.forEach(fn => fn(this.state)); } finally { this.mudou = null; }
+  },
+  // ramo mudou desde o último aviso? (sem ramo: tudo pode ter mudado)
+  mudouRamo(...ramos) { const m = this.mudou; return !m || m.has('*') || ramos.some(r => m.has(r)); },
+  // neste aviso só mudaram tokens (o caso de longe mais comum: alguém andando)
+  soTokens() { const m = this.mudou; return !!m && m.size === 1 && m.has('tokens'); },
 
   async iniciar() {
     if (FIREBASE) return this.iniciarFirebase();
@@ -242,20 +265,39 @@ const Store = {
       Chat.ligar();
     });
     this.db.ref('.info/connected').on('value', s => { this.conectado = !!s.val(); mostrarConexao(); });
-    this.db.ref('mapa').on('value', snap => {
-      const v = snap.val();
-      if (v) {
-        this.pub = v;
-        this.vazio = false;
-        this.compor();
-      } else {
+    // uma foto inteira do mapa na entrada; depois só chega o que mudou: cada token de mapa/tokens por evento de
+    // filho e cada outro ramo (portas, persg, fuga…) inteiro, em vez de a árvore toda a cada gravação de qualquer um
+    const refMapa = this.db.ref('mapa');
+    const aplicarMapa = v => {
+      if (v) { this.pub = v; this.vazio = false; this.compor(); }
+      else {
         this.pub = null;
         this.state = estadoPadrao();
         this.vazio = true;
         if (mestre) { this.vazio = false; this.gravarTudo(); }
       }
-      this.avisar();
-    });
+    };
+    const ligarRamos = () => {
+      const tokens = refMapa.child('tokens');
+      const tok = s => { if (!this.pub) this.pub = {}; (this.pub.tokens || (this.pub.tokens = {}))[s.key] = s.val(); this.vazio = false; this.comporTokens(); this.avisar('tokens'); };
+      tokens.on('child_added', s => tok(s));
+      tokens.on('child_changed', s => tok(s));
+      tokens.on('child_removed', s => { if (this.pub && this.pub.tokens) delete this.pub.tokens[s.key]; this.comporTokens(); this.avisar('tokens'); });
+      const ramo = s => {
+        const k = s.key; if (k === 'tokens') return;
+        if (!this.pub) this.pub = {};
+        this.pub[k] = s.val(); this.vazio = false; this.compor(); this.avisar(k);
+      };
+      refMapa.on('child_added', s => ramo(s));
+      refMapa.on('child_changed', s => ramo(s));
+      refMapa.on('child_removed', s => {
+        const k = s.key; if (k === 'tokens' || !this.pub) return;
+        delete this.pub[k];
+        if (!Object.keys(this.pub).length) aplicarMapa(null); else this.compor();
+        this.avisar(k);
+      });
+    };
+    refMapa.once('value').then(snap => { aplicarMapa(snap.val()); this.avisar(); ligarRamos(); }).catch(e => { console.error('mapa:', e && e.message); ligarRamos(); });
     Arquivos.ligar();
     Cores.ligar();
   },
@@ -266,6 +308,11 @@ const Store = {
     const v = this.pub || {};
     this.state = { ...CAMPOS_VAZIOS(), ...v, tokens: { ...(v.tokens || {}), ...(this.privTok || {}) } };
   },
+  // só os tokens mudaram: o resto do estado fica como está
+  comporTokens() {
+    const v = this.pub || {};
+    this.state.tokens = { ...(v.tokens || {}), ...(this.privTok || {}) };
+  },
 
   // login invisível do jogador/auxiliar; quem chamar espera ele terminar
   garantirLogin() {
@@ -275,7 +322,9 @@ const Store = {
   },
 
   // caminho: ['tokens', id] ou ['rev', 'a1']; valor null apaga
-  definir(caminho, valor) {
+  // campos (só para ['tokens', id]): o token já existe e só esses campos mudaram; vai um update dos campos
+  // em vez do token inteiro (menos bytes e um só evento de filho em quem escuta)
+  definir(caminho, valor, campos) {
     // auxiliar não cria token no mapa público: token que mora no privado e deixou de ser oculto
     // fica no privado com "pp" (a tela do Mestre publica, como no robô)
     // e não apaga token do mapa público: token público que ganhou forma de objeto ou ocultação especial continua
@@ -306,14 +355,22 @@ const Store = {
         if (valor === null) ops = [naPub || !naPriv ? ['mapa/tokens/' + id, null] : null, naPriv ? ['privado/tokens/' + id, null] : null].filter(Boolean);
         else if (ehPrivado(valor) && !forcarPub) ops = [['privado/tokens/' + id, valor]].concat(naPub ? [['mapa/tokens/' + id, null]] : []);
         else ops = [['mapa/tokens/' + id, valor]].concat(naPriv ? [['privado/tokens/' + id, null]] : []);
+        // só alguns campos mudaram e o token fica onde está: update dos campos
+        if (campos && campos.length && ops.length === 1 && ops[0][1] === valor) {
+          const antes = (ops[0][0].startsWith('privado/') ? this.privTok : (this.pub && this.pub.tokens) || {})[id];
+          if (antes && Object.keys(valor).every(c => campos.includes(c) || Object.is(antes[c], valor[c]) || (typeof antes[c] === 'object' && JSON.stringify(antes[c]) === JSON.stringify(valor[c]))) && Object.keys(antes).every(c => c in valor)) {
+            const upd = {}; campos.forEach(c => { if (!Object.is(antes[c], valor[c])) upd[c] = valor[c] === undefined ? null : valor[c]; });
+            if (Object.keys(upd).length) ops = [[ops[0][0], upd, true]]; else ops = [];
+          }
+        }
       }
-      const enviar = () => ops.forEach(([cam, v]) => this.db.ref(cam).set(v).catch(erroGravacao));
+      const enviar = () => ops.forEach(([cam, v, upd]) => (upd ? this.db.ref(cam).update(v) : this.db.ref(cam).set(v)).catch(erroGravacao));
       if (mestre || this.auth.currentUser) enviar();
       else this.garantirLogin().then(enviar).catch(erroGravacao);
     } else {
       this.salvarLocal();
     }
-    this.avisar();
+    this.avisar(caminho[0]);
   },
 
   gravarTudo() {
@@ -342,7 +399,7 @@ const Segredos = {
     if (Store.modo === 'firebase') {
       if (this.ref) return;
       this.ref = Store.db.ref('segredos');
-      this.ref.on('value', s => { this.dados = s.val() || {}; this.pronto = true; document.dispatchEvent(new Event('acf-segredos')); atualizarTudo(); agendarSincMestre(); }, e => { console.error('segredos:', e && e.message); });
+      this.ref.on('value', s => { this.dados = s.val() || {}; if (Object.keys(Diario.fila).length) this.poeLocal(['_diario'], Diario.fila); this.pronto = true; document.dispatchEvent(new Event('acf-segredos')); atualizarTudo(); agendarSincMestre(); }, e => { console.error('segredos:', e && e.message); });
     } else {
       try { this.dados = JSON.parse(localStorage.getItem('acf-segredos') || '{}'); } catch (e) { this.dados = {}; }
       this.pronto = true;
@@ -364,7 +421,21 @@ const Segredos = {
     }
     const k = caminho[caminho.length - 1];
     if (valor === null) delete o[k]; else o[k] = valor;
+    if (caminho[0] === '_diario') Diario.cache = null;
     if (Store.modo === 'firebase') Store.db.ref('segredos/' + caminho.join('/')).set(valor).catch(erroGravacao);
+    else this.salvarLocal();
+  },
+  // só na memória desta tela (várias chaves de um ramo); o servidor recebe depois por gravarLote
+  poeLocal(caminho, obj) {
+    let o = this.dados;
+    caminho.forEach(k => { if (!o[k] || typeof o[k] !== 'object') o[k] = {}; o = o[k]; });
+    Object.entries(obj).forEach(([k, v]) => { if (v === null) delete o[k]; else o[k] = v; });
+    if (caminho[0] === '_diario') Diario.cache = null;
+  },
+  // várias chaves de um ramo numa só gravação
+  gravarLote(ramo, obj) {
+    this.poeLocal([ramo], obj);
+    if (Store.modo === 'firebase') Store.db.ref('segredos/' + ramo).update(obj).catch(erroGravacao);
     else this.salvarLocal();
   },
   // apaga várias chaves de uma vez dentro de um ramo
@@ -373,6 +444,7 @@ const Segredos = {
     const o = this.dados[ramo] || {};
     const upd = {};
     chaves.forEach(k => { delete o[k]; upd[k] = null; });
+    if (ramo === '_diario') Diario.cache = null;
     if (Store.modo === 'firebase') Store.db.ref('segredos/' + ramo).update(upd).catch(erroGravacao);
     else this.salvarLocal();
   },
@@ -424,6 +496,20 @@ const Rede = {
     try { this.canal && this.canal.postMessage({ caminho: c, valor: this.copia(v) }); } catch (e) {}
     this.notificar(c);
   },
+  // vários campos de um nó numa só gravação (valor null apaga o campo)
+  async update(c, obj) {
+    const o = {}; Object.entries(obj || {}).forEach(([k, v]) => { o[k] = v === undefined ? null : v; });
+    if (!Object.keys(o).length) return;
+    if (this.fb()) {
+      if (!mestre && !Store.auth.currentUser) await Store.garantirLogin();
+      return Store.db.ref(c).update(o);
+    }
+    this.iniciarLocal();
+    Object.entries(o).forEach(([k, v]) => this.gravarLocal(c + '/' + k, v));
+    try { localStorage.setItem('acf-rede', JSON.stringify(this.arvore)); } catch (e) { aviso('Sem espaço no navegador para guardar isso (modo local).'); }
+    Object.entries(o).forEach(([k, v]) => { try { this.canal && this.canal.postMessage({ caminho: c + '/' + k, valor: this.copia(v) }); } catch (e) {} });
+    this.notificar(c);
+  },
   gravarLocal(c, v) {
     const ps = this.partes(c);
     let o = this.arvore;
@@ -472,14 +558,34 @@ const Priv = {
   dados: {}, pronto: false, off: null,
   ligar(sim) {
     if (sim && !this.off) {
-      this.off = Rede.on('privado', v => {
-        if (!this.pronto) Diario.reiniciar = true;
-        this.dados = v || {};
-        this.pronto = true;
-        if (Store.modo === 'firebase') { Store.privTok = this.dados.tokens || {}; Store.compor(); }
-        migrarOcultos();
-        Store.avisar();
-      }, () => {});
+      if (Store.modo !== 'firebase') {
+        this.off = Rede.on('privado', v => {
+          if (!this.pronto) Diario.reiniciar = true;
+          this.dados = v || {};
+          this.pronto = true;
+          migrarOcultos();
+          Store.avisar();
+        }, () => {});
+        return;
+      }
+      // Firebase: uma foto na entrada e depois só o que mudou (cada ficha oculta por evento de filho; os outros
+      // ramos inteiros), como no mapa público
+      const ref = Store.db.ref('privado');
+      const vivo = { on: true };
+      const foto = v => { if (!this.pronto) Diario.reiniciar = true; this.dados = v || {}; this.pronto = true; Store.privTok = this.dados.tokens || {}; Store.compor(); migrarOcultos(); Store.avisar(); };
+      const ligados = [];
+      const ouvir = (r, evt, fn) => { const h = s => { if (vivo.on) fn(s); }; r.on(evt, h, () => {}); ligados.push([r, evt, h]); };
+      const ligarRamos = () => {
+        const toks = ref.child('tokens');
+        const tok = s => { (this.dados.tokens || (this.dados.tokens = {}))[s.key] = s.val(); Store.privTok = this.dados.tokens; Store.comporTokens(); Store.avisar('tokens'); };
+        ouvir(toks, 'child_added', tok); ouvir(toks, 'child_changed', tok);
+        ouvir(toks, 'child_removed', s => { if (this.dados.tokens) delete this.dados.tokens[s.key]; Store.privTok = this.dados.tokens || {}; Store.comporTokens(); Store.avisar('tokens'); });
+        const ramo = s => { if (s.key === 'tokens') return; this.dados[s.key] = s.val(); Store.avisar(); };
+        ouvir(ref, 'child_added', ramo); ouvir(ref, 'child_changed', ramo);
+        ouvir(ref, 'child_removed', s => { if (s.key === 'tokens') return; delete this.dados[s.key]; Store.avisar(); });
+      };
+      ref.once('value').then(s => { if (!vivo.on) return; foto(s.val()); ligarRamos(); }).catch(e => { console.error('privado:', e && e.message); if (vivo.on) ligarRamos(); });
+      this.off = () => { vivo.on = false; ligados.forEach(([r, evt, h]) => { try { r.off(evt, h); } catch (e) {} }); };
     }
     if (!sim && this.off) {
       this.off(); this.off = null; this.dados = {}; this.pronto = false;
@@ -1133,7 +1239,8 @@ function desenharFichas() {
       f.style.left = px(pos.x); f.style.top = px(pos.y);
     }
     f.classList.toggle('em-fila', cheias.has(id));
-    $('.ficha-nome', f).textContent = rotuloFicha(tk, id);
+    const nomeEl = f._nome || (f._nome = $('.ficha-nome', f));
+    const rot = rotuloFicha(tk, id); if (nomeEl.textContent !== rot) nomeEl.textContent = rot;
     f.classList.toggle('na-vez', vezAtual() === id);
     f.classList.toggle('oculta', !!tk.h);
     f.classList.toggle('escondida', !!tk.esq);
@@ -1155,7 +1262,7 @@ function desenharFichas() {
     f.classList.toggle('no-grupo', grupo.has(id));
     const cs = condicoesVisiveis(id);
     const cTxt = cs.map(c => COND[c].i).join('');
-    const cEl = $('.ficha-cond', f);
+    const cEl = f._cond || (f._cond = $('.ficha-cond', f));
     if (cEl.textContent !== cTxt) { cEl.textContent = cTxt; cEl.title = cs.map(c => COND[c].n).join(', '); }
   });
 
@@ -1474,7 +1581,8 @@ function desenharCartaoSala() {
   const temSaida = saida && saida.p === p;
   const rev = salaRevelada(a, cn);
   c.style.setProperty('--cor', el2.cor);
-  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+  // mesmo conteúdo de antes: o cartão (e o que o Mestre abriu ou digitou nele) fica como está
+  if (!porHtml(c, `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
       <h3>CN ${String(cn).padStart(2, '0')}</h3><span class="cod">${nome || 'sem nome registrado'}</span></div></div>
     <p>Elemento: ${el2.nome}${temSaida ? `<br><strong>Elevador para o ${a < 5 ? (a + 1) + 'º andar' : '???'}</strong>` : ''}</p>
@@ -1488,7 +1596,7 @@ function desenharCartaoSala() {
       <textarea class="nota-txt" rows="9" placeholder="Pistas, armadilhas, o que já foi revelado…">${esc(notaDe(cn))}</textarea></label>
     <span class="nota-status" aria-live="polite"></span>
     ${htmlGanchosSala(cn, false)}
-    ${htmlEdicaoSala(a, cn, p)}`;
+    ${htmlEdicaoSala(a, cn, p)}`)) { c.hidden = false; return; }
   c.hidden = false;
   $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
   ligarEdicaoSala(c, a, cn);
@@ -1539,13 +1647,13 @@ function desenharCartaoSalaPublico() {
   const aqui = naNevoa ? [] : Object.entries(Store.state.tokens || {}).filter(([, tk]) =>
     SER[tk.s] && tk.a === a && salaEm(tk.a, tk.x, tk.y) === p && visivelPara(tk)).map(([, tk]) => rotuloBase(tk));
   c.style.setProperty('--cor', el2.cor);
-  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+  if (!porHtml(c, `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div>
       <h3>${vis ? 'CN ' + pad2(cn) : 'Sala desconhecida'}</h3><span class="cod">${vis ? (nome || 'sem nome registrado') : 'ainda não mapeada'}</span></div></div>
     ${mostraEl ? `<p>Elemento: ${el2.nome}</p>` : ''}
     <p><strong>Aqui:</strong> ${naNevoa ? 'não dá para ver (névoa)' : aqui.length ? aqui.map(esc).join(', ') : 'ninguém à vista'}</p>
     ${vis && Arquivos.daSala(cn).length ? `<p><strong>Arquivos encontrados:</strong></p><div class="acoes">${Arquivos.daSala(cn).map(([fid, t]) => `<button data-abrir="${fid}">📄 ${esc(t)}</button>`).join('')}</div>` : ''}
-    ${vis ? htmlGanchosSala(cn, true) : ''}`;
+    ${vis ? htmlGanchosSala(cn, true) : ''}`)) { c.hidden = false; return; }
   c.hidden = false;
   if (vis) ligarGanchosSala(c, cn, true);
   $('.fechar', c).onclick = () => selecionar(null);
@@ -1608,9 +1716,9 @@ function desenharCartao() {
   if (c.dataset.ficha === selecionado && c.contains(document.activeElement) && document.activeElement.matches('input')) return;
   const abertos = c.dataset.ficha === selecionado ? $$('details', c).map(d => d.open) : [];
   c.dataset.ficha = selecionado;
-  c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
+  if (!porHtml(c, `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo">${foto}<div><h3>${titulo}</h3><span class="cod">${apC && apC.codigo ? apC.codigo : s.codigo}</span></div></div>
-    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${condTxt}${fichaMinha}${acoes}${condMestre}${fichaEdit}`;
+    ${linhas}<p><strong>Onde:</strong> ${descreveLocal(tk)}</p>${condTxt}${fichaMinha}${acoes}${condMestre}${fichaEdit}`)) { c.hidden = false; return; }
   c.hidden = false;
   $$('details', c).forEach((d, i) => { if (abertos[i]) d.open = true; });
   if (fichaEdit) ligarEditarFicha(c, s.id);
@@ -1625,13 +1733,15 @@ function desenharCartao() {
   const bct = $('[data-acao="controle"]', c); if (bct) bct.onclick = () => { if (window.Sala3D && Sala3D.controlar) Sala3D.controlar(selecionado); };
   const brx = $('[data-acao="remover-aux"]', c); if (brx) brx.onclick = () => { const id = selecionado; if (!confirm('Tirar este Filho do mapa?')) return; selecionar(null); Store.definir(['tokens', id], null); };
   if (mestre) {
-    $('[data-acao="ocultar"]', c).onclick = () => Store.definir(['tokens', selecionado], { ...tk, h: !tk.h });
+    // o cartão pode ficar montado enquanto o token anda: os botões leem o token atual na hora do clique
+    const atual = () => (Store.state.tokens || {})[selecionado] || tk;
+    $('[data-acao="ocultar"]', c).onclick = () => { const t2 = atual(); Store.definir(['tokens', selecionado], { ...t2, h: !t2.h }); };
     const bvf = $('[data-acao="vf"]', c);
-    if (bvf) bvf.onclick = () => Store.definir(['tokens', selecionado], { ...tk, vf: !tk.vf });
+    if (bvf) bvf.onclick = () => { const t2 = atual(); Store.definir(['tokens', selecionado], { ...t2, vf: !t2.vf }); };
     $('[data-acao="remover"]', c).onclick = () => { const id = selecionado; selecionar(null); Store.definir(['tokens', id], null); };
     $('[data-acao="andar"]', c).onchange = ev => {
       const a = +ev.target.value;
-      Store.definir(['tokens', selecionado], { ...tk, a, x: CENTRO_ZN.x, y: CENTRO_ZN.y - 1.2 });
+      Store.definir(['tokens', selecionado], { ...atual(), a, x: CENTRO_ZN.x, y: CENTRO_ZN.y - 1.2 });
       irParaAndar(a);
     };
   }
@@ -1648,29 +1758,29 @@ function desenharPainel() {
   const tokens = Store.state.tokens || {};
 
   // Cobaias
-  $('#listaCobaias').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
+  const m1 = porHtml($('#listaCobaias'), SERES.filter(s => s.tipo === 'cobaia').map(s => {
     const tk = tokens[s.id];
     const visivel = tk && visivelPara(tk);
     return `<li data-id="${s.id}" style="--cor:${s.cor}">${bola(s)}<span class="info">
       <strong>${Presenca.online(s.id) ? '<span class="ponto-on on" title="conectado agora"></span>' : ''}${s.nome} <span class="sub" style="display:inline">${s.codigo}</span>${!mestre && s.id === meu ? '<span class="voce">você</span>' : ''}</strong>
       <span class="sub">${s.jogador}${funcaoDe(s.id) ? ' · ' + funcaoDe(s.id) : ''}</span>
       <span class="onde">${visivel ? descreveLocal(tk) : 'localização desconhecida'}</span>${mestre || s.id === meu ? miniBarras(fichaComVitais(s.id)) : ''}</span></li>`;
-  }).join('');
+  }).join(''));
 
   // Presenças no andar aberto (NPCs e Filhos)
   const pres = Object.entries(tokens)
     .filter(([, tk]) => SER[tk.s] && (SER[tk.s].tipo !== 'cobaia' || aux) && tk.a === andarAtual && visivelPara(tk))
     .sort((a, b) => SER[a[1].s].codigo.localeCompare(SER[b[1].s].codigo));
   const podeAndar = podeVer(andarAtual);
-  $('#listaPresencas').innerHTML = podeAndar ? pres.map(([id, tk]) => {
+  const m2 = porHtml($('#listaPresencas'), podeAndar ? pres.map(([id, tk]) => {
     const s = SER[tk.s];
     return `<li data-id="${id}">${bola(s)}<span class="info">
       <strong>${s.tipo === 'filho' ? `${s.codigo} · ${s.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : rotuloBase(tk)}</strong>
       <span class="onde">${descreveLocal(tk)}${mestre && tk.h ? ' · oculto' : ''}${mestre && tk.vf ? ' · visível aos Filhos' : ''}</span></span></li>`;
-  }).join('') : '';
+  }).join('') : '');
   $('#semPresencas').hidden = podeAndar && pres.length > 0;
 
-  $$('.lista-seres li').forEach(li => li.onclick = () => irParaFicha(li.dataset.id));
+  if (m1 || m2) $$('.lista-seres li').forEach(li => li.onclick = () => irParaFicha(li.dataset.id));
 
   if (mestre) desenharTray();
 }
@@ -1678,9 +1788,9 @@ function desenharPainel() {
 function desenharFuncoes() {
   const caixa = $('#listaFuncoes');
   if (caixa.contains(document.activeElement)) return;   // não atrapalha quem está digitando
-  caixa.innerHTML = SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'npc').map(s =>
+  if (!porHtml(caixa, SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'npc').map(s =>
     `<label class="funcao-linha"><span>${s.nome}</span>
-      <input data-id="${s.id}" value="${(Segredos.dados[s.id] || '').replace(/"/g, '&quot;')}" placeholder="função"></label>`).join('');
+      <input data-id="${s.id}" value="${(Segredos.dados[s.id] || '').replace(/"/g, '&quot;')}" placeholder="função"></label>`).join(''))) return;
   $$('input', caixa).forEach(i => i.onchange = () => { Segredos.definir(i.dataset.id, i.value); atualizarTudo(); });
 }
 
@@ -1688,20 +1798,20 @@ function desenharTray() {
   desenharFuncoes();
   const tokens = Store.state.tokens || {};
   const unicos = SERES.filter(s => s.tipo !== 'filho');
-  $('#trayNpc').innerHTML = unicos.map(s => {
+  const m1 = porHtml($('#trayNpc'), unicos.map(s => {
     const tk = tokens[s.id];
     const onde = tk ? (tk.a === andarAtual ? 'aqui' : `${tk.a}º`) : '';
     return `<button data-ser="${s.id}" title="${tk ? 'Trazer para este andar' : 'Colocar no mapa'}">
       <span class="pinta" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>${s.nome}
       ${onde ? `<span class="qtd">${onde}</span>` : ''}</button>`;
-  }).join('');
-  $('#trayFilhos').innerHTML = SERES.filter(s => s.tipo === 'filho' || s.tipo === 'espectro').map(s => {
+  }).join(''));
+  const m2 = porHtml($('#trayFilhos'), SERES.filter(s => s.tipo === 'filho' || s.tipo === 'espectro').map(s => {
     const qtd = Object.values(tokens).filter(t => t.s === s.id).length;
     return `<button data-ser="${s.id}" title="${s.tipo === 'espectro' ? 'Colocar uma Presença na Zona Neutra do andar aberto (ninguém a vê até você escolher no cartão)' : 'Colocar mais um no andar aberto'}">
       <span class="pinta ${s.tipo}" style="--cor:${s.cor}"></span>${s.tipo === 'espectro' ? '' : s.codigo + ' '}${s.nome}
       ${qtd ? `<span class="qtd">×${qtd}</span>` : ''}</button>`;
-  }).join('');
-  $$('#trayNpc button, #trayFilhos button').forEach(b => b.onclick = () => colocar(b.dataset.ser));
+  }).join(''));
+  if (m1 || m2) $$('#trayNpc button, #trayFilhos button').forEach(b => b.onclick = () => colocar(b.dataset.ser));
 }
 
 function colocar(serId) {
@@ -1753,12 +1863,12 @@ function irParaFicha(id) {
 /* ---------- Elevador ---------- */
 function desenharElevador() {
   const tokens = Store.state.tokens || {};
-  $('#listaAndares').innerHTML = ANDARES.map(a => {
+  if (!porHtml($('#listaAndares'), ANDARES.map(a => {
     const temCobaia = Object.values(tokens).some(t => t.a === a.id && SER[t.s] && SER[t.s].tipo === 'cobaia' && visivelPara(t));
     const trancado = !podeVer(a.id);
     return `<button class="andar-btn ${a.id === andarAtual ? 'atual' : ''}" data-andar="${a.id}" title="${a.titulo}${trancado ? ' (trancado)' : ''}">
       ${a.id}${trancado ? '<span class="cadeado">🔒</span>' : ''}${temCobaia && !trancado ? '<span class="ocupado"></span>' : ''}</button>`;
-  }).join('');
+  }).join(''))) return;
   $$('.andar-btn').forEach(b => b.onclick = () => irParaAndar(+b.dataset.andar));
 }
 
@@ -1772,9 +1882,18 @@ function irParaAndar(a) {
 
 // O que o Mestre Auxiliar "ouve": salas com cobaias pulsam em vermelho
 const ultimaPos = {};
+let sonsLimpos = false;
 function desenharSons() {
   const ouvinte = !!V().aux && !V().mestre;
-  if (!ouvinte) $$('.sala.som, .corredor.som').forEach(e => e.classList.remove('som'));
+  if (!ouvinte) {
+    // Mestre e jogador não têm manchas de som: só tiram o que sobrou de uma troca de perfil, uma vez
+    if (sonsLimpos) return;
+    sonsLimpos = true;
+    $$('.sala.som, .corredor.som').forEach(e => e.classList.remove('som'));
+    $$('.eco-zona, .eco-seta', stage).forEach(e => e.remove());
+    return;
+  }
+  sonsLimpos = false;
   const grupos = gruposDeSala();
   const alvo = new Map();
   const elDe = (gr, k) => {
@@ -1801,7 +1920,7 @@ function desenharSons() {
     // movimento: a mancha de som daquele lugar pulsa (sem dizer a sala)
     const k = p ? `${tk.a}:${p}` : `corr:${id}`;
     const ec = ecos[k];
-    if (ec) { ec.pulso = Date.now(); const e = $(`.eco-zona[data-k="${k}"]`, stage); if (e) { e.classList.remove('pulso'); void e.offsetWidth; e.classList.add('pulso'); } }
+    if (ec) { ec.pulso = Date.now(); const e = elVivo(ecoDom, k); if (e) { e.classList.remove('pulso'); requestAnimationFrame(() => requestAnimationFrame(() => { if (e.isConnected) e.classList.add('pulso'); })); } }   // reinicia a animação dois quadros depois, sem forçar o layout do palco (era offsetWidth a cada passo)
   });
 }
 
@@ -1812,45 +1931,47 @@ function atualizarTudo() {
   finally { document.dispatchEvent(new Event('acf-tudo')); }
 }
 function atualizarTudoPainel() {
+  // só os tokens mudaram (alguém andando, o caso comum): o que não lê os tokens nem se recalcula
+  const so = Store.soTokens();
   desenharSons();
-  desenharListaCores();
+  if (!so) desenharListaCores();
   desenharKitAux();
   desenharPerseguicao();
   verificarPedidoIniciativa();
   desenharRuido();
   verificarAlarme();
-  atualizarProtocolo();
+  if (!so) atualizarProtocolo();
   desenharElevador();
   atualizarElementos();
   desenharFichas();
   desenharPainel();
   desenharCartao();
-  marcarSalasMestre();
+  if (!so) marcarSalasMestre();
   desenharExtrasMestre();
   verificarSuaVez();
-  verificarCodigos();
+  if (!so) verificarCodigos();
   marcarVisitadas();
   if ($('#tempoVez') && document.activeElement !== $('#tempoVez')) $('#tempoVez').value = tempoVez() || '';
-  desenharExpo();
-  desenharRelogio();
+  if (!so) desenharExpo();
+  if (!so) desenharRelogio();
   desenharMinhaFicha();
-  desenharOpcoesMestre();
+  if (!so) desenharOpcoesMestre();
   ligarSinais();
   seguirAndarTV();
-  desenharCenas();
+  if (!so) desenharCenas();
   desenharGrupo();
   desenharRastros();
-  desenharCaderno();
-  desenharConectados();
-  desenharOpcoesLoja();
+  if (!so) desenharCaderno();
+  if (!so) desenharConectados();
+  if (!so) desenharOpcoesLoja();
   desenharZonaJogador();
-  aplicarAbas();
+  if (!so) aplicarAbas();
   Presenca.ligar();
   if ($('#dlgLoja').open) desenharLoja();
   atualizarDesfazer();
-  desenharApagaoMestre();
-  desenharBalanca();
-  desenharEco();
+  if (!so) desenharApagaoMestre();
+  if (!so) desenharBalanca();
+  if (!so) desenharEco();
   atualizarBotaoMinha();
 }
 
@@ -1957,14 +2078,14 @@ function desenharRuido() {
   grupos.forEach(gr => gr.ids.forEach(id => { nivelDoId[id] = { n: nivelDe(gr.ids.length + (gr.extra || 0)), qtd: gr.ids.length }; }));
   const tokens = Store.state.tokens || {};
 
-  $('#listaRuido').innerHTML = SERES.filter(s => s.tipo === 'cobaia').map(s => {
+  porHtml($('#listaRuido'), SERES.filter(s => s.tipo === 'cobaia').map(s => {
     const tk = tokens[s.id];
     const visivel = tk && visivelPara(tk);
     if (visivel && isentos.has(s.id)) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">Zona Neutra · isenta</span></li>`;
     if (!visivel || !nivelDoId[s.id]) return `<li><span class="r-nome">${s.nome}</span>${quadradinhos(0)}<span class="r-txt">—</span></li>`;
     const { n } = nivelDoId[s.id];
     return `<li class="${n >= 5 ? 'estouro' : ''}"><span class="r-nome">${s.nome}</span>${quadradinhos(n)}<span class="r-txt">${NIVEIS[n].nome} · ${NIVEIS[n].db} dB</span></li>`;
-  }).join('');
+  }).join(''));
 
   if (!mestre) return;
   // decibelímetro do Mestre: mostra a sala mais barulhenta da Caixa
@@ -1973,7 +2094,7 @@ function desenharRuido() {
   const nMax = pior ? nivelDe(pior.ids.length + (pior.extra || 0)) : 0;
   let col = '';
   for (let i = 5; i >= 1; i--) col += `<div class="dq${i <= nMax ? ' on n' + i : ''}"><span>${NIVEIS[i].db} dB</span><em>${NIVEIS[i].nome}</em></div>`;
-  $('#decibelimetro').innerHTML = col;
+  porHtml($('#decibelimetro'), col);
   $('#decibelInfo').textContent = pior ? `Mais barulho: ${nomeGrupo(pior)} (${pior.ids.length} cobaia${pior.ids.length > 1 ? 's' : ''}${pior.extra ? ' + barulho de porta' : ''})` : 'Nenhuma cobaia no mapa.';
 
   const rompidas = [...grupos.values()].filter(gr => nivelDe(gr.ids.length + (gr.extra || 0)) >= 5);
@@ -1983,7 +2104,7 @@ function desenharRuido() {
   const r = Store.state.ruido || { q: 0, p: false };
   desenharCiclo(r);
   $('#qtdQuebras').textContent = r.q || 0;
-  $('#barraQuebras').innerHTML = [1, 2, 3].map(i => `<span class="${i <= (r.q || 0) ? 'on' : ''}"></span>`).join('');
+  porHtml($('#barraQuebras'), [1, 2, 3].map(i => `<span class="${i <= (r.q || 0) ? 'on' : ''}"></span>`).join(''));
   const btnP = $('#btnProtocolo');
   btnP.disabled = !r.p && (r.q || 0) < 3;
   btnP.textContent = r.p ? 'Encerrar Protocolo Filho da O.R.F.E.U.' : 'Iniciar Protocolo Filho da O.R.F.E.U.';
@@ -2266,14 +2387,16 @@ function desenharSetup() {
     .sort((x, y) => ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[x[1].s].tipo) - ['cobaia', 'npc', 'robo', 'filho'].indexOf(SER[y[1].s].tipo));
   const antes = {};
   $$('#setupPersg .setup-linha').forEach(l => {
-    antes[l.dataset.id] = { ck: $('input.ck', l).checked, ini: $('input.ini', l).value, lim: $('input.lim', l).value, m: $('input.lim', l).dataset.m || '' };
+    antes[l.dataset.id] = { ck: $('input.ck', l).checked, ini: $('input.ini', l).value, lim: $('input.lim', l).value, m: $('input.lim', l).dataset.m || '', lado: ($('button.lado', l) || { dataset: {} }).dataset.lado || '' };
   });
-  caixa.innerHTML = linhas.map(([id, tk]) => {
+  if (!porHtml(caixa, linhas.map(([id, tk]) => {
     const s = SER[tk.s];
     // Filho: o deslocamento vem da ficha ligada a ele (filhos.js); o resto, 9 m
     const limF = s.tipo === 'filho' && window.ACF_FILHOS ? ACF_FILHOS.limPadrao(tk.s) : '';
     const a0 = antes[id] ? { ...antes[id] } : { ck: s.tipo === 'cobaia', ini: '', lim: limF || '9' };
     if (limF && !a0.m) a0.lim = limF;   // o Mestre ainda não mexeu no campo: vale o da ficha
+    // presa ou caçador (Sobrevivendo ao Horror): cobaias, NPCs e robôs começam como presa; Filhos, como caçador
+    const lado = a0.lado || ladoPadrao(s);
     let ini = a0.ini, nota = '';
     if (tk.r && tk.r.ts > pedido && pedido) {
       if (tk.r.fora) nota = 'rola fora';
@@ -2282,14 +2405,21 @@ function desenharSetup() {
     return `<div class="setup-linha" data-id="${id}">
       <input type="checkbox" class="ck" ${a0.ck ? 'checked' : ''} aria-label="Participa">
       ${bola(s)}<span class="setup-nome">${rotuloBase(tk)}${nota ? `<small>${nota}</small>` : ''}</span>
+      <button type="button" class="lado ${lado}" data-lado="${lado}" title="${lado === 'presa' ? 'Presa (toque para virar caçador)' : 'Caçador (toque para virar presa)'}" aria-label="${lado === 'presa' ? 'Presa' : 'Caçador'}">${lado === 'presa' ? '🐇' : '🐺'}</button>
       <input class="ini" data-id="${id}" type="number" placeholder="ini" value="${ini}" aria-label="Iniciativa">
       <button class="dado-mini" data-id="${id}" title="Rolar a iniciativa">🎲</button>
-      <input class="lim" type="number" min="1" value="${a0.lim}" data-m="${a0.m || ''}" aria-label="Deslocamento em metros"><span class="m">m</span>
+      <span class="setup-lim"><input class="lim" type="number" min="1" value="${a0.lim}" data-m="${a0.m || ''}" aria-label="Deslocamento em metros"><span class="m">m</span></span>
     </div>`;
-  }).join('') || '<p class="vazio">Ninguém neste andar.</p>';
+  }).join('') || '<p class="vazio">Ninguém neste andar.</p>')) return;
   $$('#setupPersg .dado-mini').forEach(b => b.onclick = () => abrirDados(`Iniciativa: ${nomeParticipante(b.dataset.id)}`, b.dataset.id));
   $$('#setupPersg input.lim').forEach(i => i.addEventListener('input', () => { i.dataset.m = '1'; }));
+  $$('#setupPersg button.lado').forEach(b => b.onclick = () => {
+    const l = b.dataset.lado === 'presa' ? 'cacador' : 'presa';
+    b.dataset.lado = l; b.className = 'lado ' + l; b.textContent = l === 'presa' ? '🐇' : '🐺';
+    b.title = l === 'presa' ? 'Presa (toque para virar caçador)' : 'Caçador (toque para virar presa)'; b.setAttribute('aria-label', l === 'presa' ? 'Presa' : 'Caçador');
+  });
 }
+const ladoPadrao = s => (s && s.tipo === 'filho' ? 'cacador' : 'presa');
 
 function desenharPerseguicao() {
   const p = P();
@@ -2303,13 +2433,13 @@ function desenharPerseguicao() {
   // painel dos jogadores
   $('#blocoPersg').hidden = !p.on;
   if (p.on) {
-    $('#listaPersg').innerHTML = ordem.map((o, i) => {
+    porHtml($('#listaPersg'), ordem.map((o, i) => {
       const tk = Store.state.tokens[o.id];
       const ativo = o.id === vez;
       return `<li class="${ativo ? 'ativo' : ''}"><span class="ord">${i + 1}º</span>
         <span class="pn">${nomeParticipante(o.id, true)}</span><span class="pi">ini ${o.ini}</span>
         <span class="pm">${tk ? fmtM(tk.m || 0) : '0,0'} / ${o.lim} m</span></li>`;
-    }).join('');
+    }).join(''));
     const tkv = vez && Store.state.tokens[vez];
     const minha = !mestre && tkv && podeMover(tkv);
     $('#minhaVez').hidden = !minha;
@@ -2325,14 +2455,14 @@ function desenharPerseguicao() {
   $('#persgAtiva').hidden = !p.on;
   if (!p.on) { desenharSetup(); return; }
   $('#persgRodada').textContent = `Rodada ${p.rod || 1}`;
-  $('#ordemPersg').innerHTML = ordem.map((o, i) => {
+  if (!porHtml($('#ordemPersg'), ordem.map((o, i) => {
     const tk = Store.state.tokens[o.id];
     const s = tk && SER[tk.s];
     return `<li class="${o.id === vez ? 'ativo' : ''}" data-i="${i}">
       <span class="ord">${i + 1}º</span>${s ? bola(s) : ''}<span class="pn">${nomeParticipante(o.id)}</span>
       <span class="pi">${o.ini}</span><span class="pm">${tk ? fmtM(tk.m || 0) : '0,0'}/${o.lim} m</span>
       <button data-mover="-1" title="Subir">▲</button><button data-mover="1" title="Descer">▼</button></li>`;
-  }).join('');
+  }).join(''))) return;
   $$('#ordemPersg button').forEach(b => b.onclick = () => {
     const i = +b.closest('li').dataset.i, j = i + +b.dataset.mover;
     const o = ordemP();
@@ -2362,31 +2492,51 @@ $('#btnPedirIni').addEventListener('click', () => { Store.definir(['persg'], { .
 // começa a perseguição com a ordem dada ([{id, ini, lim}]); usado pelo botão e pelo Encontro (momento.js)
 function iniciarPerseguicao(ordem, extra) {
   if (!mestre) return false;
-  ordem = (ordem || []).filter(o => o && Store.state.tokens[o.id]).map(o => ({ id: o.id, ini: +o.ini || 0, lim: Math.max(1, +o.lim || 9) })).sort((x, y) => y.ini - x.ini);
+  ordem = (ordem || []).filter(o => o && Store.state.tokens[o.id]).map(o => {
+    const tk = Store.state.tokens[o.id], s = SER[tk.s] || {};
+    return { id: o.id, ini: +o.ini || 0, lim: Math.max(1, +o.lim || 9), lado: o.lado === 'cacador' || o.lado === 'presa' ? o.lado : ladoPadrao(s) };
+  }).sort((x, y) => y.ini - x.ini);
   if (!ordem.length) return false;
   Store.definir(['persg'], { on: true, req: P().req || 0, ordem, vez: 0, rod: 1, vts: Date.now(), ...(extra || {}) });
   iniciarTurno(ordem[0].id);
+  // uma perseguição só: o teste estendido do Sobrevivendo ao Horror (sah.js) começa junto, com a mesma lista
+  if (window.ACF_SAH && ACF_SAH.iniciarCom) try {
+    ACF_SAH.iniciarCom(ordem.map(o => { const tk = Store.state.tokens[o.id], s = SER[tk.s] || {}; return { id: o.id, ser: tk.s, tipo: s.tipo, nome: rotuloBase(tk), lado: o.lado }; }));
+  } catch (e) { console.warn('perseguição SaH:', e); }
   return true;
+}
+// rodada nova: a ordem da vez recomeça e o teste estendido (SaH) pede os testes da rodada
+function novaRodadaPersg() {
+  const o = ordemP(); if (!P().on || !o.length) return;
+  const rod = (P().rod || 1) + 1;
+  Store.definir(['persg'], { ...P(), vez: 0, rod, vts: Date.now() });
+  iniciarTurno(o[0].id);
+  if (window.ACF_SAH && ACF_SAH.proximaRodada) try { ACF_SAH.proximaRodada(rod); } catch (e) { console.warn('perseguição SaH:', e); }
+}
+function encerrarPerseguicao() {
+  Store.definir(['persg'], { on: false, req: P().req || 0 });
+  if (window.ACF_SAH && ACF_SAH.encerrar) try { ACF_SAH.encerrar(); } catch (e) { console.warn('perseguição SaH:', e); }
 }
 $('#btnIniciarPersg').addEventListener('click', () => {
   const ordem = $$('#setupPersg .setup-linha').filter(l => $('input.ck', l).checked).map(l => ({
     id: l.dataset.id,
     ini: parseInt($('input.ini', l).value, 10) || 0,
     lim: Math.max(1, parseFloat($('input.lim', l).value) || 9),
+    lado: ($('button.lado', l) || { dataset: {} }).dataset.lado || '',
   }));
   if (!ordem.length) { aviso('Marque quem participa da perseguição.'); return; }
   iniciarPerseguicao(ordem);
 });
 $('#btnProxTurno').addEventListener('click', () => {
   const o = ordemP(); if (!o.length) return;
-  let v = (P().vez || 0) + 1, rod = P().rod || 1;
-  if (v >= o.length) { v = 0; rod++; }
-  Store.definir(['persg'], { ...P(), vez: v, rod, vts: Date.now() });
+  const v = (P().vez || 0) + 1;
+  if (v >= o.length) { novaRodadaPersg(); return; }
+  Store.definir(['persg'], { ...P(), vez: v, vts: Date.now() });
   iniciarTurno(o[v].id);
 });
 $('#btnRefazerVez').addEventListener('click', () => { const v = vezAtual(); if (v) refazerRota(v); });
 $('#btnRefazerMinha').addEventListener('click', () => { const v = vezAtual(); const tk = v && Store.state.tokens[v]; if (tk && podeMover(tk)) refazerRota(v); });
-$('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição?')) Store.definir(['persg'], { on: false, req: P().req || 0 }); });
+$('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição? A faixa some para todos.')) encerrarPerseguicao(); });
 $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; });
 
 /* ---------- Cronômetro de decisão (perseguição) ----------
@@ -2503,6 +2653,9 @@ function marcarVisitadas() {
       if (!visitadas.set.has(cn)) { visitadas.set.add(cn); try { localStorage.setItem(chaveVisitadas(), JSON.stringify([...visitadas.set])); } catch (e) {} }
     }
   }
+  const chave = visitadas.set.size + ':' + andarAtual;
+  if (visitadas.chave === chave && visitadas.stage === stage.firstChild) return;
+  visitadas.chave = chave; visitadas.stage = stage.firstChild;
   $$('.sala', stage).forEach(e => e.classList.toggle('visitada', visitadas.set.has(+e.dataset.cn)));
 }
 
@@ -2800,16 +2953,32 @@ const Diario = {
   reiniciar: false,
   sig: '',
 
-  entradas() { return Object.entries(Segredos.dados._diario || {}).map(([k, e]) => ({ k, ...e })).sort((a, b) => a.ts - b.ts); },
+  // lista ordenada, guardada até segredos/_diario mudar (era refeita e reordenada a cada redesenho)
+  cache: null, cacheDe: null,
+  entradas() {
+    const d = Segredos.dados._diario || {};
+    if (this.cache && this.cacheDe === d) return this.cache;
+    this.cacheDe = d;
+    return (this.cache = Object.entries(d).map(([k, e]) => ({ k, ...e })).sort((a, b) => a.ts - b.ts));
+  },
 
+  // as linhas novas aparecem na hora e vão ao servidor em lote (uma gravação a cada 2 s, não uma por linha)
+  fila: {}, tFila: null,
   registrar(k, txt, extra = {}) {
     if (!mestre) return;
     const e = { ts: Date.now(), k, txt, dia: ruido().d || 1 };
     Object.entries(extra).forEach(([c, v]) => { if (v !== undefined && v !== null) e[c] = v; });
-    Segredos.gravar(['_diario', Segredos.novaChave()], e);
+    this.fila[Segredos.novaChave()] = e;
+    Segredos.poeLocal(['_diario'], this.fila);
+    if (!this.tFila) this.tFila = setTimeout(() => this.despachar(), 2000);
     const todas = this.entradas();
     if (todas.length > MAX_DIARIO) Segredos.apagar('_diario', todas.slice(0, todas.length - MAX_DIARIO).map(x => x.k));
     desenharExtrasMestre();
+  },
+  despachar() {
+    clearTimeout(this.tFila); this.tFila = null;
+    const f = this.fila; this.fila = {};
+    if (Object.keys(f).length) Segredos.gravarLote('_diario', f);
   },
 
   dado(quem, r, obs) {
@@ -2819,9 +2988,17 @@ const Diario = {
     this.registrar('dado', `${nome} rolou ${r.t}${det ? ` (${det})` : ''}${obs ? ` · ${obs}` : ''}`, { quem, t: r.t, det: det || null });
   },
 
-  // chamado a cada mudança do mapa
+  // chamado a cada mudança do mapa. Guarda só o que compara (poucos campos por token e os ramos pequenos),
+  // em vez de copiar o estado inteiro por JSON a cada chegada
+  foto(st) {
+    const tokens = {};
+    Object.entries(st.tokens || {}).forEach(([id, tk]) => { if (tk) tokens[id] = { ...tk }; });
+    const r = st.ruido || {};
+    return { tokens, salas: { ...(st.salas || {}) }, rev: { ...(st.rev || {}) }, ruido: { q: r.q, p: r.p, d: r.d, hist: r.hist ? { ...r.hist } : undefined },
+      persg: { on: (st.persg || {}).on, req: (st.persg || {}).req, vez: (st.persg || {}).vez, rod: (st.persg || {}).rod, ordem: (st.persg || {}).ordem }, ap: st.ap ? { on: st.ap.on } : null, portas: { ...(st.portas || {}) }, cego: { ...(st.cego || {}) } };
+  },
   observar(st) {
-    const novo = JSON.parse(JSON.stringify({ tokens: st.tokens || {}, salas: st.salas || {}, rev: st.rev || {}, ruido: st.ruido || {}, persg: st.persg || {}, ap: st.ap || null, portas: st.portas || {}, cego: st.cego || {} }));
+    const novo = this.foto(st);
     const ant = this.prev;
     this.prev = novo;
     if (!ant || this.reiniciar) { this.reiniciar = false; this.pend = {}; return; }
@@ -2944,9 +3121,9 @@ function nomeDoId(id) {
 /* ---------- Painéis do Mestre: diário, rolagens, anotações ---------- */
 function desenharExtrasMestre() {
   if (!mestre) return;
-  desenharDiario();
+  if (!Store.soTokens()) desenharDiario();
   desenharRolagens();
-  desenharNotas();
+  if (!Store.soTokens()) desenharNotas();
 }
 
 function desenharDiario() {
@@ -2962,9 +3139,15 @@ function desenharDiario() {
   $('#diarioVazio').hidden = lista.length > 0;
 }
 
+let sigRolagens = '';
 function desenharRolagens() {
   const porQuem = {};
-  Diario.entradas().filter(e => e.k === 'dado' && e.quem).forEach(e => (porQuem[e.quem] = porQuem[e.quem] || []).push(e));
+  const dados = Diario.entradas().filter(e => e.k === 'dado' && e.quem);
+  // nada rolou desde o último desenho: a lista fica como está
+  const sig = `${dados.length}:${dados.length ? dados[dados.length - 1].k : ''}`;
+  if (sig === sigRolagens) return;
+  sigRolagens = sig;
+  dados.forEach(e => (porQuem[e.quem] = porQuem[e.quem] || []).push(e));
   const blocos = Object.entries(porQuem).map(([quem, l]) => ({ quem, l: l.reverse().slice(0, 5) }))
     .sort((a, b) => b.l[0].ts - a.l[0].ts);
   $('#listaRolagens').innerHTML = blocos.map(({ quem, l }) => {
@@ -2985,13 +3168,13 @@ function desenharNotas() {
   if (!mestre) return;
   const notas = Segredos.dados._notas || {};
   const doAndar = Object.keys(notas).map(k => +k.slice(1)).filter(cn => Math.ceil(cn / 25) === andarAtual).sort((a, b) => a - b);
-  $('#listaNotas').innerHTML = doAndar.map(cn => {
+  const mudou = porHtml($('#listaNotas'), doAndar.map(cn => {
     const [nome] = infoSala(andarAtual, cn);
     const txt = notas['c' + cn];
     return `<li data-cn="${cn}"><strong>CN ${pad2(cn)}${nome ? ' ' + esc(nome) : ''}</strong><span>${esc(txt.length > 110 ? txt.slice(0, 110) + '…' : txt)}</span></li>`;
-  }).join('');
+  }).join(''));
   $('#notasVazio').hidden = doAndar.length > 0;
-  $$('#listaNotas li').forEach(li => li.onclick = () => {
+  if (mudou) $$('#listaNotas li').forEach(li => li.onclick = () => {
     const cn = +li.dataset.cn, r = retSala(cn - 25 * (andarAtual - 1));
     focar(r.x + R / 2, r.y + R / 2);
     selecionarSala(cn);
@@ -3011,8 +3194,9 @@ $('#btnSessao').addEventListener('click', () => {
 });
 $('#btnLimparDiario').addEventListener('click', () => {
   if (!confirm('Apagar todo o diário? Baixe o .txt antes se quiser guardar.')) return;
+  Diario.despachar();
   Segredos.gravar(['_diario'], null);
-  Diario.sig = '';
+  Diario.sig = ''; sigRolagens = '';
   desenharExtrasMestre();
 });
 $('#btnBaixarDiario').addEventListener('click', () => {
@@ -3439,12 +3623,13 @@ function desenharApagaoMestre() {
   const caixa = $('#listaApagaoVe');
   if (!caixa.contains(document.activeElement)) {
     const ve = apagaoVe();
-    caixa.innerHTML = SERES.filter(x => x.tipo === 'cobaia').map(x =>
-      `<label class="chave"><input type="checkbox" data-id="${x.id}" ${ve[x.id] ? 'checked' : ''}><span>${x.nome} <small>${x.jogador}</small></span></label>`).join('');
-    $$('input', caixa).forEach(i => i.onchange = async () => {
-      Segredos.gravar(['_apagaoVe', i.dataset.id], i.checked ? true : null);
-      if (apagaoAtivo()) await publicarApagao(true);
-    });
+    if (porHtml(caixa, SERES.filter(x => x.tipo === 'cobaia').map(x =>
+      `<label class="chave"><input type="checkbox" data-id="${x.id}" ${ve[x.id] ? 'checked' : ''}><span>${x.nome} <small>${x.jogador}</small></span></label>`).join(''))) {
+      $$('input', caixa).forEach(i => i.onchange = async () => {
+        Segredos.gravar(['_apagaoVe', i.dataset.id], i.checked ? true : null);
+        if (apagaoAtivo()) await publicarApagao(true);
+      });
+    }
   }
   const b = $('#btnApagao');
   b.textContent = apagaoAtivo() ? 'Desligar apagão' : 'Ligar apagão';
@@ -3616,7 +3801,15 @@ $('#telaProtocolo').addEventListener('click', e => { e.currentTarget.hidden = tr
     e.classList.toggle('rola-esq', max > 4 && e.scrollLeft > 4);
   };
   document.addEventListener('scroll', ev => { const e = ev.target; if (e && e.matches && e.matches(SEL)) marcar(e); }, { capture: true, passive: true });
-  setInterval(() => $$(SEL).forEach(e => { if (e.offsetParent) marcar(e); }), 700);
+  // as setas mudam quando o conteúdo ou o tamanho muda: varredura depois de cada redesenho (uma por quadro),
+  // no redimensionamento e, por garantia, a cada 3 s com a aba visível (era a cada 700 ms, sempre)
+  const varrer = () => $$(SEL).forEach(e => { if (e.offsetParent) marcar(e); });
+  let agV = false;
+  const agendarVarrer = () => { if (agV) return; agV = true; requestAnimationFrame(() => { agV = false; varrer(); }); };
+  // só tokens andaram: as barras de abas não mudaram (a varredura lê o layout, cara num palco grande)
+  document.addEventListener('acf-tudo', () => { if (!Store.soTokens()) agendarVarrer(); });
+  window.addEventListener('resize', agendarVarrer);
+  setInterval(() => { if (!document.hidden) varrer(); }, 3000);
 })();
 
 // celular: o corpo do site nunca rola. Se o navegador empurrar alguma dessas caixas sozinho
@@ -4105,8 +4298,8 @@ function desenharExpo() {
   if (!mestre) return;
   const ex = Segredos.dados._expo || {};
   const cob = SERES.filter(x => x.tipo === 'cobaia');
-  $('#tabelaExpo').innerHTML = `<table><thead><tr><th></th>${ELEM_EXPO.map(k => `<th title="${ELEMENTOS[k].nome}"><span class="el-ponto" style="--cor:${ELEMENTOS[k].cor}"></span>${ELEMENTOS[k].nome.slice(0, 4)}</th>`).join('')}</tr></thead>
-    <tbody>${cob.map(x => `<tr><td>${x.nome}</td>${ELEM_EXPO.map(k => `<td>${(ex[x.id] || {})[k] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  porHtml($('#tabelaExpo'), `<table><thead><tr><th></th>${ELEM_EXPO.map(k => `<th title="${ELEMENTOS[k].nome}"><span class="el-ponto" style="--cor:${ELEMENTOS[k].cor}"></span>${ELEMENTOS[k].nome.slice(0, 4)}</th>`).join('')}</tr></thead>
+    <tbody>${cob.map(x => `<tr><td>${x.nome}</td>${ELEM_EXPO.map(k => `<td>${(ex[x.id] || {})[k] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
 }
 $('#btnZerarExpo').addEventListener('click', () => { if (confirm('Zerar a contagem de exposição de todas as cobaias?')) { Segredos.gravar(['_expo'], null); desenharExpo(); } });
 $('#btnCopiarExpo').addEventListener('click', async () => {
@@ -4312,7 +4505,7 @@ const Chat = {
     const lista = $('#chatLista');
     const noFim = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 40;
     const eu = this.autorId();
-    lista.innerHTML = this.lista(c).map(m => {
+    const itens = this.lista(c).map(m => {
       const s = SER[m.a];
       const avatar = s ? `<span class="bola" style="--cor:${s.cor};${s.img ? `background-image:url('${s.img}')` : ''}"></span>` : '<span class="bola mestre-bola">M</span>';
       const para = mestre && c === 'sus' && m.para ? ` <small>→ ${esc(this.nomeDoCx(m.para))}</small>` : '';
@@ -4323,16 +4516,28 @@ const Chat = {
       return `<li class="${m.a === eu ? 'meu' : ''}${m.d ? ' dado' : ''}">${avatar}<div class="msg">
         <div class="msg-topo"><b>${esc(m.n || '?')}</b>${para}<time>${hora(m.ts).slice(0, 5)}</time>${btn}</div>
         ${ehBz(m) ? `<div class="msg-txt msg-bz ${linguaDe(m).cls}" data-bzid="${esc(idMsg(m))}" title="${bzTraduzido(m) ? '' : 'Toque para tentar entender'}">${esc(falaDe(m))}</div>${bzTraduzido(m) ? `<div class="msg-trad">✦ ${textoChat(desembaralhar(m.t))}</div>` : ''}` : `<div class="msg-txt">${textoChat(m.t)}</div>`}</div></li>`;
-    }).join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>';
-    $$('.msg-bz', lista).forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t), 'longo'); else abrirTraducao(m); });
-    // Mestre: 🗑 pede confirmação no próprio botão (segundo toque em até 3 s apaga)
-    $$('.msg-lixo', lista).forEach(b => b.onclick = () => {
-      if (!b.classList.contains('confirma')) { b.classList.add('confirma'); b.textContent = 'apagar?'; clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove('confirma'); b.textContent = '🗑'; }, 3000); return; }
-      this.apagarMsg(c, b.dataset.k);
     });
-    $$('.responder', lista).forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
-    $$('[data-desconfiar]', lista).forEach(b => b.onclick = () => { const m = this.lista(c).find(x => x._k === b.dataset.desconfiar); if (m && window.ACF_FILHOS) ACF_FILHOS.desconfiarMsg(m); });
-    if (noFim || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
+    // mensagem nova no fim (o caso comum): só ela entra na lista (appendChild), em vez de refazer a lista inteira
+    const ant = lista.__itens;
+    let mudou, raizes = [lista];
+    if (ant && ant.length && itens.length > ant.length && lista.childElementCount === ant.length && ant.every((h, i) => h === itens[i])) {
+      const t = document.createElement('template'); t.innerHTML = itens.slice(ant.length).join('');
+      raizes = [...t.content.children]; lista.appendChild(t.content);
+      lista.__html = itens.join(''); mudou = true;
+    } else mudou = porHtml(lista, itens.join('') || '<li class="vazio">Nenhuma mensagem ainda.</li>');
+    lista.__itens = itens.length ? itens : null;
+    const $$r = sel => raizes.flatMap(r => (r === lista ? [] : r.matches(sel) ? [r] : []).concat([...r.querySelectorAll(sel)]));
+    if (mudou) {
+      $$r('.msg-bz').forEach(el => el.onclick = () => { const m = this.lista(c).find(x => idMsg(x) === el.dataset.bzid); if (!m) return; if (bzTraduzido(m)) linguaDe(m).voz(desembaralhar(m.t), 'longo'); else abrirTraducao(m); });
+      // Mestre: 🗑 pede confirmação no próprio botão (segundo toque em até 3 s apaga)
+      $$r('.msg-lixo').forEach(b => b.onclick = () => {
+        if (!b.classList.contains('confirma')) { b.classList.add('confirma'); b.textContent = 'apagar?'; clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove('confirma'); b.textContent = '🗑'; }, 3000); return; }
+        this.apagarMsg(c, b.dataset.k);
+      });
+      $$r('.responder').forEach(b => b.onclick = () => { this.resp = { cx: b.dataset.cx, nome: b.dataset.nome }; this.mostrarResp(); $('#chatTexto').focus(); });
+      $$r('[data-desconfiar]').forEach(b => b.onclick = () => { const m = this.lista(c).find(x => x._k === b.dataset.desconfiar); if (m && window.ACF_FILHOS) ACF_FILHOS.desconfiarMsg(m); });
+    }
+    if ((noFim && mudou) || this.rolarFim) { lista.scrollTop = lista.scrollHeight; this.rolarFim = false; }
     this.mostrarResp();
   },
   nomeDoCx(cx) {
@@ -4600,7 +4805,7 @@ function desenharMinhaFicha() {
   bloco.hidden = !meu || mestre || TV;
   if (bloco.hidden) return;
   const s = SER[meu];
-  $('#minhaFicha').innerHTML = `<div class="minha-topo">${bola(s)}<div><strong>${s.nome}</strong><span class="sub">${s.jogador || ''}</span></div></div>${barrasFicha(fichaComVitais(meu))}`;
+  porHtml($('#minhaFicha'), `<div class="minha-topo">${bola(s)}<div><strong>${s.nome}</strong><span class="sub">${s.jogador || ''}</span></div></div>${barrasFicha(fichaComVitais(meu))}`);
 }
 
 /* =========================================================
@@ -4686,7 +4891,12 @@ $('#btnSairEspiar').addEventListener('click', () => definirEspiar(''));
    ========================================================= */
 let abaMestre = 'mapa';
 try { abaMestre = localStorage.getItem('acf-aba') || 'mapa'; } catch (e) {}
+let abaAplicada = '';
 function aplicarAbas() {
+  // nada mudou desde a última vez: as classes já estão certas (as seções novas chegam com a classe certa)
+  const chave = (mestre ? 'M' : 'x') + abaMestre;
+  if (chave === abaAplicada) return;
+  abaAplicada = chave;
   $$('#abasMestre button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === abaMestre));
   $$('.painel section[data-aba]').forEach(s => s.classList.toggle('fora-da-aba', mestre && s.dataset.aba !== abaMestre));
 }
@@ -4759,8 +4969,8 @@ function verificarGatilho(id, a, b) {
 function desenharCenas() {
   if (!mestre) return;
   const cenas = Object.entries(Segredos.dados._cenas || {}).sort((x, y) => x[1].ts - y[1].ts);
-  $('#listaCenas').innerHTML = cenas.map(([k, c]) => `<li data-k="${k}"><span><b>${esc(c.nome)}</b><small>${nomeAndar(c.andar)} · ${Object.keys(c.tokens || {}).length} fichas · ${Object.keys(c.portas || {}).length} portas</small></span>
-    <button data-c="carregar" class="btn-fantasma">Carregar</button><button data-c="apagar" class="btn-fantasma perigo">×</button></li>`).join('') || '<li class="vazio">Nenhuma cena salva.</li>';
+  if (!porHtml($('#listaCenas'), cenas.map(([k, c]) => `<li data-k="${k}"><span><b>${esc(c.nome)}</b><small>${nomeAndar(c.andar)} · ${Object.keys(c.tokens || {}).length} fichas · ${Object.keys(c.portas || {}).length} portas</small></span>
+    <button data-c="carregar" class="btn-fantasma">Carregar</button><button data-c="apagar" class="btn-fantasma perigo">×</button></li>`).join('') || '<li class="vazio">Nenhuma cena salva.</li>')) return;
   $$('#listaCenas li[data-k]').forEach(li => {
     $('[data-c="carregar"]', li).onclick = () => carregarCena(li.dataset.k);
     $('[data-c="apagar"]', li).onclick = () => { if (confirm('Apagar esta cena?')) { Segredos.gravar(['_cenas', li.dataset.k], null); desenharCenas(); } };
@@ -4808,8 +5018,12 @@ function alternarGrupo(id) {
   if (grupo.has(id)) grupo.delete(id); else grupo.add(id);
   desenharGrupo();
 }
+let grupoChave = '';
 function desenharGrupo() {
-  $$('.ficha').forEach(f => f.classList.toggle('no-grupo', grupo.has(f.dataset.id)));
+  if (!mestre && !grupo.size) return;   // só o Mestre monta grupo
+  // as fichas novas já saem marcadas de desenharFichas; a varredura só quando o grupo muda
+  const chave = [...grupo].join(',');
+  if (chave !== grupoChave) { grupoChave = chave; $$('.ficha').forEach(f => f.classList.toggle('no-grupo', grupo.has(f.dataset.id))); }
   const info = $('#grupoInfo');
   info.hidden = !grupo.size;
   info.textContent = grupo.size ? `${grupo.size} token${grupo.size > 1 ? 's' : ''} no grupo: ${[...grupo].map(nomeDoId).join(', ')} · Esc limpa` : '';
@@ -4928,8 +5142,12 @@ ${SERES.filter(x => x.tipo === 'cobaia').map(x => `<tr><td>${x.nome}</td>${ELEM_
 const rastros = {};   // "andar:sala:cn" ou "andar:corr:ci" -> horário
 const RASTRO_MS = 180000;
 function marcarRastro(a, p, ci) { rastros[p ? `${a}:sala:${cnDe(a, p)}` : `${a}:corr:${ci}`] = Date.now(); }
+let rastrosLimpos = false;
 function desenharRastros() {
   const ouvinte = V().aux && !V().mestre;
+  // Mestre e jogador não veem rastros: só tiram o que sobrou de uma troca de perfil (uma vez por montagem do andar)
+  if (!ouvinte) { if (rastrosLimpos === stage.firstChild) return; rastrosLimpos = stage.firstChild; }
+  else rastrosLimpos = false;
   const agora = Date.now();
   $$('.sala, .corredor', stage).forEach(e => {
     const k = e.dataset.cn ? `${andarAtual}:sala:${e.dataset.cn}` : `${andarAtual}:corr:${e.dataset.ci}`;
@@ -4939,7 +5157,7 @@ function desenharRastros() {
     if (vivo) e.style.setProperty('--rastro', (1 - (agora - t) / RASTRO_MS).toFixed(2));
   });
 }
-setInterval(() => { if (aux && !mestre) desenharEscuta(gruposDeSala()); }, 3000);
+setInterval(() => { if (aux && !mestre && !document.hidden) desenharEscuta(gruposDeSala()); }, 3000);
 
 /* =========================================================
    ESCUTA DOS AUXILIARES
@@ -4962,6 +5180,9 @@ const ROSA = ['leste', 'sudeste', 'sul', 'sudoeste', 'oeste', 'noroeste', 'norte
 const rumo = (dx, dy) => ROSA[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
 const faixaDist = d => { const s = d / (R + G); return s < 1.3 ? 'muito perto' : s < 2.6 ? 'perto' : s < 4 ? 'a algumas salas' : 'longe'; };
 const INTENS = ['', 'baixo', 'médio', 'alto', 'forte', 'ensurdecedor'];
+// manchas e setas de som do auxiliar: guardadas por chave (sem procurar no palco, que tem milhares de nós)
+const ecoDom = new Map(), setaDom = new Map();
+const elVivo = (m, k) => { const e = m.get(k); if (e && e.parentNode === stage) return e; m.delete(k); return null; };
 function desenharEscuta(grupos) {
   if (!stage || !(aux && !mestre)) return;
   const agora = Date.now();
@@ -4983,8 +5204,8 @@ function desenharEscuta(grupos) {
     const idade = agora - e.ts;
     if (e.a !== andarAtual || idade > RASTRO_MS) { if (idade > RASTRO_MS) delete ecos[k]; return; }
     vivas.add(k);
-    let d = $(`.eco-zona[data-k="${k}"]`, stage);
-    if (!d) { d = el('div', 'eco-zona'); d.dataset.k = k; stage.appendChild(d); }
+    let d = elVivo(ecoDom, k);
+    if (!d) { d = el('div', 'eco-zona'); d.dataset.k = k; stage.appendChild(d); ecoDom.set(k, d); }
     d.style.left = px(e.x); d.style.top = px(e.y);
     const atual = idade < 4000;
     d.classList.toggle('exata', !!e.exata && atual);
@@ -4992,7 +5213,7 @@ function desenharEscuta(grupos) {
     d.style.setProperty('--som', atual ? e.n : 0);
     d.style.setProperty('--rastro', atual ? 1 : (1 - idade / RASTRO_MS).toFixed(2));
   });
-  $$('.eco-zona', stage).forEach(d => { if (!vivas.has(d.dataset.k)) d.remove(); });
+  ecoDom.forEach((d, k) => { if (!vivas.has(k)) { d.remove(); ecoDom.delete(k); } });
   // setas nos Filhos e no robô do auxiliar
   const atuais = Object.values(ecos).filter(e => e.a === andarAtual && agora - e.ts < 4000);
   const fFoco = FIL ? FIL.foco : null;   // vista pelos sentidos de um Filho: só a seta dele
@@ -5004,15 +5225,15 @@ function desenharEscuta(grupos) {
     atuais.forEach(e => { const dist = Math.hypot(e.x - tk.x, e.y - tk.y); const nota = e.n / Math.max(1, dist); if (!melhor || nota > melhor.nota) melhor = { e, dist, nota }; });
     if (!melhor) return;
     setas.add(id);
-    let s = $(`.eco-seta[data-id="${id}"]`, stage);
-    if (!s) { s = el('div', 'eco-seta'); s.dataset.id = id; s.innerHTML = '<i></i>'; stage.appendChild(s); }
+    let s = elVivo(setaDom, id);
+    if (!s) { s = el('div', 'eco-seta'); s.dataset.id = id; s.innerHTML = '<i></i>'; stage.appendChild(s); setaDom.set(id, s); }
     s.style.left = px(tk.x); s.style.top = px(tk.y);
     s.style.setProperty('--ang', (Math.atan2(melhor.e.y - tk.y, melhor.e.x - tk.x) * 180 / Math.PI + 90).toFixed(0) + 'deg');
     s.style.setProperty('--som', melhor.e.n);
     const sr = SER[tk.s];
     linhas.push(`<li style="--cor:${sr.cor}"><b>${esc(sr.tipo === 'filho' ? `${sr.codigo} ${sr.nome}${tk.n > 1 ? ' #' + tk.n : ''}` : sr.nome)}</b> ouve um som ${INTENS[melhor.e.n]} ao <b>${rumo(melhor.e.x - tk.x, melhor.e.y - tk.y)}</b>, ${faixaDist(melhor.dist)}</li>`);
   });
-  $$('.eco-seta', stage).forEach(s => { if (!setas.has(s.dataset.id)) s.remove(); });
+  setaDom.forEach((s, id) => { if (!setas.has(id)) { s.remove(); setaDom.delete(id); } });
   const lista = $('#escutaAux');
   if (lista) {
     const extra = FIL ? FIL.linhasEscuta(atuais) : '';
@@ -5073,7 +5294,7 @@ const Presenca = {
         Rede.set(cam, { a: quem, ts: Date.now() }).catch(() => {});
         if (Store.modo === 'firebase') { try { Store.db.ref(cam).onDisconnect().remove(); } catch (e) {} }
         clearInterval(this.timer);
-        this.timer = setInterval(() => Rede.set(cam + '/ts', Date.now()).catch(() => {}), 20000);
+        this.timer = setInterval(() => Rede.set(cam + '/ts', Date.now()).catch(() => {}), 60000);
       } else { clearInterval(this.timer); Rede.set(cam, null).catch(() => {}); }
     }
     if (!this.off) this.off = Rede.on('presenca', v => { this.lista = v || {}; desenharConectados(); desenharPainel(); }, () => { this.off = null; });
@@ -5083,15 +5304,15 @@ const Presenca = {
     return Object.values(this.lista || {}).some(p => p && p.a === id && agora - (p.ts || 0) < 120000);
   },
 };
-window.addEventListener('beforeunload', () => { if (Presenca.quem) Rede.set('presenca/' + Presenca.id, null).catch(() => {}); });
+window.addEventListener('beforeunload', () => { if (Presenca.quem) Rede.set('presenca/' + Presenca.id, null).catch(() => {}); if (mestre) Diario.despachar(); });
 function desenharConectados() {
   if (!mestre) return;
   const nomes = ['_mestre', ...SERES.filter(s => s.tipo === 'cobaia' || s.tipo === 'robo').map(s => s.id)];
-  $('#listaConectados').innerHTML = nomes.map(id => {
+  porHtml($('#listaConectados'), nomes.map(id => {
     const on = Presenca.online(id);
     const nome = id === '_mestre' ? 'Mestre' : SER[id].nome + (SER[id].jogador ? ` · ${SER[id].jogador}` : '');
     return `<li class="${on ? 'on' : ''}"><span class="ponto-on"></span>${esc(nome)}</li>`;
-  }).join('');
+  }).join(''));
 }
 
 /* =========================================================
@@ -5732,16 +5953,22 @@ const Metros = { ult: null, total: 0, id: null };
 const chaveMetros = id => 'acf-metros-' + id;
 function vigiarMetros() {
   const id = meu || aux; if (!id || mestre) return;
-  if (Metros.id !== id) { Metros.id = id; Metros.ult = null; try { Metros.total = +localStorage.getItem(chaveMetros(id)) || 0; } catch (e) { Metros.total = 0; } }
+  if (Metros.id !== id) { if (Metros.tSalvar) salvarMetros(); Metros.id = id; Metros.ult = null; try { Metros.total = +localStorage.getItem(chaveMetros(id)) || 0; } catch (e) { Metros.total = 0; } }
   const tk = (Store.state.tokens || {})[id];
   if (!tk) { Metros.ult = null; return; }
   const u = Metros.ult;
   if (u && u.a === tk.a && (u.x !== tk.x || u.y !== tk.y) && Math.hypot(tk.x - u.x, tk.y - u.y) < 6) {
     Metros.total += custoMetros(u, tk);
-    try { localStorage.setItem(chaveMetros(id), String(+Metros.total.toFixed(2))); } catch (e) {}
+    // guarda no navegador com folga (era uma gravação em disco a cada passo)
+    if (!Metros.tSalvar) Metros.tSalvar = setTimeout(salvarMetros, 1500);
   }
   Metros.ult = { a: tk.a, x: tk.x, y: tk.y };
 }
+function salvarMetros() {
+  clearTimeout(Metros.tSalvar); Metros.tSalvar = null;
+  if (Metros.id) try { localStorage.setItem(chaveMetros(Metros.id), String(+Metros.total.toFixed(2))); } catch (e) {}
+}
+window.addEventListener('beforeunload', salvarMetros);
 Store.aoMudar(vigiarMetros);
 
 /* ---------- NARRADOR (só o Mestre) ----------
@@ -6003,7 +6230,8 @@ Store.aoMudar(() => { verificarApagao(); focoInicialCelular(); agendarSincMestre
 // o Mestre trancou de novo o andar aberto: a tela volta para a senha
 Store.aoMudar(() => { const el = $('#bloqueio'); if (el && !podeVer(andarAtual) && el.hidden) montarAndar(); });
 Store.aoMudar(() => {
-  if (podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
+  // a assinatura do andar (salas, nomes, portas) não depende dos tokens: quando só eles mudaram, nem se calcula
+  if (!Store.soTokens() && podeVer(andarAtual) && assinatura() !== assinaturaAndar) montarAndar();
   atualizarTudo();
 });
 
@@ -6247,7 +6475,9 @@ function moverToken3DLivre(id, tk, x, y, fim) {
   if (lim) novo.m = +m.toFixed(2);
   if (novo.esq && Math.hypot(novo.x - tk.x, novo.y - tk.y) > 0.05) { delete novo.esq; delete novo.eo; }   // só sai do esconderijo quem anda de verdade
   const agora = performance.now();
-  if (fim || agora - s.ultimo > 140) { s.ultimo = agora; Store.definir(['tokens', id], novo); }
+  // grava a cada 250 ms (quem recebe interpola) e só se andou de verdade; os campos x, y, m vão por update
+  const andou = !s.grav || Math.hypot(novo.x - s.grav.x, novo.y - s.grav.y) >= 0.25 || novo.m !== s.grav.m;
+  if (fim || (agora - s.ultimo > 250 && andou)) { s.ultimo = agora; s.grav = { x: novo.x, y: novo.y, m: novo.m }; Store.definir(['tokens', id], novo, ['x', 'y', 'm']); }
   else Store.state.tokens[id] = novo;   // o próximo envio leva a posição mais nova
   if (fim) { delete mov3d[id]; if (!mestre && (novo.x !== s.antes.x || novo.y !== s.antes.y)) empilharLocal(id, s.antes); }
   return { ok: true, x: novo.x, y: novo.y, m: novo.m || 0, lim, esgotou };
@@ -6260,7 +6490,7 @@ function virarToken3D(id, graus) {
   const g = Math.round(((graus % 360) + 360) % 360), ant = tk.d;
   if (ant !== undefined && Math.abs(((g - ant + 540) % 360) - 180) < 6) return;
   const s = virar3d[id] || (virar3d[id] = { ultimo: 0, timer: null });
-  const enviar = () => { s.timer = null; s.ultimo = performance.now(); const t2 = (Store.state.tokens || {})[id]; if (t2) Store.definir(['tokens', id], { ...t2, d: s.g }); };
+  const enviar = () => { s.timer = null; s.ultimo = performance.now(); const t2 = (Store.state.tokens || {})[id]; if (t2) Store.definir(['tokens', id], { ...t2, d: s.g }, ['d']); };
   s.g = g; tk.d = g;
   if (performance.now() - s.ultimo > 260) enviar(); else if (!s.timer) s.timer = setTimeout(enviar, 260);
 }
@@ -6327,7 +6557,7 @@ function ruidoPior() {
 }
 window.ACF = {
   Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som, COND, publicarVitais, enviarChat, condicoesVisiveis,
-  get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), definir: (c, v) => Store.definir(c, v),
+  get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), soTokens: () => Store.soTokens(), definir: (c, v) => Store.definir(c, v),
   get mudo() { return mudo; }, get vez() { return vezAtual(); }, get tv() { return TV; },
   get pronto() { return Store.modo === 'firebase' || !FIREBASE; },
   garantirLogin: () => (Store.modo === 'firebase' && !mestre && Store.auth && !Store.auth.currentUser ? Store.garantirLogin() : Promise.resolve()),
@@ -6345,6 +6575,7 @@ window.ACF = {
   ganchoSala: g => { ganchosSala.push(g); },
   ganchoToken: g => { ganchosToken.push(g); },
   iniciarPerseguicao: (o, x) => iniciarPerseguicao(o, x),
+  novaRodadaPersg: () => { if (mestre) novaRodadaPersg(); }, encerrarPerseguicao: () => { if (mestre) encerrarPerseguicao(); },
   chatLocal(m) { if (!m || !m.t) return; Chat.locais.push({ a: '', n: '', t: String(m.t).slice(0, 200), ts: m.ts || Date.now(), local: true }); Chat.locais = Chat.locais.slice(-20); Chat.atualizar(); },
   get selecionado() { return selecionado; }, selecionar: id => selecionar(id), abrirDados: (t, id) => abrirDados(t, id),
   ganchoChat: f => { ganchosChat.push(f); },
