@@ -496,8 +496,9 @@ const Vista = {
   },
   porPorta3d(k, v) {
     const ap = this.ap, T = ap.T, P = (ap.mundo.portas || []).find(x => x && x.c.ci === v.ci); if (!P) return;
-    const F = ap.fabrica(), g = new T.Group(), W = 2.4, H = 2.7;
-    g.position.copy(P.grp.position); g.rotation.y = P.grp.rotation.y;
+    // o corredor tem uma porta em cada ponta (sala3d.js, P.grps): a barricada aparece nas duas, como a porta
+    const F = ap.fabrica(), g0 = new T.Group(), g = new T.Group(), W = 2.4, H = 2.7, pontas = P.grps || [P.grp];
+    g0.position.copy(pontas[0].position); g0.rotation.y = pontas[0].rotation.y;
     const aco = F.m('#5a5e62', { r: .6, me: .45 }), mad = F.m('#6b4a2c', { r: .85 }), escuro = F.m('#1a1a1a', { me: .5 });
     [-1, 1].forEach(s => F.bx(g, .09, H - .16, W / 2 - .06, aco, 0, 0, s * (W / 4 - .01)));
     F.bx(g, .1, H - .16, .02, escuro, 0, 0, 0);
@@ -505,6 +506,9 @@ const Vista = {
     [-1, 1].forEach(lx => { [[.55, .5], [1.45, -.45], [2.1, .38]].forEach(([y, r]) => { const tb = F.bx(g, .05, .18, W + .3, mad, lx * .1, y, 0); tb.rotation.x = r; }); });
     const cad = new T.Group(); cad.position.set(.45, 0, .2); cad.rotation.z = .45; g.add(cad);
     F.bx(cad, .42, .05, .42, mad, 0, .45, 0); [[-.18, -.18], [.18, -.18], [-.18, .18], [.18, .18]].forEach(([a, b]) => F.bx(cad, .04, .45, .04, mad, a, 0, b)); F.bx(cad, .04, .5, .42, mad, -.19, .5, 0);
+    // as peças montadas em g passam para a ponta 1; a ponta 2 é a mesma cópia (geometria compartilhada), girada
+    [...g.children].forEach(o => g0.add(o)); g.add(g0);
+    pontas.slice(1).forEach(pg => { const c = g0.clone(); c.position.copy(pg.position); c.rotation.y = pg.rotation.y; g.add(c); });
     g.traverse(o => { o.raycast = () => {}; });
     this.grupo.add(g);
     const fresca = agora() - num(v.ts) < 3500;

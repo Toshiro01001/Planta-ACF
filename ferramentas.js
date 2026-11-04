@@ -705,18 +705,33 @@ function desenharMesaParede() {
     <label class="chave"><input type="checkbox" data-pdm="on" ${on ? 'checked' : ''}><span>Parede desperta (os jogadores veem o botão)</span></label>
     <p class="mini">${P.contOk ? cobaias().map(x => `${esc(x.nome)} ${int(P.cont[x.id])}`).join(' · ') : 'Contagem: <button data-pdm="contar">consultar a pedra</button>'}</p>
     <div class="mesa-linha"><button data-pdm="abrir" class="btn-protocolo">🧱 Abrir a Parede</button></div>
+    ${htmlParedesSalas()}
     ${lista.length ? `<details class="pd-m-lista"><summary>Desejos registrados (${lista.length}) · ${pend ? `${pend} preço${pend > 1 ? 's' : ''} pendente${pend > 1 ? 's' : ''}` : 'tudo cobrado'}</summary>${lista.slice(0, 40).map(([k, d]) => { const q = dataHora(d.ts), pago = dv[k] === 'pago'; return `<article class="${pago ? 'pago' : ''}"><header><b>${esc(nomeDe(d.s))}</b> · preço ${int(d.n)} · ${q.data} ${q.hora}<button data-pdm="pago" data-k="${esc(k)}" class="pd-m-st">${pago ? '✓ cobrado' : 'marcar cobrado'}</button><button data-pdm="apagar" data-k="${esc(k)}" aria-label="Apagar este registro">×</button></header><p>“${esc(d.d)}”</p><p class="mini">${esc(d.p)}</p></article>`; }).join('')}</details>` : ''}`;
   if (c.dataset.html !== html) { c.innerHTML = html; c.dataset.html = html; }
+}
+// a Parede nas salas do complexo (mapa/paredes, app.js): a CN 09 fixa e as sorteadas; só o Mestre sorteia e liga/desliga
+function htmlParedesSalas() {
+  if (!A.paredeNaSala) return '';
+  const pd = est().paredes || {}, cns = new Set([9]);
+  Object.keys(pd).forEach(k => { if (/^c\d{1,3}$/.test(k)) cns.add(+k.slice(1)); });
+  const lista = [...cns].sort((a, b) => a - b), dois = n => String(n).padStart(2, '0');
+  const ligadas = lista.filter(cn => A.paredeNaSala(cn)).length;
+  return `<div class="pd-m-salas"><p class="mini"><b>Nas salas do complexo</b> (${ligadas} ligada${ligadas === 1 ? '' : 's'}): a CN 09 sempre tem a Parede; as outras são sorteadas, 1 ou 2 por andar. No 3D ela fica numa parede livre da sala; no mapa, um ícone. O jogador só vê a Parede numa sala que já pode ver.</p>
+    <div class="pd-m-chips">${lista.map(cn => `<label class="chave"><input type="checkbox" data-pdm-sala="${cn}" ${A.paredeNaSala(cn) ? 'checked' : ''} ${A.mestre ? '' : 'disabled'}><span>CN ${dois(cn)} · ${Math.ceil(cn / 25)}º</span></label>`).join('')}</div>
+    ${A.mestre ? `<div class="mesa-linha"><button data-pdm="sortear">🎲 Sortear de novo</button><input id="pdmCn" type="number" min="1" max="125" inputmode="numeric" placeholder="CN" aria-label="Número da sala (CN)"><button data-pdm="por">Pôr nesta sala</button></div>` : ''}</div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-pdm]'); if (!b || !(A.mestre || A.aux)) return;
   const a = b.dataset.pdm;
+  if (a === 'sortear' && A.mestre) { if (confirm('Sortear de novo as salas com a Parede de Desejos? A CN 09 continua como está.')) { A.sortearParedes(); setTimeout(desenharMesaParede, 60); } return; }
+  if (a === 'por' && A.mestre) { const i = $('#pdmCn'), cn = int(i && i.value); if (cn >= 1 && cn <= 125) { A.ligarParedeSala(cn, true); i.value = ''; setTimeout(desenharMesaParede, 60); } else if (A.aviso) A.aviso('Digite o número da sala (CN 1 a 125).'); return; }
   if (a === 'abrir') abrirParede();
   else if (a === 'contar') carregarContagens();
   else if (a === 'pago') { const k = b.dataset.k; A.definir(['dividas', k], (est().dividas || {})[k] === 'pago' ? null : 'pago'); setTimeout(desenharMesaParede, 30); }
   else if (a === 'apagar') { if (confirm('Apagar este registro de desejo? (A contagem do Worker não muda.)')) A.Rede.set('desejos/' + b.dataset.k, null).catch(() => {}); }
 });
 document.addEventListener('change', e => {
+  if (e.target.matches && e.target.matches('[data-pdm-sala]') && A.mestre) { A.ligarParedeSala(int(e.target.dataset.pdmSala), e.target.checked); setTimeout(desenharMesaParede, 60); return; }
   if (e.target.matches && e.target.matches('[data-pdm="on"]') && (A.mestre || A.aux)) { A.definir(['parede'], e.target.checked ? { on: true, ts: Date.now() } : null); setTimeout(desenharMesaParede, 30); }
 });
 

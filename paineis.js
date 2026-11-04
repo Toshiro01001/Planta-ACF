@@ -50,6 +50,7 @@
     blocoApagao: { ic: '🌑', t: 'Apagão', cat: 'clima' },
     blocoFuncoes: { ic: '🎭', t: 'Funções' },
     blocoConectados: { ic: '🟢', t: 'Conectados agora' },
+    blocoDesemp: { ic: '📈', t: 'Desempenho' },
     blocoExpo: { ic: '☢', t: 'Exposição (NEX)' },
     blocoBalanca: { ic: '⚖', t: 'Balança do Eco' },
     blocoDiario: { ic: '📔', t: 'Diário da sessão' },
@@ -81,12 +82,20 @@
     blocoMesaMom: { ic: '✨', t: 'Momentos marcantes', cat: 'cena' },
     blocoMesaRel: { ic: '📋', t: 'Relatório da missão', cat: 'reg' },
     blocoMesaNex: { ic: '🧮', t: 'Calculadora de NEX', cat: 'recomp' },
-    blocoMesaParede: { ic: '🧱', t: 'Parede de Desejos', cat: 'recomp' }
+    blocoMesaParede: { ic: '🧱', t: 'Parede de Desejos', cat: 'recomp' },
+    // qol.js: cartões de qualidade de vida (conteúdo montado só quando abertos)
+    blocoQolAgora: { ic: '📡', t: 'Agora', d: 'on-line · onde está cada um · alertas' },
+    blocoQolMacros: { ic: '⚡', t: 'Macros', cat: 'ctrl', d: 'grave e repita sequências' },
+    blocoQolDesf: { ic: '↶', t: 'Desfazer ações', cat: 'ctrl' },
+    blocoQolRetrato: { ic: '📸', t: 'Retrato da sessão', d: 'preparar · restaurar' },
+    blocoQolAux: { ic: '🎮', t: 'Controle rápido' },
+    blocoQolMapa: { ic: '🧠', t: 'Mapa mental', d: 'só você vê' },
+    blocoCmdOrdens: { ic: '📨', t: 'Ordens e pilotos', cat: 'ctrl', d: 'ordens aos auxiliares · piloto dos Filhos' }
   };
   const reg = b => REG[b.id] || { ic: '▪', t: txt($('h2', b)).replace(/^[☆★]\s*/, '') || b.id };
   // cartões-atalho: o bloco mora numa aba, mas ganha um cartão noutra (abre o MESMO bloco, sem duplicar)
   // aba → lista de [id do bloco, id do bloco depois do qual o cartão entra]
-  const ATALHOS = { sessao: [['blocoSahPers', 'blocoRuidoM']] };
+  const ATALHOS = { sessao: [['blocoQolAgora', ''], ['blocoSahPers', 'blocoRuidoM']] };
   const tituloDe = b => reg(b).t || txt($('h2', b)).replace(/^[☆★]\s*/, '');
 
   /* ---------- estado vivo de cada bloco: lista de [ícone, texto, classe] ---------- */
@@ -117,6 +126,7 @@
     blocoApagao: () => { const on = /deslig/i.test(txt('#btnApagao')); return [[on ? '🌑' : '💡', on ? 'apagão ligado' : 'luz normal', on ? 'alerta' : '']]; },
     blocoFuncoes: b => [['🎭', n('.funcao-linha', b) + ' funções']],
     blocoConectados: b => [['🟢', n('#listaConectados li.on', b) + ' de ' + n('#listaConectados li', b) + ' on-line']],
+    blocoDesemp: b => { const on = n('#desempLista .dsp-li:not(.dsp-off)', b), al = n('#desempLista .dsp-alerta', b), pior = $$('#desempLista .dsp-li:not(.dsp-off) .dsp-fps b', b).map(x => +x.textContent || 0); return [['📈', on ? on + (on === 1 ? ' aparelho' : ' aparelhos') : 'nenhum aparelho'], ...(on ? [['⏱', 'pior ' + Math.min(...pior) + ' FPS', al ? 'alerta' : '']] : []), ...(al ? [['⚠', al + ' com problema', 'alerta']] : [])]; },
     blocoExpo: b => [['☢', Math.max(0, n('#tabelaExpo tr', b) - 1) + ' cobaias']],
     blocoBalanca: () => [['⚖', (txt('#balMae') || '50%') + ' Mãe · ' + (txt('#balRei') || '50%') + ' Rei'], ['·', txt('#balancaEstado') || 'Neutro']],
     blocoDiario: b => { const k = n('#listaDiario li', b); const u = $('#listaDiario li', b); return [['📔', k + ' registros'], ...(u ? [['🕒', txt(u).slice(0, 40)]] : [])]; },
@@ -144,7 +154,7 @@
   };
   const resumo = b => {
     let r = [];
-    try { r = (SUM[b.id] ? SUM[b.id](b) : []) || []; } catch (e) { r = []; }
+    try { r = (SUM[b.id] ? SUM[b.id](b) : window.ACF_QOL && ACF_QOL.BLOCOS[b.id] ? ACF_QOL.resumo(b.id) : []) || []; } catch (e) { r = []; }
     r = r.filter(x => x && x[1]);
     if (!r.length && reg(b).d) r = [['', reg(b).d]];
     return r;

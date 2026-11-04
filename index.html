@@ -9,8 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261103o">
-<link rel="stylesheet" href="paineis.css?v=20261103o">
+<link rel="stylesheet" href="style.css?v=20261104c">
+<link rel="stylesheet" href="paineis.css?v=20261103r">
+<link rel="stylesheet" href="qol.css?v=20261104c">
 </head>
 <body>
 
@@ -328,6 +329,16 @@
       <ul id="listaConectados" class="lista-conectados"></ul>
     </section>
 
+    <section class="bloco mestre-only" id="blocoDesemp" data-aba="registro" hidden>
+      <h2>Desempenho dos aparelhos</h2>
+      <p class="mini">Cada tela aberta (jogadores, auxiliares e a sua) mede o próprio desempenho e manda um resumo a cada 10 s, só enquanto a aba está à vista. Em vermelho: menos de 30 quadros por segundo ou travadas seguidas (acima de 100 ms).</p>
+      <ul id="desempLista" class="dsp-lista"></ul>
+      <h3>Resumo da sessão</h3>
+      <p class="mini">O pior caso de cada pessoa desde que esta aba abriu.</p>
+      <ul id="desempResumo" class="dsp-resumo"></ul>
+      <button type="button" class="btn-fantasma" data-dsp="zerar">Zerar o resumo</button>
+    </section>
+
     <section class="bloco mestre-only" id="blocoRelogio" data-aba="sessao" hidden>
       <h2>Relógio da Caixa</h2>
       <p class="mini">Todos veem a hora no topo do mapa. À 00:00, todos recebem o aviso de que os robôs S.T.A.F.F. desligam.</p>
@@ -382,12 +393,15 @@
       <p class="mini">Faixas: 50/50 a 60/40 neutro · 65/35 a 85/15 tingido · 90/10 a 100 consagrado.</p>
     </section>
 
-    <section class="bloco mestre-only" id="blocoApagao" data-aba="sessao" hidden>
+    <section class="bloco mestre-aux" id="blocoApagao" data-aba="sessao" hidden>
       <h2>Apagão</h2>
       <p class="mini">O sinal da Interface cai: a planta escurece e cada jogador passa a enxergar só o próprio token, até o Mestre desligar. Os auxiliares não são afetados.</p>
+      <div class="mestre-only" hidden>
       <h3>Continuam enxergando no apagão</h3>
       <div id="listaApagaoVe" class="lista-apagao"></div>
       <p class="mini">Fica salvo só com o Mestre. O site não mostra o motivo a ninguém.</p>
+      </div>
+      <p class="mini so-aux-txt">Auxiliar: quem continua enxergando é escolha do Mestre; a tela dele completa isso sozinha quando estiver aberta.</p>
       <button id="btnApagao" class="btn-protocolo">Ligar apagão</button>
     </section>
 
@@ -406,7 +420,7 @@
     </section>
     <section class="bloco mestre-only" id="blocoMesaInv" data-aba="mesa" hidden><h2>Cena de investigação</h2><div id="mesaInv"></div></section>
     <section class="bloco mestre-only" id="blocoMesaTeste" data-aba="mesa" hidden><h2>Pedir teste</h2><div id="mesaTeste"></div></section>
-    <section class="bloco mestre-only" id="blocoSahPers" data-aba="mesa" hidden>
+    <section class="bloco mestre-aux" id="blocoSahPers" data-aba="mesa" hidden>
       <h2>Perseguição (Sobrevivendo ao Horror)</h2>
       <div id="sahPers"></div>
       <h3>Participantes e ordem</h3>
@@ -423,9 +437,9 @@
       <div id="persgAtiva" hidden>
         <p class="mini"><b id="persgRodada">Rodada 1</b> · a ordem vai da maior iniciativa para a menor. Quando a vez de todos termina, a rodada seguinte começa e o site pede os testes.</p>
         <ol id="ordemPersg" class="ordem-persg"></ol>
-        <label class="chave"><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
-        <div class="crono-mestre"><label>⏱ Tempo por vez <input id="tempoVez" type="number" min="0" step="5" placeholder="0"> s</label><button id="btnReiniciarCrono" class="btn-fantasma">Reiniciar tempo</button></div>
-        <p class="mini">0 ou vazio desliga o cronômetro. Ele recomeça a cada "Próximo turno".</p>
+        <label class="chave mestre-only" hidden><input type="checkbox" id="chkLivre"><span>Mestre move sem limite e fora da vez</span></label>
+        <div class="crono-mestre mestre-only" hidden><label>⏱ Tempo por vez <input id="tempoVez" type="number" min="0" step="5" placeholder="0"> s</label><button id="btnReiniciarCrono" class="btn-fantasma">Reiniciar tempo</button></div>
+        <p class="mini mestre-only" hidden>0 ou vazio desliga o cronômetro. Ele recomeça a cada "Próximo turno".</p>
         <div class="ferramentas">
           <button id="btnProxTurno" class="btn-roxo">Próximo turno</button>
           <button id="btnRefazerVez" class="btn-fantasma">Refazer rota de quem está na vez</button>
@@ -443,7 +457,7 @@
     <section class="bloco mestre-only" id="blocoMesaExpo" data-aba="mesa" hidden><h2>Salas de Exposição</h2><div id="mesaExpo"></div></section>
     <section class="bloco mestre-only" id="blocoMesaInt" data-aba="mesa" hidden><h2>Interlúdio</h2><div id="mesaInt"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRec" data-aba="mesa" hidden><h2>Fim de missão</h2><div id="mesaRec"></div></section>
-    <section class="bloco mestre-only" id="blocoMesaAmb" data-aba="mesa" hidden><h2>Ambiente</h2><div id="mesaAmb"></div></section>
+    <section class="bloco mestre-aux" id="blocoMesaAmb" data-aba="mesa" hidden><h2>Ambiente</h2><div id="mesaAmb"></div></section>
     <section class="bloco mestre-only" id="blocoMesaRol" data-aba="mesa" hidden><h2>Rolagem secreta</h2><div id="mesaRol"></div></section>
     <section class="bloco mestre-aux" id="blocoMesaAmea" data-aba="mesa" hidden><h2>Ameaças</h2><div id="mesaAmea"></div></section>
     <section class="bloco mestre-aux" id="blocoMesaMemb" data-aba="mesa" hidden><h2>Membrana</h2><div id="mesaMemb"></div></section>
@@ -698,36 +712,39 @@
 <script src="data.js?v=20261031p"></script>
 <script src="config.js?v=20261020b"></script>
 <script src="escudo.js?v=20261020b"></script>
-<script src="app.js?v=20261103o"></script>
+<script src="app.js?v=20261104c"></script>
 <script src="catalogo-op.js?v=20261020b"></script>
 <script src="fichas.js?v=20261103o"></script>
 <script src="quadro.js?v=20261020b"></script>
-<script src="mesa.js?v=20261103o"></script>
+<script src="mesa.js?v=20261104c"></script>
 <script src="sah-dados.js?v=20261020b"></script>
 <script src="sah.js?v=20261103o"></script>
 <script src="limpo.js?v=20261103o"></script>
 <script src="arquivo.js?v=20261103o"></script>
-<script src="ferramentas.js?v=20261103o"></script>
+<script src="ferramentas.js?v=20261104c"></script>
 <script src="sessao.js?v=20261020b"></script>
 <script src="exposicao.js?v=20261030d"></script>
 <script src="exposicao3d.js?v=20261030d"></script>
 <script src="jogo.js?v=20261020b"></script>
-<script src="objetos3d.js?v=20261031a"></script>
+<script src="objetos3d.js?v=20261103r"></script>
 <script src="interacoes3d.js?v=20261103o"></script>
 <script src="detalhes3d.js?v=20261031a"></script>
-<script src="tokens3d.js?v=20261103o"></script>
+<script src="tokens3d.js?v=20261103r"></script>
 <script src="vozes.js?v=20261103o"></script>
 <script src="dados3d.js?v=20261103o"></script>
-<script src="sala3d.js?v=20261103o"></script>
-<script src="nevoa.js?v=20261030d"></script>
-<script src="filhos.js?v=20261103o"></script>
+<script src="sala3d.js?v=20261104c"></script>
+<script src="nevoa.js?v=20261104c"></script>
+<script src="filhos.js?v=20261103r"></script>
 <script src="momento.js?v=20261103o"></script>
 <script src="sons-filhos.js?v=20261103o"></script>
-<script src="imersao.js?v=20261103o"></script>
+<script src="imersao.js?v=20261103r"></script>
 <script src="visao3d.js?v=20261103o"></script>
 <script src="perseg3d.js?v=20261103o"></script>
-<script src="fuga3d.js?v=20261103o"></script>
-<script src="disfarce3d.js?v=20261103o"></script>
-<script src="paineis.js?v=20261103o"></script>
+<script src="fuga3d.js?v=20261104c"></script>
+<script src="disfarce3d.js?v=20261103r"></script>
+<script src="desempenho.js?v=20261103r"></script>
+<script src="paineis.js?v=20261104c"></script>
+<script src="qol.js?v=20261104c"></script>
+<script src="comando.js?v=20261104c"></script>
 </body>
 </html>

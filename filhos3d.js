@@ -1313,12 +1313,15 @@
       /* ---------- animação ---------- */
       let desl = 0, prox = 0; const QM = new T.Quaternion();
       const pos = geoV.attributes.position;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.2 });
       const anim = (dt, t, andando) => {
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 2.5);
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
+        desl = kA * Math.min(1.6, .55 + mv.vEf / 3.2);   // mais rápida, mais inclinada
         // desliza: sobe um pouco, inclina para a frente, sem passos
         corpo.position.y = desl * (.03 + Math.sin(t * 2.1) * .01);
         corpo.rotation.x = desl * .07 + Math.sin(t * .6) * .006;
-        corpo.rotation.z = Math.sin(t * .43) * .015;
+        corpo.rotation.z = Math.sin(t * .43) * .015 + bank; corpo.rotation.x += ace;
         // respiração presa: o peito sobe em soluços
         const resp = Math.sin(t * 1.1) * .5 + Math.max(0, Math.sin(t * 3.7)) * .4;
         alto.scale.set(1 + resp * .006, 1 + resp * .004, 1 + resp * .01);
@@ -1879,11 +1882,14 @@
     const ap = (ob, k2, v, vel, dt) => { ob[k2] += (v - ob[k2]) * Math.min(1, dt * vel); };
     const FRENTE = new T.Vector3(0, .6, 6);
     let sombraOk = false;
+    // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+    const mv = NS.mov(g, { sem: s && s.semente, vPadrao: o.ovos ? 1.3 : .7 });
     const anim = (dt, t, andando) => {
+      mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
       if (!sombraOk && agua) { sombraOk = true; agua.ag.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = false; } }); }
       const tt = t + des;
-      ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 5);
-      if (andando) fase += dt * (o.ovos ? 9 : 14);
+      ritmo = kA;
+      fase += mv.ritmo(dt, o.ovos ? 9 : 14, o.ovos ? 1.3 : .7);
       naAgua += ((modo === 'na_agua' ? 1 : 0) - naAgua) * Math.min(1, dt * 2.5);
       // ação única
       let lx = 0, ly = 0, lz = 0, pitch = 0, boca = 0, garras = 0, foco = null, acende = 1, ordem = null, achata = 0;
@@ -1915,7 +1921,7 @@
       // corrida baixa: corpo colado ao chão, ondula de lado como lagarto
       const ond = Math.sin(fase), afunda = naAgua * (o.ovos ? 1.12 : 0);
       corpo.position.set(lx, BAIXO - R * .1 + ly - achata * .12 - afunda + Math.abs(Math.cos(fase)) * .02 * R, lz);
-      corpo.rotation.set(pitch + R * .03, ond * .12 * R + Math.sin(tt * .5) * .03 * (1 - R), -ond * .03 * R);
+      corpo.rotation.set(pitch + R * .03 + ace, ond * .12 * R + Math.sin(tt * .5) * .03 * (1 - R), -ond * .03 * R + bank);
       // tiques: sem andar, a criatura dá trancos de cabeça e de passo
       prox -= dt;
       if (prox <= 0) { prox = (o.ovos ? .8 : .25) + ra() * (o.ovos ? 2.5 : 1.1); tiqueAlvo = [(ra() - .5) * (o.ovos ? .5 : 1.1), (ra() - .5) * .3, ra() < .4 ? 1 : 0]; tique = o.ovos ? 0 : .18; }
@@ -2406,11 +2412,14 @@
     const ap = (ob, k2, v, vel, dt) => { ob[k2] += (v - ob[k2]) * Math.min(1, dt * vel); };
     const FRENTE = new T.Vector3(0, .6, 6);
     let sombraOk = false;
+    // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+    const mv = NS.mov(g, { sem: s && s.semente, vPadrao: o.ovos ? 1.3 : .7 });
     const anim = (dt, t, andando) => {
+      mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
       if (!sombraOk && agua) { sombraOk = true; agua.ag.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = false; } }); }
       const tt = t + des;
-      ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 5);
-      if (andando) fase += dt * (o.ovos ? 9 : 14);
+      ritmo = kA;
+      fase += mv.ritmo(dt, o.ovos ? 9 : 14, o.ovos ? 1.3 : .7);
       naAgua += ((modo === 'na_agua' ? 1 : 0) - naAgua) * Math.min(1, dt * 2.5);
       // ação única
       let lx = 0, ly = 0, lz = 0, pitch = 0, boca = 0, garras = 0, foco = null, acende = 1, ordem = null, achata = 0;
@@ -2442,7 +2451,7 @@
       // corrida baixa: corpo colado ao chão, ondula de lado como lagarto
       const ond = Math.sin(fase), afunda = naAgua * (o.ovos ? 1.12 : 0);
       corpo.position.set(lx, BAIXO - R * .1 + ly - achata * .12 - afunda + Math.abs(Math.cos(fase)) * .02 * R, lz);
-      corpo.rotation.set(pitch + R * .03, ond * .12 * R + Math.sin(tt * .5) * .03 * (1 - R), -ond * .03 * R);
+      corpo.rotation.set(pitch + R * .03 + ace, ond * .12 * R + Math.sin(tt * .5) * .03 * (1 - R), -ond * .03 * R + bank);
       // tiques: sem andar, a criatura dá trancos de cabeça e de passo
       prox -= dt;
       if (prox <= 0) { prox = (o.ovos ? .8 : .25) + ra() * (o.ovos ? 2.5 : 1.1); tiqueAlvo = [(ra() - .5) * (o.ovos ? .5 : 1.1), (ra() - .5) * .3, ra() < .4 ? 1 : 0]; tique = o.ovos ? 0 : .18; }
@@ -2710,16 +2719,19 @@
       let modo = 'solto', kCand = 0;
       const meus = new Set();   // o que esta forma criou direto em g; o resto (base, anel, nome) é do site
       const tmp = V3(), perp = V3(), tmpC = V3();
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.6 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         kCand += ((modo === 'candelabro' ? 1 : 0) - kCand) * Math.min(1, dt * 2.2);
         const kC = kCand * kCand * (3 - 2 * kCand), kL = 1 - kC;   // peso do disfarce e do "solta"
         const kV = Math.max(.0001, Math.min(1, (kCand - .55) / .4));   // as velas só aparecem com os braços quase no lugar
-        kAnda += ((andando && kC < .5 ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
-        fase += dt / 2.6 * kAnda;
+        kAnda += ((andando && kC < .5 ? 1 : 0) - kAnda) * Math.min(1, dt * 6);
+        fase += dt / 2.6 * kAnda * Math.max(.6, Math.min(4, mv.vEf / .5));
         // gaiola balança presa às correntes, mais quando anda; quase parada no disfarce
         const bal = 1 - kC * .85;
         corpo.rotation.x = (Math.sin(t * .9) * .025 + Math.sin(fase * 6.283 * 8) * .02 * kAnda + kAnda * .04) * bal;
-        corpo.rotation.z = (Math.sin(t * .7 + 1) * .03 + tique(t, 7.3, .6, 1) * .05 * kL) * bal;
+        corpo.rotation.z = (Math.sin(t * .7 + 1) * .03 + tique(t, 7.3, .6, 1) * .05 * kL) * bal + bank * kL;
         corpo.rotation.y = Math.sin(t * .23) * .08 * bal;
         acaoCorpo(dt, t);
         corpo.position.y += SOBE * kC;
@@ -2731,7 +2743,7 @@
         panos.forEach(pn => { pn.piv.rotation.x = Math.sin(t * .8 + pn.f) * .03; pn.piv.rotation.z = pn.z0 + Math.sin(t * .6 + pn.f * 2) * .03; });
         // pernas: uma de cada vez, levanta alto e crava o espeto no chão
         pernas.forEach((p, k) => {
-          const passo = .55, janela = 1 / 8, ini = p.ordem * janela;
+          const passo = .55 * Math.max(1, Math.min(1.8, mv.vEf / 1.2)), janela = 1 / 8, ini = p.ordem * janela;
           let u = ((fase - ini) % 1 + 1) % 1, dz = 0, dy = 0, dx = 0;
           if (u < janela) { const v = u / janela, e = v * v * (3 - 2 * v); dz = passo * (-.5 + e); dy = Math.sin(v * Math.PI) * .7 + (v > .8 ? -.05 : 0); dx = Math.sin(v * Math.PI) * .25 * p.sx * 0; }
           else dz = passo * (.5 - (u - janela) / (1 - janela));
@@ -3247,15 +3259,18 @@
       const ac = acoes({ ataque: 1.4, revelar: 2.0 });
       let desl = 0, giro = 0;
       const pos = geoV.attributes.position;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.2 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const A = ac.passo(dt);
         const atk = A && A.tipo === 'ataque' ? A.k : -1, rev = A && A.tipo === 'revelar' ? A.k : -1;
         const eAtk = atk >= 0 ? (atk < .12 ? sm(atk / .12) : 1 - sm((atk - .6) / .4) * (atk > .6 ? 1 : 0)) : 0, eRev = rev >= 0 ? env(rev, .3, .7) : 0;
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 2);
+        desl = kA * Math.min(1.6, .55 + mv.vEf / 3.2);
         // flutua sem passos; desliza inclinada um pouco
         const subida = rev >= 0 ? -.35 * (1 - sm(rev / .45)) : 0;
         corpo.position.set(0, .06 + Math.sin(t * .8) * .03 + subida, 0);
-        corpo.rotation.set(desl * .06 - eAtk * .05, 0, Math.sin(t * .31) * .008);
+        corpo.rotation.set(desl * .06 - eAtk * .05 + ace, 0, Math.sin(t * .31) * .008 + bank);
         pesc.rotation.set(.08 + eAtk * .12, Math.sin(t * .17) * .03, 0);
         // auréola: gira devagar; acende na revelação; inflama no ataque
         const acende = rev >= 0 ? sm(rev / .35) : 1;
@@ -3795,12 +3810,15 @@
       let corr = 0, boca = .2, fase = 0;
       const DM = new T.Matrix4(), DQ = new T.Quaternion(), QY = new T.Quaternion(), YA = V(0, 1, 0), P = V(), S = V();
       const abre = (x, z, hx, hz, a) => { const c = Math.cos(a), s2 = Math.sin(a), rx = x - hx, rz = z - hz; return [hx + rx * c + rz * s2, hz - rx * s2 + rz * c]; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 3.0 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const A = ac.passo(dt);
         const atk = A && A.tipo === 'ataque' ? A.k : -1, rev = A && A.tipo === 'revelar' ? A.k : -1;
         const eAtk = atk >= 0 ? env(atk, .22, .62) : 0, eRev = rev >= 0 ? env(rev, .22, .72) : 0;
         corr += ((andando && atk < 0 && rev < 0 ? 1 : 0) - corr) * Math.min(1, dt * 4);
-        fase += dt * (2 * PI * 2.1) * (.25 + corr * .75);
+        fase += dt * (2 * PI * 2.1) * (.25 + corr * .75 * Math.max(.5, Math.min(1.6, mv.vEf / 3)));
         // respiração pesada e irregular
         const resp = Math.sin(t * 2.4 + Math.sin(t * .7) * .9), r2 = Math.max(0, resp);
         tronco.scale.set(1 + resp * .018, 1 + r2 * .01, 1 + resp * .03);
@@ -3808,7 +3826,7 @@
         const galope = Math.sin(fase * 2);
         quadril.position.set(0, 1.14 - corr * .22 + corr * galope * .05 + eRev * .22 + eAtk * .05, -.3 - corr * .2 + eAtk * .25);
         tronco.rotation.x = .2 + corr * (.9 + Math.sin(fase) * .07) - eRev * .25 + eAtk * .2 + r2 * .015;
-        tronco.rotation.y = Math.sin(t * .37) * .04 + corr * Math.sin(fase) * .05;
+        tronco.rotation.y = Math.sin(t * .37) * .04 + corr * Math.sin(fase) * .05; tronco.rotation.z = bank;
         tronco.rotation.z = Math.sin(t * .29) * .03;
         // a boca do tronco: entreaberta na respiração, inteira no ataque e na revelação
         let alvoB = .6 + .2 * Math.max(0, Math.sin(t * 2.4 + Math.sin(t * .7) * .9 - .6)) + (Math.sin(t * 5.3) > .97 ? .12 : 0);
@@ -4099,7 +4117,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const mola = x => x <= 0 ? 0 : 1 - Math.exp(-x * 7) * Math.cos(x * 16);
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.5 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         // pesos das ações: empinar e cravar (ataque); monte de pano que se desdobra (revelar)
         let empina = 0, crava = 0, uR = -1, monte = 0, ergue = 1;
         if (acA) {
@@ -4108,12 +4129,12 @@
           else { uR = u; monte = 1 - faixa(u, .25, .9); ergue = faixa(u, .85, 1.15); }
           if (u >= acA.dur) acA = null;
         }
-        kAnda += ((andando ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
-        fase += dt * .9 * kAnda;
+        kAnda = kA;
+        fase += dt * .9 * kAnda * Math.max(.6, Math.min(3, mv.vEf / .6));
         // corpo: ondula, respira e se arrasta aos trancos
         const resp = Math.sin(t * 1.4 + Math.sin(t * .5)) * .5 + .5, tranco = Math.pow(Math.max(0, Math.sin(fase * 6.283 * 2)), 3) * kAnda;
         corpo.position.set(Math.sin(fase * 6.283) * .03 * kAnda, -.02 * resp + tranco * .03 + empina * .12 - crava * .04 - monte * .3, tranco * .05 + crava * .25 - empina * .08);
-        corpo.rotation.set(-empina * .32 + crava * .22, Math.sin(fase * 6.283) * .04 * kAnda, Math.sin(fase * 6.283 + 1) * .03 * kAnda + Math.sin(t * .6) * .01);
+        corpo.rotation.set(-empina * .32 + crava * .22, Math.sin(fase * 6.283) * .04 * kAnda, Math.sin(fase * 6.283 + 1) * .03 * kAnda + Math.sin(t * .6) * .01 + bank * .6);
         corpo.scale.set(1 + monte * .12, 1 - monte * .45, 1);
         corpo.updateMatrix();
         // mortalha: onda correndo da frente para trás por cima dos braços
@@ -4449,7 +4470,10 @@
 
       /* ---------- animação ---------- */
       let fase = 0, incl = 0, alvoIncl = 0, tIncl = 1, tAbana = 5, abana = 0, tFareja = 3, fareja = 0, tBoca = 6, bocaA = 0, tPisca = 2, pisca = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.75 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         let atq = 0, rev = 0, u = 0;
         if (ac) { ac.t += dt; u = ac.t / ac.dur; if (u >= 1) ac = null; else if (ac.tipo === 'ataque') atq = 1; else rev = 1; }
         const enco = atq ? env(u, 0, .1, .1, .2) : 0, bote = atq ? env(u, .1, .25, .55, .85) : 0, abre = atq ? env(u, .12, .26, .46, .52) : 0;
@@ -4462,7 +4486,7 @@
         cab.rotation.z = inclF; cab.rotation.y = Math.sin(t * .37) * .12 * (1 - bote);
         cab.rotation.x = -feliz * .2 - bote * .55 - enco * .15;
         // orelhas balançando atrás do movimento da cabeça
-        orelhas.forEach(O => { let rz = -inclF * .8; if (rz * O.sx < 0) rz *= .25; O.p.rotation.z = rz + Math.sin(t * 2.1 + O.sx) * .03 + bote * O.sx * .25; O.p.rotation.x = -bote * .6 + (andando ? Math.sin(fase * 2) * .06 : 0); });
+        orelhas.forEach(O => { let rz = -inclF * .8; if (rz * O.sx < 0) rz *= .25; O.p.rotation.z = rz + Math.sin(t * 2.1 + O.sx) * .03 + bote * O.sx * .25; O.p.rotation.x = -bote * .6 + Math.sin(fase * 2) * .06 * kA; });
         // farejar: o nariz treme rápido
         tFareja -= dt; if (tFareja <= 0) { fareja = .6; tFareja = 3 + R() * 4; } fareja = Math.max(0, fareja - dt);
         const fq = fareja > 0 ? Math.sin(t * 40) * .06 : 0; nariz.scale.set(1 + fq, 1 - fq * .5, 1); nariz.position.y = .085 + fq * .01;
@@ -4478,18 +4502,18 @@
         const ab = Math.max(abana > 0 ? Math.min(1, abana * 3) * Math.min(1, (1.3 - abana) * 6) : 0, feliz);
         bracos.forEach((B, i) => {
           const sx = B.sx, solta = Math.max(ab * .7, bote);
-          B.b.rotation.set(-.22 - ab * .35 + bote * .25 + (andando ? Math.sin(fase + i * Math.PI) * .04 : 0), 0, -sx * (.06 + ab * -.25 + bote * -.2));
+          B.b.rotation.set(-.22 - ab * .35 + bote * .25 + Math.sin(fase + i * Math.PI) * .04 * kA, 0, -sx * (.06 + ab * -.25 + bote * -.2));
           B.cot.rotation.set(-1.05 - ab * .55 + bote * .25, 0, -sx * .48 * (1 - solta) + sx * ab * .2);
           B.mao.rotation.set(-.2, -sx * (.9 - ab * .5), Math.sin(t * 24 + i * 1.3) * ab * .75);
           B.dedos.forEach((D, j) => { const cur = (1 - ab) * (D.pol ? .3 : .9 + Math.sin(t * 1.7 + j + i) * .08) + bote * .2; D.d.rotation.z = sx * cur * (D.pol ? .5 : 1); D.d.rotation.x = D.pol ? .3 : 0; });
         });
         // andar humano normal, calmo demais (os braços quase não balançam)
-        if (andando) {
-          fase += dt * 3.6; const a = Math.sin(fase);
+        if (kA > .01) {
+          fase += mv.ritmo(dt, 3.6, .75); const a = Math.sin(fase) * kA;
           pernas[0].p.rotation.x = a * .38; pernas[1].p.rotation.x = -a * .38;
-          pernas[0].j.rotation.x = Math.max(0, -Math.cos(fase)) * .55 + .03; pernas[1].j.rotation.x = Math.max(0, Math.cos(fase)) * .55 + .03;
+          pernas[0].j.rotation.x = Math.max(0, -Math.cos(fase)) * .55 * kA + .03; pernas[1].j.rotation.x = Math.max(0, Math.cos(fase)) * .55 * kA + .03;
           pernas[0].pe.rotation.x = -a * .15; pernas[1].pe.rotation.x = a * .15;
-          corpo.position.y = Math.abs(Math.cos(fase)) * .018 - .01; tronco.rotation.y = a * .03;
+          corpo.position.y = (Math.abs(Math.cos(fase)) * .018 - .01) * kA; tronco.rotation.y = a * .03; tronco.rotation.z = bank;
         } else {
           pernas.forEach(P => { P.p.rotation.x *= .9; P.j.rotation.x *= .9; P.pe.rotation.x *= .9; }); corpo.position.y *= .9; tronco.rotation.y = Math.sin(t * .3) * .02;
         }
@@ -4498,7 +4522,7 @@
         tronco.scale.set(1 + resp * .01, 1, 1 + resp * .014);
         pesc.rotation.x = .25 + bote * .1; pesc.position.z = .02 + bote * .06; pesc.scale.y = 1 + bote * .35;
         corpo.position.z = bote * .22 - enco * .05;
-        pernas.forEach(P => { if (!andando) P.p.rotation.x = -bote * .35 * (P.sx > 0 ? 1 : .2); });
+        pernas.forEach(P => { if (kA <= .01) P.p.rotation.x = -bote * .35 * (P.sx > 0 ? 1 : .2); });
       };
       return { g, alt: 1.85, raioBase: .4, anim, acao };
     },
@@ -4872,7 +4896,10 @@
       /* ---------- animação ---------- */
       let fase = 0, tTela = 0, giro = 0, alvoGiro = 0, tGiro = 1, incl = .18, alvoIncl = .18, pisc = 1, tPisc = 2, tDedo = 0;
       const pc0 = cG.attributes.position;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.65 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         let atq = 0, rev = 0, u = 0;
         if (ac) { ac.t += dt; u = ac.t / ac.dur; if (u >= 1) ac = null; else if (ac.tipo === 'ataque') atq = 1; else rev = 1; }
         // envelopes das ações
@@ -4896,7 +4923,7 @@
         // braços: abertos, balançando de leve; dedos se mexendo um por vez
         tDedo += dt;
         bracos.forEach((B, i) => {
-          const balanco = andando ? Math.sin(fase + i * Math.PI) * .12 : Math.sin(t * .7 + i * 2) * .03;
+          const balanco = Math.sin(fase + i * Math.PI) * .12 * kA + Math.sin(t * .7 + i * 2) * .03 * (1 - kA);
           B.b.rotation.x = .12 + balanco + prep * .55 - bote * 1.85 - ergue * .2;
           B.b.rotation.z = B.sx * (.4 + Math.sin(t * .5 + i) * .03 + bote * -.15 + ergue * .35);
           B.cot.rotation.z = B.sx * .18; B.cot.rotation.x = -.35 - prep * .5 + bote * .3 - ergue * .3;
@@ -4910,12 +4937,12 @@
           });
         });
         // passo lento e arrastado: a perna direita arrasta o pé
-        const fa = Math.sin(fase);
-        if (andando) {
-          fase += dt * 2.6;
-          pernas[0].p.rotation.x = fa * .4; pernas[0].joelho.rotation.x = Math.max(0, Math.sin(fase + 1.3)) * .7; pernas[0].pe.rotation.x = -Math.max(0, Math.sin(fase + .6)) * .3;
+        const fa = Math.sin(fase) * kA;
+        if (kA > .01) {
+          fase += mv.ritmo(dt, 2.6, .65);
+          pernas[0].p.rotation.x = fa * .4; pernas[0].joelho.rotation.x = Math.max(0, Math.sin(fase + 1.3)) * .7 * kA; pernas[0].pe.rotation.x = -Math.max(0, Math.sin(fase + .6)) * .3 * kA;
           pernas[1].p.rotation.x = -fa * .22; pernas[1].joelho.rotation.x = .08 + Math.max(0, -fa) * .12; pernas[1].pe.rotation.x = .25 + Math.max(0, fa) * .2;
-          corpo.position.y = -Math.max(0, -Math.sin(fase * 2)) * .03; corpo.rotation.z = Math.sin(fase) * .04; tronco.rotation.y = fa * .07;
+          corpo.position.y = -Math.max(0, -Math.sin(fase * 2)) * .03 * kA; corpo.rotation.z = Math.sin(fase) * .04 * kA + Math.sin(t * .4) * .015 * (1 - kA) + bank; tronco.rotation.y = fa * .07;
         } else {
           pernas.forEach(P => { P.p.rotation.x *= .9; P.joelho.rotation.x = P.joelho.rotation.x * .9 + .04; P.pe.rotation.x *= .9; });
           corpo.position.y *= .9; corpo.rotation.z = Math.sin(t * .4) * .015; tronco.rotation.y = Math.sin(t * .27) * .04;
@@ -4926,11 +4953,11 @@
         tronco.scale.set(1 + resp * .015, 1, 1 + resp * .02);
         corpo.position.z = bote * .18 - prep * .05;
         // a barra do sobretudo balança e arrasta
-        const pa = pc0.array, amp = andando ? .05 : .012;
+        const pa = pc0.array, amp = .012 + .038 * kA;
         for (let i = 0; i < pc0.count; i++) { const y = baseC[i * 3 + 1]; if (y > -.1) continue; const w = Math.min(1, (-y - .1) / .8), x0 = baseC[i * 3], z0 = baseC[i * 3 + 2];
-          pa[i * 3] = x0 + Math.sin(t * 1.7 + z0 * 6 + fase) * amp * w * .5; pa[i * 3 + 2] = z0 + (Math.sin(fase * (andando ? 1 : 0) + x0 * 5 + t * 1.1) * amp - (andando ? .05 : 0) - bote * .06) * w; }
+          pa[i * 3] = x0 + Math.sin(t * 1.7 + z0 * 6 + fase) * amp * w * .5; pa[i * 3 + 2] = z0 + (Math.sin(fase * kA + x0 * 5 + t * 1.1) * amp - .05 * kA - bote * .06) * w; }
         pc0.needsUpdate = true;
-        trapos.forEach((p, i) => { p.rotation.z = Math.sin(t * 1.6 + i) * (andando ? .2 : .06); });
+        trapos.forEach((p, i) => { p.rotation.z = Math.sin(t * 1.6 + i) * (.06 + .14 * kA); });
       };
       return { g, alt: 2.3, raioBase: .5, anim, acao, estado };
     },
@@ -5335,15 +5362,18 @@
       const ac = acoes({ ataque: 1.6, revelar: 2.0 });
       const brilho = halo(g, '#c8ccd8', 3, 0, 1.4, 0); brilho.material.opacity = 0;
       let desl = 0, levanta = 0, alvoLev = 0, proxLev = 3, quemLev = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const A = ac.passo(dt);
         const atk = A && A.tipo === 'ataque' ? A.k : -1, rev = A && A.tipo === 'revelar' ? A.k : -1;
         const eAtk = atk >= 0 ? env(atk, .25, .75) : 0, eRev = rev >= 0 ? env(rev, .2, .65) : 0;
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 2.5);
+        desl = kA * Math.min(1.6, .55 + mv.vEf / 3.2);
         // flutua sobre o cabelo, sobe e desce devagar; na revelação, sobe de uma vez
         const sobe = rev >= 0 ? (rev < .25 ? -.45 * (1 - sm(rev / .25)) : 0) + eRev * .12 : 0;
         corpo.position.set(0, 1.28 + Math.sin(t * .9) * .04 + sobe, desl * .05);
-        corpo.rotation.set(desl * .1 + Math.sin(t * .5) * .02 - eAtk * .06, Math.sin(t * .23) * .08, Math.sin(t * .37) * .03);
+        corpo.rotation.set(desl * .1 + Math.sin(t * .5) * .02 - eAtk * .06 + ace, Math.sin(t * .23) * .08, Math.sin(t * .37) * .03 + bank);
         // cabeça pendendo, balança e às vezes estala de lado; ergue de uma vez na revelação e no ataque
         const ciclo = (t + .7) / 6.1, ph = (ciclo % 1) * 6.1, sinal = Math.floor(ciclo) % 2 ? 1 : -1, tr = ph < .08 ? ph / .08 : Math.exp(-(ph - .08) * 1.8);
         const ergue = Math.max(eRev, eAtk * .8);
@@ -5405,6 +5435,1113 @@
       };
       anim(0, 0, false);
       return { g, alt: 3.0, raioBase: .75, anim, acao: tipo => ac.disparar(tipo) };
+    },
+  };
+})();
+
+/* ===== forma: chama_soldado ===== */
+/* chama_soldado.js · forma: soldado enorme e musculoso, sem rosto: no lugar da cabeça sobe uma chama líquida
+   psicodélica (roxo, magenta, laranja, verde e azul que escorrem e trocam de cor sem parar). Colete tático cheio
+   de bolsos, rádio no peito e ombreira de placas no ombro direito; braços nus e enormes, com veias; antebraços
+   blindados com canhões que soltam brilho roxo (o direito maior, de coronha e carregador). Calça camuflada com
+   joelheiras, coldre na coxa, cinto e coturnos. Aura de raios roxos que estalam em volta do corpo.
+   Formato: ACF3D.formasFilho.chama_soldado = { nome, criar(F, s) → { g, alt, raioBase, anim, acao, estado } }
+   acao('ataque') (ou 'atacar'): ergue os dois canhões e dispara feixes de raios roxos à frente, com coice.
+   acao('revelar'): a chama acende do nada sobre o pescoço e explode em raios em volta do corpo.
+   acao('ritual') / acao('conjurar'): abre os braços e os raios sobem em coluna.
+   estado('contida'): a chama baixa e quase só roxa, poucos raios. estado('solta') (padrão): chama alta e aura cheia. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).chama_soldado = {
+    nome: 'Soldado de colete com chama no lugar da cabeça',
+    criar: (F, s) => {
+      const K = kit(F, 'chama_soldado'), { sombraContato, semSombra, T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv } = K;
+      const g = grupo(null);
+      sombraContato(g, .7, .6);
+
+      /* ---------- texturas (guardadas entre cópias) ---------- */
+      // camuflado de mata escuro: manchas oliva, marrom e preto, com dobras do tecido
+      const texCamo = texP('camo', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#4a4634'; x.fillRect(0, 0, w, h);
+        const blob = (c, n, t) => { for (let i = 0; i < n; i++) { x.fillStyle = c; x.beginPath(); const cx = r() * w, cy = r() * h, rr = t * (.5 + r()); for (let a = 0; a <= 12; a++) { const an = a / 12 * PI * 2, d = rr * (.6 + r() * .55); x.lineTo(cx + Math.cos(an) * d * 1.4, cy + Math.sin(an) * d * .8); } x.fill(); } };
+        blob('#3a3a26', 26, 16); blob('#5e4a30', 22, 12); blob('#26231a', 20, 9); blob('#6a6448', 10, 6);
+        for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(0,0,0,${.1 + r() * .18})`; x.lineWidth = 1 + r() * 3; x.beginPath(); const x0 = r() * w; x.moveTo(x0, r() * h); x.lineTo(x0 + (r() - .5) * 30, r() * h); x.stroke(); }
+        for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '200,190,160'},${r() * .07})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      }, { rep: [2, 2] });
+      // lona do colete: verde-acinzentado escuro com trama, costuras e desgaste
+      const texLona = texP('lona', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#3c3c32'; x.fillRect(0, 0, w, h);
+        for (let y = 0; y < h; y += 3) { x.fillStyle = `rgba(0,0,0,${.08 + r() * .06})`; x.fillRect(0, y, w, 1); }
+        for (let xx = 0; xx < w; xx += 3) { x.fillStyle = `rgba(255,255,240,${.02 + r() * .03})`; x.fillRect(xx, 0, 1, h); }
+        x.strokeStyle = 'rgba(10,10,6,.55)'; x.setLineDash([4, 3]); x.lineWidth = 1.5; for (let i = 0; i < 9; i++) { x.beginPath(); x.moveTo(0, 20 + i * 28); x.lineTo(w, 20 + i * 28); x.stroke(); } x.setLineDash([]);
+        for (let i = 0; i < 40; i++) { const gx = r() * w, gy = r() * h, gr = x.createRadialGradient(gx, gy, 1, gx, gy, 6 + r() * 26); gr.addColorStop(0, `rgba(${r() < .5 ? '20,18,10' : '110,105,85'},.3)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(gx - 40, gy - 40, 80, 80); }
+      }, { rep: [2, 2] });
+      // pele: marrom bronzeado com sombra de músculo e veias saltadas
+      const texPele = texP('pele', 256, 512, (x, w, h, r) => {
+        x.fillStyle = '#7a4a30'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 50; i++) { const gx = r() * w, gy = r() * h, gr = x.createRadialGradient(gx, gy, 2, gx, gy, 20 + r() * 50); gr.addColorStop(0, r() < .5 ? 'rgba(150,95,60,.35)' : 'rgba(60,32,20,.3)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(gx - 70, gy - 70, 140, 140); }
+        x.lineCap = 'round';
+        for (let i = 0; i < 26; i++) { let px = r() * w, py = r() * h, an = PI / 2 + (r() - .5) * .8; x.strokeStyle = `rgba(${r() < .5 ? '70,40,40' : '110,70,60'},.55)`; x.lineWidth = 2 + r() * 2.5; x.beginPath(); x.moveTo(px, py); for (let k = 0; k < 10; k++) { an += (r() - .5) * .7; px += Math.cos(an) * 12; py += Math.sin(an) * 12; x.lineTo(px, py); if (r() < .2) { x.stroke(); x.beginPath(); x.moveTo(px, py); x.lineWidth *= .7; } } x.stroke(); }
+        for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(${r() < .5 ? '30,15,8' : '200,150,120'},${r() * .06})`; x.fillRect(r() * w, r() * h, 1.5, 1.5); }
+      });
+      // relevo da pele (veias e poros)
+      const texPeleB = texP('peleB', 128, 256, (x, w, h, r) => { x.fillStyle = '#808080'; x.fillRect(0, 0, w, h); x.lineCap = 'round'; for (let i = 0; i < 18; i++) { let px = r() * w, py = r() * h, an = PI / 2 + (r() - .5); x.strokeStyle = 'rgba(255,255,255,.5)'; x.lineWidth = 2 + r() * 2; x.beginPath(); x.moveTo(px, py); for (let k = 0; k < 8; k++) { an += (r() - .5) * .7; px += Math.cos(an) * 8; py += Math.sin(an) * 8; x.lineTo(px, py); } x.stroke(); } for (let i = 0; i < 2000; i++) { x.fillStyle = `rgba(0,0,0,${r() * .15})`; x.fillRect(r() * w, r() * h, 1, 1); } }, { linear: true });
+      // metal fosco riscado (manoplas e canhões)
+      const texMetal = texP('metal', 128, 128, (x, w, h, r) => { x.fillStyle = '#3a3a40'; x.fillRect(0, 0, w, h); for (let i = 0; i < 300; i++) { x.strokeStyle = `rgba(${r() < .5 ? '0,0,0' : '200,200,220'},${r() * .12})`; x.lineWidth = r() * 1.2; x.beginPath(); const x0 = r() * w, y0 = r() * h; x.moveTo(x0, y0); x.lineTo(x0 + (r() - .5) * 20, y0 + (r() - .5) * 6); x.stroke(); } for (let i = 0; i < 20; i++) { x.fillStyle = 'rgba(0,0,0,.4)'; x.fillRect(r() * w, r() * h, 2, 2); } }, { rep: [2, 2] });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uE: { value: 0 } };
+      // a luz roxa dos raios lambe a pele e o tecido (reflexo vindo de baixo e das bordas, pulsando com a aura)
+      const lambida = { fEmis: 'float lb = pow(1.0 - abs(dot(normalize(vNw), normalize(cameraPosition - vPw))), 3.0); totalEmissiveRadiance += vec3(0.38, 0.1, 0.8) * lb * (0.08 + uE * 0.45);' };
+      const camo = shader(mat({ map: texCamo, roughness: .9, color: '#a8a090' }), 'ent_soldado_lambe', Um, lambida);
+      const lona = shader(mat({ map: texLona, roughness: .85, color: '#b0b0a0' }), 'ent_soldado_lambe', Um, lambida);
+      const pele = shader(mat({ map: texPele, bumpMap: texPeleB, bumpScale: .006, roughness: .58, metalness: .0, color: '#8c7a70' }), 'ent_soldado_lambe', Um, lambida);
+      const metal = mat({ map: texMetal, roughness: .38, metalness: .75, color: '#9090a0' });
+      const preto = mat({ color: '#1a1a1c', roughness: .6, metalness: .2 });
+      const borracha = mat({ color: '#141414', roughness: .85 });
+      const malhaM = mat({ color: '#1c1c22', roughness: .7, map: texP('malha', 64, 64, (x, w, h) => { x.fillStyle = '#222'; x.fillRect(0, 0, w, h); x.fillStyle = '#0a0a0a'; for (let i = 0; i < w; i += 4) for (let j = 0; j < h; j += 4) x.fillRect(i + (j % 8 ? 2 : 0), j, 2, 2); }, { rep: [6, 4] }) });
+      const bocaM = mat({ color: '#200830', emissive: '#c060ff', emissiveIntensity: 2.4, roughness: .3 });
+      const ledM = mat({ color: '#101010', emissive: '#7a30ff', emissiveIntensity: 1.2 });
+
+      /* ---------- esqueleto: alto (1,95 m até os ombros e pescoço), ombros muito largos ---------- */
+      const R = bipede(g, { quadril: .99, coxa: .47, canela: .44, largQ: .14, cintura: .1, peito: .27, ombroY: .2, ombroX: .34, braco: .33, ante: .3, pescoco: .28, cabeca: .02 });
+      const { corpo, tronco, peito, pernas, bracos, pesc, cab } = R;
+
+      /* ---------- pernas: calça camuflada larga, joelheira, coldre na coxa direita, coturno ---------- */
+      const geoCoxa = uma('coxa', () => deform(torneado(t => .128 - .035 * t + .012 * bump(t, .3, .25), .47, 14, 14), (x, y, z) => [x * (1 + .06 * Math.sin(y * 30 + x * 9)), y, z * (1.08 + .06 * Math.cos(y * 25))]));
+      const geoCanela = uma('canela', () => deform(torneado(t => .094 - .014 * t + .01 * bump(t, .25, .2) + .012 * bump(t, .92, .1), .44, 14, 14), (x, y, z) => [x * (1 + .06 * Math.sin(y * 34)), y, z * (1 + .04 * Math.sin(y * 21 + x * 7))]));
+      const geoJoelheira = uma('joelheira', () => juntar([mover(new T.SphereGeometry(.07, 12, 8, 0, PI * 2, 0, PI * .55), 0, 0, .045, PI / 2 - .2, 0, 0, 1.1, 1.3, .6), mover(new T.TorusGeometry(.083, .009, 5, 18), 0, .06, 0, PI / 2, 0, 0, 1, 1, .9), mover(new T.TorusGeometry(.08, .009, 5, 18), 0, -.07, 0, PI / 2, 0, 0, 1, 1, .9)]));
+      const geoBota = uma('bota', () => juntar([mover(new T.CylinderGeometry(.068, .072, .2, 14), 0, .02, -.005), deform(mover(new T.SphereGeometry(.075, 16, 10), 0, -.055, .06, 0, 0, 0, .9, .62, 1.8), (x, y, z) => (y < -.09 ? [x, -.09, z] : null))]));
+      const geoSola = uma('sola', () => juntar([mover(new T.BoxGeometry(.13, .035, .3), 0, -.09, .055), mover(new T.BoxGeometry(.135, .012, .305), 0, -.072, .055)]));
+      const geoCadarco = uma('cadarco', () => { const l = []; for (let i = 0; i < 6; i++) { const y = .1 - i * .028, z = .066 + (i > 3 ? (i - 3) * .022 : 0); l.push(mover(new T.BoxGeometry(.055, .007, .007), 0, y, z, 0, 0, .5), mover(new T.BoxGeometry(.055, .007, .007), 0, y, z, 0, 0, -.5)); } return juntar(l); });
+      const geoColdre = uma('coldre', () => juntar([mover(new T.BoxGeometry(.06, .2, .11), 0, -.12, 0, 0, 0, .08), mover(new T.BoxGeometry(.05, .08, .09), 0, .0, .01), mover(new T.TorusGeometry(.12, .012, 4, 20), 0, -.08, 0, PI / 2, 0, 0, .95, .8, 1), mover(new T.TorusGeometry(.11, .012, 4, 20), 0, -.2, 0, PI / 2, 0, 0, .9, .78, 1)]));
+      pernas.forEach(p => {
+        malha(p.quad, geoCoxa, camo);
+        malha(p.joelho, geoCanela, camo);
+        const jo = malha(p.joelho, geoJoelheira, preto); jo.position.set(0, .0, .02);
+        malha(p.pe, geoBota, borracha).position.y = .028;
+        malha(p.pe, geoSola, borracha).position.y = .028;
+        malha(p.pe, geoCadarco, preto).position.y = .028;
+        if (p.k < 0) { const c = malha(p.quad, geoColdre, preto); c.position.set(-.1, -.06, .01); }
+        else { const c = malha(p.quad, uma('bolsoCoxa', () => juntar([mover(new T.BoxGeometry(.05, .13, .13), 0, -.17, .01), mover(new T.BoxGeometry(.055, .03, .135), 0, -.11, .01)])), lona); c.position.set(.1, 0, 0); }
+      });
+      // quadril: calça, cinto largo com fivela e bolsos, faixas do colete descendo
+      malha(corpo, uma('quadril', () => casca([[-.17, .24, .15], [-.06, .26, .165], [.04, .265, .17], [.12, .262, .17]], { seg: 28 })), camo);
+      malha(corpo, uma('cinto', () => juntar([casca([[.07, .272, .178], [.13, .274, .18]], { seg: 28 }), mover(new T.BoxGeometry(.09, .06, .03), 0, .1, .18)])), preto);
+      malha(corpo, uma('bolsosCinto', () => { const l = []; [-.2, -.13, .13, .2].forEach((x0, i) => { const a = Math.atan2(x0, .14); l.push(mover(new T.BoxGeometry(.06, .08, .05), x0 * 1.08, .06, Math.cos(a) * .16, 0, a, 0)); }); [-.6, .6].forEach(a => l.push(mover(new T.BoxGeometry(.1, .07, .05), Math.sin(a + PI) * .2, .05, Math.cos(a + PI) * .15, 0, a, 0))); return juntar(l); }), lona);
+      malha(corpo, uma('fivela', () => mover(new T.BoxGeometry(.05, .035, .01), 0, .1, .187)), metal);
+
+      /* ---------- tronco: camiseta de malha, colete tático cheio de bolsos ---------- */
+      // colete: casca quase quadrada; aberturas nos braços ficam por baixo dos ombros
+      const quadr = (x, y, z, k = .45) => { const a = Math.atan2(x, z), r = Math.hypot(x, z); const sx = Math.sign(Math.sin(a)) * Math.pow(Math.abs(Math.sin(a)), k), sz = Math.sign(Math.cos(a)) * Math.pow(Math.abs(Math.cos(a)), k); return [sx * r * .78 + x * .22, y, sz * r * .78 + z * .22]; };
+      const PERF_COLETE = [[-.1, .262, .175], [0, .275, .185], [.12, .3, .2], [.24, .33, .215], [.34, .345, .22], [.42, .335, .21], [.48, .3, .19], [.53, .22, .16], [.56, .13, .12]];
+      malha(tronco, uma('colete', () => casca(PERF_COLETE, { seg: 36, deform: (x, y, z, j, u, ang) => { const [a, b, c] = quadr(x, y, z); return [a * (1 + .02 * Math.sin(y * 40)), b, c + (c > 0 ? .012 * Math.sin(x * 30) : 0)]; } })), lona);
+      // gola de malha preta alta (a camiseta por baixo) e o toco do pescoço onde a chama nasce
+      malha(tronco, uma('gola', () => casca([[.5, .15, .12], [.56, .12, .1], [.6, .1, .09], [.62, .092, .084]], { seg: 20 })), malhaM);
+      // placas e bolsos do colete
+      malha(tronco, uma('bolsos', () => {
+        const l = [], B = (w, h, d, x, y, z, ry = 0, rx = 0) => l.push(mover(new T.BoxGeometry(w, h, d, 2, 2, 1), x, y, z, rx, ry, 0));
+        // placa frontal e três porta-carregadores no peito
+        B(.34, .2, .03, 0, .3, .19);
+        [-.1, 0, .1].forEach(x0 => { B(.08, .12, .05, x0, .17, .205); B(.085, .03, .055, x0, .225, .207); });
+        // dois bolsos grandes embaixo e o painel lateral
+        [-.14, .14].forEach(x0 => { B(.13, .1, .055, x0, .03, .195, x0 * .9); B(.135, .03, .06, x0, .085, .198, x0 * .9); });
+        // bolsos laterais e das costas
+        [-1, 1].forEach(sx => { B(.05, .14, .12, sx * .27, .12, 0, 0); B(.05, .1, .1, sx * .26, .3, -.03); });
+        B(.3, .22, .04, 0, .28, -.19); B(.12, .1, .05, -.08, .07, -.185); B(.12, .1, .05, .08, .07, -.185);
+        // alças e cordões (faixas sobre os ombros)
+        [-1, 1].forEach(sx => l.push(mover(new T.TorusGeometry(.12, .022, 4, 16, PI), sx * .17, .5, 0, 0, PI / 2, 0, 1, 1, 1.25)));
+        return juntar(l);
+      }), lona);
+      malha(tronco, uma('fivelas', () => { const l = []; [-.1, 0, .1].forEach(x0 => l.push(mover(new T.BoxGeometry(.03, .025, .012), x0, .225, .236))); [-.14, .14].forEach(x0 => l.push(mover(new T.BoxGeometry(.035, .022, .012), x0, .083, .23))); l.push(mover(new T.CylinderGeometry(.012, .012, .26, 6), .3, .2, .08, 0, 0, .15)); return juntar(l); }), preto);
+      // tiras MOLLE (fitas horizontais costuradas) na frente e nas costas, placas laterais, granadas e faca no colete
+      malha(tronco, uma('molle', () => { const l = []; for (let r = 0; r < 5; r++) { const y = .02 + r * .1; [-1, 1].forEach(sz => { for (let c = -3; c <= 3; c++) { const x0 = c * .07, a = Math.atan2(x0, .2); l.push(mover(new T.BoxGeometry(.05, .016, .008), x0 * 1.05, y + (sz < 0 ? .03 : 0), sz * (.205 + Math.abs(c) * -.004), 0, sz < 0 ? PI - a : a, 0)); } }); } [-1, 1].forEach(sx => l.push(mover(new T.BoxGeometry(.03, .26, .2, 1, 3, 1), sx * .3, .2, 0))); return juntar(l); }), preto);
+      malha(tronco, uma('granadas', () => juntar([mover(new T.CylinderGeometry(.024, .024, .07, 10), -.2, .05, .2), mover(new T.CylinderGeometry(.024, .024, .07, 10), -.15, .05, .21), mover(new T.CylinderGeometry(.008, .008, .02, 6), -.2, .095, .2), mover(new T.CylinderGeometry(.008, .008, .02, 6), -.15, .095, .21)])), metal);
+      malha(tronco, uma('facaColete', () => juntar([mover(new T.BoxGeometry(.035, .16, .025), .21, .33, .195, 0, 0, -.5), mover(new T.CylinderGeometry(.013, .015, .08, 8), .25, .42, .2, 0, 0, -.5)])), borracha);
+      // rádio no peito esquerdo com antena curta e grade de alto-falante
+      const radio = grupo(tronco, .13, .4, .2); radio.rotation.set(-.1, .15, 0);
+      malha(radio, uma('radio', () => juntar([mover(new T.BoxGeometry(.07, .11, .04, 1, 3, 1), 0, 0, 0), mover(new T.CylinderGeometry(.006, .008, .08, 6), .022, .09, 0), mover(new T.CylinderGeometry(.01, .01, .02, 8), -.02, .065, 0)])), preto);
+      malha(radio, uma('grade', () => { const l = []; for (let i = 0; i < 5; i++) l.push(mover(new T.BoxGeometry(.045, .005, .005), 0, .025 - i * .012, .021)); return juntar(l); }), metal);
+      const led = malha(radio, uma('led', () => new T.SphereGeometry(.005, 6, 4)), ledM); led.position.set(-.024, -.04, .022);
+      // ombreira de placas sobrepostas no ombro direito (do soldado, -x)
+      const ombreira = grupo(peito, -.31, .2, -.01); ombreira.scale.setScalar(1.15);
+      malha(ombreira, uma('ombreira', () => { const l = []; for (let i = 0; i < 4; i++) l.push(mover(new T.SphereGeometry(.13 - i * .008, 18, 8, 0, PI * 2, 0, PI * .42), -i * .025, -i * .055, 0, 0, 0, .55 + i * .12, 1.05, .55, 1)); return juntar(l); }), metal);
+      malha(ombreira, uma('ombreiraBorda', () => { const l = []; for (let i = 0; i < 4; i++) l.push(mover(new T.TorusGeometry(.115 - i * .008, .007, 4, 20), -i * .025 - .02, -i * .055 - .028, 0, PI / 2, 0, .55 + i * .12, 1.05, 1, 1)); return juntar(l); }), preto);
+
+      /* ---------- braços nus enormes, manoplas blindadas e canhões ---------- */
+      // braço: deltoide e bíceps saltados (a frente é +z), tríceps atrás
+      const geoBraco = uma('braco', () => deform(torneado(t => .085 + .03 * bump(t, .05, .14) + .016 * bump(t, .45, .22) - .012 * t, .33, 18, 16), (x, y, z) => { const t = -y / .33; return [x * (1 + .06 * bump(t, .4, .2)), y, z * (1 + .22 * bump(t, .42, .2) * (z > 0 ? 1 : .5)) + (z > 0 ? .012 * bump(t, .45, .2) : -.008 * bump(t, .3, .2))]; }));
+      const geoDelt = uma('deltoide', () => deform(new T.SphereGeometry(.14, 18, 14), (x, y, z) => [x * .95, y * 1.1 - (y < 0 ? y * .3 : 0), z * 1.1]));
+      const geoAnte = uma('ante', () => torneado(t => .074 + .014 * bump(t, .15, .2) - .014 * t, .3, 14, 14));
+      // manopla: segmentos de placa do cotovelo ao punho, com anéis e rebites
+      const geoManopla = uma('manopla', () => { const l = []; for (let i = 0; i < 5; i++) { const y = -.05 - i * .052, r0 = .082 - i * .004; l.push(mover(new T.CylinderGeometry(r0, r0 - .006, .05, 14, 1), 0, y, 0, .04, 0, 0, 1, 1, 1.08)); l.push(mover(new T.TorusGeometry(r0 - .002, .006, 4, 16), 0, y + .024, 0, PI / 2 + .04, 0, 0, 1, 1.08, 1)); } l.push(mover(new T.SphereGeometry(.078, 12, 8), 0, -.01, 0, 0, 0, 0, 1, .7, 1.1)); return juntar(l); });
+      const geoPunho = uma('punho', () => juntar([deform(mover(new T.SphereGeometry(.058, 14, 10), 0, -.065, .005, 0, 0, 0, 1, 1.15, .85), (x, y, z) => [x, y, z + (z > 0 && y < -.08 ? -.01 : 0)]), mover(new T.BoxGeometry(.1, .03, .07), 0, -.11, .012)]));
+      // canhão do antebraço esquerdo: cano com aletas, carcaça e boca
+      const geoCanhaoE = uma('canhaoE', () => { const l = [mover(new T.CylinderGeometry(.045, .05, .26, 14), 0, -.2, .085), mover(new T.BoxGeometry(.075, .2, .07), 0, -.12, .055)]; for (let i = 0; i < 6; i++) l.push(mover(new T.CylinderGeometry(.056, .056, .014, 14), 0, -.13 - i * .028, .085)); l.push(mover(new T.CylinderGeometry(.034, .045, .06, 14), 0, -.36, .085)); return juntar(l); });
+      // arma do braço direito: carcaça grande sobre o antebraço, carregador, cano duplo e boca larga
+      const geoCanhaoD = uma('canhaoD', () => { const l = [mover(new T.BoxGeometry(.09, .34, .1, 1, 4, 1), 0, -.17, .09), mover(new T.BoxGeometry(.05, .12, .05), 0, -.15, .17, .3, 0, 0), mover(new T.CylinderGeometry(.035, .035, .26, 12), -.015, -.43, .1), mover(new T.CylinderGeometry(.022, .022, .26, 10), .03, -.42, .07), mover(new T.BoxGeometry(.06, .05, .12), 0, .02, .07)]; for (let i = 0; i < 4; i++) l.push(mover(new T.BoxGeometry(.1, .012, .11), 0, -.04 - i * .06, .09)); l.push(mover(new T.CylinderGeometry(.044, .036, .07, 12), -.015, -.58, .1)); return juntar(l); });
+      const BOCA = [];
+      bracos.forEach((b, i) => {
+        malha(b.braco, geoBraco, pele);
+        const d = malha(b.ombro, geoDelt, pele); d.position.set(b.k * .02, -.02, 0);
+        malha(b.cot, geoAnte, pele);
+        malha(b.cot, geoManopla, metal);
+        malha(b.mao, geoPunho, preto);
+        const arma = malha(b.cot, b.k < 0 ? geoCanhaoD : geoCanhaoE, metal);
+        const boca = grupo(b.cot, b.k < 0 ? -.015 : 0, b.k < 0 ? -.62 : -.4, b.k < 0 ? .1 : .085);
+        const bocaLuz = malha(boca, uma('bocaLuz', () => new T.CylinderGeometry(.026, .026, .012, 12)), bocaM);
+        const brilho = halo(boca, '#b050ff', .22, 0, -.02, 0, .8);
+        const vent = malha(b.cot, uma(b.k < 0 ? 'ventD' : 'ventE', () => { const l = []; for (let j = 0; j < 4; j++) l.push(mover(new T.BoxGeometry(.012, .035, .006), (b.k < 0 ? .046 : .036) * (j % 2 ? 1 : -1), (b.k < 0 ? -.12 : -.1) - Math.floor(j / 2) * .06, b.k < 0 ? .1 : .085)); return juntar(l); }), bocaM);
+        BOCA.push({ boca, brilho, arma });
+      });
+      // dedos das mãos fechadas no cabo (nós dos dedos)
+      bracos.forEach(b => malha(b.mao, uma('nos', () => { const l = []; for (let i = 0; i < 4; i++) l.push(mover(new T.SphereGeometry(.017, 8, 6), -.033 + i * .022, -.12, .045)); return juntar(l); }), preto));
+
+      /* ---------- a chama no lugar da cabeça ---------- */
+      // malha: bulbo do tamanho de uma cabeça que se alonga para cima e para trás, puxado para o lado esquerdo
+      const geoChama = uma('chama', () => deform(new T.SphereGeometry(1, 32, 48), (x, y, z) => {
+        const t = (y + 1) / 2, r = .088 + .1 * Math.sin(Math.min(1, t / .5) * PI * .6) * (t < .5 ? 1 : 1 - (t - .5) / .5 * .8) - (t > .88 ? (t - .88) * 1.1 : 0);
+        const h = t * .78, tz = -.34 * t * t, tx = .2 * t * t * t + .03 * Math.sin(t * 7);
+        const q = Math.hypot(x, z), nx = x / Math.max(1e-4, q), nz = z / Math.max(1e-4, q);
+        return [nx * q * r * (1.1 + .35 * t) + tx, h - .02, nz * q * r * (1 - .35 * t) + tz];
+      }));
+      const Uc = { uT: { value: 0 }, uHue: { value: 0 }, uK: { value: 1 }, uA: { value: 0 } };
+      const chamaGLSL = {
+        vBegin: `float tt = clamp(transformed.y / 0.75, 0.0, 1.0);
+          float dn = fb3(transformed * 4.0 + vec3(0.0, -uT * 2.4, uT * 0.5)) - 0.5, dn2 = vn3(transformed * 11.0 + vec3(0.0, -uT * 4.0, 0.0)) - 0.5;
+          transformed += normal * (dn * (0.03 + 0.16 * tt) + dn2 * 0.035 * tt) * (0.7 + uA);
+          transformed.x += sin(uT * 2.3 + transformed.y * 7.0) * 0.045 * tt * tt + sin(uT * 5.1 + transformed.y * 13.0) * 0.015 * tt;
+          transformed.z += cos(uT * 1.7 + transformed.y * 5.0) * 0.035 * tt * tt - 0.06 * uA * tt;
+          transformed.y *= uK;`,
+        fHead: `vec3 hsv2rgb(vec3 c){ vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0); return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y); }`,
+        fMap: `vec3 q = vPo * 5.5 + vec3(0.0, -uT * 1.2, 0.0);
+          float w1 = fb3(q + vec3(uT * 0.3, 0.0, 0.0)), w2 = fb3(q * 1.6 + vec3(4.0, uT * 0.25, 1.0) + w1 * 2.5);
+          float mar = sin((vPo.y * 14.0 + w2 * 10.0 + w1 * 4.0) - uT * 2.0);
+          float mar2 = sin(vPo.x * 18.0 + w1 * 9.0 + uT * 1.3);
+          // paleta: roxo e magenta dominam; veios laranja, amarelo-verde e azul escorrem por cima
+          float u = fract(w2 * 1.3 + mar * 0.12 + mar2 * 0.04 + uHue) * 6.0;
+          vec3 c0 = vec3(0.42, 0.08, 0.95), c1 = vec3(0.95, 0.15, 0.75), c2 = vec3(1.0, 0.45, 0.04), c3 = vec3(0.55, 1.0, 0.15), c4 = vec3(0.1, 0.45, 1.0), c5 = vec3(0.6, 0.15, 1.0);
+          vec3 cor = u < 1.0 ? mix(c0, c1, smoothstep(0.6, 1.0, u)) : u < 2.0 ? mix(c1, c2, smoothstep(1.7, 2.0, u)) : u < 3.0 ? mix(c2, c3, smoothstep(2.5, 3.0, u)) : u < 4.0 ? mix(c3, c4, smoothstep(3.4, 4.0, u)) : u < 5.0 ? mix(c4, c5, smoothstep(4.4, 5.0, u)) : mix(c5, c0, smoothstep(5.5, 6.0, u));
+          cor *= cor;
+          float veio = smoothstep(0.8, 0.98, mar), escuro = smoothstep(-0.4, -0.9, mar) * smoothstep(0.3, 0.6, w2);
+          cor += vec3(1.0, 0.6, 0.95) * veio * 0.25;
+          cor *= 1.0 - escuro * 0.7;
+          float base = smoothstep(0.0, 0.12, vPo.y);
+          float fres = pow(1.0 - abs(dot(normalize(vNw), normalize(cameraPosition - vPw))), 2.0);
+          diffuseColor.rgb = cor * (1.1 + fres * 0.8) * (0.6 + 0.4 * base) * (1.0 + uA * 0.5);`,
+      };
+      const chamaM = shader(F.guardar(new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })), 'ent_chama_psico', Uc, chamaGLSL);
+      const chamaG = grupo(pesc, 0, .03, .0);
+      const chama = semSombra(malha(chamaG, geoChama, chamaM)); chama.renderOrder = 1;
+      // casca externa somada à luz (o brilho em volta, mais solta)
+      const Uc2 = { uT: Uc.uT, uHue: Uc.uHue, uK: Uc.uK, uA: Uc.uA };
+      const brilhoM = shader(somar('#ffffff', { op: .55, lado: T.FrontSide }), 'ent_chama_brilho', Uc2, {
+        vBegin: chamaGLSL.vBegin.replace('normal * dn * (0.03 + 0.09 * tt)', 'normal * (0.035 + dn * 0.12) * (0.4 + tt)'),
+        fMap: `float fres = pow(1.0 - abs(dot(normalize(vNw), normalize(cameraPosition - vPw))), 1.8); float w = fb3(vPo * 7.0 + vec3(0.0, -uT * 2.5, 0.0));
+          diffuseColor.rgb = mix(vec3(0.45, 0.1, 1.0), vec3(1.0, 0.35, 0.7), w) * fres * (0.35 + w * .8) * (1.0 + uA);` });
+      // línguas de chama que escapam para cima e para trás (mesma pintura, cada uma num ritmo)
+      const geoLingua = uma('lingua', () => deform(new T.ConeGeometry(.05, .42, 10, 14, true), (x, y, z) => { const t = (y + .21) / .42; return [x * (1 - t * .2) + .06 * t * t, y + .21, z - .12 * t * t]; }));
+      const LING = [[-.06, .3, -.04, -.35, .2], [.08, .36, -.1, .3, -.25], [.02, .44, -.16, -.1, .1], [.12, .28, -.02, .6, -.4], [-.1, .22, -.08, -.7, .3]].map(([x, y, z, rz, rx], i) => {
+        const l = semSombra(malha(chamaG, geoLingua, chamaM)); l.position.set(x, y, z); l.rotation.set(rx - .35, 0, rz); l.scale.set(1, .8 + i * .12, 1); l.userData.r0 = [rx - .35, rz]; return l;
+      });
+      const chamaB = semSombra(malha(chamaG, geoChama, brilhoM)); chamaB.scale.setScalar(1.16); chamaB.renderOrder = 2;
+      const haloCab = halo(chamaG, '#8a30ff', .8, .03, .25, -.08, .3);
+      const haloCab2 = halo(chamaG, '#ff80c0', .45, .02, .2, .0, .25);
+      // faíscas: gotas soltas que sobem da chama (malha só, sem luz)
+      const NF = 12, faisca = [];
+      const geoGota = uma('gota', () => new T.SphereGeometry(.012, 6, 4));
+      for (let i = 0; i < NF; i++) { const m = somar('#d080ff'); const me = semSombra(malha(chamaG, geoGota, m)); faisca.push({ me, m, vida: 0, vx: 0, vy: 0, vz: 0, f: i / NF }); }
+
+      /* ---------- aura de raios roxos ---------- */
+      const RA = raios(g, 14, 10, '#a050ff', .012);
+      const raioSt = [];
+      for (let i = 0; i < RA.n; i++) raioSt.push({ vida: 0, dur: .1, prox: i * .07, tipo: 0 });
+      RA.me.material = [RA.me.material]; RA.me.geometry.addGroup(0, RA.me.geometry.index.count, 0);   // fica fora do LOD (muda todo quadro)
+      const auraBaixa = halo(g, '#7a30ff', 3.2, 0, 1.0, 0, .12);
+      const auraAlta = halo(g, '#c060ff', 1.6, 0, 1.75, -.05, .18);
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.5, revelar: 2.2, ritual: 3.8, conjurar: 1.6 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.4, vCorre: 3.0 });
+      const est = {}, P = { A: 1.95, aQ: .42, ciclo: .9, braco: false };
+      let contida = 0, contidaAlvo = 0, hue = 0;
+      const W = V(), Wb = V(), mInv = new T.Matrix4(), cor = new T.Color();
+      // ponto de um objeto no espaço do modelo (sem alocar)
+      const ponto = (obj, x, y, z, out) => { out.set(x, y, z); obj.localToWorld(out); return out.applyMatrix4(mInv); };
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0;
+        const eAtk = tipo === 'ataque' ? env(k, .22, .7) : 0, tiro = tipo === 'ataque' ? sino(k, .3, .38, .7) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .1, .75) : 0, acende = tipo === 'revelar' ? sm((k - .05) / .35) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .7 : 0;
+        contida += (contidaAlvo - contida) * Math.min(1, dt * 2);
+        passada(R, mv, dt, t, P, est);
+        const kA = est.k;
+        // postura: peito estufado, ombros para trás, joelhos abertos (pose da referência), cabeça-chama inclinada
+        tronco.rotation.set(-.08 - eAtk * .05 + eRit * -.08, est.sf * .06 * kA, 0);
+        peito.rotation.set(.02, 0, 0);
+        pesc.rotation.set(-.12 + Math.sin(t * .7) * .04, Math.sin(t * .4) * .1, Math.sin(t * .55) * .05);
+        // braços: canhões baixos e um pouco abertos; balançam com o passo; no ataque apontam à frente
+        bracos.forEach((b, i) => {
+          const sx = b.k, bal = (i ? est.sf : -est.sf) * .14 * kA;
+          let ax = sx * (.5 + .02 * Math.sin(t * .6 + i)), ay = -.36 + est.resp * .005, az = .2 + bal * 1.4;
+          let px = sx * .9, py = -.2, pz = -.5;
+          if (eAtk > 0) { const r2 = tiro * .06; ax += (sx * .14 - ax) * eAtk; ay += (.0 + r2 - ay) * eAtk; az += (.62 - r2 * 1.5 - az) * eAtk; px = sx * .9; py = -.6; pz = -.1; }
+          if (eRit > 0) { ax += (sx * .62 - ax) * eRit; ay += (.18 - ay) * eRit; az += (.2 - az) * eRit; }
+          if (eRev > 0) { ax += (sx * .5 - ax) * eRev * .7; ay += (-.3 - ay) * eRev * .7; }
+          ik(b, ax, ay, az, px, py, pz);
+          b.mao.rotation.set(eAtk * .2, 0, 0);
+        });
+        // chama: tremula (no shader), troca de cor sem parar, acende na revelação, cresce no ataque, baixa contida
+        hue = (hue + dt * (.05 + eAtk * .25 + eRev * .4)) % 1; Uc.uHue.value = hue; Uc.uT.value = t; Um.uT.value = t;
+        const alto = (1 - contida * .45) * acende * (1 + eAtk * .25 + eRev * .3 + eRit * .3);
+        Uc.uK.value = Math.max(.05, alto); Uc.uA.value = eAtk * .8 + eRev + eRit * .6;
+        LING.forEach((l, i) => { l.rotation.x = l.userData.r0[0] + Math.sin(t * (2.1 + i * .37) + i) * .18; l.rotation.z = l.userData.r0[1] + Math.sin(t * (1.7 + i * .29) + i * 2) * .22; l.scale.y = (.85 + i * .1 + Math.sin(t * (3.3 + i) + i) * .15) * (1 + eAtk * .5 + eRev * .6); });
+        chamaG.scale.set(Math.max(.02, acende) * (1 + Math.sin(t * 9) * .015), 1, Math.max(.02, acende));
+        haloCab.material.opacity = (.35 + .1 * Math.sin(t * 6.3) + eAtk * .3 + eRev * .5) * acende; haloCab.scale.setScalar(.9 * alto + eRev * .8);
+        haloCab2.material.opacity = (.22 + .08 * Math.sin(t * 4.1 + 1)) * acende; hsv((hue + .3) % 1, .7, 1, cor); haloCab2.material.color.copy(cor);
+        Um.uE.value = .35 + .2 * Math.sin(t * 3.1) + eAtk * .8 + eRev + eRit * .5 - contida * .3;
+        const nv = ret.nivelLOD || 0;
+        // faíscas da chama
+        faisca.forEach((f, i) => {
+          f.vida -= dt;
+          if (f.vida <= 0 && acende > .5 && nv < 2) { f.vida = .5 + ((i * 7919 + Math.floor(t * 3)) % 10) / 14; f.me.position.set(Math.sin(i * 2.4 + t) * .08, .15 + (i % 4) * .08, Math.cos(i * 1.7 + t) * .06 - .05); f.vx = Math.sin(i * 5.3 + t) * .15; f.vy = .3 + (i % 3) * .15; f.vz = -.1 - (i % 2) * .1; }
+          if (f.vida > 0) { f.me.position.x += f.vx * dt; f.me.position.y += f.vy * dt; f.me.position.z += f.vz * dt; const q = Math.min(1, f.vida * 2); f.me.scale.setScalar(.4 + q); hsv((hue + i * .09) % 1, .6, q, f.m.color); f.me.visible = true; } else f.me.visible = false;
+        });
+        // bocas dos canhões: brilho pulsando, clarão no tiro
+        BOCA.forEach((bc, i) => { bc.brilho.material.opacity = .5 + .2 * Math.sin(t * 7 + i * 2) + tiro * .5; bc.brilho.scale.setScalar(.2 + tiro * .5 + eRit * .15); });
+        bocaM.emissiveIntensity = 2 + Math.sin(t * 5) * .4 + tiro * 4; ledM.emissiveIntensity = (Math.sin(t * 4) > .2 ? 1.5 : .2);
+        auraBaixa.material.opacity = (.1 + .04 * Math.sin(t * 2.3) + eRev * .3 + eAtk * .1) * (1 - contida * .7); auraAlta.material.opacity = (.14 + .05 * Math.sin(t * 3.7) + eRev * .3) * (1 - contida * .6) * acende;
+        // raios: só perto ou no meio (de longe ficam apagados; a aura brilhante continua)
+        if (nv >= 2) { for (let i = 0; i < RA.n; i++) RA.vida(i, 0); return; }
+        g.updateMatrixWorld(true); mInv.copy(g.matrixWorld).invert();
+        const ritmo = (1 - contida * .8) * (1 + eRev * 2 + eRit * 1.5), alcance = 1 + eRev * .8;
+        raioSt.forEach((r, i) => {
+          r.vida -= dt; r.prox -= dt * ritmo;
+          if (r.vida <= 0 && r.prox <= 0) {
+            const q = RA.rr; r.dur = .06 + q() * .12; r.vida = r.dur; r.prox = .1 + q() * .7;
+            if (tipo === 'ataque' && k > .28 && k < .75 && i < 6) {
+              // feixes dos canhões até um ponto à frente
+              const bc = BOCA[i % 2]; ponto(bc.boca, 0, -.03, 0, W); Wb.set(W.x * .3 + (q() - .5) * .3, W.y - .1 + (q() - .5) * .3, W.z + 3.5 + q() * 1.5);
+              RA.gerar(i, W.x, W.y, W.z, Wb.x, Wb.y, Wb.z, .12, .02); r.vida = r.dur = .08 + q() * .08;
+            } else if (eRit > .3 && i < 5) {
+              // ritual: coluna de raios subindo das mãos
+              const bc = BOCA[i % 2]; ponto(bc.boca, 0, 0, 0, W); RA.gerar(i, W.x, W.y, W.z, W.x * .4 + (q() - .5) * .4, 3.2 + q() * .5, W.z * .4 + (q() - .5) * .4, .14, .016);
+            } else if (i < 3 && q() < .6) {
+              // das bocas dos canhões ao chão
+              const bc = BOCA[i % 2]; ponto(bc.boca, 0, -.02, 0, W); RA.gerar(i, W.x, W.y, W.z, W.x + (q() - .5) * .6, .02, W.z + (q() - .3) * .6, .07, .01);
+            } else {
+              // estalos em volta do corpo: de um ponto do corpo para fora e de volta
+              const a = q() * PI * 2, y0 = .3 + q() * 1.6, r0 = .28 + q() * .15, a2 = a + (q() - .5) * 1.4, y1 = y0 + (q() - .5) * .9, r1 = (.45 + q() * .5) * alcance;
+              RA.gerar(i, Math.sin(a) * r0, y0, Math.cos(a) * r0, Math.sin(a2) * r1, y1, Math.cos(a2) * r1, .06 + eRev * .06, .009 + q() * .006);
+            }
+          }
+          const kk = r.vida > 0 ? Math.min(1, r.vida / r.dur * 1.6) * (.6 + .4 * Math.sin(t * 60 + i)) : 0;
+          RA.vida(i, kk);
+        });
+      };
+      const ret = { g, alt: 2.25, raioBase: .55, anim, acao: tipo => ac.disparar(tipo),
+        estado: nome => { if (nome === 'contida') contidaAlvo = 1; else if (nome === 'solta' || nome === 'padrao') contidaAlvo = 0; } };
+      anim(0, 0, false);
+      return ret;
+    },
+  };
+})();
+
+/* ===== forma: coroa_espinhos_sobretudo ===== */
+/* coroa_espinhos_sobretudo.js · forma: homem de cabelo preto desgrenhado com uma coroa de espinhos, olhos azuis
+   que brilham, barba por fazer e sorriso de canto. Sobretudo marrom longo e aberto sobre camiseta preta, calça
+   escura. Faca na mão direita, lâmina suja de sangue. Está de pé dentro de sangue: uma maré vermelha e escura que
+   gira em volta das pernas até as coxas e se espalha numa poça larga no chão, ondulando sem parar.
+   Formato: ACF3D.formasFilho.coroa_espinhos_sobretudo = { nome, criar(F, s) → { g, alt, raioBase, anim, acao, estado } }
+   acao('ataque') (ou 'atacar'): avança meio passo e corta de baixo para cima com a faca; o sangue espirra e sobe.
+   acao('revelar'): sobe de dentro do sangue, a maré se ergue com ele e os olhos acendem.
+   acao('ritual') / acao('conjurar'): abre os braços, o sangue sobe em pontas em volta dele.
+   estado('mare') (padrão): sangue até as coxas. estado('poca'): a maré baixa e fica só a poça no chão. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).coroa_espinhos_sobretudo = {
+    nome: 'Homem de sobretudo e coroa de espinhos dentro do sangue',
+    criar: (F, s) => {
+      const K = kit(F, 'coroa_espinhos_sobretudo'), { T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, acoes, env, sino, bipede, passada } = K;
+      const g = grupo(null);
+
+      /* ---------- texturas ---------- */
+      // sobretudo: couro/lona marrom gasto, mais escuro e manchado de sangue embaixo
+      const texCasaco = texP('casaco', 512, 512, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#5a4636'); gr.addColorStop(.6, '#4a382a'); gr.addColorStop(.85, '#3a2620'); gr.addColorStop(1, '#2a1210'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 200; i++) { const x0 = r() * w; x.strokeStyle = `rgba(${r() < .6 ? '20,12,8' : '120,96,72'},${.06 + r() * .12})`; x.lineWidth = 2 + r() * 8; x.beginPath(); x.moveTo(x0, r() * h * .4); x.bezierCurveTo(x0 + (r() - .5) * 20, h * .5, x0 + (r() - .5) * 20, h * .8, x0 + (r() - .5) * 26, h); x.stroke(); }
+        for (let i = 0; i < 60; i++) { const gx = r() * w, gy = h * (.55 + r() * .45), g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 6 + r() * 26); g2.addColorStop(0, 'rgba(90,10,8,.45)'); g2.addColorStop(1, 'rgba(60,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 40, gy - 40, 80, 80); }
+        for (let i = 0; i < 5000; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '160,130,100'},${r() * .06})`; x.fillRect(r() * w, r() * h, 1, 1); }
+        x.strokeStyle = 'rgba(15,8,5,.6)'; x.lineWidth = 2; x.setLineDash([5, 4]); x.beginPath(); x.moveTo(0, h * .02); x.lineTo(w, h * .02); x.stroke(); x.setLineDash([]);
+      });
+      const texCamisa = texP('camisa', 256, 256, (x, w, h, r) => { x.fillStyle = '#121214'; x.fillRect(0, 0, w, h); for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(${r() < .5 ? '0,0,0' : '60,60,66'},${.1 + r() * .2})`; x.lineWidth = 1 + r() * 4; x.beginPath(); const y0 = r() * h; x.moveTo(0, y0); x.bezierCurveTo(w * .3, y0 + (r() - .5) * 20, w * .6, y0 + (r() - .5) * 20, w, y0 + (r() - .5) * 20); x.stroke(); } for (let i = 0; i < 25; i++) { const gx = r() * w, gy = h * (.4 + r() * .6), g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 5 + r() * 16); g2.addColorStop(0, 'rgba(80,6,6,.5)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 30, gy - 30, 60, 60); } });
+      // rosto (esfera: frente em u = 0,25): pele clara cansada, barba por fazer, sobrancelhas, olheiras, sorriso de canto
+      const texRosto = texP('rosto', 512, 256, (x, w, h, r) => {
+        x.fillStyle = '#c49a80'; x.fillRect(0, 0, w, h);
+        const FX = w * .25;
+        const g0 = x.createRadialGradient(FX, h * .5, 10, FX, h * .52, 120); g0.addColorStop(0, 'rgba(255,230,210,.18)'); g0.addColorStop(.6, 'rgba(0,0,0,0)'); g0.addColorStop(1, 'rgba(40,20,12,.35)'); x.fillStyle = g0; x.fillRect(0, 0, w, h);
+        // barba por fazer: maxilar, queixo e buço
+        for (let i = 0; i < 9000; i++) { const a = r() * PI * 2, rr = Math.sqrt(r()); const px = FX + Math.cos(a) * rr * 80, py = h * .62 + Math.sin(a) * rr * 50; if (py < h * .6 && Math.abs(px - FX) < 40) continue; if (py < h * .55) continue; x.fillStyle = `rgba(30,22,20,${.18 + r() * .25})`; x.fillRect(px, py, 1, 1.5); }
+        // sobrancelhas grossas e franzidas
+        [-1, 1].forEach(sx => { x.strokeStyle = '#1a1210'; x.lineCap = 'round'; for (let k = 0; k < 6; k++) { x.lineWidth = 3.5 - k * .3; x.beginPath(); x.moveTo(FX + sx * 10, h * .405 + k * .4); x.quadraticCurveTo(FX + sx * 24, h * .385 - (sx > 0 ? 2 : 0), FX + sx * 40, h * .4); x.stroke(); } });
+        // olheiras e sombra das pálpebras
+        [-1, 1].forEach(sx => { const g2 = x.createRadialGradient(FX + sx * 25, h * .47, 2, FX + sx * 25, h * .47, 18); g2.addColorStop(0, 'rgba(60,30,30,.6)'); g2.addColorStop(1, 'rgba(60,30,30,0)'); x.fillStyle = g2; x.fillRect(FX + sx * 25 - 20, h * .47 - 20, 40, 40); });
+        // nariz (sombra lateral) e narinas
+        x.fillStyle = 'rgba(80,45,35,.35)'; x.beginPath(); x.ellipse(FX + 6, h * .57, 4, 14, 0, 0, 7); x.fill();
+        x.fillStyle = 'rgba(40,20,15,.6)'; [-1, 1].forEach(sx => { x.beginPath(); x.ellipse(FX + sx * 5, h * .62, 2.5, 1.6, 0, 0, 7); x.fill(); });
+        // boca: lábio fino, sorriso de canto (o lado esquerdo dele sobe)
+        x.strokeStyle = '#5a2a24'; x.lineWidth = 2.4; x.beginPath(); x.moveTo(FX - 16, h * .705); x.quadraticCurveTo(FX - 2, h * .715, FX + 8, h * .7); x.quadraticCurveTo(FX + 15, h * .69, FX + 19, h * .675); x.stroke();
+        x.strokeStyle = 'rgba(140,80,70,.5)'; x.lineWidth = 3; x.beginPath(); x.moveTo(FX - 12, h * .725); x.quadraticCurveTo(FX, h * .735, FX + 12, h * .72); x.stroke();
+        // respingos de sangue no rosto
+        for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(110,10,8,${.4 + r() * .4})`; x.beginPath(); x.arc(FX + (r() - .3) * 70, h * (.3 + r() * .5), .8 + r() * 2, 0, 7); x.fill(); }
+        // gotas que escorrem da coroa pela testa
+        for (let i = 0; i < 5; i++) { const x0 = FX + (r() - .5) * 60; x.strokeStyle = 'rgba(120,8,6,.75)'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(x0, h * .22); x.lineTo(x0 + (r() - .5) * 3, h * (.3 + r() * .1)); x.stroke(); }
+        for (let i = 0; i < 4000; i++) { x.fillStyle = `rgba(${r() < .5 ? '60,30,20' : '255,220,200'},${r() * .05})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      });
+      const texCabelo = texP('cabelo', 64, 256, (x, w, h, r) => { x.clearRect(0, 0, w, h); for (let i = 0; i < 90; i++) { const x0 = r() * w; x.strokeStyle = r() < .2 ? '#2a2420' : '#0c0a0a'; x.lineWidth = .8 + r() * 2; x.beginPath(); x.moveTo(x0, 0); x.lineTo(x0 + (r() - .5) * 8, h * (.6 + r() * .4)); x.stroke(); } });
+      // sangue: vermelho escuro com veios claros (o shader anima)
+      const texSangue = texP('sangue', 256, 256, (x, w, h, r) => { x.fillStyle = '#4a0606'; x.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 8 + r() * 40); g2.addColorStop(0, r() < .5 ? 'rgba(140,14,10,.5)' : 'rgba(20,0,0,.5)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 50, gy - 50, 100, 100); } }, { rep: [2, 2] });
+      const texFaca = texP('faca', 128, 32, (x, w, h, r) => { const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#e8e8ec'); gr.addColorStop(.5, '#9a9aa4'); gr.addColorStop(1, '#d0d0d8'); x.fillStyle = gr; x.fillRect(0, 0, w, h); for (let i = 0; i < 18; i++) { x.fillStyle = `rgba(120,6,4,${.4 + r() * .5})`; x.beginPath(); x.ellipse(w * (.3 + r() * .7), r() * h, 3 + r() * 9, 2 + r() * 4, 0, 0, 7); x.fill(); } });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uDrag: { value: 0 }, uTopo: { value: .55 } };
+      const balanco = { vBegin: `float bx = clamp((0.95 - transformed.y) / 0.6, 0.0, 1.0); bx *= bx;
+        transformed.x += sin(uT * 1.2 + transformed.y * 3.0 + transformed.z * 5.0) * 0.012 * bx;
+        transformed.z += (cos(uT * 0.9 + transformed.x * 6.0) * 0.012 - uDrag * 0.16) * bx;` };
+      const casaco = shader(mat({ map: texCasaco, roughness: .78, duplo: true, color: '#c8b8a8' }), 'ent_casaco_pano', Um, balanco);
+      const camisa = mat({ map: texCamisa, roughness: .85, color: '#d0d0d0' });
+      const calca = mat({ color: '#18161a', roughness: .85 });
+      const sapato = mat({ color: '#100c0a', roughness: .5 });
+      const pele = mat({ color: '#c09478', roughness: .62 });
+      const rosto = mat({ map: texRosto, roughness: .6, color: '#e8d8d0' });
+      const cabeloM = mat({ map: texCabelo, alphaTest: .4, duplo: true, roughness: .55, color: '#ffffff' });
+      const cabeloBase = mat({ color: '#0e0c0c', roughness: .6 });
+      const espinhoM = mat({ color: '#3a2218', roughness: .75 });
+      const espinhoP = mat({ color: '#5a1a12', roughness: .6 });
+      const olhoM = mat({ color: '#0a1a30', emissive: '#58b8ff', emissiveIntensity: 2.6, roughness: .2 });
+      const facaM = mat({ map: texFaca, roughness: .22, metalness: .85, color: '#ffffff' });
+      const caboM = mat({ color: '#1c1614', roughness: .5, metalness: .3 });
+      // sangue: superfície que ondula (no shader), brilho úmido e veios que correm em volta
+      const Us = { uT: Um.uT, uSobe: { value: 1 }, uFuria: { value: 0 }, uDrag: Um.uDrag };
+      const sangueM = shader(mat({ map: texSangue, roughness: .22, metalness: .1, color: '#c8b0b0', emissive: '#3a0000', emissiveIntensity: .7, duplo: true }), 'ent_sangue_mare', Us, {
+        vBegin: `float rr = length(transformed.xz), an = atan(transformed.z, transformed.x);
+          float onda = sin(rr * 18.0 - uT * 2.6 + an * 2.0) * 0.012 + sin(an * 5.0 + uT * 1.7 + rr * 6.0) * 0.012 + (fb3(vec3(transformed.xz * 4.0, uT * 0.5)) - 0.5) * 0.04;
+          float topo = smoothstep(0.02, 0.3, transformed.y);
+          transformed.y += onda * (0.4 + topo) * (1.0 + uFuria * 2.0);
+          transformed.y *= uSobe;
+          transformed.xz *= 1.0 + (sin(an * 3.0 - uT * 1.3) * 0.04 + uFuria * 0.15) * topo;
+          transformed.z -= uDrag * 0.18 * topo;`,
+        fMap: `float an2 = atan(vPo.z, vPo.x); float vei = sin(an2 * 7.0 + vPo.y * 9.0 - uT * 1.9 + fb3(vPo * 6.0) * 4.0);
+          diffuseColor.rgb *= 0.75 + 0.45 * smoothstep(0.6, 1.0, vei);`,
+        fEmis: `totalEmissiveRadiance *= 0.7 + 0.6 * fb3(vPw * 3.0 + vec3(0.0, uT * 0.4, 0.0)) + uFuria * 1.5;` });
+
+      /* ---------- esqueleto ---------- */
+      const R = bipede(g, { quadril: .95, coxa: .45, canela: .42, largQ: .1, cintura: .1, peito: .26, ombroY: .2, ombroX: .225, braco: .3, ante: .27, pescoco: .27, cabeca: .1 });
+      const { corpo, tronco, peito, pernas, bracos, pesc, cab } = R;
+      // pernas: calça escura e sapatos (ficam quase todas dentro do sangue)
+      const geoCoxa = uma('coxa', () => torneado(t => .082 - .022 * t, .45, 12, 12)), geoCanela = uma('canela', () => torneado(t => .06 - .012 * t + .006 * bump(t, .25, .2), .42, 12, 12));
+      const geoSap = uma('sapato', () => juntar([deform(mover(new T.SphereGeometry(.06, 14, 8), 0, -.04, .05, 0, 0, 0, .85, .6, 1.9), (x, y, z) => (y < -.075 ? [x, -.075, z] : null)), mover(new T.BoxGeometry(.1, .02, .25), 0, -.075, .05)]));
+      pernas.forEach(p => { malha(p.quad, geoCoxa, calca); malha(p.joelho, geoCanela, calca); malha(p.pe, geoSap, sapato).position.y = -.005; });
+      malha(corpo, uma('quadril', () => casca([[-.12, .16, .11], [-.02, .175, .12], [.08, .175, .12], [.14, .17, .115]], { seg: 22 })), calca);
+      // tronco: camiseta preta justa
+      malha(tronco, uma('torso', () => casca([[-.06, .17, .115], [.06, .18, .12], [.2, .205, .13], [.32, .23, .14], [.42, .235, .135], [.48, .2, .11], [.52, .11, .075], [.55, .055, .05]], { seg: 28 })), camisa);
+      // sobretudo aberto: costas e laterais da barra (abaixo dos joelhos) aos ombros, gola virada e lapelas
+      const PC = [[-.62, .34, .26], [-.45, .3, .23], [-.25, .255, .19], [-.05, .22, .16], [.1, .225, .155], [.25, .25, .165], [.38, .27, .17], [.46, .265, .155], [.52, .21, .13], [.55, .12, .09]];
+      const geoCasaco = uma('casaco', () => casca(PC, { seg: 44, abertura: .5, deform: (x, y, z, j, u, ang) => { const b = Math.max(0, -y); const k = 1 + Math.sin(ang * 6 + y * 4) * (.015 + .04 * b); return [x * k, y, z * k + (Math.abs(ang) < .8 && y < .3 ? -.01 : 0)]; } }));
+      const casacoMe = malha(tronco, geoCasaco, casaco);
+      malha(tronco, uma('gola', () => juntar([mover(new T.CylinderGeometry(.1, .14, .13, 20, 1, true, PI * .35, PI * 1.3), 0, .55, -.03, -.2, 0, 0, 1, 1, .9),
+        ...[-1, 1].map(q => deform(mover(new T.PlaneGeometry(.09, .3, 2, 6), q * .085, .4, .135, -.12, q * .45, q * -.18), (x, y, z) => [x, y, z + Math.abs(x - q * .085) * .25]))])), casaco);
+      // botões e cinto do casaco caídos nos lados
+      malha(tronco, uma('cintoCasaco', () => juntar([-1, 1].map(q => tubo([[q * .17, .1, .12], [q * .22, .02, .08], [q * .23, -.12, .03], [q * .22, -.3, .02]], .012, { seg: 10, rad: 5 })))), casaco);
+      // braços em mangas do casaco, mãos de pele
+      const geoManga = uma('manga', () => deform(torneado(t => .06 - .008 * t, .3, 12, 12), (x, y, z) => [x * (1 + .05 * Math.sin(y * 40)), y, z * (1 + .05 * Math.sin(y * 31))]));
+      const geoMangaA = uma('mangaA', () => juntar([deform(torneado(t => .052 + .008 * bump(t, .9, .1), .25, 12, 12), (x, y, z) => [x * (1 + .06 * Math.sin(y * 50)), y, z]), mover(new T.CylinderGeometry(.06, .056, .05, 12, 1, true), 0, -.24, 0)]));
+      const geoMao = uma('mao', () => juntar([mover(new T.SphereGeometry(.042, 12, 8), 0, -.05, 0, 0, 0, 0, .8, 1.2, .5), ...[0, 1, 2, 3].map(i => mover(new T.CylinderGeometry(.009, .008, .06, 6), -.024 + i * .016, -.1, .012, .5, 0, 0)), mover(new T.CylinderGeometry(.01, .009, .045, 6), .03, -.04, .02, .3, 0, -.6)]));
+      bracos.forEach(b => { malha(b.braco, geoManga, casaco); malha(b.braco, uma('ombroC', () => new T.SphereGeometry(.062, 12, 10)), casaco); malha(b.cot, geoMangaA, casaco); malha(b.mao, geoMao, pele); });
+      // faca na mão direita: lâmina para baixo e para a frente
+      const faca = grupo(bracos[0].mao, -.005, -.08, .02); faca.rotation.set(1.9, 0, 0);
+      malha(faca, uma('cabo', () => juntar([mover(new T.CylinderGeometry(.014, .016, .11, 8), 0, -.04, 0), mover(new T.BoxGeometry(.05, .012, .025), 0, .02, 0), mover(new T.SphereGeometry(.016, 8, 6), 0, -.1, 0)])), caboM);
+      malha(faca, uma('lamina', () => { const sh = new T.Shape(); sh.moveTo(-.012, 0); sh.lineTo(.014, 0); sh.lineTo(.016, .14); sh.quadraticCurveTo(.012, .2, -.004, .24); sh.lineTo(-.012, .16); sh.lineTo(-.012, 0); const ge = new T.ExtrudeGeometry(sh, { depth: .004, bevelEnabled: true, bevelThickness: .002, bevelSize: .003, bevelSegments: 1 }); ge.translate(0, .026, -.002); ge.rotateY(PI / 2); const p = ge.attributes.position, uv = ge.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getY(i) * 4, p.getZ(i) * 30 + .5); return ge; }), facaM);
+      const brilhoFaca = halo(faca, '#ffffff', .1, 0, .14, 0, 0);
+
+      /* ---------- cabeça: rosto, olhos azuis acesos, cabelo preto e a coroa de espinhos ---------- */
+      malha(pesc, uma('pescoco', () => mover(new T.CylinderGeometry(.05, .058, .14, 12), 0, .03, 0)), pele);
+      const geoCab = uma('cabeca', () => deform(new T.SphereGeometry(.1, 32, 24), (x, y, z) => {
+        let X = x * .82, Y = y * 1.18, Z = z * .98;
+        if (Y < -.02) { const q = Math.min(1, (-.02 - Y) / .1); X *= 1 - q * .28; Z = Z * (1 - q * .12) + (Z > 0 ? q * .012 : 0); }
+        if (Z > 0) { Z += bump(X, 0, .014) * bump(Y, -.012, .03) * .03; Z -= bump(Math.abs(X), .03, .016) * bump(Y, .018, .014) * .012; Z += bump(Y, .042, .012) * Math.max(0, 1 - Math.abs(X) / .06) * .006; }
+        return [X, Y, Z];
+      }));
+      malha(cab, geoCab, rosto);
+      const OLHOS = [-1, 1].map(sx => { const o = malha(cab, uma('olho', () => new T.SphereGeometry(.0105, 10, 8)), olhoM); o.position.set(sx * .03, .018, .083); o.scale.set(1, .7, .6); return o; });
+      const brOlhos = [-1, 1].map(sx => halo(cab, '#6ac4ff', .07, sx * .03, .018, .095, .6));
+      // orelhas
+      [-1, 1].forEach(sx => { const o = malha(cab, uma('orelha', () => mover(new T.SphereGeometry(.022, 8, 6), 0, 0, 0, 0, 0, 0, .45, 1, .8)), pele); o.position.set(sx * .083, .0, -.005); });
+      // cabelo: calota e mechas espetadas e caídas sobre a testa
+      const calota = malha(cab, uma('calota', () => mover(new T.SphereGeometry(.106, 20, 12, 0, PI * 2, 0, PI * .5), 0, .018, -.018, -.42, 0, 0, .9, 1.15, 1.0)), cabeloBase);
+      malha(cab, uma('mechas', () => {
+        const l = [], r = NS.rng(41);
+        for (let i = 0; i < 70; i++) {
+          const a = r() * PI * 2, el = .15 + r() * 1.1, d = V(Math.sin(a) * Math.cos(el), Math.sin(el), Math.cos(a) * Math.cos(el));
+          const o0 = V(d.x * .088, .015 + d.y * .115, d.z * .098 - .01), frente = d.z > .5 && d.y < .7;
+          const L2 = frente ? .06 + r() * .05 : .05 + r() * .06;
+          const p1 = o0.clone().addScaledVector(d, L2 * .4), p2 = o0.clone().addScaledVector(d, L2 * .7).add(V((r() - .5) * .03, -L2 * (frente ? .75 : .55) + (d.y > .9 ? r() * .03 : 0), frente ? .012 : (r() - .5) * .02));
+          if (frente) p2.y = Math.max(p2.y, .02);
+          l.push(tubo([o0, p1, p2], t => .013 * (1 - t * .8), { seg: 6, rad: 4 }));
+        }
+        return juntar(l);
+      }), cabeloBase);
+      // coroa: três galhos trançados com espinhos
+      const coroa = grupo(cab, 0, .072, -.006); coroa.rotation.x = -.12;
+      malha(coroa, uma('coroa', () => { const l = []; for (let v = 0; v < 3; v++) { const pts = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * PI * 2, rr = .1 + Math.sin(a * 5 + v * 2.1) * .006; pts.push([Math.sin(a) * rr * 1.0, Math.sin(a * 7 + v * 2.1) * .009, Math.cos(a) * rr * 1.12]); } l.push(tubo(pts, .005, { seg: 96, rad: 4, fechado: true, tampa: false })); } return juntar(l); }), espinhoM);
+      malha(coroa, uma('espinhos', () => { const l = [], r = NS.rng(13); for (let i = 0; i < 46; i++) { const a = r() * PI * 2, rr = .1, c = .025 + r() * .03, up = (r() - .3) * 1.4; const e = mover(new T.ConeGeometry(.0035, c, 4), 0, c / 2, 0); const m4 = new T.Matrix4().makeRotationFromEuler(new T.Euler(PI / 2 - up * .5, a, 0)); e.applyMatrix4(m4); e.translate(Math.sin(a) * rr, (r() - .5) * .015, Math.cos(a) * rr * 1.12); l.push(e); } return juntar(l); }), espinhoP);
+
+      /* ---------- o sangue: maré em volta das pernas e poça larga ---------- */
+      const mare = grupo(g);
+      malha(mare, uma('mare', () => {
+        // perfil da maré (de fora para dentro): poça rasa larga, sobe num monte que gira e abraça as coxas
+        const prof = [[1.15, .0], [1.02, .01], [.88, .022], [.74, .045], [.6, .09], [.49, .17], [.41, .27], [.35, .37], [.3, .44], [.25, .48], [.2, .48], [.16, .46]];
+        const pts = prof.map(([r0, y]) => new T.Vector2(r0, y));
+        return new T.LatheGeometry(pts, 56);
+      }), sangueM);
+      const respingos = [];
+      for (let i = 0; i < 8; i++) { const m = malha(mare, uma('gotaS', () => new T.SphereGeometry(.025, 8, 6)), sangueM); m.visible = false; respingos.push({ m, vida: 0, vx: 0, vy: 0, vz: 0 }); }
+      const brilhoSangue = halo(g, '#ff1a10', 2.4, 0, .25, 0, .12);
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.3, revelar: 2.4, ritual: 3.8, conjurar: 1.6 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.3 });
+      const est = {}, P = { A: 1.85, aQ: .4, ciclo: .86, braco: false };
+      let sobe = 1, sobeAlvo = 1, giro = 0;
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0;
+        const prep = tipo === 'ataque' ? sino(k, 0, .25, .45) : 0, golpe = tipo === 'ataque' ? sino(k, .25, .45, 1) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .05, .7) : 0, nasce = tipo === 'revelar' ? sm((k - .1) / .55) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .8 : 0;
+        passada(R, mv, dt, t, P, est);
+        const kA = est.k;
+        // sobe de dentro do sangue na revelação
+        R.corpo.position.y -= (1 - nasce) * .95;
+        // postura: relaxada, ombros um pouco caídos, cabeça baixa olhando por baixo das sobrancelhas
+        tronco.rotation.set(-.05 - prep * .1 + golpe * .2, est.sf * .05 * kA - prep * .5 + golpe * .7, 0);
+        peito.rotation.set(.03, 0, 0);
+        cab.rotation.x += .02 - golpe * .1; cab.rotation.z += Math.sin(t * .37) * .05 + .06; cab.rotation.y += Math.sin(t * .21) * .08;
+        // braços: o direito com a faca baixa e um pouco à frente; o esquerdo solto; ataque corta de baixo para cima
+        bracos.forEach((b, i) => {
+          const bal = (i ? est.sf : -est.sf) * .16 * kA;
+          let ax = b.k * (.24 + (i ? 0 : .03)), ay = -.52, az = .06 + bal + (i ? 0 : .08), px = b.k * .3, py = 0, pz = -1;
+          if (i === 0) { if (prep > 0) { ax += (-.32 - ax) * prep; ay += (-.42 - ay) * prep; az += (-.15 - az) * prep; } if (golpe > 0) { ax += (.05 - ax) * golpe; ay += (.0 - ay) * golpe; az += (.45 - az) * golpe; } }
+          if (eRit > 0) { ax += (b.k * .58 - ax) * eRit; ay += (-.05 - ay) * eRit; az += (.18 - az) * eRit; }
+          ik(b, ax, ay, az, px, py, pz);
+          b.mao.rotation.set(i ? .1 : .2 + golpe * .6 + Math.sin(t * .9) * .08 * (1 - kA), i ? 0 : Math.sin(t * .6) * .15, 0);
+        });
+        // casaco arrasta para trás ao andar
+        Um.uT.value = t; Um.uDrag.value = kA * Math.min(1.4, .5 + mv.vEf * .4);
+        // sangue: ondula, gira devagar, sobe na fúria (ataque, ritual) e acompanha o estado
+        sobe += (sobeAlvo - sobe) * Math.min(1, dt * 1.5);
+        Us.uSobe.value = Math.max(.03, sobe * (1 + eRit * .5 + golpe * .15) * (tipo === 'revelar' ? .4 + .6 * nasce + eRev * .3 : 1));
+        Us.uFuria.value = eRit * .8 + golpe * .5 + eRev * .6;
+        giro += dt * (.15 + eRit * .8); mare.rotation.y = giro;
+        brilhoSangue.material.opacity = .1 + .04 * Math.sin(t * 1.3) + eRit * .2 + eRev * .15;
+        // respingos no golpe e no ritual
+        respingos.forEach((r, i) => {
+          if (r.vida <= 0 && ((golpe > .3 || eRit > .4 || eRev > .4) && Math.sin(t * 13 + i * 3.1) > .7 || i < 2 && Math.sin(t * 1.7 + i * 2.3) > .985)) { const a = i * .8 + t; r.vida = .7; r.m.visible = true; r.m.position.set(Math.sin(a) * .35, .45, Math.cos(a) * .35 + .1); r.vx = Math.sin(a) * .8; r.vy = 1.6 + (i % 3) * .4; r.vz = Math.cos(a) * .8 + golpe * 1.2; }
+          if (r.vida > 0) { r.vida -= dt; r.vy -= 6 * dt; r.m.position.x += r.vx * dt; r.m.position.y += r.vy * dt; r.m.position.z += r.vz * dt; r.m.scale.set(.7, 1 + Math.abs(r.vy) * .4, .7); if (r.m.position.y < .02 || r.vida <= 0) { r.vida = 0; r.m.visible = false; } }
+        });
+        // olhos: brilham sempre, pulsam; acendem de uma vez na revelação
+        const acende = tipo === 'revelar' ? sm((k - .45) / .2) : 1;
+        olhoM.emissiveIntensity = (2.2 + Math.sin(t * 1.7) * .4 + golpe * 1.5 + eRit) * acende;
+        brOlhos.forEach(b => { b.material.opacity = (.45 + .15 * Math.sin(t * 1.7) + golpe * .3 + eRev * .4) * acende; });
+        brilhoFaca.material.opacity = Math.max(0, Math.sin(t * .9 + 1)) ** 12 * .9 + golpe * .5;
+      };
+      const ret = { g, alt: 1.95, raioBase: .62, anim, acao: tipo => ac.disparar(tipo),
+        estado: nome => { if (nome === 'poca' || nome === 'seco') sobeAlvo = .06; else if (nome === 'mare' || nome === 'padrao') sobeAlvo = 1; } };
+      anim(0, 0, false);
+      return ret;
     },
   };
 })();
@@ -5649,7 +6786,11 @@
       let fase = 0, tPisca = 0, nivel = 1, tContrai = 2, contrai = 0, tTique = 1, tique = V(0, 0, 0), tE = 0;
       const ORIG_P = { pD: V(-.3, .09, .2), pE: V(.32, .09, .12), mD: V(-.2, .14, .62), mE: V(.26, .14, .55) };
       const peito = V(0, 0, 0);
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.7 });
+      const FR_ = V(), TR_ = V();
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         A.passo(dt);
         const atq = A.ativo('ataque') ? A.k : -1, rev = A.ativo('revelar') ? A.k : -1;
         U.uT.value = t; nuc.pulso(t, dt);
@@ -5665,14 +6806,14 @@
         let ty = .58 - enc * .1, tz = -.12, rx = .5 + enc * .15, ry = 0, rz = 0;
         pD.alvo.copy(ORIG_P.pD); pE.alvo.copy(ORIG_P.pE); mD.alvo.copy(ORIG_P.mD); mE.alvo.copy(ORIG_P.mE);
         // braço esquerdo levantado de vez em quando, garras abertas
-        const ergue = suave(.5 + .5 * Math.sin(t * .35)) * (andando ? 0 : 1);
+        const ergue = suave(.5 + .5 * Math.sin(t * .35)) * (1 - kA);
         mE.alvo.lerp(V(.4, 1.22, .48), ergue * .85);
-        if (andando) {
+        if (kA > .01) {
           // galope rápido aos saltos: patas da frente e de trás alternam, o corpo voa entre os apoios
-          fase += dt * 9; const s1 = Math.sin(fase), c1 = Math.cos(fase);
-          ty += Math.max(0, s1) * .16 - .02; rx += .3 + c1 * .14; tz += c1 * .05;
-          const fr = V(0, Math.max(0, -c1) * .22, s1 * .28), tr = V(0, Math.max(0, c1) * .2, -s1 * .28);
-          mD.alvo.add(fr); mE.alvo.add(fr).add(V(0, 0, .04)); pD.alvo.add(tr); pE.alvo.add(tr);
+          fase += mv.ritmo(dt, 9, 1.7); const s1 = Math.sin(fase) * kA, c1 = Math.cos(fase) * kA;
+          ty += Math.max(0, s1) * .16 - .02 * kA; rx += .3 * kA + c1 * .14 + ace; tz += c1 * .05;
+          const fr = FR_.set(0, Math.max(0, -c1) * .22, s1 * .28), tr = TR_.set(0, Math.max(0, c1) * .2, -s1 * .28);
+          mD.alvo.add(fr); mE.alvo.add(fr); mE.alvo.z += .04 * kA; pD.alvo.add(tr); pE.alvo.add(tr);
         }
         // tiques: a cabeça vira de estalo
         tTique -= dt; if (tTique <= 0) { tTique = .4 + R() * 1.6; tique.set((R() - .5) * .5, (R() - .5) * .9, (R() - .5) * .7); }
@@ -5719,6 +6860,553 @@
       };
       return { g, alt: 1.4, raioBase: .6, anim,
         acao: tipo => { if (tipo === 'ataque') A.disparar('ataque', 1.4); else if (tipo === 'revelar') A.disparar('revelar', 1.6); } };
+    },
+  };
+})();
+
+/* ===== forma: encapuzada_meia_mascara ===== */
+/* encapuzada_meia_mascara.js · forma: moça de capuz num manto marrom-escuro longo até o chão, com barras e
+   bordados dourados. Meia máscara branca e lisa cobrindo o lado direito do rosto; franja preta reta e cabelo curto.
+   Ombreiras pontudas de borda dourada, correntes douradas cruzando o peito até um grande selo de ouro (estrela
+   num círculo), estola dourada descendo pela frente com franjas e uma faixa central bordada com símbolos. Atrás
+   da cabeça, uma auréola dourada de símbolos que gira devagar.
+   Formato: ACF3D.formasFilho.encapuzada_meia_mascara = { nome, criar(F, s) → { g, alt, raioBase, anim, acao, estado } }
+   acao('ataque') (ou 'atacar'): tira a mão do manto, aponta, e um círculo de símbolos dispara à frente; a auréola
+   acelera. acao('revelar'): a auréola se acende do nada e um círculo de símbolos brilha no chão em volta dela.
+   acao('ritual') / acao('conjurar'): ergue as duas mãos, a auréola cresce e gira rápido, o círculo do chão acende.
+   estado('apagada'): a auréola some (só o manto e a máscara). estado('acesa') (padrão): auréola visível. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).encapuzada_meia_mascara = {
+    nome: 'Moça encapuzada de meia máscara e auréola dourada',
+    criar: (F, s) => {
+      const K = kit(F, 'encapuzada_meia_mascara'), { sombraContato, semSombra, T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, acoes, env, sino } = K;
+      const g = grupo(null);
+      sombraContato(g, .75, .6);
+
+      /* ---------- símbolos (inventados aqui: traços curtos numa grade, semente fixa) ---------- */
+      const glifo = (x, cx, cy, tam, r) => {
+        const P = [[0, 0], [.5, 0], [1, 0], [0, .5], [.5, .5], [1, .5], [0, 1], [.5, 1], [1, 1]];
+        let a = (r() * 9) | 0; x.beginPath(); x.moveTo(cx + (P[a][0] - .5) * tam, cy + (P[a][1] - .5) * tam);
+        const n = 2 + ((r() * 3) | 0); for (let i = 0; i < n; i++) { let b; do { b = (r() * 9) | 0; } while (b === a); a = b; x.lineTo(cx + (P[a][0] - .5) * tam, cy + (P[a][1] - .5) * tam); }
+        x.stroke(); if (r() < .4) { x.beginPath(); x.arc(cx + (r() - .5) * tam * .6, cy + (r() - .5) * tam * .6, tam * .1, 0, 7); x.stroke(); }
+      };
+      /* ---------- texturas ---------- */
+      const texManto = texP('manto', 512, 512, (x, w, h, r) => {
+        x.fillStyle = '#2e1e14'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 160; i++) { const x0 = r() * w; x.strokeStyle = `rgba(${r() < .6 ? '10,6,3' : '90,64,44'},${.08 + r() * .14})`; x.lineWidth = 3 + r() * 12; x.beginPath(); x.moveTo(x0, 0); x.bezierCurveTo(x0 + (r() - .5) * 16, h * .4, x0 + (r() - .5) * 16, h * .7, x0 + (r() - .5) * 24, h); x.stroke(); }
+        for (let i = 0; i < 6000; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '150,110,70'},${r() * .05})`; x.fillRect(r() * w, r() * h, 1, 1); }
+        // barra dourada bordada na parte de baixo (v baixo = tela embaixo)
+        x.fillStyle = '#b08a34'; x.fillRect(0, h - 22, w, 10); x.fillRect(0, h - 40, w, 3);
+        x.strokeStyle = '#c99a40'; x.lineWidth = 2; for (let i = 0; i < w; i += 22) { x.beginPath(); x.moveTo(i, h - 28); x.lineTo(i + 11, h - 36); x.lineTo(i + 22, h - 28); x.stroke(); }
+      });
+      // faixa central bordada: fundo marrom e colunas de símbolos dourados
+      const texFaixa = texP('faixa', 128, 512, (x, w, h, r) => {
+        x.fillStyle = '#24170f'; x.fillRect(0, 0, w, h);
+        x.strokeStyle = '#d0a040'; x.lineWidth = 3; x.strokeRect(6, 4, w - 12, h - 8); x.lineWidth = 1.2; x.strokeRect(12, 10, w - 24, h - 20);
+        x.lineWidth = 3.2; x.lineCap = 'round'; x.lineJoin = 'round';
+        for (let row = 0; row < 11; row++) { const n = row % 4 === 3 ? 2 : 3; for (let c = 0; c < n; c++) glifo(x, w / 2 + (c - (n - 1) / 2) * 30, 50 + row * 40, 22, r); }
+        x.beginPath(); x.moveTo(30, h - 70); x.lineTo(30, h - 40); x.quadraticCurveTo(w / 2, h - 10, w - 30, h - 40); x.lineTo(w - 30, h - 70); x.stroke();
+      });
+      // estola dourada com franjas
+      const texEstola = texP('estola', 64, 512, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#7a5a1c'); gr.addColorStop(.5, '#c79a3a'); gr.addColorStop(1, '#7a5a1c'); x.fillStyle = gr; x.fillRect(0, 0, w, h - 40);
+        x.strokeStyle = '#5a3e10'; x.lineWidth = 2; for (let y = 20; y < h - 50; y += 26) { x.beginPath(); x.moveTo(8, y); x.lineTo(w / 2, y + 10); x.lineTo(w - 8, y); x.stroke(); }
+        x.fillStyle = '#c79a3a'; for (let i = 0; i < w; i += 5) x.fillRect(i, h - 40, 2.5, 34 + r() * 6);
+      });
+      const alfaEstola = texP('estolaA', 64, 512, (x, w, h, r) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h - 40); for (let i = 0; i < w; i += 5) x.fillRect(i, h - 40, 2.5, 34 + r() * 6); }, { linear: true });
+      // selo: estrela de oito pontas num círculo com escrita
+      const texSelo = texP('selo', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#2a1a10'; x.fillRect(0, 0, w, h); const c = w / 2;
+        x.strokeStyle = '#e0b048'; x.lineWidth = 8; x.beginPath(); x.arc(c, c, c - 8, 0, 7); x.stroke(); x.lineWidth = 3; x.beginPath(); x.arc(c, c, c - 22, 0, 7); x.stroke();
+        x.lineWidth = 4; x.beginPath(); for (let i = 0; i <= 16; i++) { const a = i / 16 * PI * 2 - PI / 2, rr = i % 2 ? c * .5 : c * .78; x.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr); } x.stroke();
+        x.beginPath(); x.arc(c, c, c * .36, 0, 7); x.stroke();
+        x.lineWidth = 3; x.lineCap = 'round'; for (let i = 0; i < 4; i++) glifo(x, c - 27 + i * 18, c, 13, r);
+      });
+      // auréola: dois anéis de símbolos, raios e um brilho
+      const texAureola = texP('aureola', 512, 512, (x, w, h, r) => {
+        x.clearRect(0, 0, w, h); const c = w / 2;
+        const g2 = x.createRadialGradient(c, c, c * .2, c, c, c); g2.addColorStop(0, 'rgba(255,210,110,.35)'); g2.addColorStop(.6, 'rgba(255,190,80,.15)'); g2.addColorStop(1, 'rgba(255,180,60,0)'); x.fillStyle = g2; x.fillRect(0, 0, w, h);
+        x.strokeStyle = 'rgba(255,215,120,.9)'; x.lineCap = 'round'; x.lineJoin = 'round';
+        [c * .93, c * .78, c * .55, c * .42].forEach((rr, i) => { x.lineWidth = i % 2 ? 2 : 4; x.beginPath(); x.arc(c, c, rr, 0, 7); x.stroke(); });
+        // anel externo de símbolos e interno
+        const anel = (rr, n, tam) => { for (let i = 0; i < n; i++) { const a = i / n * PI * 2; x.save(); x.translate(c + Math.cos(a) * rr, c + Math.sin(a) * rr); x.rotate(a + PI / 2); x.lineWidth = 2.6; glifo(x, 0, 0, tam, r); x.restore(); } };
+        anel(c * .855, 30, 22); anel(c * .485, 18, 16);
+        // raios finos entre os anéis
+        x.lineWidth = 1.5; for (let i = 0; i < 48; i++) { const a = i / 48 * PI * 2; x.beginPath(); x.moveTo(c + Math.cos(a) * c * .58, c + Math.sin(a) * c * .58); x.lineTo(c + Math.cos(a) * c * .75, c + Math.sin(a) * c * .75); x.stroke(); }
+      }, { clamp: true });
+      // círculo do chão (ritual) e do disparo: um anel de símbolos mais simples
+      const texCirculo = texP('circulo', 256, 256, (x, w, h, r) => {
+        x.clearRect(0, 0, w, h); const c = w / 2; x.strokeStyle = 'rgba(255,210,110,1)'; x.lineCap = 'round';
+        x.lineWidth = 4; x.beginPath(); x.arc(c, c, c - 6, 0, 7); x.stroke(); x.lineWidth = 2; x.beginPath(); x.arc(c, c, c - 34, 0, 7); x.stroke();
+        for (let i = 0; i < 20; i++) { const a = i / 20 * PI * 2; x.save(); x.translate(c + Math.cos(a) * (c - 20), c + Math.sin(a) * (c - 20)); x.rotate(a + PI / 2); x.lineWidth = 2; glifo(x, 0, 0, 14, r); x.restore(); }
+        x.lineWidth = 3; x.beginPath(); for (let i = 0; i <= 6; i++) { const a = i / 6 * PI * 2 * 2 - PI / 2; x.lineTo(c + Math.cos(a) * (c - 40), c + Math.sin(a) * (c - 40)); } x.stroke();
+      }, { clamp: true });
+      // rosto (frente em u = 0,25): pele clara, olhos castanhos, boca pequena e séria
+      const texRosto = texP('rosto', 512, 256, (x, w, h, r) => {
+        x.fillStyle = '#c89c84'; x.fillRect(0, 0, w, h); const FX = w * .25;
+        const g0 = x.createRadialGradient(FX, h * .55, 10, FX, h * .55, 110); g0.addColorStop(0, 'rgba(255,235,220,.2)'); g0.addColorStop(1, 'rgba(90,50,40,.3)'); x.fillStyle = g0; x.fillRect(0, 0, w, h);
+        [-1, 1].forEach(sx => {
+          const ex = FX + sx * 24, ey = h * .5;
+          x.fillStyle = '#f4ece6'; x.beginPath(); x.ellipse(ex, ey, 12, 7, 0, 0, 7); x.fill();
+          x.fillStyle = '#7a4818'; x.beginPath(); x.arc(ex, ey, 6.5, 0, 7); x.fill(); x.fillStyle = '#1a0e06'; x.beginPath(); x.arc(ex, ey, 2.8, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.8)'; x.beginPath(); x.arc(ex - 2, ey - 2, 1.4, 0, 7); x.fill();
+          x.strokeStyle = '#1a0e08'; x.lineWidth = 3; x.beginPath(); x.ellipse(ex, ey, 12.5, 7.5, 0, PI * 1.02, PI * 1.98); x.stroke();
+          x.strokeStyle = 'rgba(40,24,16,.8)'; x.lineWidth = 2.4; x.beginPath(); x.moveTo(ex - sx * 9, ey - 13); x.quadraticCurveTo(ex, ey - 16, ex + sx * 10, ey - 12); x.stroke();
+        });
+        x.fillStyle = 'rgba(150,90,80,.35)'; x.beginPath(); x.ellipse(FX + 3, h * .6, 3, 10, 0, 0, 7); x.fill();
+        x.strokeStyle = '#a0584c'; x.lineWidth = 2.2; x.beginPath(); x.moveTo(FX - 9, h * .7); x.quadraticCurveTo(FX, h * .705, FX + 9, h * .7); x.stroke();
+        x.fillStyle = 'rgba(190,110,100,.4)'; x.beginPath(); x.ellipse(FX, h * .715, 7, 2.6, 0, 0, 7); x.fill();
+        for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(${r() < .5 ? '120,70,60' : '255,240,230'},${r() * .04})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      });
+      const texCabelo = texP('cabelo', 64, 256, (x, w, h, r) => { x.fillStyle = '#0a0808'; x.fillRect(0, 0, w, h); for (let i = 0; i < 80; i++) { const x0 = r() * w; x.strokeStyle = r() < .25 ? '#2a2228' : '#050404'; x.lineWidth = .8 + r() * 2; x.beginPath(); x.moveTo(x0, 0); x.lineTo(x0 + (r() - .5) * 3, h); x.stroke(); } });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uDrag: { value: 0 }, uAbre: { value: 0 } };
+      const balanco = { vBegin: `float bx = clamp((1.1 - transformed.y) / 1.1, 0.0, 1.0); bx *= bx;
+        transformed.x += (sin(uT * 1.0 + transformed.y * 3.0 + transformed.z * 4.0) * 0.018 + sin(uT * 2.1 + transformed.x * 8.0) * 0.006) * bx * (1.0 + uAbre);
+        transformed.z += (cos(uT * 0.8 + transformed.x * 5.0) * 0.016 - uDrag * 0.22) * bx;
+        transformed.xz *= 1.0 + uAbre * bx * 0.25;` };
+      const manto = shader(mat({ map: texManto, roughness: .85, duplo: true, color: '#d8c8b8' }), 'ent_manto_dourado', Um, balanco);
+      const faixa = shader(mat({ map: texFaixa, roughness: .7, duplo: true, color: '#ffffff', emissive: '#ffffff', emissiveMap: texFaixa, emissiveIntensity: .08 }), 'ent_manto_dourado', Um, balanco);
+      const estola = shader(mat({ map: texEstola, alphaMap: alfaEstola, alphaTest: .5, roughness: .45, metalness: .5, duplo: true, color: '#ffffff' }), 'ent_manto_dourado', Um, balanco);
+      const ouro = mat({ color: '#d8a83c', roughness: .3, metalness: .85, emissive: '#3a2400', emissiveIntensity: .5 });
+      const ouroFosco = mat({ color: '#b08a34', roughness: .5, metalness: .6, emissive: '#2a1800', emissiveIntensity: .4 });
+      const ouroPano = shader(mat({ color: '#b08a34', roughness: .5, metalness: .6, emissive: '#2a1800', emissiveIntensity: .4 }), 'ent_manto_dourado', Um, balanco);
+      const seloM = mat({ map: texSelo, roughness: .35, metalness: .7, color: '#ffffff', emissive: '#ffcc66', emissiveMap: texSelo, emissiveIntensity: .25 });
+      const rostoM = mat({ map: texRosto, roughness: .65, color: '#e8e0dc' });
+      const cabeloM = mat({ map: texCabelo, roughness: .45, color: '#ffffff' });
+      // máscara: porcelana branca envernizada (reflete) com um brilho que corre por ela
+      const mascM = mat({ color: '#e8e4dc', roughness: .18, metalness: .05, clearcoat: 1, clearcoatRoughness: .05, emissive: '#ffffff', emissiveIntensity: .02 }, 'fis');
+      const dentro = mat({ color: '#0a0604', roughness: 1 });
+      const pele = mat({ color: '#e0bca4', roughness: .6 });
+      const aurM = somar('#ffd27a', { map: texAureola, op: .9 });
+      const aurM2 = somar('#ffcf70', { map: texAureola, op: .35 });
+      const circM = somar('#ffd27a', { map: texCirculo, op: 0 });
+      const tiroM = somar('#ffe0a0', { map: texCirculo, op: 0 });
+
+      /* ---------- corpo ---------- */
+      const corpo = grupo(g), tronco = grupo(corpo, 0, .95, 0), peito = grupo(tronco, 0, .3, 0);
+      // manto: largo até o chão, aberto na frente (mostra a faixa bordada), cai dos ombros
+      const PM = [[-.95, .56, .5], [-.8, .5, .44], [-.55, .42, .36], [-.3, .35, .29], [-.05, .29, .23], [.2, .25, .19], [.38, .25, .18], [.46, .25, .17], [.52, .2, .14], [.56, .12, .1]];
+      malha(tronco, uma('manto', () => casca(PM, { seg: 52, abertura: .55, deform: (x, y, z, j, u, ang) => { const k = 1 + Math.sin(ang * 8 + y * 2) * .03 * Math.max(0, .5 - y); return [x * k, y, z * k]; } })), manto);
+      // vestido de baixo (frente, entre as bordas do manto) com a faixa bordada no meio
+      malha(tronco, uma('vestido', () => casca([[-.95, .4, .36], [-.6, .32, .29], [-.3, .26, .23], [0, .21, .18], [.25, .19, .16], [.45, .2, .155], [.53, .15, .12]], { seg: 32 })), manto);
+      malha(tronco, uma('faixa', () => { const pts = []; for (let k = 0; k <= 10; k++) { const y = .45 - k * .14, t = (.45 - y) / 1.4, zz = .16 + t * .22; pts.push([0, y, zz]); } return fita(pts, t => .13 + t * .06, { seg: 20, normal: () => V(0, 0, 1) }); }), faixa);
+      // bordas douradas do manto (frente e barra)
+      malha(tronco, uma('bordas', () => {
+        const l = [];
+        [-1, 1].forEach(sx => { const pts = PM.slice().reverse().map(([y, a, b]) => { const ang = .275; return [sx * Math.sin(ang) * a * 1.01, y, Math.cos(ang) * b * 1.01]; }); l.push(tubo(pts.slice(1), .012, { seg: 30, rad: 5 })); });
+        const pts = []; for (let k = 0; k <= 50; k++) { const ang = .275 + k / 50 * (PI * 2 - .55); pts.push([Math.sin(ang) * .57, -.94, Math.cos(ang) * .51]); } l.push(tubo(pts, .013, { seg: 60, rad: 5 }));
+        return juntar(l);
+      }), ouroPano);
+      // estola: duas faixas douradas descendo pela frente até os joelhos, com franja
+      malha(tronco, uma('estola', () => juntar([-1, 1].map(sx => { const pts = []; for (let k = 0; k <= 8; k++) { const y = .5 - k * .12, t = k / 8; pts.push([sx * (.1 + t * .06), y, .15 + t * .17 + (k === 0 ? -.03 : 0)]); } return fita(pts, .075, { seg: 16, normal: () => V(0, 0, 1) }); }))), estola);
+      // ombreiras pontudas de borda dourada e gola alta
+      [-1, 1].forEach(sx => {
+        const o = grupo(peito, sx * .21, .2, 0); o.scale.setScalar(1.15);
+        malha(o, uma('ombreira', () => { const sh = new T.Shape(); sh.moveTo(0, .08); sh.lineTo(.2, .02); sh.lineTo(.3, -.06); sh.lineTo(.12, -.08); sh.lineTo(0, -.1); sh.lineTo(0, .08); const ge = new T.ExtrudeGeometry(sh, { depth: .24, bevelEnabled: true, bevelThickness: .01, bevelSize: .01, bevelSegments: 1 }); ge.translate(0, 0, -.12); return deform(ge, (x, y, z) => [x * .72, y - x * x * 1.1 - z * z * .4, z * (1 - x * .9)]); }), manto).scale.x = sx;
+        malha(o, uma('ombreiraBorda', () => tubo([[0, .08, -.12], [.144, -.02, -.07], [.223, -.12, 0], [.144, -.02, .07], [0, .08, .12]], .011, { seg: 24, rad: 5 })), ouroFosco).scale.x = sx;
+        // correntes: duas de cada lado, da ponta da ombreira ao selo
+        malha(o, uma('correntes', () => juntar([[.12, -.02, .11, .5], [.16, -.06, .1, .6]].map(([x0, y0, z0, f]) => { const pts = []; for (let k = 0; k <= 10; k++) { const t = k / 10, x = x0 + (-.2 - x0) * t, y = y0 - .05 * t - Math.sin(t * PI) * .07 * f - .12 * t * t, z = z0 + .1 * t; pts.push([x, y, z]); } return tubo(pts, .006, { seg: 20, rad: 4 }); }))), ouro).scale.x = sx;
+      });
+      malha(peito, uma('gola', () => juntar([casca([[.15, .1, .09], [.22, .085, .08], [.27, .075, .072]], { seg: 20 }), mover(new T.TorusGeometry(.086, .008, 5, 20), 0, .15, .0, PI / 2, 0, 0)])), manto);
+      // selo dourado no peito
+      const selo = grupo(peito, 0, .02, .205); selo.rotation.x = -.1;
+      malha(selo, uma('seloDisco', () => new T.CircleGeometry(.1, 32)), seloM);
+      malha(selo, uma('seloAro', () => juntar([mover(new T.TorusGeometry(.1, .01, 6, 32), 0, 0, 0), mover(new T.ConeGeometry(.02, .06, 6), 0, -.13, .0, PI, 0, 0), mover(new T.SphereGeometry(.014, 8, 6), 0, -.1, .0)])), ouro);
+      const brSelo = halo(selo, '#ffcf70', .35, 0, 0, .02, .3);
+
+      /* ---------- cabeça: capuz, rosto, franja, meia máscara ---------- */
+      const pesc = grupo(peito, 0, .28, .0), cab = grupo(pesc, 0, .12, .02);
+      malha(pesc, uma('pescoco', () => mover(new T.CylinderGeometry(.042, .048, .12, 10), 0, .02, 0)), pele);
+      const geoCab = uma('cabeca', () => deform(new T.SphereGeometry(.092, 30, 22), (x, y, z) => { let X = x * .84, Y = y * 1.14, Z = z; if (Y < -.02) { const q = Math.min(1, (-.02 - Y) / .09); X *= 1 - q * .3; Z = Z * (1 - q * .1); } if (Z > 0) Z += bump(X, 0, .012) * bump(Y, -.01, .025) * .018; return [X, Y, Z]; }));
+      malha(cab, geoCab, rostoM);
+      // cabelo: calota preta e cortina reta até o queixo, franja reta na testa
+      malha(cab, uma('cabelo', () => juntar([mover(new T.SphereGeometry(.099, 22, 12, 0, PI * 2, 0, PI * .55), 0, .012, -.008, -.18, 0, 0, .92, 1.1, 1.04),
+        casca([[-.1, .095, .09, -.01], [-.02, .1, .1, -.008], [.06, .098, .1, -.006]], { seg: 28, abertura: 1.5 }),
+        // mechas dos lados até o queixo
+        ...[-1, 1].map(sx => fita([[sx * .085, .06, .045], [sx * .095, 0, .05], [sx * .09, -.07, .045]], .05, { seg: 8, normal: P => V(P.x, 0, P.z * .3) }))])), cabeloM);
+      // franja reta e desfiada na testa (alfa recorta as pontas)
+      const alfaFranja = texP('franjaA', 128, 64, (x, w, h, r) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.fillStyle = '#fff'; for (let i = 0; i < w; i += 2) x.fillRect(i, 0, 2, h * (.72 + r() * .26)); }, { linear: true });
+      const franjaM = mat({ map: texCabelo, alphaMap: alfaFranja, alphaTest: .5, roughness: .45, duplo: true, color: '#ffffff' });
+      malha(cab, uma('franja', () => deform(new T.CylinderGeometry(.097, .1, .07, 22, 3, true, -1.05, 2.1), (x, y, z) => [x, y + .04 - Math.abs(x) * .15, z + .004])), franjaM);
+      // o olho que aparece pelo furo da máscara
+      const furo = grupo(cab, -.024, .0, .083);
+      malha(furo, uma('furo', () => mover(new T.SphereGeometry(.013, 10, 8), 0, 0, 0, 0, 0, 0, 1.1, .6, .5)), dentro);
+      malha(furo, uma('iris', () => mover(new T.SphereGeometry(.0055, 8, 6), 0, 0, .006)), mat({ color: '#6a3a14', roughness: .2 }));
+      // meia máscara: casca lisa no lado direito do rosto (x < 0), com o furo do olho
+      const masc = grupo(cab, 0, 0, 0);
+      malha(masc, uma('mascara', () => {
+        const ge = new T.SphereGeometry(.1, 24, 22, -PI * .14, PI * .66, PI * .14, PI * .62);   // de -x até a linha do nariz, testa ao queixo
+        return deform(ge, (x, y, z) => { let X = x * .86, Y = y * 1.16, Z = z * 1.03; if (Y < -.02) { const q = Math.min(1, (-.02 - Y) / .09); X *= 1 - q * .3; } if (Z > 0) Z += bump(X, 0, .012) * bump(Y, -.01, .025) * .02; const fur = bump(X, -.023, .012) * bump(Y, .0, .008); return [X, Y, Z - fur * .02 + .004]; });
+      }), mascM).scale.set(1.04, 1.02, 1.04);
+      const brilhoMasc = halo(masc, '#ffffff', .05, -.03, .03, .1, 0);
+      // capuz: concha alta e funda, aberta na frente, com borda dourada
+      const capuz = grupo(cab, 0, .02, -.03);
+      malha(capuz, uma('capuz', () => casca([[-.17, .16, .16, -.01], [-.08, .145, .155, .0], [.04, .14, .15, .0], [.12, .125, .14, -.02], [.18, .09, .1, -.05], [.23, .03, .04, -.08]], { seg: 32, abertura: 1.6, deform: (x, y, z) => [x * (1 + .03 * Math.sin(y * 25)), y, z] })), manto);
+      malha(capuz, uma('capuzBorda', () => { const pts = []; for (let k = 0; k <= 24; k++) { const t = k / 24, ang = .8 + t * (PI * 2 - 1.6); const yy = -.17 + Math.sin(t * PI) * .4; pts.push([Math.sin(ang) * .15 * (1 - Math.max(0, yy - .1) * 2), Math.min(.2, yy), Math.cos(ang) * .155]); } return tubo(pts, .008, { seg: 40, rad: 5 }); }), ouroFosco);
+      malha(capuz, uma('capuzDentro', () => mover(new T.SphereGeometry(.13, 14, 10), 0, .02, -.05, 0, 0, 0, 1, 1.2, 1)), dentro);
+
+      /* ---------- auréola de símbolos atrás da cabeça ---------- */
+      const aur = grupo(cab, 0, .05, -.3); aur.userData.base = 1.25;
+      const aurP = semSombra(malha(aur, uma('aurPlano', () => new T.PlaneGeometry(1.25, 1.25)), aurM));
+      const aurP2 = semSombra(malha(aur, uma('aurPlano', () => new T.PlaneGeometry(1.25, 1.25)), aurM2)); aurP2.position.z = -.02; aurP2.scale.setScalar(1.35);
+      const aurBr = halo(aur, '#ffc860', 1.5, 0, 0, -.05, .32);
+
+      /* ---------- mãos escondidas no manto (aparecem no ataque e no ritual) ---------- */
+      const bracos = [-1, 1].map(k => {
+        const ombro = grupo(peito, k * .17, .16, -.02), braco = grupo(ombro), cot = grupo(braco, 0, -.27, 0), mao = grupo(cot, 0, -.25, 0);
+        malha(braco, uma('mangaB', () => torneado(t => .055 + .01 * t, .27, 10, 10)), manto);
+        malha(cot, uma('mangaA', () => deform(new T.CylinderGeometry(.065, .1, .26, 14, 2, true), (x, y, z) => [x, y - .13, z])), manto);
+        malha(mao, uma('mao', () => juntar([mover(new T.SphereGeometry(.036, 10, 8), 0, -.04, 0, 0, 0, 0, .8, 1.2, .45), ...[0, 1, 2, 3].map(i => mover(new T.CylinderGeometry(.007, .006, .065, 6), -.018 + i * .012, -.09, 0)), mover(new T.CylinderGeometry(.008, .007, .045, 6), .028, -.035, .01, 0, 0, -.6)])), pele);
+        return { ombro, braco, cot, mao, k, Lb: .27, La: .25 };
+      });
+
+      /* ---------- círculo de símbolos do chão e o disparo ---------- */
+      const circ = semSombra(malha(g, uma('circChao', () => new T.PlaneGeometry(2.4, 2.4).rotateX(-PI / 2)), circM)); circ.position.y = .015;
+      const tiro = semSombra(malha(g, uma('circTiro', () => new T.PlaneGeometry(.7, .7)), tiroM)); tiro.visible = false;
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.4, revelar: 2.2, ritual: 3.8, conjurar: 1.6 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.1 });
+      let giro = 0, giro2 = 0, aurVis = 1, aurAlvo = 1, faseA = 0, tBrilho = 2;
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0, kA = sm(mv.k);
+        const eAtk = tipo === 'ataque' ? env(k, .25, .7) : 0, disparo = tipo === 'ataque' ? sm((k - .35) / .5) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .05, .75) : 0, acende = tipo === 'revelar' ? sm((k - .1) / .45) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .8 : 0;
+        // passo curto e deslizado, sob o manto: sobe e desce pouco, balança de leve
+        faseA += mv.avanco(dt, .9);
+        corpo.position.set(Math.sin(faseA) * .012 * kA, Math.abs(Math.cos(faseA)) * .015 * kA + Math.sin(t * 1.1) * .004, 0);
+        corpo.rotation.set(kA * .04 + eAtk * .04, Math.sin(faseA) * .05 * kA, Math.sin(faseA) * .015 * kA + Math.max(-.1, Math.min(.1, -mv.giro * mv.vEf * .04)) * kA);
+        // cabeça: quieta, inclina um pouco; olha em volta devagar
+        cab.rotation.set(.04 + mv.op * .4 - eRit * .25, mv.oy * .35 + Math.sin(t * .2) * .05, Math.sin(t * .33) * .03);
+        Um.uT.value = t; Um.uDrag.value = kA * Math.min(1.3, .5 + mv.vEf * .4); Um.uAbre.value = eRit * .6 + eRev * .4;
+        // braços: dentro do manto; o direito aponta no ataque; os dois sobem no ritual
+        bracos.forEach((b, i) => {
+          let ax = b.k * .12, ay = -.4, az = .08, w = 0;
+          if (i === 0 && eAtk > 0) { ax += (-.08 - ax) * eAtk; ay += (.05 - ay) * eAtk; az += (.48 - az) * eAtk; w = eAtk; }
+          if (eRit > 0) { ax += (b.k * .3 - ax) * eRit; ay += (.25 - ay) * eRit; az += (.25 - az) * eRit; w = Math.max(w, eRit); }
+          ik(b, ax, ay, az, b.k * .5, -.3, -.5);
+          b.mao.visible = w > .15; b.mao.rotation.set(-.3 * w, 0, 0);
+        });
+        // auréola: gira devagar; acelera no ataque e no ritual; acende na revelação; some no estado 'apagada'
+        aurVis += (aurAlvo - aurVis) * Math.min(1, dt * 2);
+        const vis = Math.max(aurVis, eRit, eAtk) * acende;
+        giro += dt * (.12 + eAtk * 1.6 + eRit * 2.2 + eRev * 3); giro2 -= dt * (.07 + eRit * 1.2 + eRev * 2);
+        aurP.rotation.z = giro; aurP2.rotation.z = giro2; aur.scale.setScalar(Math.max(.01, vis * 1.25 * (1 + eRit * .45 + eRev * .2 + Math.sin(t * .8) * .02)));
+        aurM.opacity = (.75 + .15 * Math.sin(t * 1.3) + eAtk * .2) * vis; aurM2.opacity = (.25 + eRit * .3) * vis; aurBr.material.opacity = (.18 + .06 * Math.sin(t * 1.3) + eRit * .25 + eRev * .3) * vis;
+        aur.visible = vis > .01;
+        // selo e bordas: brilho que respira
+        seloM.emissiveIntensity = .2 + .1 * Math.sin(t * 1.3) + eRit * .8 + eRev * .6; brSelo.material.opacity = .2 + .1 * Math.sin(t * 1.3) + eRit * .5;
+        ouro.emissiveIntensity = .45 + eRit * .8 + eRev * .5;
+        // máscara: um reflexo corre por ela de tempos em tempos
+        tBrilho -= dt; const q = Math.max(0, Math.min(1, 1 - tBrilho / .8));
+        if (tBrilho < 0) tBrilho = 1.6 + Math.sin(t * 7.3) * .6;
+        brilhoMasc.position.set(-.05 + q * .04, .05 - q * .07, .09); brilhoMasc.material.opacity = Math.sin(q * PI) * .95 + eRev * .3; brilhoMasc.scale.setScalar(.05 + Math.sin(q * PI) * .05);
+        mascM.emissiveIntensity = .07 + Math.sin(q * PI) * .1 + eRev * .25 + eRit * .1;
+        // círculo do chão: acende no ritual e na revelação, girando
+        circM.opacity = Math.max(eRit, eRev) * .8; circ.visible = circM.opacity > .01; circ.rotation.y = -giro * .5; circ.scale.setScalar(.7 + Math.max(eRit, eRev) * .5);
+        // disparo: um círculo de símbolos sai da mão e voa à frente crescendo
+        tiro.visible = disparo > 0 && disparo < 1; tiroM.opacity = Math.sin(disparo * PI) * .95;
+        tiro.position.set(-.1, 1.42, .55 + disparo * 3.2); tiro.scale.setScalar(.6 + disparo * 1.6); tiro.rotation.z = giro * 2;
+      };
+      const ret = { g, alt: 1.95, raioBase: .62, anim, acao: tipo => ac.disparar(tipo),
+        estado: nome => { if (nome === 'apagada') aurAlvo = 0; else if (nome === 'acesa' || nome === 'padrao') aurAlvo = 1; } };
+      anim(0, 0, false);
+      return ret;
     },
   };
 })();
@@ -6183,11 +7871,14 @@
       /* ---------- animação: plantado no lugar; range, balança, estala a tesoura, as raízes se mexem ---------- */
       const posR = raizMesh ? raizMesh.geometry.attributes.position : null;
       let agit = 0, quadro = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.8 });
       const anim = (dt, t, andando) => {
-        agit += ((andando ? 1 : 0) - agit) * Math.min(1, dt * 2);
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
+        agit = kA * Math.min(1.5, .6 + mv.vEf / 3);
         // rangido: balanço lento que trava e solta aos trancos
         const trava = Math.round(Math.sin(t * .7) * 6) / 6, solta = Math.sin(t * .7) * .3 + trava * .7;
-        corpo.rotation.z = solta * .045 + Math.sin(t * 13) * .002 * agit;
+        corpo.rotation.z = solta * .045 + Math.sin(t * 13) * .002 * agit + bank * .6;
         corpo.rotation.x = -.04 + Math.sin(t * .43) * .02 + (Math.sin(t * .23) > .96 ? .03 : 0);
         corpo.rotation.y = Math.sin(t * .31) * .05;
         // cabeça jogada para trás, boca que abre num grito mudo
@@ -6601,7 +8292,10 @@
       const ra = K.rngDe(K.semente + 99), des = ra() * 10;
       let fase = ra() * 6, prox = .5, alvo = [0, 0, 0], cr = [0, 0, 0], ritmo = 0;
       const ap = (o, k2, v, vel, dt) => { o[k2] += (v - o[k2]) * Math.min(1, dt * vel); };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.8 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const tt = t + des;
         const resp = Math.sin(tt * 1.8 + Math.sin(tt * .43) * 2.4) * (.55 + .45 * Math.sin(tt * .29));
         peito.scale.set(1 + resp * .03, 1 + resp * .012, 1 + resp * .04);
@@ -6613,8 +8307,8 @@
         cab.rotation.x = -.35 - V.corcunda * .8 + cr[2] * .4;
         mand.rotation.x = .12 + Math.max(0, Math.sin(tt * .9)) * .25 + (Math.sin(tt * 13) > .8 ? .1 : 0);
         lingua.forEach((l, i) => { l.rotation.x = .25 + Math.sin(tt * 3 - i * .9) * .35; l.rotation.y = Math.sin(tt * 2.1 - i * .7) * .3; });
-        ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 4);
-        if (andando) fase += dt * 3.3;
+        ritmo = kA;
+        fase += mv.ritmo(dt, 3.3, .8);
         const sn = Math.sin(fase), cs = Math.cos(fase), R = ritmo;
         pernas.forEach((p, i) => {
           const s2 = i ? -sn : sn, arrasto = i ? .45 : 1;
@@ -6623,7 +8317,7 @@
           ap(p.tornozelo.rotation, 'x', (s2 * .2 - .05) * R, 10, dt);
         });
         corpo.position.y = R * (Math.abs(cs) * .035 - .035) + (1 - R) * Math.sin(tt * .7) * .006;
-        corpo.rotation.z = R * sn * .06 + (1 - R) * Math.sin(tt * .45) * .02;
+        corpo.rotation.z = R * sn * .06 + (1 - R) * Math.sin(tt * .45) * .02 + bank;
         quadril.rotation.y = R * sn * .1;
         peito.rotation.y = -R * sn * .14; peito.rotation.x = V.corcunda + R * .06 + Math.sin(tt * .5) * .015;
         bracos.forEach((b, i) => {
@@ -6697,6 +8391,583 @@
       };
       animTudo(0, 0, false); const caixa = new T.Box3().setFromObject(g);
       return { g, alt: +caixa.max.y.toFixed(2), raioBase: .42, anim: animTudo, acao };
+    },
+  };
+})();
+
+/* ===== forma: esqueleto_foice ===== */
+/* esqueleto_foice.js · forma: ceifador esqueleto alto num manto encapuzado preto-esverdeado que se desfaz em
+   farrapos longuíssimos até o chão. Crânio amarelado de dentes à mostra dentro do capuz; o manto aberto no peito
+   mostra a coluna e as costelas. Braços de osso em mangas rasgadas seguram um cajado torto, enrolado em galhos de
+   espinhos, que leva no alto uma espiral branca luminosa cercada de pontas e uma lâmina de foice enorme e curva.
+   Por baixo do manto saem quatro pernas de osso compridas, dobradas como patas, com garras: é nelas que ele anda.
+   Fumaça escura sobe em volta da barra. Gigante: cerca de 3,3 m no capuz, inclinado para a frente.
+   Formato: ACF3D.formasFilho.esqueleto_foice = { nome, criar(F, s) → { g, alt, raioBase, anim, acao } }
+   acao('ataque') (ou 'atacar'): ergue a foice por cima do ombro e corta em arco à frente; a espiral se acende.
+   acao('revelar'): a fumaça sobe de uma vez e a figura se firma de dentro dela, a espiral girando rápido.
+   acao('ritual') / acao('conjurar'): ergue o cajado na vertical e a espiral gira e cresce. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).esqueleto_foice = {
+    nome: 'Ceifador esqueleto de foice e cajado em espiral',
+    criar: (F, s) => {
+      const K = kit(F, 'esqueleto_foice'), { sombraContato, semSombra, T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, acoes, env, sino, texBrilho } = K;
+      const g = grupo(null);
+      // gigante: o ceifador inteiro é montado em escala humana e ampliado 1,5x (≈ 3,3 m de capuz, a foice acima)
+      const ESC = 1.5, G = grupo(g); G.scale.setScalar(ESC);
+      const sombra = sombraContato(g, 1.5, .6);
+
+      /* ---------- texturas ---------- */
+      // manto: tecido podre preto-esverdeado com fios verticais e rasgos; o alfa recorta a barra em tiras e abre o peito
+      const texManto = texP('manto', 512, 512, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#2a2c26'); gr.addColorStop(.6, '#1e201b'); gr.addColorStop(1, '#141510'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 340; i++) { const x0 = r() * w; x.strokeStyle = r() < .6 ? `rgba(0,0,0,${.15 + r() * .2})` : `rgba(90,95,80,${.05 + r() * .08})`; x.lineWidth = 1 + r() * 6; x.beginPath(); x.moveTo(x0, r() * h * .3); x.bezierCurveTo(x0 + (r() - .5) * 14, h * .4, x0 + (r() - .5) * 14, h * .7, x0 + (r() - .5) * 18, h); x.stroke(); }
+        for (let i = 0; i < 50; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 10 + r() * 40); g2.addColorStop(0, r() < .5 ? 'rgba(40,50,30,.35)' : 'rgba(0,0,0,.4)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 50, gy - 50, 100, 100); }
+        for (let i = 0; i < 6000; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '120,120,100'},${r() * .06})`; x.fillRect(r() * w, r() * h, 1, 2); }
+      });
+      // alfa do manto: tiras na barra (u ao redor, v de baixo para cima), furos e a abertura do peito (frente, u = 0,5)
+      const alfaManto = texP('mantoA', 512, 512, (x, w, h, r) => {
+        x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.fillStyle = '#000';
+        // y da tela: 0 = topo (v = 1); a barra fica em baixo
+        for (let x0 = -4; x0 < w + 4;) { const lw = 4 + r() * 12, l = h * (.04 + r() * .32); x.beginPath(); x.moveTo(x0, h + 1); x.lineTo(x0 + lw * .3, h - l); x.lineTo(x0 + lw, h + 1); x.fill(); x0 += lw + 3 + r() * 16; }
+        for (let i = 0; i < 26; i++) { const cx = r() * w, cy = h * (.35 + r() * .55), rr = 3 + r() * 10; x.beginPath(); x.ellipse(cx, cy, rr * .6, rr * 2.2, 0, 0, 7); x.fill(); }
+        // abertura do peito: losango alongado na frente, do esterno à cintura
+        x.beginPath(); x.moveTo(w * .5, h * .06); x.bezierCurveTo(w * .43, h * .14, w * .41, h * .26, w * .5, h * .42); x.bezierCurveTo(w * .59, h * .26, w * .57, h * .14, w * .5, h * .06); x.fill();
+      }, { linear: true });
+      // tiras soltas: um pano estreito com a ponta esgarçada
+      const alfaTira = texP('tiraA', 64, 256, (x, w, h, r) => { x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.fillStyle = '#000'; for (let x0 = 0; x0 < w;) { const lw = 3 + r() * 8, l = h * (.05 + r() * .4); x.beginPath(); x.moveTo(x0, h + 1); x.lineTo(x0 + lw * .5, h - l); x.lineTo(x0 + lw, h + 1); x.fill(); x0 += lw + r() * 5; } for (let i = 0; i < 5; i++) { x.beginPath(); x.ellipse(r() * w, r() * h * .8, 2 + r() * 3, 5 + r() * 12, 0, 0, 7); x.fill(); } }, { linear: true });
+      // osso: amarelo envelhecido, encardido nas juntas, rachaduras finas
+      const texOsso = texP('osso', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#b6a682'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 70; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 6 + r() * 30); g2.addColorStop(0, r() < .55 ? 'rgba(70,58,36,.45)' : 'rgba(220,210,180,.3)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 40, gy - 40, 80, 80); }
+        x.lineCap = 'round'; for (let i = 0; i < 40; i++) { let px = r() * w, py = r() * h, an = r() * 6.3; x.strokeStyle = `rgba(40,30,15,${.3 + r() * .4})`; x.lineWidth = .6 + r(); x.beginPath(); x.moveTo(px, py); for (let k = 0; k < 6; k++) { an += (r() - .5) * 1.2; px += Math.cos(an) * 6; py += Math.sin(an) * 6; x.lineTo(px, py); } x.stroke(); }
+        for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(${r() < .5 ? '30,20,10' : '240,230,200'},${r() * .1})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      }, { rep: [1, 2] });
+      // crânio: frente da esfera em u = 0,25: órbitas fundas, buraco do nariz, dentes
+      const texCranio = texP('cranio', 512, 256, (x, w, h, r) => {
+        x.fillStyle = '#b4a27c'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 50; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 8 + r() * 30); g2.addColorStop(0, r() < .5 ? 'rgba(80,66,40,.4)' : 'rgba(225,215,185,.3)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 40, gy - 40, 80, 80); }
+        const FX = w * .25;
+        [-1, 1].forEach(sx => { const g2 = x.createRadialGradient(FX + sx * 26, h * .44, 2, FX + sx * 26, h * .46, 24); g2.addColorStop(0, '#050302'); g2.addColorStop(.55, '#1a120a'); g2.addColorStop(1, 'rgba(60,46,26,0)'); x.fillStyle = g2; x.fillRect(FX + sx * 26 - 30, h * .44 - 30, 60, 60); });
+        x.fillStyle = '#0c0805'; x.beginPath(); x.moveTo(FX, h * .55); x.lineTo(FX - 9, h * .66); x.lineTo(FX + 9, h * .66); x.fill();
+        x.fillStyle = '#1a1208'; x.fillRect(FX - 34, h * .72, 68, 22);
+        for (let i = 0; i < 9; i++) { x.fillStyle = '#d8ccaa'; x.fillRect(FX - 32 + i * 7.3, h * .725, 5.5, 9); x.fillRect(FX - 32 + i * 7.3, h * .725 + 12, 5.5, 8); }
+        for (let i = 0; i < 2000; i++) { x.fillStyle = `rgba(${r() < .5 ? '20,12,6' : '235,225,195'},${r() * .1})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      });
+      // espiral branca luminosa com pontas (a do alto do cajado)
+      const texEspiral = texP('espiral', 256, 256, (x, w, h) => {
+        x.clearRect(0, 0, w, h); const c = w / 2;
+        const g2 = x.createRadialGradient(c, c, 0, c, c, c); g2.addColorStop(0, 'rgba(255,255,255,.65)'); g2.addColorStop(.3, 'rgba(220,230,255,.25)'); g2.addColorStop(1, 'rgba(200,210,255,0)'); x.fillStyle = g2; x.fillRect(0, 0, w, h);
+        x.strokeStyle = 'rgba(255,255,255,1)'; x.lineCap = 'round'; x.shadowColor = '#cfe0ff'; x.shadowBlur = 10;
+        for (let pass = 0; pass < 2; pass++) { x.lineWidth = pass ? 3 : 7; x.globalAlpha = pass ? 1 : .45; x.beginPath(); for (let a = 0; a < PI * 7; a += .05) { const rr = 4 + a * 4.2; x.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr); } x.stroke(); }
+        x.globalAlpha = 1; x.lineWidth = 2;
+        for (let i = 0; i < 8; i++) { const a = i / 8 * PI * 2 + .2, l = i % 2 ? .46 : .36; x.beginPath(); x.moveTo(c + Math.cos(a) * c * .3, c + Math.sin(a) * c * .3); x.lineTo(c + Math.cos(a) * c * l * 2, c + Math.sin(a) * c * l * 2); x.stroke(); }
+      }, { clamp: true });
+      // fumaça escura
+      const texFumaca = texP('fumaca', 128, 128, (x, w, h, r) => { x.clearRect(0, 0, w, h); for (let i = 0; i < 26; i++) { const gx = w / 2 + (r() - .5) * w * .5, gy = h / 2 + (r() - .5) * h * .5, rr = 10 + r() * 30, g2 = x.createRadialGradient(gx, gy, 0, gx, gy, rr); g2.addColorStop(0, 'rgba(255,255,255,.22)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.fillRect(0, 0, w, h); } }, { clamp: true });
+      // lâmina: aço velho claro, gume mais claro, escorridos escuros
+      const texLamina = texP('lamina', 256, 64, (x, w, h, r) => { const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#f0ece2'); gr.addColorStop(.25, '#c4c0b6'); gr.addColorStop(1, '#6a665e'); x.fillStyle = gr; x.fillRect(0, 0, w, h); for (let i = 0; i < 40; i++) { const x0 = r() * w; x.strokeStyle = `rgba(30,20,15,${.2 + r() * .4})`; x.lineWidth = 1 + r() * 2.5; x.beginPath(); x.moveTo(x0, h * .25); x.lineTo(x0 + (r() - .5) * 4, h * (.4 + r() * .6)); x.stroke(); } for (let i = 0; i < 800; i++) { x.fillStyle = `rgba(0,0,0,${r() * .15})`; x.fillRect(r() * w, r() * h, 2, 1); } });
+      // madeira torta do cajado
+      const texPau = texP('pau', 64, 256, (x, w, h, r) => { x.fillStyle = '#3a3026'; x.fillRect(0, 0, w, h); for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(${r() < .5 ? '10,8,5' : '110,95,75'},${.2 + r() * .3})`; x.lineWidth = 1 + r() * 2; const x0 = r() * w; x.beginPath(); x.moveTo(x0, 0); x.bezierCurveTo(x0 + 6, h * .3, x0 - 6, h * .6, x0 + (r() - .5) * 8, h); x.stroke(); } }, { rep: [1, 4] });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uDrag: { value: 0 }, uAbre: { value: 0 } };
+      // pano: a parte de baixo ondula e arrasta para trás ao andar (no shader: nenhum custo na CPU)
+      const balanco = { vBegin: `float bx = clamp((1.25 - transformed.y) / 1.25, 0.0, 1.0); bx *= bx;
+        transformed.x += (sin(uT * 1.1 + transformed.y * 3.0 + transformed.z * 4.0) * 0.035 + sin(uT * 2.3 + transformed.x * 9.0) * 0.012) * bx * (1.0 + uAbre);
+        transformed.z += (cos(uT * 0.9 + transformed.y * 2.6 + transformed.x * 5.0) * 0.03 - uDrag * 0.3) * bx;
+        transformed.xz *= 1.0 + uAbre * bx * 0.5;` };
+      const manto = shader(mat({ map: texManto, alphaMap: alfaManto, alphaTest: .5, roughness: .95, duplo: true, color: '#c8cec0' }), 'ent_ceifador_pano', Um, balanco);
+      const tiraM = shader(mat({ map: texManto, alphaMap: alfaTira, alphaTest: .5, roughness: .95, duplo: true, color: '#b8beb0' }), 'ent_ceifador_pano', Um, balanco);
+      const osso = mat({ map: texOsso, bumpMap: texOsso, bumpScale: .004, roughness: .75, color: '#a89c84' });
+      const ossoEsc = mat({ map: texOsso, roughness: .8, color: '#7a6a50' });
+      const cranioM = mat({ map: texCranio, bumpMap: texCranio, bumpScale: .003, roughness: .75, color: '#86795f' });
+      const fundo = mat({ color: '#020202', roughness: 1 });
+      const pauM = mat({ map: texPau, roughness: .85, color: '#a09080' });
+      const espinhoM = mat({ color: '#2a2018', roughness: .7 });
+      const laminaM = mat({ map: texLamina, roughness: .3, metalness: .55, color: '#ece8e0', duplo: true });
+      const espM = somar('#e8f0ff', { map: texEspiral, op: .95 });
+      const nucleoM = mat({ color: '#d8e4ff', emissive: '#e0e8ff', emissiveIntensity: 2.6, roughness: .2 });
+
+      /* ---------- corpo flutuante sobre as pernas de osso ---------- */
+      const corpo = grupo(G, 0, 0, 0), tronco = grupo(corpo, 0, .55, 0), peito = grupo(tronco, 0, .85, 0);
+      // manto: do chão aos ombros, mais largo embaixo, com a frente aberta no peito
+      const PM = [[0, .62, .55], [.12, .56, .5], [.35, .46, .4], [.6, .36, .3], [.85, .3, .24], [1.05, .27, .2], [1.25, .3, .2], [1.45, .34, .21], [1.58, .36, .21], [1.66, .3, .17], [1.72, .16, .12]];
+      const geoManto = uma('manto', () => casca(PM.map(([y, a, b]) => [y, a, b, -.02]), { seg: 56, deform: (x, y, z, j, u, ang) => { const k = 1 + .05 * Math.sin(ang * 9 + y * 3) * (1.3 - y / 1.7) + .03 * fbm(x * 4, y * 3, z * 4); const cauda = z < 0 ? Math.pow(Math.max(0, 1 - y / .7), 2) * (-z / .6) * .55 : 0; return [x * k, y, z * k - cauda]; } }));
+      const mantoMe = malha(corpo, geoManto, manto);
+      // mangas e tiras longuíssimas que caem dos ombros e da cintura até o chão
+      const geoTiras = uma('tiras', () => {
+        const l = [], r = NS.rng(77);
+        for (let i = 0; i < 30; i++) {
+          const a = (i / 30) * PI * 2 + (r() - .5) * .2, y0 = i % 3 === 0 ? 1.58 : i % 3 === 1 ? 1.2 : .9, r0 = y0 > 1.5 ? .32 : y0 > 1 ? .3 : .34, comp = y0 - .02 + r() * .1;
+          const pts = []; for (let k = 0; k <= 5; k++) { const t = k / 5, rr = r0 + t * (.2 + r() * .08) + (y0 > 1.5 ? .03 : 0); pts.push([Math.sin(a + (r() - .5) * .1) * rr, y0 - t * comp, Math.cos(a) * rr * .9 - .02]); }
+          l.push(fita(pts, t => (.06 + r() * .05) * (1 - t * .3), { seg: 12, normal: P => V(P.x, 0, P.z) }));
+        }
+        return juntar(l);
+      });
+      malha(corpo, geoTiras, tiraM);
+
+      /* ---------- esqueleto à mostra: crânio, coluna e costelas ---------- */
+      const pesc = grupo(peito, 0, .24, .0), cab = grupo(pesc, 0, .2, .03);
+      // capuz: concha aberta na frente, pontudo atrás
+      const capuz = grupo(cab, 0, .01, -.03);
+      malha(capuz, uma('capuz', () => casca([[-.16, .18, .19, .0], [-.06, .16, .19, .01], [.05, .15, .18, .0], [.13, .13, .16, -.02], [.2, .09, .11, -.05], [.26, .03, .04, -.09]], { seg: 32, abertura: 1.35, deform: (x, y, z) => [x * (1 + .04 * Math.sin(y * 30)), y, z + (z > .05 ? .015 * Math.sin(x * 40) : 0)] })), manto);
+      malha(capuz, uma('capuzDentro', () => mover(new T.SphereGeometry(.13, 16, 12), 0, .02, -.05, 0, 0, 0, 1, 1.15, 1)), fundo);
+      malha(pesc, uma('cervical', () => { const l = []; for (let i = 0; i < 5; i++) l.push(mover(new T.CylinderGeometry(.024, .026, .03, 8), 0, i * .04 - .02, 0)); return juntar(l); }), osso);
+      // crânio alongado e magro, maçãs fundas; mandíbula separada (abre e fecha)
+      const geoCr = uma('cranio', () => deform(new T.SphereGeometry(.095, 28, 20), (x, y, z) => {
+        let k = 1; if (z > 0) [-1, 1].forEach(sx => { k -= bump(x, sx * .034, .02) * bump(y, .005, .022) * .3; });
+        const queixo = y < -.03 ? 1 - Math.min(.4, (-.03 - y) * 6) : 1, tempora = Math.abs(x) > .06 && y > -.02 && y < .04 ? .94 : 1;
+        const malar = z > .03 && y < -.005 && y > -.045 ? bump(Math.abs(x), .052, .018) * .012 : 0;
+        return [x * .84 * k * queixo * tempora + Math.sign(x) * malar, y * 1.2, z * 1.05 * k + (y < -.04 && z > 0 ? .012 : 0) - (z > 0 ? bump(y, -.035, .012) * bump(x, 0, .012) * .02 : 0)];
+      }));
+      malha(cab, geoCr, cranioM);
+      const mand = grupo(cab, 0, -.06, .0);
+      malha(mand, uma('mandibula', () => deform(new T.SphereGeometry(.07, 18, 10, 0, PI * 2, PI * .45, PI * .55), (x, y, z) => [x * .95, y * .7 - .015, z * 1.15 + .02])), cranioM);
+      // dentes: arcada de cima no crânio, a de baixo na mandíbula
+      const geoDentes = uma('dentes', () => { const l = []; for (let i = 0; i < 10; i++) { const a = (i - 4.5) * .17; l.push(mover(new T.BoxGeometry(.011, .017, .01), Math.sin(a) * .052, 0, Math.cos(a) * .052, 0, a, 0)); } return juntar(l); });
+      malha(cab, geoDentes, osso).position.set(0, -.068, .03);
+      malha(mand, geoDentes, osso).position.set(0, -.014, .035);
+      // brilho fraco no fundo das órbitas
+      const brO = [-1, 1].map(sx => halo(cab, '#d8e0ff', .05, sx * .033, .005, .085, .25));
+      // coluna e costelas (o peito aberto do manto)
+      malha(tronco, uma('coluna', () => { const l = []; for (let i = 0; i < 16; i++) { const y = .1 + i * .062; l.push(mover(new T.CylinderGeometry(.022, .024, .04, 8), 0, y, -.06 + Math.sin(i * .3) * .01)); l.push(mover(new T.BoxGeometry(.012, .03, .04), 0, y, -.09)); } return juntar(l); }), osso);
+      malha(peito, uma('costelas', () => {
+        const l = [];
+        for (let i = 0; i < 8; i++) {
+          const y = -.42 + i * .068, w = .1 + Math.sin((i + 1) / 9 * PI) * .085, d = .1 + Math.sin((i + 1) / 9 * PI) * .05, cai = .05;
+          [-1, 1].forEach(sx => l.push(tubo([[sx * .02, y, -.05], [sx * w * .9, y - cai * .3, -.04], [sx * w, y - cai * .7, .03], [sx * w * .7, y - cai, .09], [sx * .025, y - cai * .8 - .02, d]], t => .012 - t * .003, { seg: 12, rad: 5 })));
+        }
+        l.push(mover(new T.BoxGeometry(.03, .28, .015), 0, -.24, .095));
+        // clavículas e ombros (cabeças do úmero)
+        [-1, 1].forEach(sx => { l.push(tubo([[sx * .02, .08, .04], [sx * .12, .1, .03], [sx * .21, .09, -.01]], .012, { seg: 8, rad: 5 })); });
+        return juntar(l);
+      }), osso);
+      // sombra dentro do peito (o fundo das costelas é escuro)
+      malha(peito, uma('vazioPeito', () => mover(new T.SphereGeometry(.15, 12, 10), 0, -.2, -.02, 0, 0, 0, 1, 1.6, .7)), fundo);
+
+      /* ---------- braços de osso em mangas rasgadas ---------- */
+      const bracos = [-1, 1].map(k => {
+        const ombro = grupo(peito, k * .22, .07, -.01), braco = grupo(ombro), cot = grupo(braco, 0, -.31, 0), mao = grupo(cot, 0, -.29, 0);
+        malha(braco, uma('umero', () => juntar([torneado(t => .016 + .01 * bump(t, 0, .1) + .01 * bump(t, 1, .08), .31, 14, 8), mover(new T.SphereGeometry(.03, 10, 8), 0, 0, 0)])), osso);
+        malha(cot, uma('ulna', () => juntar([mover(torneado(t => .011 + .006 * bump(t, 0, .1) + .006 * bump(t, 1, .1), .29, 12, 7), -.012, 0, 0), mover(torneado(t => .009 + .006 * bump(t, 1, .1), .29, 12, 7), .012, 0, .006), mover(new T.SphereGeometry(.024, 10, 8), 0, 0, 0)])), osso);
+        // manga larga e rasgada pendurada do braço
+        malha(braco, uma('manga', () => deform(new T.CylinderGeometry(.055, .1, .34, 16, 6, true), (x, y, z) => [x * (1 + .1 * Math.sin(y * 20 + x * 30)), y - .15 - (y < 0 ? Math.abs(Math.sin(Math.atan2(x, z) * 5)) * .06 : 0), z * (1 + .08 * Math.cos(y * 17))])), tiraM);
+        // mão de osso: cinco dedos longos fechados no cabo
+        const m = grupo(mao);
+        malha(m, uma('mao', () => { const l = [mover(new T.BoxGeometry(.05, .06, .02), 0, -.03, 0)]; for (let i = 0; i < 4; i++) { const x0 = -.018 + i * .012; l.push(tubo([[x0, -.06, 0], [x0, -.1, .02], [x0, -.115, .05], [x0, -.1, .07]], .0055, { seg: 8, rad: 4 })); } l.push(tubo([[.025, -.02, .01], [.04, -.05, .04], [.03, -.07, .065]], .006, { seg: 6, rad: 4 })); return juntar(l); }), osso);
+        return { ombro, braco, cot, mao, k, Lb: .31, La: .29 };
+      });
+
+      /* ---------- cajado com espiral e foice ---------- */
+      // o cajado fica no espaço do peito (as mãos pegam pontos dele): de baixo à esquerda dele até o alto à direita
+      const cajado = grupo(peito, .02, -.2, .26), cajadoG = grupo(cajado);
+      const BASE = V(.48, -1.15, .02), TOPO = V(-.45, 1.12, -.08), DIR = TOPO.clone().sub(BASE), LC = DIR.length(); DIR.normalize();
+      cajadoG.position.copy(BASE); cajadoG.quaternion.setFromUnitVectors(V(0, 1, 0), DIR);
+      malha(cajadoG, uma('pau', () => tubo([[0, 0, 0], [.02, LC * .25, .01], [-.015, LC * .5, -.01], [.02, LC * .75, .015], [0, LC, 0]], t => .021 - t * .005 + .006 * bump(t, .3, .03) + .007 * bump(t, .62, .03) + .006 * bump(t, .85, .025), { seg: 40, rad: 8 })), pauM);
+      // galhos de espinho enrolados no cajado
+      malha(cajadoG, uma('galhos', () => {
+        const l = [], r = NS.rng(9);
+        for (let v = 0; v < 2; v++) { const pts = []; for (let k = 0; k <= 30; k++) { const t = .35 + k / 30 * .62, a = t * 22 + v * PI; pts.push([Math.cos(a) * .03, t * LC, Math.sin(a) * .03]); } l.push(tubo(pts, .006, { seg: 60, rad: 4 })); }
+        for (let i = 0; i < 26; i++) { const t = .4 + r() * .58, a = r() * PI * 2; l.push(mover(new T.ConeGeometry(.006, .05 + r() * .04, 4), Math.cos(a) * .04, t * LC, Math.sin(a) * .04, Math.sin(a) * 1.3, 0, -Math.cos(a) * 1.3)); }
+        return juntar(l);
+      }), espinhoM);
+      // espiral no alto: disco luminoso girando, aro de osso com pontas em volta
+      const esp = grupo(cajadoG, 0, LC * .9, 0); esp.quaternion.copy(cajadoG.quaternion).invert();   // fica de frente
+      const espDisco = semSombra(malha(esp, uma('espDisco', () => new T.PlaneGeometry(.5, .5)), espM)); espDisco.position.z = .02;
+      malha(esp, uma('espNucleo', () => new T.SphereGeometry(.035, 14, 10)), nucleoM);
+      malha(esp, uma('espAro', () => { const l = [mover(new T.TorusGeometry(.13, .012, 6, 28), 0, 0, 0)]; for (let i = 0; i < 9; i++) { const a = i / 9 * PI * 2, c = i % 2 ? .28 : .2; l.push(mover(new T.ConeGeometry(.012, c, 5), Math.cos(a) * (.13 + c / 2), Math.sin(a) * (.13 + c / 2), 0, 0, 0, a - PI / 2)); } return juntar(l); }), osso);
+      const espHalo = halo(esp, '#c8d8ff', 1.3, 0, 0, .03, .7), espHalo2 = halo(esp, '#ffffff', .35, 0, 0, .05, .9);
+      // lâmina: crescente longa que sai do topo e se curva por cima da cabeça
+      const lam = grupo(cajadoG, 0, LC * .985, 0);
+      malha(lam, uma('lamina', () => {
+        const sh = new T.Shape(), N = 24, pts = [];
+        for (let i = 0; i <= N; i++) { const t = i / N, a = t * 1.6; pts.push([Math.sin(a) * 1.0 * (1 - t * .1), Math.cos(a) * .55 - .55 + t * .08]); }
+        sh.moveTo(0, .03); pts.forEach(([x, y], i) => sh.lineTo(x * 1.05, y + .05 + (1 - i / N) * .04));
+        for (let i = N; i >= 0; i--) { const [x, y] = pts[i], t = i / N; sh.lineTo(x * .98 - .02 * (1 - t), y - .07 * (1 - t) * (1 - t) - .012); }
+        const ge = new T.ExtrudeGeometry(sh, { depth: .012, bevelEnabled: true, bevelThickness: .004, bevelSize: .006, bevelSegments: 1, curveSegments: 4 });
+        const p = ge.attributes.position, uv = ge.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i), (p.getY(i) + .1) * 6);
+        ge.translate(0, 0, -.006); ge.computeVertexNormals(); return ge;
+      }), laminaM);
+      lam.quaternion.copy(cajadoG.quaternion).invert(); lam.rotateY(-.35); lam.rotateZ(.12); lam.scale.setScalar(1.15);
+      // virola de osso na junção da lâmina
+      malha(lam, uma('virola', () => juntar([mover(new T.CylinderGeometry(.035, .03, .09, 10), 0, -.02, 0), mover(new T.TorusGeometry(.034, .008, 5, 12), 0, .02, 0, PI / 2, 0, 0)])), osso);
+
+      /* ---------- quatro pernas de osso com garras (é nelas que ele anda) ---------- */
+      const geoFemur = uma('femur', () => juntar([torneado(t => .024 + .02 * bump(t, 0, .08) + .024 * bump(t, 1, .07) - .005 * Math.sin(t * PI), .55, 16, 8), mover(new T.SphereGeometry(.04, 10, 8), 0, 0, 0), mover(new T.SphereGeometry(.03, 8, 6), .02, -.56, -.02)]));
+      const geoTibia = uma('tibia', () => juntar([torneado(t => .019 + .016 * bump(t, 0, .08) + .008 * bump(t, 1, .1), .72, 16, 8), mover(torneado(t => .009 + .005 * bump(t, 1, .1), .7, 10, 6), .018, -.01, .0), mover(new T.SphereGeometry(.034, 10, 8), 0, 0, 0)]));
+      const geoGarra = uma('garra', () => { const l = [mover(new T.SphereGeometry(.03, 8, 6), 0, 0, 0)]; for (let i = 0; i < 3; i++) { const a = (i - 1) * .55; l.push(tubo([[0, 0, 0], [Math.sin(a) * .05, -.01, Math.cos(a) * .05], [Math.sin(a) * .1, -.03, Math.cos(a) * .09], [Math.sin(a) * .13, -.06, Math.cos(a) * .1]], t => .011 * (1 - t * .85), { seg: 8, rad: 5 })); } l.push(tubo([[0, 0, 0], [0, .0, -.05], [0, -.03, -.08]], t => .009 * (1 - t * .8), { seg: 5, rad: 4 })); return juntar(l); });
+      const PERNAS = [[-1, .5], [1, .5], [-1, -.55], [1, -.55]].map(([sx, fz], i) => {
+        const ombro = grupo(tronco, sx * .22, -.18, fz * .2), braco = grupo(ombro), cot = grupo(braco, 0, -.55, 0), pe = grupo(cot, 0, -.72, 0);
+        malha(braco, geoFemur, osso); malha(cot, geoTibia, osso); malha(pe, geoGarra, ossoEsc);
+        // pé apoiado: x e z no espaço do corpo (fora da barra do manto)
+        return { ombro, braco, cot, pe, Lb: .55, La: .72, sx, fz, px: sx * .74, pz: fz * .6 + .05, fase: i === 0 || i === 3 ? 0 : .5, lev: 0 };
+      });
+
+      /* ---------- fumaça em volta da barra ---------- */
+      const FUM = [];
+      for (let i = 0; i < 10; i++) { const m = F.guardar(new T.SpriteMaterial({ map: texFumaca, color: new T.Color('#101210'), transparent: true, opacity: 0, depthWrite: false })); const sp = new T.Sprite(m); G.add(sp); FUM.push({ sp, m, vida: i / 10 * 3, dur: 3, a: i * 2.4 }); }
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.6, revelar: 2.4, ritual: 3.8, conjurar: 1.6 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0, vCorre: 2.6 });
+      let giroEsp = 0, faseP = 0;
+      const W = V(), Gr = V(), Gr2 = V(), Lc = V();
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0, kA = sm(mv.k);
+        const sobe = tipo === 'ataque' ? sino(k, .0, .3, .45) : 0, corte = tipo === 'ataque' ? sino(k, .3, .5, 1) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .05, .6) : 0, nasce = tipo === 'revelar' ? sm((k - .1) / .5) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .8 : 0;
+        sombra.material.opacity = .6 * (.4 + .6 * nasce);
+        Um.uT.value = t; Um.uDrag.value = kA * Math.min(1.4, .4 + mv.vEf * .45); Um.uAbre.value = eRev * .6 + corte * .2;
+        // corpo: paira, inclina um pouco para frente ao andar, oscila nos passos das pernas
+        faseP += mv.avanco(dt, 1.1);
+        const passo = Math.sin(faseP * 2) * .02 * kA;
+        corpo.position.set(0, .02 + Math.sin(t * .9) * .015 + passo - (1 - nasce) * .6, 0);
+        corpo.scale.setScalar(.6 + .4 * nasce);
+        corpo.rotation.set(.17 + kA * .06 - sobe * .06 + corte * .12, Math.sin(t * .23) * .04 + (corte - sobe) * .25, Math.max(-.12, Math.min(.12, -mv.giro * mv.vEf * .04)) * kA);
+        pesc.rotation.set(-.12 + Math.sin(t * .5) * .04 + mv.op * .3, mv.oy * .3 + Math.sin(t * .31) * .1, Math.sin(t * .4) * .05);
+        mand.rotation.x = .12 + Math.max(0, Math.sin(t * .8)) * .06 + sobe * .3 + eRev * .35;
+        // cajado: balança devagar (a foice pendula); ataque: ergue por cima do ombro e corta em arco à frente
+        cajado.rotation.set(Math.sin(t * .6) * .04 + sobe * -.5 + corte * 1.1 - eRit * .25, Math.sin(t * .37) * .05 + sobe * -.7 + corte * 1.3, Math.sin(t * .5 + 1) * .05 - eRit * .5 + sobe * .3);
+        cajado.position.set(.02 - eRit * .12, -.2 + sobe * .25 + eRit * .25, .26 + corte * .15);
+        cajado.updateMatrix(); cajadoG.updateMatrix();
+        // as mãos pegam o cajado: a de cima (direita) no alto do cabo, a de baixo no meio
+        Gr.copy(DIR).multiplyScalar(LC * .78).add(BASE).applyMatrix4(cajado.matrix);
+        Gr2.copy(DIR).multiplyScalar(LC * .42).add(BASE).applyMatrix4(cajado.matrix);
+        ik(bracos[0], Gr.x, Gr.y + .02, Gr.z - .02, -.6, -.4, -.5);
+        ik(bracos[1], Gr2.x, Gr2.y + .02, Gr2.z - .02, .8, -.3, -.4);
+        bracos.forEach(b => { b.mao.rotation.set(.2, 0, b.k * .3); });
+        // espiral: gira sempre; acelera e cresce no ataque, na revelação e no ritual
+        giroEsp += dt * (1.2 + corte * 6 + eRev * 9 + eRit * 4);
+        espDisco.rotation.z = -giroEsp; espDisco.scale.setScalar(1 + eRit * .7 + corte * .3 + eRev * .5 + Math.sin(t * 2) * .04);
+        espHalo.material.opacity = Math.min(1, .62 + .15 * Math.sin(t * 1.7) + corte * .4 + eRit * .4 + eRev * .3); espHalo.scale.setScalar(1.3 + eRit * .9 + corte * .4 + Math.sin(t * 2.3) * .06); espHalo2.material.opacity = .75 + .2 * Math.sin(t * 3.1);
+        nucleoM.emissiveIntensity = 2.4 + Math.sin(t * 2.2) * .4 + corte * 2 + eRit * 2;
+        brO.forEach(b => { b.material.opacity = .18 + .1 * Math.sin(t * 1.3) + corte * .5 + eRev * .6; });
+        // pernas de osso: passos alternados em diagonal (trás e frente cruzadas); paradas, tamborilam as garras
+        const passoL = .34 * Math.min(1.3, .5 + mv.vEf * .5);
+        PERNAS.forEach((p, i) => {
+          const fs = (faseP / (PI * 2) + p.fase) % 1, apoio = fs < .62;
+          let z = p.pz, y = 0, x = p.px;
+          if (kA > .01) {
+            const u = apoio ? fs / .62 : (fs - .62) / .38;
+            const dz = apoio ? (.5 - u) * passoL : (-.5 + sm(u)) * passoL;
+            z += dz * kA; y = apoio ? 0 : Math.sin(u * PI) * .14 * kA;
+          }
+          // tique parado: uma garra de cada vez bate no chão
+          const bat = (1 - kA) * Math.max(0, Math.sin(t * 2.1 + i * 1.7)) ** 8 * .06;
+          y += bat + eRev * .15 * Math.sin(k * 20 + i);
+          // alvo no espaço do tronco (as pernas estão nele): compensa a altura e a escala do corpo
+          const sc = corpo.scale.x, ty = (y - corpo.position.y) / sc - tronco.position.y;
+          ik(p, x / sc, ty, z / sc, p.sx * 1, .7, p.fz * .4);
+          p.pe.rotation.set(0, p.fz > 0 ? 0 : PI, 0);
+        });
+        // fumaça: sobe da barra e some (de longe, só três)
+        const nv = ret.nivelLOD || 0;
+        FUM.forEach((f, i) => {
+          f.vida += dt * (1 + eRev * 3);
+          if (f.vida >= f.dur) { f.vida = 0; f.a += 2.39; }
+          const q = f.vida / f.dur, rr = .45 + q * .5 + eRev * .6;
+          f.sp.position.set(Math.sin(f.a) * rr, .1 + q * (1.1 + eRev), Math.cos(f.a) * rr - kA * q * .6);
+          f.sp.scale.setScalar(.5 + q * .9 + eRev * .5);
+          f.m.opacity = (nv >= 2 && i > 2 ? 0 : 1) * Math.sin(q * PI) * (.32 + eRev * .18); f.m.rotation = f.a + q;
+        });
+      };
+      const ret = { g, alt: 3.35, raioBase: 1.1, anim, acao: tipo => ac.disparar(tipo) };
+      anim(0, 0, false);
+      return ret;
     },
   };
 })();
@@ -6952,7 +9223,10 @@
       /* ---------- animação ---------- */
       const A = acoes();
       let fase = 0, tPulo = 2.5, pulo = 0, puloSem = 0, tGrito = .5, quem = 0, tTique = 1;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.6 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         A.passo(dt);
         const atq = A.ativo('ataque') ? A.k : -1, rev = A.ativo('revelar') ? A.k : -1;
         U.uT.value = t; nuc.pulso(t, dt);
@@ -6980,7 +9254,7 @@
         POSE.forEach((Q, i) => {
           const B = Q.B, o = Math.sin(t * (.6 + i * .13) + i * 2);
           let rz = Q.z + o * .08, rx = Q.x + Math.sin(t * .5 + i) * .06, cx = Q.cx + o * .1, cz = Q.cz;
-          if (andando) { const q = Math.sin(fase + i * 1.7); rx += q * .25; cx += q * .15; }
+          if (kA > .01) { const q = Math.sin(fase + i * 1.7) * kA; rx += q * .25; cx += q * .15; }
           if (atq >= 0 && i < 2) {
             // golpe cruzado: os dois braços sobem, depois cortam para a frente e para baixo
             const sobe = sino(atq, 0, .3, .5), corta = janela(atq, .3, .5) * (1 - janela(atq, .75, 1));
@@ -6993,12 +9267,12 @@
         });
         // andar aos trancos: avança em arrancos e o corpo se desfaz e se refaz
         let des = 0;
-        if (andando) {
-          fase += dt * (Math.sin(t * 7) > -.2 ? 7 : 0.5); const fq = Math.floor(fase * 2.2) / 2.2, a = Math.sin(fq);
+        if (kA > .01) {
+          fase += mv.ritmo(dt, Math.sin(t * 7) > -.2 ? 7 : 0.5, 1.6); const fq = Math.floor(fase * 2.2) / 2.2, a = Math.sin(fq) * kA;
           pernas[0].p.rotation.x = a * .45; pernas[1].p.rotation.x = -a * .45;
           pernas[0].joe.rotation.x = Math.max(0, -a) * .6 + .05; pernas[1].joe.rotation.x = Math.max(0, a) * .6 + .05;
-          fig.position.y = Math.abs(Math.cos(fq)) * .03; tronco.rotation.y = a * .1; tronco.rotation.z = Math.sin(fq * .5) * .06;
-          des = .12 + .3 * Math.max(0, Math.sin(t * 4.3)) * Math.max(0, Math.sin(t * 1.9));
+          fig.position.y = Math.abs(Math.cos(fq)) * .03 * kA; tronco.rotation.y = a * .1; tronco.rotation.z = Math.sin(fq * .5) * .06 * kA + bank;
+          des = (.12 + .3 * Math.max(0, Math.sin(t * 4.3)) * Math.max(0, Math.sin(t * 1.9))) * kA;
         } else {
           pernas.forEach((Pn, i) => { Pn.p.rotation.x *= .9; Pn.joe.rotation.x = .08 + i * .06; Pn.p.rotation.z = Pn.sx * .04; Pn.pe.rotation.y = Pn.sx * .25; });
           fig.position.y *= .9; tronco.rotation.y = Math.sin(t * .4) * .06; tronco.rotation.z = Math.sin(t * .31) * .04;
@@ -7580,13 +9854,16 @@
       const ra = K.rngDe(K.semente + 31), des = ra() * 10;
       let modo = 'emerso', af = 0, ritmo = 0, fase = 0, escuta = 0, prox = 2, acao = null;
       const ap = (o, k2, v, vel, dt) => { o[k2] += (v - o[k2]) * Math.min(1, dt * vel); };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.9 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         if (!sombraOk) { sombraOk = true; placaP.castShadow = false; chao.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); }
         const tt = t + des;
-        ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 3);
+        ritmo = kA;
         const alvoAf = modo === 'submerso' ? 1.15 : andando ? 1 : 0;
         af += (alvoAf - af) * Math.min(1, dt * 2.2);
-        if (andando) fase += dt * 3.2;
+        fase += mv.ritmo(dt, 3.2, .9);
         // ação única por cima de tudo
         let ax = 0, ay = 0, az = 0, ayaw = 0, aroll = 0, boca = 0, pescUp = 0, chaoA = 0, ext = 0;
         if (acao) {
@@ -7617,7 +9894,7 @@
         // afunda: meio corpo some no concreto e ondula como quem nada
         const nada = af * (Math.sin(fase * 1.1) * .06);
         corpo.position.set(ax, -af * .92 + nada + ay, az + ritmo * Math.sin(fase * 2.2) * .03);
-        corpo.rotation.set(af * .06 + ritmo * Math.sin(fase * 1.1) * .05, ayaw + ritmo * Math.sin(fase * 1.1) * .08, aroll + ritmo * Math.sin(fase * 1.1 + 1) * .05);
+        corpo.rotation.set(af * .06 + ritmo * Math.sin(fase * 1.1) * .05, ayaw + ritmo * Math.sin(fase * 1.1) * .08, aroll + ritmo * Math.sin(fase * 1.1 + 1) * .05 + bank);
         // chão: aparece com o afundamento e na revelação
         const vis = cl(Math.max(af, chaoA));
         mChao.opacity = vis; placa.visible = ent.visible = vis > .02;
@@ -8008,7 +10285,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.35 : 1.9 }; };
       const ei0 = mOlho.emissiveIntensity;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.3 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const tt = t + des;
         // pesos das ações: agachar, bote, encolhida (revelar), erguida com urro
         let agA = 0, bote = 0, enc = 0, urro = 0, vel = 7;
@@ -8035,8 +10315,8 @@
         abre = abre * (1 - acaoK) + acaoK * (agA * .2 + bote * 1.45 + enc * .1 + urro * 1.5) + (bote + urro > .6 ? Math.sin(tt * 38) * .06 : 0);
         maxila.rotation.x = -.15 - abre * .45; mand.rotation.x = .15 + abre * .6;
         mOlho.emissiveIntensity = ei0 * (1 + urro * 1.6 + bote * .8) * (enc > .5 ? .25 : 1);
-        ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 4);
-        if (andando) fase += dt * 4.2;
+        ritmo = kA;
+        fase += mv.ritmo(dt, 4.2, 1.3);
         const sn = Math.sin(fase), R = ritmo;
         pernas.forEach((p, i) => {
           const s2 = i ? -sn : sn, lev = Math.max(0, Math.sin(fase + (i ? Math.PI : 0) + 1.3));
@@ -8048,7 +10328,7 @@
         // os dedos dos pés ficam no chão (o corpo ampliado sobe um pouco); o resto em escala
         corpo.position.y = (.08 - R * Math.abs(Math.cos(fase)) * .05 + (1 - R) * resp * .008 - agA * .12 - enc * .16 + bote * .05) * ESCALA;
         corpo.position.z = (bote * .38 - agA * .05) * ESCALA;
-        corpo.rotation.z = R * sn * .05 + (1 - R) * Math.sin(tt * .9) * .025 + tremeU * .3;
+        corpo.rotation.z = R * sn * .05 + (1 - R) * Math.sin(tt * .9) * .025 + tremeU * .3 + bank;
         peito.rotation.x = .84 + R * .1 + Math.sin(tt * 2.4) * .015 + agA * .3 + bote * .32 + enc * .55 - urro * .32; peito.rotation.y = (-R * sn * .12 + (1 - R) * cr[0] * .15) * livre;
         bracos.forEach((b, i) => {
           const s2 = i ? sn : -sn, tique = Math.sin(tt * 11 + i * 3) > .96 ? .25 : 0;
@@ -8345,7 +10625,10 @@
 
       /* ---------- animação ---------- */
       let fase = 0, tGrao = 0, tRisco = 0, tPoeira = 0, ativo = 0, tAtivo = 0, inc = 0, alvoInc = 0, tInc = 2;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.6 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         if (!sombraOk) { sombraOk = true; aplicar(visivel); } // o site liga as sombras depois de criar
         let atq = 0, rev = 0, u = 0;
         if (ac) { ac.t += dt; u = ac.t / ac.dur; if (u >= 1) ac = null; else if (ac.tipo === 'ataque') atq = 1; else rev = 1; }
@@ -8381,7 +10664,7 @@
         const pulso = Math.sin(Math.min(1, tAtivo / 2.6) * Math.PI);
         extras.forEach(E => {
           const meu = E.i === ativo ? pulso : 0, sx = E.sx, cima = E.i < 2;
-          const passo = andando ? Math.sin(fase + E.i * 1.6) * .18 : 0;
+          const passo = Math.sin(fase + E.i * 1.6) * .18 * kA;
           E.o.rotation.z = sx * (E.aO + meu * .35 + prep * .3 - bote * (cima ? .55 : .2) + passo * .5);
           E.o.rotation.y = -sx * (E.giro * .6 + meu * .25 + prep * -.3 + bote * 1.05) + passo;
           E.c.rotation.z = sx * (E.aC - meu * .4 + prep * -.3 + bote * (cima ? 1.15 : .75));
@@ -8390,16 +10673,16 @@
         });
         // braços normais pendurados, dedos que se mexem
         bracos.forEach((B, i) => {
-          B.o.rotation.z = B.sx * (.1 + Math.sin(t * .4 + i * 2) * .02 + bote * .25); B.o.rotation.x = (andando ? Math.sin(fase + i * Math.PI) * .12 : 0) - bote * .6;
+          B.o.rotation.z = B.sx * (.1 + Math.sin(t * .4 + i * 2) * .02 + bote * .25); B.o.rotation.x = Math.sin(fase + i * Math.PI) * .12 * kA - bote * .6;
           B.c.rotation.x = -.15 - bote * .4;
           B.dedos.forEach((d, j) => { d.rotation.z = -B.sx * (.15 + Math.max(0, Math.sin(t * 1.3 - j * .7 + i * 2)) * .35); });
         });
         // andar deslizando: passos longos, sem sacudir o corpo
-        if (andando) {
-          fase += dt * 1.9; const a = Math.sin(fase);
+        if (kA > .01) {
+          fase += mv.ritmo(dt, 1.9, .6); const a = Math.sin(fase) * kA;
           pernas[0].p.rotation.x = a * .32; pernas[1].p.rotation.x = -a * .32;
-          pernas[0].j.rotation.x = Math.max(0, Math.sin(fase - .8)) * .25; pernas[1].j.rotation.x = Math.max(0, Math.sin(fase - .8 + Math.PI)) * .25;
-          corpo.position.y = .02 + Math.sin(t * .8) * .01; tronco.rotation.y = a * .05;
+          pernas[0].j.rotation.x = Math.max(0, Math.sin(fase - .8)) * .25 * kA; pernas[1].j.rotation.x = Math.max(0, Math.sin(fase - .8 + Math.PI)) * .25 * kA;
+          corpo.position.y = (.02 + Math.sin(t * .8) * .01) * kA; tronco.rotation.y = a * .05; tronco.rotation.z = bank;
         } else {
           pernas.forEach(P => { P.p.rotation.x *= .92; P.j.rotation.x *= .92; }); corpo.position.y *= .95; tronco.rotation.y = Math.sin(t * .2) * .04;
         }
@@ -8754,11 +11037,14 @@
       const ac = acoes({ ataque: 1.3, revelar: 2.0 });
       const brilho = halo(g, '#ff3ab0', 2.6, 0, 1.3, 0); brilho.material.opacity = .12;
       let desl = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.2 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const A = ac.passo(dt);
         const atk = A && A.tipo === 'ataque' ? A.k : -1, rev = A && A.tipo === 'revelar' ? A.k : -1;
         const eAtk = atk >= 0 ? env(atk, .18, .6) : 0;
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 3);
+        desl = kA * Math.min(1.6, .55 + mv.vEf / 3.2);
         // desfaz e refaz: ao andar pulsa entre inteira e espalhada; na revelação começa espalhada e se junta
         let espalha = desl * (.5 + .5 * Math.sin(t * 3.2)) * .8;
         if (rev >= 0) espalha = Math.max(espalha, 1 - sm(rev / .8));
@@ -8770,7 +11056,7 @@
         brilhos.forEach((b, i) => { b.material.opacity = (.55 + Math.sin(t * 2.7 + i) * .15 + eAtk * .3) * acendeRosto * forma; });
         // corpo: flutua, balança devagar, inclina ao andar e ao atacar
         corpo.position.set(0, .06 + Math.sin(t * 1.1) * .05 + (rev >= 0 ? -.2 * (1 - sm(rev)) : 0), eAtk * .15);
-        corpo.rotation.set(desl * .15 + eAtk * .2, Math.sin(t * .3) * .1 + (rev >= 0 ? (1 - sm(rev)) * 3 : 0), Math.sin(t * .47) * .04);
+        corpo.rotation.set(desl * .15 + eAtk * .2 + ace, Math.sin(t * .3) * .1 + (rev >= 0 ? (1 - sm(rev)) * 3 : 0), Math.sin(t * .47) * .04 + bank);
         corpo.scale.setScalar(1 + espalha * .15);
         pesc.rotation.set(Math.sin(t * .7) * .06 - eAtk * .1, Math.sin(t * .43) * .15, .1 + Math.sin(t * .53) * .08);
         texS.offset.y = (texS.offset.y - dt * .45) % 1; texC.offset.y = (texC.offset.y - dt * .2) % 1;
@@ -8847,6 +11133,498 @@
       };
       anim(0, 0, false);
       return { g, alt: 2.2, raioBase: .55, anim, acao: tipo => ac.disparar(tipo) };
+    },
+  };
+})();
+
+/* ===== forma: freira_cranio_equino ===== */
+/* freira_cranio_equino.js · forma: freira altíssima e magra (cerca de 3,5 m) num hábito preto gasto até o chão,
+   véu preto e faixa branca na testa. No lugar do rosto, um crânio comprido de cavalo, pálido, de focinho caído e
+   dentes à mostra, com cinco olhos roxos em fendas de losango (três grandes na testa e dois pequenos dos lados).
+   Pescoço longo e enrugado; cabelo preto muito comprido caindo pela frente e pelas costas. Braços longos e pálidos
+   saindo das mangas de punho encardido, mãos de dedos compridos; cruz invertida pendurada no peito.
+   Cabelo preto com mechas brancas, longuíssimo; braços compridos demais, as mãos passam dos joelhos.
+   Formato: ACF3D.formasFilho.freira_cranio_equino = { nome, criar(F, s) → { g, alt, raioBase, anim, acao, estado } }
+   acao('ataque') (ou 'atacar'): estica o pescoço e avança a cabeça com a boca aberta, as mãos se lançam à frente.
+   acao('revelar'): desdobra-se de curvada até a altura toda e os cinco olhos abrem juntos.
+   acao('ritual') / acao('conjurar'): ergue os braços, joga a cabeça para trás, os olhos ardem.
+   estado('curvada'): curva o pescoço e o tronco para caber em corredores e portas (≈ 2,6 m). estado('ereta') (padrão). */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).freira_cranio_equino = {
+    nome: 'Freira altíssima de crânio de cavalo e olhos roxos',
+    criar: (F, s) => {
+      const K = kit(F, 'freira_cranio_equino'), { sombraContato, semSombra, T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, acoes, env, sino } = K;
+      const g = grupo(null);
+      sombraContato(g, .75, .6);
+
+      /* ---------- texturas ---------- */
+      const texHabito = texP('habito', 512, 512, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#141214'); gr.addColorStop(.75, '#1a1716'); gr.addColorStop(1, '#3a332c'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 220; i++) { const x0 = r() * w; x.strokeStyle = r() < .6 ? `rgba(0,0,0,${.2 + r() * .2})` : `rgba(80,74,70,${.05 + r() * .08})`; x.lineWidth = 2 + r() * 9; x.beginPath(); x.moveTo(x0, r() * h * .2); x.bezierCurveTo(x0 + (r() - .5) * 12, h * .4, x0 + (r() - .5) * 12, h * .7, x0 + (r() - .5) * 18, h); x.stroke(); }
+        // barra encardida de poeira e lama
+        for (let i = 0; i < 80; i++) { const gx = r() * w, gy = h * (.8 + r() * .2), g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 8 + r() * 30); g2.addColorStop(0, 'rgba(110,96,80,.35)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 40, gy - 40, 80, 80); }
+        for (let i = 0; i < 5000; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '140,130,120'},${r() * .05})`; x.fillRect(r() * w, r() * h, 1, 2); }
+      });
+      const alfaHabito = texP('habitoA', 256, 256, (x, w, h, r) => { x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.fillStyle = '#000'; for (let x0 = -2; x0 < w + 2;) { const lw = 3 + r() * 9, l = h * (.01 + r() * .06); x.beginPath(); x.moveTo(x0, h + 1); x.lineTo(x0 + lw * .5, h - l); x.lineTo(x0 + lw, h + 1); x.fill(); x0 += lw + 2 + r() * 14; } }, { linear: true });
+      // pele pálida acinzentada com rugas e manchas (pescoço, braços, mãos)
+      const texPele = texP('pele', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#b8b0a6'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 90; i++) { x.strokeStyle = `rgba(70,60,56,${.2 + r() * .3})`; x.lineWidth = .8 + r() * 1.6; x.beginPath(); const y0 = r() * h; x.moveTo(0, y0); x.bezierCurveTo(w * .3, y0 + (r() - .5) * 8, w * .7, y0 + (r() - .5) * 8, w, y0 + (r() - .5) * 8); x.stroke(); }
+        for (let i = 0; i < 40; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 5 + r() * 20); g2.addColorStop(0, r() < .5 ? 'rgba(120,100,100,.3)' : 'rgba(230,225,215,.25)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 30, gy - 30, 60, 60); }
+        for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(${r() < .5 ? '40,30,30' : '255,250,240'},${r() * .06})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      }, { rep: [1, 2] });
+      // osso do crânio: branco sujo, cinza nas reentrâncias, rachaduras
+      const texCranio = texP('cranio', 256, 256, (x, w, h, r) => {
+        x.fillStyle = '#d0c8bc'; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 70; i++) { const gx = r() * w, gy = r() * h, g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 6 + r() * 28); g2.addColorStop(0, r() < .55 ? 'rgba(90,80,72,.35)' : 'rgba(245,240,232,.3)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 40, gy - 40, 80, 80); }
+        x.lineCap = 'round'; for (let i = 0; i < 30; i++) { let px = r() * w, py = r() * h, an = r() * 6.3; x.strokeStyle = `rgba(50,40,36,${.3 + r() * .3})`; x.lineWidth = .7; x.beginPath(); x.moveTo(px, py); for (let k = 0; k < 6; k++) { an += (r() - .5) * 1.2; px += Math.cos(an) * 7; py += Math.sin(an) * 7; x.lineTo(px, py); } x.stroke(); }
+      }, { rep: [2, 2] });
+      // cabelo preto longuíssimo (cartões com fios)
+      const texCabelo = texP('cabelo', 128, 512, (x, w, h, r) => { x.clearRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const x0 = r() * w, len = h * (.55 + r() * .45); x.strokeStyle = r() < .22 ? '#d8d4cc' : r() < .3 ? '#8a8680' : r() < .6 ? '#121012' : '#060506'; x.lineWidth = .7 + r() * 2.2; x.beginPath(); x.moveTo(x0, -1); x.bezierCurveTo(x0 + (r() - .5) * 8, len * .3, x0 + (r() - .5) * 10, len * .7, x0 + (r() - .5) * 12, len); x.stroke(); } });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uDrag: { value: 0 }, uPasso: { value: 0 }, uAbre: { value: 0 } };
+      // hábito: a barra chuta em cada passo (a perna por baixo), arrasta para trás e ondula de leve
+      const balanco = { vBegin: `float bx = clamp((1.3 - transformed.y) / 1.3, 0.0, 1.0); bx *= bx;
+        float lado = sign(transformed.x + 0.0001);
+        transformed.z += (sin(uPasso) * lado * 0.09 * bx) - uDrag * 0.25 * bx + cos(uT * 0.8 + transformed.x * 4.0) * 0.012 * bx;
+        transformed.x += sin(uT * 1.0 + transformed.y * 2.0 + transformed.z * 4.0) * 0.015 * bx * (1.0 + uAbre);
+        transformed.xz *= 1.0 + uAbre * bx * 0.3;` };
+      const habito = shader(mat({ map: texHabito, alphaMap: alfaHabito, alphaTest: .5, roughness: .9, duplo: true, color: '#d0c8c0' }), 'ent_freira_pano', Um, balanco);
+      const veuM = mat({ map: texHabito, roughness: .9, duplo: true, color: '#b8b0a8' });
+      const brancoM = mat({ color: '#e4e0d6', roughness: .8, emissive: '#2a2824', emissiveIntensity: .4 });
+      const pele = mat({ map: texPele, roughness: .7, color: '#d8d0c8' });
+      const ossoM = mat({ map: texCranio, bumpMap: texCranio, bumpScale: .005, roughness: .78, color: '#c8c6c0' });
+      const denteM = mat({ color: '#c8bca4', roughness: .5 });
+      const fendaM = mat({ color: '#2a0a10', roughness: .8 });
+      const narinaM = mat({ color: '#0e0606', roughness: 1 });
+      const olhoM = [0, 1, 2, 3, 4].map(() => mat({ color: '#3a1060', emissive: '#c880ff', emissiveIntensity: 3.6, roughness: .12 }));
+      const cabeloM = shader(mat({ map: texCabelo, alphaTest: .35, duplo: true, roughness: .5, color: '#ffffff' }), 'ent_freira_cabelo', Um, { vBegin: `float bc = clamp((2.6 - transformed.y) / 1.2, 0.0, 1.0); transformed.x += sin(uT * 0.9 + transformed.y * 3.0) * 0.02 * bc; transformed.z += (cos(uT * 0.7 + transformed.y * 2.0) * 0.02 - uDrag * 0.18) * bc * bc;` });
+      const cruzM = mat({ color: '#6a6058', roughness: .4, metalness: .6 });
+
+      /* ---------- corpo: hábito estreito até o chão ---------- */
+      const corpo = grupo(g), tronco = grupo(corpo, 0, 1.5, 0), peito = grupo(tronco, 0, .95, 0); corpo.scale.setScalar(1.07);
+      const PH = [[0, .42, .38], [.3, .38, .34], [.7, .32, .28], [1.1, .27, .22], [1.5, .23, .18], [1.85, .22, .17], [2.15, .25, .18], [2.38, .27, .18], [2.52, .25, .16], [2.6, .17, .12], [2.66, .08, .07]];
+      malha(corpo, uma('habito', () => casca(PH, { seg: 48, deform: (x, y, z, j, u, ang) => { const k = 1 + .04 * Math.sin(ang * 8 + y * 3) * Math.max(0, 1 - y / 1.5) + .02 * fbm(x * 4, y * 3, z * 4); return [x * k, y, z * k]; } })), habito);
+      // cruz invertida pendurada num cordão
+      const cruz = grupo(peito, 0, -.2, .175);
+      malha(cruz, uma('cruz', () => juntar([mover(new T.BoxGeometry(.035, .3, .022), 0, -.15, 0), mover(new T.BoxGeometry(.16, .035, .022), 0, -.22, 0)])), cruzM);
+      malha(peito, uma('cordao', () => juntar([-1, 1].map(sx => tubo([[sx * .07, .14, .1], [sx * .08, .02, .16], [sx * .03, -.13, .18], [0, -.2, .178]], .005, { seg: 12, rad: 4 })))), cruzM);
+
+      /* ---------- braços longos e pálidos, mangas de punho encardido ---------- */
+      const bracos = [-1, 1].map(k => {
+        const ombro = grupo(peito, k * .25, -.02, -.01), braco = grupo(ombro), cot = grupo(braco, 0, -.86, 0), mao = grupo(cot, 0, -.8, 0);
+        malha(braco, uma('mangaB', () => deform(torneado(t => .075 + .015 * t, .86, 12, 12), (x, y, z) => [x * (1 + .06 * Math.sin(y * 18)), y, z])), veuM);
+        malha(cot, uma('mangaA', () => juntar([deform(new T.CylinderGeometry(.09, .12, .4, 14, 3, true), (x, y, z) => [x, y - .2, z]), mover(new T.CylinderGeometry(.122, .124, .06, 14, 1, true), 0, -.42, 0)])), veuM);
+        malha(cot, uma('punho', () => mover(new T.TorusGeometry(.118, .016, 5, 16), 0, -.43, 0, PI / 2, 0, 0)), brancoM);
+        malha(cot, uma('antebraco', () => deform(torneado(t => .036 - .008 * t + .004 * bump(t, .95, .06), .8, 14, 10), (x, y, z) => [x * (1 + .05 * Math.sin(y * 40)), y, z])), pele);
+        // mão de dedos compridos, nós saltados
+        const m = grupo(mao); const dedos = [];
+        malha(m, uma('palma', () => mover(new T.SphereGeometry(.05, 12, 8), 0, -.055, 0, 0, 0, 0, .8, 1.4, .38)), pele);
+        for (let i = 0; i < 5; i++) {
+          const pol = i === 4, d = grupo(m, pol ? k * .036 : (-.027 + i * .018) * k, pol ? -.04 : -.12, pol ? .014 : 0);
+          d.rotation.set(-.15, 0, pol ? k * .5 : (i - 1.5) * .06 * k);
+          malha(d, uma(pol ? 'polegar' : 'dedo', () => juntar(pol ? [tubo([[0, 0, 0], [0, -.05, .01], [0, -.1, .02]], t => .009 - t * .003, { seg: 8, rad: 5 })] : [tubo([[0, 0, 0], [0, -.07, .005], [0, -.15, .02], [0, -.22, .045]], t => .0085 - t * .0035, { seg: 12, rad: 5 }), ...[0, 1].map(j => mover(new T.SphereGeometry(.0095, 6, 5), 0, -.07 - j * .075, .006))])), pele);
+          d.scale.setScalar(1.35); dedos.push(d);
+        }
+        return { ombro, braco, cot, mao, k, Lb: .86, La: .8, dedos };
+      });
+
+      /* ---------- pescoço longo e enrugado, crânio de cavalo ---------- */
+      const pesc = grupo(peito, 0, .12, .0), pesc2 = grupo(pesc, 0, .24, .02), cab = grupo(pesc2, 0, .24, .02);
+      const geoPesc = uma('pescoco', () => deform(new T.CylinderGeometry(.068, .085, .26, 16, 10, true), (x, y, z) => { const k = 1 + .06 * Math.sin(y * 70) + .03 * Math.sin(Math.atan2(x, z) * 5 + y * 20); return [x * k, y + .13, z * k]; }));
+      malha(pesc, geoPesc, pele); malha(pesc2, geoPesc, pele);
+      // crânio: comprido, estreitando no focinho que cai para a frente; a mandíbula abre
+      const cranio = grupo(cab, 0, .04, .02); cranio.rotation.x = .3; cranio.scale.setScalar(1.4);
+      malha(cranio, uma('cranio', () => deform(new T.SphereGeometry(1, 36, 26), (x, y, z) => {
+        const f = Math.max(0, z);
+        let X = x * (.14 - .065 * f + .02 * bump(z, -.2, .3)), Y = y * (.14 - .06 * f), Z = z > 0 ? z * .42 : z * .16;
+        Y -= f * f * .03; if (y < 0) Y *= .8;
+        X *= 1 + .45 * bump(z, .92, .1) * (y < .2 ? 1 : .6); Y *= 1 + .25 * bump(z, .92, .1);
+        // órbitas e crista da testa
+        if (y > .2 && z > -.2 && z < .4) Y += .012 * bump(x, 0, .25);
+        return [X, Y, Z];
+      })), ossoM);
+      // mandíbula (abre no ataque)
+      const mand = grupo(cranio, 0, -.06, -.08);
+      malha(mand, uma('mandibula', () => deform(new T.SphereGeometry(1, 24, 12, 0, PI * 2, PI * .5, PI * .5), (x, y, z) => { const f = Math.max(0, z); return [x * (.085 - .045 * f), y * .05 - .005, z > 0 ? z * .43 + .07 : z * .1 + .07]; })), ossoM);
+      // dentes: uma fileira em cima e uma embaixo, na metade da frente do focinho
+      const geoDentes = uma('dentes', () => { const l = []; for (let i = 0; i < 9; i++) { const zz = .16 + i * .028, xx = .043 - i * .002; [-1, 1].forEach(sx => l.push(mover(new T.BoxGeometry(.011, .02, .016), sx * xx, 0, zz))); } return juntar(l); });
+      malha(cranio, geoDentes, denteM).position.set(0, -.07, -.02);
+      malha(mand, geoDentes, denteM).position.set(0, .006, -.09);
+      // narinas
+      [-1, 1].forEach(sx => { const n = malha(cranio, uma('narina', () => mover(new T.SphereGeometry(.016, 8, 6), 0, 0, 0, 0, 0, 0, .7, 1, 1.4)), narinaM); n.position.set(sx * .026, -.02, .405); });
+      // cinco olhos roxos em fendas de losango (três na testa, dois pequenos dos lados)
+      const OLHOS = [[0, .118, .15, 1.5], [-.062, .1, .1, 1.3], [.062, .1, .1, 1.3], [-.11, .062, .01, .8], [.11, .062, .01, .8]].map(([x0, y0, z0, e], i) => {
+        const o = grupo(cranio, x0, y0, z0);
+        o.lookAt(o.position.clone().add(V(x0 * 4, .75, .8)));
+        malha(o, uma('fenda', () => mover(new T.OctahedronGeometry(.035, 0), 0, 0, -.006, 0, 0, 0, .6, 1.5, .28)), fendaM).scale.setScalar(e);
+        const olho = malha(o, uma('olhoE', () => mover(new T.SphereGeometry(.016, 12, 8), 0, 0, 0, 0, 0, 0, 1, 1.25, .7)), olhoM[i]); olho.scale.setScalar(e);
+        const br = halo(o, '#b870ff', .2 * e, 0, .02, 0, .7);
+        return { o, olho, br, e };
+      });
+      // faixa branca na testa e véu preto caindo pelas costas
+      malha(cab, uma('faixa', () => mover(deform(new T.CylinderGeometry(.15, .15, .08, 26, 1, true), (x, y, z) => [x * .92, y, z * 1.05]), 0, .08, -.06, .35, 0, 0)), brancoM);
+      malha(cab, uma('veu', () => casca([[-.75, .3, .26, -.12], [-.5, .26, .22, -.12], [-.25, .2, .18, -.1], [-.05, .17, .16, -.08], [.06, .155, .15, -.07], [.12, .13, .13, -.07], [.17, .07, .08, -.08]], { seg: 32, abertura: 1.5, deform: (x, y, z) => [x * (1 + .04 * Math.sin(y * 14)), y, z] })), veuM);
+      // cabelo preto: cortinas que descem da cabeça pela frente (sobre os ombros) e pelas costas
+      const raizCabelo = grupo(pesc2, 0, .24, .0);
+      malha(raizCabelo, uma('cabelo', () => {
+        const l = [], r = NS.rng(31);
+        for (let i = 0; i < 30; i++) {
+          const lado = i % 2 ? 1 : -1, frente = i < 16, a = lado * (frente ? .45 + (i >> 1) * .07 : 1.2 + ((i - 16) >> 1) * .27), sx = Math.sin(a), sz = Math.cos(a);
+          const fim = frente ? -1.45 - r() * .35 : -1.25 - r() * .35, rr = .14;
+          l.push(fita([[sx * rr * .9, .08, sz * rr * .7 - .06], [sx * rr * 1.2, -.1, sz * rr * (frente ? 1.3 : .8) - .04], [sx * rr * 1.35, -.4, sz * rr * (frente ? 1.5 : .9)], [sx * rr * 1.4, -.8, sz * rr * (frente ? 1.55 : 1.0)], [sx * rr * 1.35, fim, sz * rr * (frente ? 1.5 : 1.0)]], t => .085 * (1 - t * .35), { seg: 14, normal: P => V(P.x, 0, P.z) }));
+        }
+        return juntar(l);
+      }), cabeloM);
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.6, revelar: 2.6, ritual: 3.8, conjurar: 1.8 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: .9, vCorre: 2.4 });
+      let curva = 0, curvaAlvo = 0, faseA = 0, tInclina = 3, inclina = 0, inclinaAlvo = 0, tPisca = 2, piscaI = -1, piscaT = 0;
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0, kA = sm(mv.k);
+        const prep = tipo === 'ataque' ? sino(k, 0, .25, .4) : 0, bote = tipo === 'ataque' ? sino(k, .25, .45, 1) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .02, .7) : 0, abre = tipo === 'revelar' ? sm((k - .1) / .55) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .8 : 0;
+        curva += (curvaAlvo - curva) * Math.min(1, dt * 1.2);
+        const cv = Math.max(curva, tipo === 'revelar' ? 1 - abre : 0);
+        // passos longos e lentos: o corpo sobe e desce pouco, a barra chuta a cada passo
+        faseA += mv.avanco(dt, 1.5);
+        Um.uPasso.value = faseA * kA; Um.uT.value = t; Um.uDrag.value = kA * Math.min(1.2, .4 + mv.vEf * .45); Um.uAbre.value = eRit * .4 + eRev * .3;
+        corpo.position.set(Math.sin(faseA) * .025 * kA, Math.abs(Math.cos(faseA)) * .03 * kA - cv * .05, 0);
+        corpo.rotation.set(kA * .03, Math.sin(faseA) * .05 * kA, Math.sin(faseA) * .02 * kA + Math.max(-.08, Math.min(.08, -mv.giro * mv.vEf * .03)) * kA);
+        tronco.rotation.set(cv * .38 - eRit * .08 + bote * .1, 0, Math.sin(t * .29) * .012);
+        peito.rotation.set(cv * .3, 0, 0);
+        // cabeça: inclina de lado devagar (às vezes de uma vez, como bicho curioso)
+        tInclina -= dt; if (tInclina <= 0) { tInclina = 2.5 + (Math.sin(t * 3.7) * .5 + .5) * 4; inclinaAlvo = Math.sin(t * 7.1) * .55; }
+        inclina += (inclinaAlvo - inclina) * Math.min(1, dt * (Math.abs(inclinaAlvo - inclina) > .4 ? 5 : 1.3));
+        pesc.rotation.set(.12 - cv * .5 + prep * .2 - bote * .5 - eRit * .25, mv.oy * .2, inclina * .3);
+        pesc2.rotation.set(.12 - cv * .35 - bote * .4 - eRit * .2, 0, inclina * .3);
+        cab.rotation.set(-.15 + cv * .95 + mv.op * .3 + bote * .55 - eRit * .3 + Math.sin(t * .5) * .03, mv.oy * .3 + Math.sin(t * .19) * .1, inclina * .55);
+        pesc2.position.z = .02 + bote * .1; cab.position.y = .24 + bote * .08;
+        mand.rotation.x = .04 + Math.max(0, Math.sin(t * .6)) ** 6 * .12 + bote * .45 + eRit * .2;
+        // braços: pendem retos até os joelhos; ataque lança as mãos à frente; ritual ergue
+        bracos.forEach((b, i) => {
+          let ax = b.k * (.36 + .02 * Math.sin(t * .4 + i)), ay = -1.56 + Math.sin(faseA + i * PI) * .02 * kA, az = .06 + Math.sin(faseA + i * PI) * .12 * kA, px = b.k * .3, py = 0, pz = -1;
+          if (bote > 0) { ax += (b.k * .2 - ax) * bote; ay += (-.35 - ay) * bote; az += (1.1 - az) * bote; }
+          if (eRit > 0) { ax += (b.k * .65 - ax) * eRit; ay += (.55 - ay) * eRit; az += (.3 - az) * eRit; px = b.k; }
+          if (cv > 0) { az += cv * .4; ay += cv * .25; }
+          ik(b, ax, ay, az, px, py, pz);
+          b.mao.rotation.set(.05 - bote * .3, 0, 0);
+          // dedos: tremem e se dobram devagar; abrem no bote
+          b.dedos.forEach((d, j) => { d.rotation.x = -.15 - (j < 4 ? (Math.sin(t * (1.3 + j * .21) + i * 2 + j) * .5 + .5) * .35 * (1 - bote) : 0) + bote * .2; });
+        });
+        // olhos: piscam um de cada vez, em sequência; ardem no ritual; abrem juntos na revelação
+        tPisca -= dt;
+        if (tPisca <= 0 && piscaI < 0) { piscaI = 0; piscaT = 0; }
+        if (piscaI >= 0) { piscaT += dt; if (piscaT > .14) { piscaT = 0; piscaI++; if (piscaI >= 5) { piscaI = -1; tPisca = 2 + (Math.sin(t * 5.3) * .5 + .5) * 3.5; } } }
+        const ordem = [1, 0, 2, 4, 3];
+        OLHOS.forEach((O, i) => {
+          const pis = piscaI >= 0 && ordem[piscaI] === i ? Math.sin(piscaT / .14 * PI) : 0;
+          const fech = tipo === 'revelar' ? 1 - sm((k - .55) / .12) : 0;
+          O.olho.scale.set(O.e, O.e * Math.max(.05, 1 - pis - fech), O.e);
+          olhoM[i].emissiveIntensity = (3.2 + Math.sin(t * 1.1 + i) * .5 + eRit * 2.5 + bote * 1.5 + eRev * 1.5) * (1 - fech);
+          O.br.material.opacity = (.62 + .1 * Math.sin(t * 1.1 + i) + eRit * .3 + bote * .2) * (1 - pis) * (1 - fech);
+        });
+      };
+      const ret = { g, alt: 3.5, raioBase: .55, anim, acao: tipo => ac.disparar(tipo),
+        estado: nome => { if (nome === 'curvada' || nome === 'curvado') curvaAlvo = 1; else if (nome === 'ereta' || nome === 'ereto' || nome === 'padrao') curvaAlvo = 0; } };
+      anim(0, 0, false);
+      return ret;
     },
   };
 })();
@@ -9095,9 +11873,12 @@
 
       /* ================= animação ================= */
       let fase = 0, kAnda = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.83 });
       const anim = (dt, t, andando) => {
-        kAnda += ((andando ? 1 : 0) - kAnda) * Math.min(1, dt * 2.5);
-        fase += dt * 3.2 * kAnda;
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
+        kAnda = kA;
+        fase += mv.ritmo(dt, 3.2, .83);
         const pas = Math.sin(fase), pas2 = Math.cos(fase);
         // andar lento e arrastado: passadas longas, quadril balançando
         pernas.forEach((p, i) => {
@@ -9108,7 +11889,7 @@
         });
         corpo.position.y = -Math.abs(pas) * .05 * kAnda - .02 * (1 - Math.cos(t * .9)) * .5;
         corpo.position.x = Math.sin(fase) * .04 * kAnda;
-        corpo.rotation.z = Math.sin(fase) * .05 * kAnda + Math.sin(t * .53) * .025;
+        corpo.rotation.z = Math.sin(fase) * .05 * kAnda + Math.sin(t * .53) * .025 + bank;
         corpo.rotation.y = Math.sin(fase) * .08 * kAnda;
         // tronco respira de forma irregular e treme às vezes
         const espasmo = tique(t, 4.7, .25, .8);
@@ -9192,6 +11973,488 @@
       };
       animTudo(0, 0, false);
       return { g, alt: 2.6 * K, raioBase: .5, anim: animTudo, acao };
+    },
+  };
+})();
+
+/* ===== forma: manto_coroa_tentaculos ===== */
+/* manto_coroa_tentaculos.js · forma: figura altíssima (quase 3,8 m, o dobro de uma pessoa) num manto escuro e
+   esfarrapado que se alarga até o chão e se arrasta atrás. Capuz alto com uma coroa de pontas longas e finas;
+   lá dentro, um rosto pálido, comprido, quase escondido, de órbitas fundas com um brilho amarelado. Braços longos
+   nas mangas rasgadas terminam em garras compridas. Tentáculos amarelados saem de baixo da barra e se enrolam em
+   espiral pelo chão; uma espiral amarela gira devagar no ar atrás da cabeça. Névoa amarelada, cor de papel velho.
+   Formato: ACF3D.formasFilho.manto_coroa_tentaculos = { nome, criar(F, s) → { g, alt, raioBase, anim, acao, estado } }
+   acao('ataque') (ou 'atacar'): uma garra varre à frente e os tentáculos chicoteiam para a frente.
+   acao('revelar'): a figura cresce do chão dentro da névoa, a coroa por último; os tentáculos se abrem.
+   acao('ritual') / acao('conjurar'): ergue os braços, a espiral se acende e gira rápido.
+   estado('curvado'): curva o tronco para caber em corredores e portas (≈ 2,6 m). estado('ereto') (padrão): de pé. */
+(() => {
+  'use strict';
+  const NS = window.ACF3D = window.ACF3D || {};
+  /* ---------- kit de modelagem (o mesmo nas seis formas desta leva; cada arquivo funciona sozinho) ----------
+     Geometrias e texturas fixas ficam guardadas por forma (NS.__cacheFormas): a segunda cópia na sala, outro andar
+     ou o 3D reaberto não recriam nada; só materiais (que piscam por cópia) e malhas animadas são por cópia.
+     Nada é alocado por quadro: vetores e quatérnios de trabalho são criados uma vez. */
+  const CACHE = NS.__cacheFormas || (NS.__cacheFormas = new Map());
+  function kit(F, nomeForma) {
+    const T = F.T, PI = Math.PI, U = T.BufferGeometryUtils;
+    const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+    const vv = p => (p && p.isVector3 ? p : V(p[0], p[1], p[2]));
+    // guardado entre cópias: fazer() roda uma vez por aparelho; cada uso entra no descarte do mundo (o three
+    // sobe de novo para a placa se o mesmo objeto voltar a ser desenhado depois de descartado)
+    const uma = (k, fazer) => { const kk = nomeForma + '|' + k; let v = CACHE.get(kk); if (!v) { v = fazer(); CACHE.set(kk, v); } (Array.isArray(v) ? v : [v]).forEach(x => x && x.dispose && F.guardar(x)); return v; };
+    const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return [c, c.getContext('2d')]; };
+    // textura pintada (guardada): desenhar(x, w, h, r) com r = sorteio de semente fixa
+    const texP = (k, w, h, desenhar, o = {}) => uma('tx:' + k, () => {
+      const [c, x] = tela(w, h); desenhar(x, w, h, NS.rng(k.length * 977 + w + h * 3));
+      const t = new T.CanvasTexture(c); t.encoding = o.linear ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = 4;
+      if (o.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.rep[0], o.rep[1]); }
+      if (o.clamp) { t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+      return t;
+    });
+    // material: as cores são escritas como aparecem na tela (vão para o espaço linear aqui)
+    const lin = c => new T.Color(c).convertSRGBToLinear();
+    const mat = (p = {}, tipo) => {
+      const q = { ...p };
+      ['color', 'emissive'].forEach(k => { if (typeof q[k] === 'string') q[k] = lin(q[k]); });
+      if (q.duplo) { q.side = T.DoubleSide; delete q.duplo; }
+      const M = tipo === 'fis' ? T.MeshPhysicalMaterial : tipo === 'basico' ? T.MeshBasicMaterial : T.MeshStandardMaterial;
+      return F.guardar(new M(q));
+    };
+    const somar = (cor, o = {}) => F.guardar(new T.MeshBasicMaterial({ color: typeof cor === 'string' ? lin(cor) : cor, transparent: true, opacity: o.op ?? 1, blending: T.AdditiveBlending, depthWrite: false, side: o.lado ?? T.DoubleSide, vertexColors: !!o.vc, map: o.map || null, toneMapped: false }));
+    // trechos de shader num material (uniforms do objeto U; uT = tempo)
+    function shader(m, chave, Un, o) {
+      m.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, Un);
+        const dec = Object.keys(Un).map(k => `uniform ${typeof Un[k].value === 'number' ? 'float' : Un[k].value.isColor ? 'vec3' : Un[k].value.isVector2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
+        const ruido = `float hs3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hs3(i), hs3(i + vec3(1,0,0)), f.x), mix(hs3(i + vec3(0,1,0)), hs3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hs3(i + vec3(0,0,1)), hs3(i + vec3(1,0,1)), f.x), mix(hs3(i + vec3(0,1,1)), hs3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float fb3(vec3 p){ return vn3(p) * 0.55 + vn3(p * 2.03) * 0.3 + vn3(p * 4.1) * 0.15; }`;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.vHead || ''}`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>\nvPo = transformed;\n${o.vBegin || ''}\nvPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * normal);`);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\n${dec}\n${ruido}\nvarying vec3 vPw;\nvarying vec3 vPo;\nvarying vec3 vNw;\n${o.fHead || ''}`)
+          .replace('#include <map_fragment>', `#include <map_fragment>\n${o.fMap || ''}`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${o.fEmis || ''}`)
+          .replace('#include <dithering_fragment>', `${o.fFim || ''}\n#include <dithering_fragment>`);
+      };
+      m.customProgramCacheKey = () => chave;
+      return m;
+    }
+    const malha = (pai, geo, m) => { const me = new T.Mesh(geo, m); F.guardar(geo); if (pai) pai.add(me); return me; };
+    // efeito de luz (plano somado, chama, raio) não faz sombra: o site liga castShadow em toda malha do token,
+    // então a propriedade fica presa em falso só nestas malhas
+    const semSombra = me => { try { Object.defineProperty(me, 'castShadow', { get: () => false, set: () => {}, configurable: true }); } catch (e) { me.castShadow = false; } return me; };
+    const grupo = (pai, x = 0, y = 0, z = 0) => { const g = new T.Group(); g.position.set(x, y, z); if (pai) pai.add(g); return g; };
+    // ruído suave (valor) e fractal
+    const fr = v => v - Math.floor(v), h3 = (i, j, k) => fr(Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453);
+    const sm = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }, L = (a, b, t) => a + (b - a) * t;
+    function vn(x, y, z) {
+      const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = sm(x - i), v = sm(y - j), w = sm(z - k);
+      const a = L(L(h3(i, j, k), h3(i + 1, j, k), u), L(h3(i, j + 1, k), h3(i + 1, j + 1, k), u), v);
+      const b = L(L(h3(i, j, k + 1), h3(i + 1, j, k + 1), u), L(h3(i, j + 1, k + 1), h3(i + 1, j + 1, k + 1), u), v);
+      return L(a, b, w) * 2 - 1;
+    }
+    const fbm = (x, y, z, o = 3) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); a *= .5; f *= 2.03; } return s; };
+    const bump = (v, c, w) => Math.exp(-Math.pow((v - c) / w, 2));
+    function deform(geo, fn) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const r = fn(p.getX(i), p.getY(i), p.getZ(i), i); if (r) p.setXYZ(i, r[0], r[1], r[2]); }
+      p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+    }
+    // normais suaves mesmo na costura da UV
+    function suavizar(geo) {
+      geo.computeVertexNormals(); const p = geo.attributes.position, n = geo.attributes.normal, mapa = new Map();
+      for (let i = 0; i < p.count; i++) { const k = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`; let l = mapa.get(k); if (!l) mapa.set(k, l = []); l.push(i); }
+      mapa.forEach(l => { if (l.length < 2) return; let x = 0, y = 0, z = 0; l.forEach(i => { x += n.getX(i); y += n.getY(i); z += n.getZ(i); }); const d = Math.hypot(x, y, z) || 1; l.forEach(i => n.setXYZ(i, x / d, y / d, z / d)); });
+      return geo;
+    }
+    /* casca: superfície de revolução de seção elíptica, anel por anel (de baixo para cima).
+       perfil: [[y, largura, profundidade, deslocZ, deslocX]]. A frente (+z) fica em u = 0,5 da textura. */
+    function casca(perfil, o = {}) {
+      const seg = o.seg || 24, n = perfil.length, pos = [], uv = [], idx = [];
+      const ab = o.abertura || 0, ps0 = ab ? ab / 2 : Math.PI, pl0 = ab ? Math.PI * 2 - ab : Math.PI * 2;
+      for (let i = 0; i <= seg; i++) {
+        const u = i / seg;
+        for (let j = 0; j < n; j++) {
+          const p = perfil[j], ph = ps0 + u * pl0;
+          let x = Math.sin(ph) * p[1] + (p[4] || 0), y = p[0], z = Math.cos(ph) * p[2] + (p[3] || 0);
+          if (o.deform) { const r = o.deform(x, y, z, j, u, Math.atan2(Math.sin(ph), Math.cos(ph))); if (r) [x, y, z] = r; }
+          pos.push(x, y, z); uv.push(u * (o.repU || 1), j / (n - 1) * (o.repV || 1));
+        }
+      }
+      for (let i = 0; i < seg; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = (i + 1) * n + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); if (ab) geo.computeVertexNormals(); else suavizar(geo); return geo;
+    }
+    // tubo que afina ao longo de uma curva: raio(t), t de 0 a 1; f(t, ang) deforma o raio
+    function tubo(pts, raio, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), !!o.fechado, 'catmullrom', o.tensao ?? .5);
+      const nS = o.seg || 16, nR = o.rad || 6, geo = new T.TubeGeometry(curva, nS, 1, nR, !!o.fechado);
+      const pos = geo.attributes.position, P = V();
+      for (let i = 0; i <= nS; i++) {
+        curva.getPointAt(i / nS, P); const rr = typeof raio === 'number' ? raio : raio(i / nS);
+        for (let j = 0; j <= nR; j++) { const k = i * (nR + 1) + j, f = o.f ? 1 + o.f(i / nS, j / nR * PI * 2) : 1; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * rr * f, P.y + (pos.getY(k) - P.y) * rr * f, P.z + (pos.getZ(k) - P.z) * rr * f); }
+      }
+      if (o.tampa !== false) {   // tampa as pontas (cones curtos) para não ver por dentro
+        const g2 = tampar(geo, nS, nR); geo.dispose(); return g2;
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    function tampar(geo, nS, nR) {
+      const p = geo.attributes.position, uv = geo.attributes.uv, ix = Array.from(geo.index.array), np = p.count, P = Array.from(p.array), UV = Array.from(uv.array);
+      [[0, 1], [nS, -1]].forEach(([i, s]) => {
+        let cx = 0, cy = 0, cz = 0; for (let j = 0; j < nR; j++) { const k = i * (nR + 1) + j; cx += p.getX(k); cy += p.getY(k); cz += p.getZ(k); }
+        const c = P.length / 3; P.push(cx / nR, cy / nR, cz / nR); UV.push(.5, i ? 1 : 0);
+        for (let j = 0; j < nR; j++) { const a = i * (nR + 1) + j, b = a + 1; if (s > 0) ix.push(c, b, a); else ix.push(c, a, b); }
+      });
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(UV, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
+    }
+    // peça torneada pendurada: raio rf(t), t de 0 (topo, y = 0) a 1 (ponta, y = -L)
+    function torneado(rf, L0, n = 16, rad = 12) {
+      const pf = [new T.Vector2(1e-4, -L0 - rf(1) * .5)];
+      for (let i = n; i >= 0; i--) { const t = i / n; pf.push(new T.Vector2(Math.max(1e-4, rf(t)), -t * L0)); }
+      pf.push(new T.Vector2(1e-4, rf(0) * .5));
+      return new T.LatheGeometry(pf, rad);
+    }
+    // cápsula pendurada: pivô no topo (y = 0), desce até -comp
+    function capsula(r1, r2, comp, seg = 8, anel = 3) {
+      const pf = [];
+      for (let a = 0; a <= anel; a++) { const t = a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r2 * Math.sin(t)), -comp - r2 * Math.cos(t))); }
+      for (let a = 1; a <= anel; a++) { const t = PI / 2 + a / anel * PI / 2; pf.push(new T.Vector2(Math.max(1e-4, r1 * Math.sin(t)), -r1 * Math.cos(t))); }
+      return new T.LatheGeometry(pf, seg);
+    }
+    // fita (tira de pano) ao longo de uma curva; a face olha para fora do eixo y (ou para normal(P, t))
+    function fita(pts, larg, o = {}) {
+      const curva = new T.CatmullRomCurve3(pts.map(vv), false, 'catmullrom', .5), n = o.seg || 16, pos = [], uv = [], idx = [];
+      const P = V(), Tn = V(), N = V(), B = V(), Q = V();
+      for (let i = 0; i <= n; i++) {
+        const t = i / n; curva.getPointAt(t, P); curva.getTangentAt(t, Tn);
+        if (o.normal) N.copy(o.normal(P, t)); else N.set(P.x, 0, P.z);
+        if (N.lengthSq() < 1e-8) N.set(0, 0, 1); N.normalize();
+        B.copy(Tn).cross(N).normalize(); const w = (typeof larg === 'number' ? larg : larg(t)) / 2;
+        for (const s of [-1, 1]) { Q.copy(P).addScaledVector(B, s * w); pos.push(Q.x, Q.y, Q.z); uv.push((s < 0 ? 0 : 1) * (o.u1 ?? 1) + (s < 0 ? (o.u0 || 0) : 0), t * (o.rep || 1)); }
+      }
+      for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    // aplica posição/rotação/escala numa geometria
+    const M4 = new T.Matrix4(), Q4 = new T.Quaternion(), E4 = new T.Euler(), S4 = V(), P4 = V();
+    const mover = (geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => geo.applyMatrix4(M4.compose(P4.set(x, y, z), Q4.setFromEuler(E4.set(rx, ry, rz)), S4.set(sx, sy, sz)));
+    // junta várias geometrias numa só (um desenho): posição, normal e uv
+    function juntar(geos) {
+      let nv = 0, ni = 0;
+      const L2 = geos.filter(Boolean).map(g0 => { if (!g0.attributes.normal) g0.computeVertexNormals(); nv += g0.attributes.position.count; ni += g0.index ? g0.index.count : g0.attributes.position.count; return g0; });
+      const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      L2.forEach(g0 => {
+        const a = g0.attributes, c = a.position.count; P.set(a.position.array, ov * 3); N.set(a.normal.array, ov * 3); if (a.uv) UV.set(a.uv.array, ov * 2);
+        if (g0.index) { const ix = g0.index.array; for (let i = 0; i < ix.length; i++) I[oi + i] = ix[i] + ov; oi += ix.length; } else { for (let i = 0; i < c; i++) I[oi + i] = ov + i; oi += c; }
+        ov += c; g0.dispose();
+      });
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(P, 3)); out.setAttribute('normal', new T.BufferAttribute(N, 3)); out.setAttribute('uv', new T.BufferAttribute(UV, 2)); out.setIndex(new T.BufferAttribute(I, 1));
+      out.computeBoundingSphere(); return out;
+    }
+    // IK de dois ossos sem alocação: braço (ombro, braco, cot, Lb, La); alvo e polo no espaço do pai do ombro
+    const IK = { P: V(), Tg: V(), u: V(), pv: V(), d1: V(), d2: V(), c: V(), BX: V(0, -1, 0), qi: new T.Quaternion(), qB: new T.Quaternion(), qC: new T.Quaternion() };
+    function ik(br, ax, ay, az, px, py, pz, w = 1) {
+      const { P, Tg, u, pv, d1, d2, c, BX, qi, qB, qC } = IK;
+      P.copy(br.ombro.position); Tg.set(ax, ay, az);
+      u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+      const L1 = br.Lb, L2 = br.La;
+      d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+      const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+      pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+      d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+      c.copy(P).addScaledVector(d1, L1); d2.subVectors(Tg, c).normalize();
+      qB.setFromUnitVectors(BX, d1); qi.copy(qB).invert(); d2.applyQuaternion(qi); qC.setFromUnitVectors(BX, d2);
+      br.ombro.rotation.set(0, 0, 0);
+      if (w >= 1) { br.braco.quaternion.copy(qB); br.cot.quaternion.copy(qC); } else { br.braco.quaternion.slerp(qB, w); br.cot.quaternion.slerp(qC, w); }
+    }
+    // brilho redondo (sprite somado à luz); a textura é a mesma para todas as formas
+    const texBrilho = () => uma('brilho', () => { const [c, x] = tela(64); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new T.CanvasTexture(c); return t; });
+    function halo(pai, cor, tam, x = 0, y = 0, z = 0, op = 1) {
+      const sp = new T.Sprite(F.guardar(new T.SpriteMaterial({ map: texBrilho(), color: lin(cor), transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })));
+      sp.scale.set(tam, tam, 1); sp.position.set(x, y, z); pai.add(sp); return sp;
+    }
+    /* raios: n raios num desenho só (tiras cruzadas somadas à luz). gerar(i, A, B, desvio, galhos) refaz um raio
+       (só quando cai um raio novo, não todo quadro); vida(i, k) acende/apaga pela cor dos vértices. */
+    function raios(pai, n, segs, cor, larg) {
+      const nvR = (segs + 1) * 4, pos = new Float32Array(n * nvR * 3), col = new Float32Array(n * nvR * 3), idx = [];
+      for (let r = 0; r < n; r++) for (let s = 0; s < segs; s++) for (let q = 0; q < 2; q++) { const a = r * nvR + s * 4 + q * 2, b = a + 4; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx);
+      geo.attributes.position.setUsage(T.DynamicDrawUsage); geo.attributes.color.setUsage(T.DynamicDrawUsage);
+      geo.boundingSphere = new T.Sphere(V(0, 1, 0), 3);
+      const m = somar('#ffffff', { vc: true }); const me = semSombra(malha(pai, geo, m)); me.frustumCulled = false; me.raycast = () => {};
+      const C = lin(cor), rr = NS.rng(n * 31 + segs), luz = new Float32Array(n), lg = new Float32Array(n).fill(larg);
+      const gerar = (i, ax, ay, az, bx, by, bz, desvio, lw = larg) => {
+        lg[i] = lw; let o = i * nvR * 3; const dx = bx - ax, dy = by - ay, dz = bz - az, comp = Math.hypot(dx, dy, dz) || 1;
+        // perpendiculares ao raio
+        let px = -dz, py = 0, pz = dx; let pl = Math.hypot(px, py, pz); if (pl < 1e-5) { px = 1; pz = 0; pl = 1; } px /= pl; pz /= pl;
+        const qx = (dy * pz - dz * py) / comp, qy = (dz * px - dx * pz) / comp, qz = (dx * py - dy * px) / comp;
+        let ox = 0, oy = 0;
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs, env = Math.sin(t * PI); ox = ox * .45 + (rr() - .5) * desvio * 2; oy = oy * .45 + (rr() - .5) * desvio * 2;
+          const cx = ax + dx * t + (px * ox + qx * oy) * env, cy = ay + dy * t + (py * ox + qy * oy) * env, cz = az + dz * t + (pz * ox + qz * oy) * env, w = lw * (1 - t * .6);
+          pos[o++] = cx - px * w; pos[o++] = cy; pos[o++] = cz - pz * w; pos[o++] = cx + px * w; pos[o++] = cy; pos[o++] = cz + pz * w;
+          pos[o++] = cx - qx * w; pos[o++] = cy - qy * w; pos[o++] = cz - qz * w; pos[o++] = cx + qx * w; pos[o++] = cy + qy * w; pos[o++] = cz + qz * w;
+        }
+        geo.attributes.position.needsUpdate = true;
+      };
+      const vida = (i, k) => {
+        if (Math.abs(luz[i] - k) < .02 && (k === 0 || luz[i] === k)) return; luz[i] = k; let o = i * nvR * 3;
+        for (let v = 0; v < nvR; v++) { const f = k * (v % 4 < 2 ? 1 : .8); col[o++] = C.r * f + f * f * .4; col[o++] = C.g * f + f * f * .3; col[o++] = C.b * f + f * f * .4; }
+        geo.attributes.color.needsUpdate = true;
+      };
+      return { me, gerar, vida, n, rr };
+    }
+    // sombra de contato: mancha escura e macia no chão sob a forma (assenta o modelo; não depende da luz da sala)
+    function sombraContato(pai, raio, op = .55) {
+      const tx = texP('sombraContato', 128, 128, (x, w) => { const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.45, 'rgba(0,0,0,.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, w); }, { clamp: true });
+      const m = F.guardar(new T.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const me = semSombra(malha(pai, uma('sombraPlano', () => new T.PlaneGeometry(1, 1).rotateX(-PI / 2)), m)); me.scale.set(raio * 2, 1, raio * 2); me.position.y = .045; me.renderOrder = -1; me.raycast = () => {};
+      return me;
+    }
+    // ações curtas (ataque, revelar…): disparar(tipo); a cada quadro passo(dt) devolve { tipo, k de 0 a 1, s } ou null
+    function acoes(dur) {
+      const st = { tipo: '', s: 0, d: 1 }, out = { tipo: '', k: 0, s: 0 };
+      const alias = { atacar: 'ataque', golpe: 'ataque' };
+      return {
+        disparar(tipo) { tipo = alias[tipo] || tipo; if (!(tipo in dur)) return false; st.tipo = tipo; st.s = 0; st.d = dur[tipo]; return true; },
+        passo(dt) { if (!st.tipo) return null; st.s += dt; if (st.s >= st.d) { st.tipo = ''; return null; } out.tipo = st.tipo; out.k = st.s / st.d; out.s = st.s; return out; },
+      };
+    }
+    // envelope: sobe de 0 a 1 até a, fica até b, desce até o fim (k de 0 a 1)
+    const env = (k, a, b) => k < a ? sm(k / a) : k < b ? 1 : 1 - sm((k - b) / (1 - b));
+    const sino = (k, a, m, b) => k < a || k > b ? 0 : k < m ? sm((k - a) / (m - a)) : 1 - sm((k - m) / (b - m));
+    /* bípede: pélvis (corpo) > tronco > peito; pernas quadril > joelho > pé; braços ombro > braço > cotovelo > mão.
+       o = { quadril, coxa, canela, largQ, ombroY, ombroX, braco, ante } (metros). Só a hierarquia: a malha é de cada forma. */
+    function bipede(pai, o) {
+      const corpo = grupo(pai, 0, o.quadril, 0), tronco = grupo(corpo, 0, o.cintura || .1, 0), peito = grupo(tronco, 0, o.peito || .25, 0);
+      const pernas = [-1, 1].map(k => { const quad = grupo(corpo, k * o.largQ, 0, 0), joelho = grupo(quad, 0, -o.coxa, 0), pe = grupo(joelho, 0, -o.canela, 0); return { quad, joelho, pe, k }; });
+      const bracos = [-1, 1].map(k => { const ombro = grupo(peito, k * o.ombroX, o.ombroY, 0), braco = grupo(ombro), cot = grupo(braco, 0, -o.braco, 0), mao = grupo(cot, 0, -o.ante, 0); return { ombro, braco, cot, mao, k, Lb: o.braco, La: o.ante }; });
+      const pesc = grupo(peito, 0, o.pescoco || .3, 0), cab = grupo(pesc, 0, o.cabeca || .1, 0);
+      return { corpo, tronco, peito, pernas, bracos, pesc, cab, o };
+    }
+    /* passada do bípede (a mesma conta do boneco comum do site, tokens3d.js): passo preso ao chão pelo motor
+       (velocidade real), joelho que dobra na volta, pé plano no apoio, quadril girando, braço oposto à perna,
+       tronco subindo na passagem; parado: respira e troca o peso de perna. P: { A (altura), aQ, aB, cot, peso, braco: false }. */
+    function passada(R, mv, dt, t, P, est) {
+      const k = sm(mv.k), kc = sm(mv.kc), kp = 1 - k;
+      est.fase = (est.fase || mv.sem * 6.283) + mv.avanco(dt, P.A * (P.ciclo || .86) * (1 + .5 * kc));
+      const f = est.fase, sf = Math.sin(f), cf = Math.cos(f), c2 = Math.cos(2 * f), curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (P.aQ || .44) * (1 + .4 * kc) * curto * k, peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = R.pernas[i], si = i ? -sf : sf, ci = i ? -cf : cf;
+        const q = si * aQ - kc * .06 * k, apoio = sm(ci * 1.6 + .5);
+        let j = k * (Math.max(0, -ci) * (.78 + .7 * kc) + .06 + .2 * kc);
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso); j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
+      }
+      const s = P.A / 1.75;
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004)), bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      R.corpo.position.set(-k * cf * .016 * s + peso * .022 * s, R.o.quadril + bob - kp * Math.abs(mv.peso) * .006 * s, 0);
+      R.corpo.rotation.set(k * (.035 + .17 * kc) + Math.max(-.06, Math.min(.1, mv.acel * .018)) * k, -k * (.07 + .05 * kc) * sf, k * .02 * cf + bank + peso * .018);
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      R.peito.scale.set(1 + resp * .008, 1, 1 + resp * .015);
+      est.sf = sf; est.cf = cf; est.c2 = c2; est.resp = resp; est.k = k; est.kc = kc; est.peso = peso; est.bank = bank;
+      if (P.braco !== false) {
+        const aB = (P.aB || .36) * (1 + .45 * kc) * curto * k;
+        for (let i = 0; i < 2; i++) {
+          const b = R.bracos[i], bal = (i ? sf : -sf) * aB;
+          b.braco.quaternion.set(0, 0, 0, 1); b.cot.quaternion.set(0, 0, 0, 1);
+          b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, (P.abre || .06) * b.k + b.k * kc * .1 * k);
+          b.cot.rotation.set(-(P.cot || .15) - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.3 + Math.max(0, -bal) * .12)), 0, 0);
+        }
+      }
+      // cabeça estável: compensa o tronco e olha em volta parada
+      R.cab.rotation.set(-R.corpo.rotation.x * .8 + kp * mv.op * .5 - k * .015 * c2, -R.corpo.rotation.y * .9 + mv.oy * .42 * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k, -R.corpo.rotation.z * .7);
+      return est;
+    }
+    // cor HSV → RGB em [0,1]
+    const hsv = (h, s, v, out) => { const i = Math.floor(h * 6), f2 = h * 6 - i, p = v * (1 - s), q = v * (1 - f2 * s), t2 = v * (1 - (1 - f2) * s); switch (((i % 6) + 6) % 6) { case 0: out.r = v; out.g = t2; out.b = p; break; case 1: out.r = q; out.g = v; out.b = p; break; case 2: out.r = p; out.g = v; out.b = t2; break; case 3: out.r = p; out.g = q; out.b = v; break; case 4: out.r = t2; out.g = p; out.b = v; break; default: out.r = v; out.g = p; out.b = q; } return out; };
+    return { sombraContato, semSombra, T, PI, V, vv, uma, tela, texP, lin, mat, somar, shader, malha, grupo, fbm, vn, sm, bump, deform, suavizar, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, raios, acoes, env, sino, bipede, passada, hsv, texBrilho };
+  }
+(NS.formasFilho = NS.formasFilho || {}).manto_coroa_tentaculos = {
+    nome: 'Figura altíssima de manto, coroa de pontas e tentáculos',
+    criar: (F, s) => {
+      const K = kit(F, 'manto_coroa_tentaculos'), { sombraContato, semSombra, T, PI, V, uma, texP, mat, somar, shader, malha, grupo, fbm, sm, bump, deform, casca, tubo, torneado, capsula, fita, mover, juntar, ik, halo, acoes, env, sino } = K;
+      const g = grupo(null);
+      sombraContato(g, 1.6, .65);
+
+      /* ---------- texturas ---------- */
+      // manto: preto-sépia com manchas amareladas de papel velho e fios verticais
+      const texManto = texP('manto', 512, 512, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#1e1812'); gr.addColorStop(.7, '#241c12'); gr.addColorStop(1, '#3a2e18'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        for (let i = 0; i < 280; i++) { const x0 = r() * w; x.strokeStyle = r() < .65 ? `rgba(0,0,0,${.15 + r() * .2})` : `rgba(140,118,60,${.04 + r() * .07})`; x.lineWidth = 1 + r() * 9; x.beginPath(); x.moveTo(x0, r() * h * .3); x.bezierCurveTo(x0 + (r() - .5) * 16, h * .4, x0 + (r() - .5) * 16, h * .7, x0 + (r() - .5) * 22, h); x.stroke(); }
+        for (let i = 0; i < 40; i++) { const gx = r() * w, gy = h * (.4 + r() * .6), g2 = x.createRadialGradient(gx, gy, 1, gx, gy, 20 + r() * 60); g2.addColorStop(0, 'rgba(150,126,60,.18)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(gx - 80, gy - 80, 160, 160); }
+        for (let i = 0; i < 6000; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '170,150,90'},${r() * .05})`; x.fillRect(r() * w, r() * h, 1, 2); }
+      });
+      const alfaManto = texP('mantoA', 512, 512, (x, w, h, r) => {
+        x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.fillStyle = '#000';
+        for (let x0 = -4; x0 < w + 4;) { const lw = 6 + r() * 18, l = h * (.03 + r() * .2); x.beginPath(); x.moveTo(x0, h + 1); x.lineTo(x0 + lw * (.2 + r() * .6), h - l); x.lineTo(x0 + lw, h + 1); x.fill(); x0 += lw + 4 + r() * 18; }
+        for (let i = 0; i < 6; i++) { const cx = r() * w, cy = h * (.78 + r() * .18), rr = 3 + r() * 6; x.beginPath(); x.ellipse(cx, cy, rr * .5, rr * 3, 0, 0, 7); x.fill(); }
+      }, { linear: true });
+      // tentáculo: ocre amarelado envelhecido, escuro em cima, mais claro embaixo, anéis finos
+      const texTent = texP('tent', 128, 256, (x, w, h, r) => {
+        const gr = x.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#4a3a1a'); gr.addColorStop(.5, '#a8904c'); gr.addColorStop(1, '#4a3a1a'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        for (let y = 0; y < h; y += 5 + r() * 4) { x.fillStyle = `rgba(30,20,8,${.12 + r() * .15})`; x.fillRect(0, y, w, 1.5); }
+        for (let i = 0; i < 40; i++) { x.fillStyle = 'rgba(220,200,140,.35)'; x.beginPath(); x.arc(w * (.4 + r() * .2), r() * h, 2 + r() * 3, 0, 7); x.fill(); }
+        for (let i = 0; i < 2000; i++) { x.fillStyle = `rgba(${r() < .5 ? '20,12,4' : '230,210,150'},${r() * .08})`; x.fillRect(r() * w, r() * h, 1, 1); }
+      }, { rep: [1, 3] });
+      // rosto: pálido amarelado, comprido, órbitas fundas (frente em u = 0,25)
+      const texRosto = texP('rosto', 256, 128, (x, w, h, r) => {
+        x.fillStyle = '#bcb090'; x.fillRect(0, 0, w, h); const FX = w * .25; const sh0 = x.createLinearGradient(0, 0, 0, h); sh0.addColorStop(0, 'rgba(0,0,0,.55)'); sh0.addColorStop(.35, 'rgba(0,0,0,0)'); x.fillStyle = sh0; x.fillRect(0, 0, w, h);
+        [-1, 1].forEach(sx => { const g2 = x.createRadialGradient(FX + sx * 12, h * .44, 1, FX + sx * 12, h * .45, 13); g2.addColorStop(0, '#000'); g2.addColorStop(.6, '#1a140a'); g2.addColorStop(1, 'rgba(60,50,30,0)'); x.fillStyle = g2; x.fillRect(FX + sx * 12 - 15, h * .45 - 15, 30, 30); });
+        x.strokeStyle = 'rgba(40,30,15,.7)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(FX - 8, h * .74); x.quadraticCurveTo(FX, h * .76, FX + 8, h * .74); x.stroke();
+        for (let i = 0; i < 12; i++) { x.strokeStyle = 'rgba(60,50,30,.35)'; x.lineWidth = .7; x.beginPath(); const x0 = FX + (r() - .5) * 40; x.moveTo(x0, h * .2 + r() * 20); x.lineTo(x0 + (r() - .5) * 6, h * (.5 + r() * .4)); x.stroke(); }
+      });
+      // espiral amarela no ar
+      const texEspiral = texP('espiral', 256, 256, (x, w, h) => { x.clearRect(0, 0, w, h); const c = w / 2; x.strokeStyle = 'rgba(255,230,150,1)'; x.lineCap = 'round'; for (let pass = 0; pass < 2; pass++) { x.lineWidth = pass ? 3 : 9; x.globalAlpha = pass ? .9 : .3; x.beginPath(); for (let a = 0; a < PI * 6; a += .05) { const rr = 3 + a * 6.2; x.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr * .9); } x.stroke(); } }, { clamp: true });
+      const texNevoa = texP('nevoa', 128, 128, (x, w, h, r) => { x.clearRect(0, 0, w, h); for (let i = 0; i < 20; i++) { const gx = w / 2 + (r() - .5) * w * .5, gy = h / 2 + (r() - .5) * h * .4, rr = 14 + r() * 30, g2 = x.createRadialGradient(gx, gy, 0, gx, gy, rr); g2.addColorStop(0, 'rgba(255,255,255,.2)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.fillRect(0, 0, w, h); } }, { clamp: true });
+
+      /* ---------- materiais ---------- */
+      const Um = { uT: { value: 0 }, uDrag: { value: 0 }, uAbre: { value: 0 }, uLash: { value: 0 } };
+      // manto: barra ondula pesada e arrasta para trás ao andar; a cauda de trás se arrasta no chão
+      const balanco = { vBegin: `float bx = clamp((2.0 - transformed.y) / 2.0, 0.0, 1.0); bx *= bx;
+        transformed.x += (sin(uT * 0.7 + transformed.y * 1.6 + transformed.z * 2.0) * 0.05 + sin(uT * 1.6 + transformed.x * 4.0) * 0.015) * bx * (1.0 + uAbre);
+        transformed.z += (cos(uT * 0.6 + transformed.y * 1.4 + transformed.x * 3.0) * 0.04 - uDrag * 0.45) * bx;
+        transformed.xz *= 1.0 + uAbre * bx * 0.35;` };
+      const manto = shader(mat({ map: texManto, alphaMap: alfaManto, alphaTest: .5, roughness: .95, duplo: true, color: '#d0c4a8' }), 'ent_rei_manto', Um, balanco);
+      const mantoLiso = shader(mat({ map: texManto, roughness: .95, duplo: true, color: '#d0c4a8' }), 'ent_rei_manto', Um, balanco);
+      // tentáculos: ondulam (cada um no seu ritmo pelo ângulo em volta do corpo), arrastam e chicoteiam (no shader)
+      const tentM = shader(mat({ map: texTent, roughness: .5, color: '#867656', emissive: '#140e04', emissiveIntensity: .3 }), 'ent_rei_tentaculo', Um, {
+        vBegin: `float rr = length(transformed.xz), an = atan(transformed.z, transformed.x), q = clamp((rr - 0.7) / 1.4, 0.0, 1.0);
+          float fase = an * 3.0 + floor((an + 3.1416) * 1.1) * 1.7;
+          float da = sin(uT * 0.9 + fase + rr * 3.0) * 0.22 * q + sin(uT * 1.7 + fase * 1.3 + rr * 6.0) * 0.06 * q;
+          float c = cos(da), s = sin(da); transformed.xz = mat2(c, -s, s, c) * transformed.xz;
+          transformed.y += (sin(uT * 1.2 + fase + rr * 4.0) * 0.08 + 0.05) * q * q + uLash * q * 0.5;
+          transformed.z += uLash * q * q * 1.4 - uDrag * q * q * 0.7;
+          transformed.xz *= 1.0 + uAbre * q * 0.3;` });
+      const garraM = mat({ color: '#2a2218', roughness: .3, metalness: .2 });
+      const maoM = mat({ color: '#3a3428', roughness: .6 });
+      const rostoM = mat({ map: texRosto, roughness: .85, color: '#80765e', emissive: '#14110a', emissiveIntensity: .2 });
+      const dentro = mat({ color: '#020201', roughness: 1 });
+      const coroaM = mat({ color: '#1a1610', roughness: .5, metalness: .4 });
+      const olhoM = mat({ color: '#000', emissive: '#ffe08a', emissiveIntensity: 1.6 });
+      const espM = somar('#e8c060', { map: texEspiral, op: .2 });
+
+      /* ---------- corpo (alto: ombros a 2,95 m) ---------- */
+      const ALT = 3.82;
+      const corpo = grupo(g), tronco = grupo(corpo, 0, 1.3, 0), peito = grupo(tronco, 0, 1.6, 0);
+      // manto: do chão aos ombros (no espaço do corpo), largo embaixo e com cauda atrás
+      const PM = [[0, 1.0, .9], [.25, .88, .78], [.6, .74, .64], [1.0, .62, .52], [1.5, .53, .42], [2.0, .47, .36], [2.4, .44, .32], [2.7, .43, .3], [2.88, .4, .28], [2.98, .3, .22], [3.04, .16, .14]];
+      malha(corpo, uma('manto', () => casca(PM, { seg: 64, deform: (x, y, z, j, u, ang) => {
+        const k = 1 + .06 * Math.sin(ang * 11 + y * 2) * Math.max(0, 1.2 - y / 2) + .04 * fbm(x * 2, y * 2, z * 2);
+        const cauda = z < 0 ? Math.pow(Math.max(0, 1 - y / .9), 2) * (-z / .9) * .9 : 0;
+        return [x * k * 1.15, y, (z * k - cauda) * 1.15];
+      } })), manto);
+      // capa curta sobre os ombros (o volume do alto da figura)
+      malha(peito, uma('capa', () => casca([[-.8, .62, .5], [-.55, .56, .44], [-.3, .5, .38], [-.08, .46, .33], [.02, .4, .29], [.09, .28, .21], [.14, .15, .13]], { seg: 48, deform: (x, y, z, j, u, ang) => { const k = (1 + .08 * Math.sin(ang * 9) * Math.max(0, -y)) * 1.12; return [x * k, y, z * k]; } })), manto);
+      // capuz alto
+      const cab = grupo(peito, 0, .3, .02); cab.scale.setScalar(1.1);
+      malha(cab, uma('capuz', () => casca([[-.2, .2, .22, .02], [-.08, .2, .22, .02], [.05, .19, .2, .01], [.16, .17, .17, -.01], [.26, .14, .14, -.02], [.32, .1, .1, -.02]], { seg: 36, abertura: 1.15, deform: (x, y, z) => [x * (1 + .04 * Math.sin(y * 20)), y, z] })), mantoLiso);
+      malha(cab, uma('capuzDentro', () => mover(new T.SphereGeometry(.17, 14, 10), 0, .0, -.04, 0, 0, 0, 1, 1.3, 1)), dentro);
+      // rosto pálido comprido, recuado no capuz
+      malha(cab, uma('rosto', () => deform(new T.SphereGeometry(.09, 22, 16), (x, y, z) => { let k = 1; if (z > 0) [-1, 1].forEach(sx => { k -= bump(x, sx * .027, .016) * bump(y, .01, .02) * .25; }); return [x * .76 * k, y * 1.55 - (y < 0 ? .02 : 0), z * .9 * k - (y < -.03 ? .012 : 0)]; })), rostoM).position.set(0, -.03, .075);
+      const olhos = [-1, 1].map(sx => { const o = malha(cab, uma('olho', () => new T.SphereGeometry(.007, 6, 4)), olhoM); o.position.set(sx * .022, .0, .145); return o; });
+      const brOlho = halo(cab, '#ffe08a', .12, .02, 0, .16, .25);
+      // coroa: aro e sete pontas longas e finas, levemente abertas
+      const coroa = grupo(cab, 0, .19, -.01);
+      malha(coroa, uma('coroa', () => {
+        const l = [mover(new T.CylinderGeometry(.15, .17, .06, 20, 1, true), 0, 0, 0), mover(new T.TorusGeometry(.165, .012, 5, 24), 0, -.03, 0, PI / 2, 0, 0)];
+        // pontas longas e irregulares: comprimentos e curvas diferentes, umas tortas para fora
+        const N = 9, rc = NS.rng(17); for (let i = 0; i < N; i++) { const a = (i - (N - 1) / 2) * .33, c = (i === 4 ? .5 : .24 + rc() * .26) * (1 - Math.abs(i - 4) * .04), ab = (i - 4) * .08 + (rc() - .5) * .12, tz = (rc() - .5) * .06;
+          l.push(tubo([[Math.sin(a) * .155, .0, Math.cos(a) * .14], [Math.sin(a) * .16 + Math.sin(ab) * c * .2, c * .45, Math.cos(a) * .135 + tz * .5], [Math.sin(a) * .165 + Math.sin(ab) * c * .5 + (rc() - .5) * .03, c * .8, Math.cos(a) * .13 + tz], [Math.sin(a) * .17 + Math.sin(ab) * c * .65, c, Math.cos(a) * .12 + tz * 1.3]], t => .022 * (1 - t * .95), { seg: 12, rad: 5 })); }
+        for (let i = 0; i < 6; i++) { const a = PI + (i - 2.5) * .5; l.push(mover(new T.ConeGeometry(.012, .16, 5), Math.sin(a) * .155, .08, Math.cos(a) * .14)); }
+        return juntar(l);
+      }), coroaM);
+
+      /* ---------- braços longos e garras ---------- */
+      const bracos = [-1, 1].map(k => {
+        const ombro = grupo(peito, k * .41, .02, .0), braco = grupo(ombro), cot = grupo(braco, 0, -.72, 0), mao = grupo(cot, 0, -.66, 0);
+        malha(braco, uma('mangaB', () => deform(new T.CylinderGeometry(.08, .14, .74, 14, 6, true), (x, y, z) => [x * (1 + .1 * Math.sin(y * 12 + x * 20)), y - .36, z])), manto);
+        malha(cot, uma('mangaA', () => deform(new T.CylinderGeometry(.12, .24, .55, 16, 6, true), (x, y, z) => { const an = Math.atan2(x, z); return [x, y - .26 - (y < 0 ? Math.abs(Math.sin(an * 4)) * .14 : 0), z * (1 + .1 * Math.cos(y * 9))]; })), manto);
+        malha(cot, uma('pulso', () => torneado(t => .03 - .006 * t, .66, 10, 8)), maoM);
+        // mão comprida: palma estreita e cinco garras longas e curvas
+        malha(mao, uma('garras', () => { const l = [mover(new T.SphereGeometry(.045, 10, 8), 0, -.05, 0, 0, 0, 0, .8, 1.5, .45)]; for (let i = 0; i < 5; i++) { const x0 = -.032 + i * .016, pol = i === 4; l.push(tubo([[pol ? .035 : x0, pol ? -.04 : -.1, 0], [pol ? .06 : x0 * 1.3, pol ? -.12 : -.22, .03], [pol ? .07 : x0 * 1.5, pol ? -.2 : -.33, .1], [pol ? .06 : x0 * 1.4, pol ? -.25 : -.4, .17]], t => .011 * (1 - t * .9), { seg: 10, rad: 5 })); } return juntar(l); }), garraM);
+        return { ombro, braco, cot, mao, k, Lb: .72, La: .66 };
+      });
+
+      /* ---------- tentáculos (saem de baixo da barra e se enrolam no chão) ---------- */
+      malha(g, uma('tentaculos', () => {
+        const l = [], r = NS.rng(5); const N = 9;
+        for (let i = 0; i < N; i++) {
+          const a = i / N * PI * 2 + .5 + (r() - .5) * .3, H = .25 + r() * 1.25, R1 = 1.05 + r() * .4, cr = .14 + r() * .12, giro = (r() < .5 ? -1 : 1), pts = [];
+          // sai de baixo da barra, corre rente ao chão, ergue-se num arco que se inclina para fora e enrola a ponta
+          const base = [[.62, .08], [.9, .07], [R1, .12], [R1 + .22, .2 + H * .25], [R1 + .3, .2 + H * .62], [R1 + .22, .2 + H * .92]];
+          base.forEach(([R0, Y], k) => { const aa = a + giro * k * .07 + Math.sin(k * 1.7 + i) * .04; pts.push([Math.cos(aa) * R0, Y, Math.sin(aa) * R0]); });
+          const cR = R1 + .22 - cr, cY = .2 + H * .92;
+          for (let k = 1; k <= 14; k++) { const u = k / 14, an = u * PI * 1.9, rad = cr * (1 - u * .75), R0 = cR + Math.cos(an) * rad, Y = cY + Math.sin(an) * rad, aa = a + giro * (.35 + u * .25); pts.push([Math.cos(aa) * R0, Y, Math.sin(aa) * R0]); }
+          l.push(tubo(pts, t => .145 * Math.pow(1 - t, 1.05) + .012, { seg: 64, rad: 9, f: (t, an) => .02 * Math.sin(t * 90) * (1 - t) }));
+        }
+        return juntar(l);
+      }), tentM);
+
+      /* ---------- espiral no ar e névoa amarelada ---------- */
+      const esp = semSombra(malha(peito, uma('espPlano', () => new T.PlaneGeometry(1.6, 1.6)), espM)); esp.position.set(.3, .9, -.6);
+      const NEV = [];
+      for (let i = 0; i < 7; i++) { const m = F.guardar(new T.SpriteMaterial({ map: texNevoa, color: new T.Color('#b8a060'), transparent: true, opacity: 0, depthWrite: false })); const sp = new T.Sprite(m); g.add(sp); NEV.push({ sp, m, vida: i / 7 * 5, dur: 5, a: i * 2.2 }); }
+
+      /* ---------- animação ---------- */
+      const ac = acoes({ ataque: 1.8, revelar: 2.8, ritual: 3.8, conjurar: 1.8 });
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: .9, vCorre: 2.4 });
+      let curva = 0, curvaAlvo = 0, giroE = 0, faseA = 0;
+      const anim = (dt, t, andando) => {
+        mv.passo(dt, andando).vida(dt);
+        const A = ac.passo(dt), tipo = A ? A.tipo : '', k = A ? A.k : 0, kA = sm(mv.k);
+        const prep = tipo === 'ataque' ? sino(k, 0, .3, .45) : 0, golpe = tipo === 'ataque' ? sino(k, .3, .48, 1) : 0;
+        const eRev = tipo === 'revelar' ? env(k, .05, .7) : 0, nasce = tipo === 'revelar' ? sm((k - .05) / .7) : 1;
+        const eRit = tipo === 'ritual' ? env(k, .15, .8) : tipo === 'conjurar' ? env(k, .2, .75) * .8 : 0;
+        curva += (curvaAlvo - curva) * Math.min(1, dt * 1.2);
+        // desliza devagar: o corpo balança como quem anda por baixo do manto
+        faseA += mv.avanco(dt, 1.4);
+        corpo.position.set(Math.sin(faseA) * .03 * kA, Math.abs(Math.cos(faseA)) * .02 * kA, 0);
+        corpo.scale.set(1, .3 + .7 * nasce, 1);
+        corpo.rotation.set(kA * .03 + golpe * .05, Math.sin(faseA) * .04 * kA + Math.sin(t * .13) * .03, Math.max(-.08, Math.min(.08, -mv.giro * mv.vEf * .03)) * kA);
+        // curvado: dobra na cintura e no peito, cabeça volta a olhar para frente
+        tronco.rotation.set(curva * .5 + eRit * -.06 + prep * -.08 + golpe * .2, (golpe - prep) * .3, Math.sin(t * .27) * .015);
+        peito.rotation.set(curva * .45, 0, 0);
+        cab.rotation.set(-curva * .85 + .08 + mv.op * .3 + Math.sin(t * .4) * .03, mv.oy * .25 + Math.sin(t * .17) * .08, Math.sin(t * .23) * .06 - .05);
+        coroa.scale.set(1, .2 + .8 * sm((k - .55) / .3) * (tipo === 'revelar' ? 1 : 0) + (tipo === 'revelar' ? 0 : .8), 1);
+        // braços: pendem ao lado, garras abertas e paradas; ataque varre à frente com a direita; ritual ergue os dois
+        bracos.forEach((b, i) => {
+          let ax = b.k * (.5 + .03 * Math.sin(t * .5 + i)), ay = -1.25 + Math.sin(t * .7 + i * 2) * .02, az = .12 + Math.sin(faseA + i * PI) * .08 * kA, px = b.k, py = 0, pz = -.6;
+          if (i === 0) { if (prep > 0) { ax += (-.9 - ax) * prep; ay += (-.3 - ay) * prep; az += (-.3 - az) * prep; } if (golpe > 0) { const q = sm((k - .3) / .35); ax += ((-.9 + q * 1.4) - ax) * golpe; ay += (-.55 - ay) * golpe; az += (.95 - az) * golpe; pz = -1; } }
+          if (eRit > 0) { ax += (b.k * .85 - ax) * eRit; ay += (.35 - ay) * eRit; az += (.25 - az) * eRit; }
+          if (curva > 0) { az += curva * .35; ay += curva * .2; }
+          ik(b, ax, ay, az, px, py, pz);
+          b.mao.rotation.set(-.1 - golpe * .4 + Math.sin(t * .9 + i) * .05, 0, b.k * .1);
+        });
+        // pano e tentáculos (shader)
+        Um.uT.value = t; Um.uDrag.value = kA * Math.min(1.3, .4 + mv.vEf * .5); Um.uAbre.value = eRit * .5 + eRev * .6 + (1 - nasce) * .5; Um.uLash.value = golpe * 1.0 + prep * -.2;
+        // olhos e espiral
+        olhoM.emissiveIntensity = 1.2 + Math.sin(t * .9) * .4 + eRit * 2 + golpe; brOlho.material.opacity = .15 + .08 * Math.sin(t * .9) + eRit * .3;
+        giroE += dt * (.15 + eRit * 2.5 + eRev * 1.5); esp.rotation.z = giroE; espM.opacity = (.14 + .05 * Math.sin(t * .6) + eRit * .6 + eRev * .3) * (1 - curva * .6); esp.scale.setScalar(1 + eRit * .6);
+        // névoa amarelada em volta da base
+        const nv = ret.nivelLOD || 0;
+        NEV.forEach((f, i) => {
+          f.vida += dt * (1 + eRev * 2); if (f.vida >= f.dur) { f.vida = 0; f.a += 2.39; }
+          const q = f.vida / f.dur, rr = .8 + q * .9;
+          f.sp.position.set(Math.sin(f.a) * rr, .2 + q * (.8 + eRev * 1.5), Math.cos(f.a) * rr - kA * q);
+          f.sp.scale.setScalar(1.2 + q * 1.4); f.m.opacity = (nv >= 2 && i > 2 ? 0 : 1) * Math.sin(q * PI) * (.16 + eRev * .3); f.m.rotation = f.a + q;
+        });
+      };
+      const ret = { g, alt: ALT, raioBase: 1.0, anim, acao: tipo => ac.disparar(tipo),
+        estado: nome => { if (nome === 'curvado' || nome === 'curvada') curvaAlvo = 1; else if (nome === 'ereto' || nome === 'ereta' || nome === 'padrao') curvaAlvo = 0; } };
+      anim(0, 0, false);
+      return ret;
     },
   };
 })();
@@ -9610,7 +12873,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const mola = x => x <= 0 ? 0 : 1 - Math.exp(-x * 9) * Math.cos(x * 24);
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.9 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.07 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         let wA = 0, yA = 0, trA = 0, bowR = 0, gritoR = 0, uR = -1;
         if (acA) {
           acA.t += dt; const u = acA.t;
@@ -9624,15 +12890,15 @@
           }
           if (u >= acA.dur) acA = null;
         }
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 3);
+        desl = kA;
         // andar de passos longos e arrastados; parado, oscila como quem conduz uma orquestra
-        if (andando) fase += dt * 3.2;
+        fase += mv.ritmo(dt, 3.2, 1.07);
         const a = Math.sin(fase) * .5 * desl;
         pernas[0].braco.rotation.x = a; pernas[1].braco.rotation.x = -a;
         pernas[0].cot.rotation.x = Math.max(0, -Math.cos(fase)) * .7 * desl + .05; pernas[1].cot.rotation.x = Math.max(0, Math.cos(fase)) * .7 * desl + .05;
         pernas.forEach(p => { p.bota.rotation.x = -p.cot.rotation.x * .4; });
         corpo.position.y = -Math.abs(Math.sin(fase)) * .04 * desl;
-        alto.rotation.x = -.1 + desl * .12 + Math.sin(t * .6) * .02 - wA * .16 + yA * .4 + bowR * .45 - gritoR * .16; alto.rotation.z = Math.sin(t * .5) * .03 + Math.sin(fase) * .04 * desl;
+        alto.rotation.x = -.1 + desl * .12 + Math.sin(t * .6) * .02 - wA * .16 + yA * .4 + bowR * .45 - gritoR * .16; alto.rotation.z = Math.sin(t * .5) * .03 + Math.sin(fase) * .04 * desl + bank;
         // a batuta desenha um oito no ar, com acentos bruscos
         const ac = Math.pow(Math.max(0, Math.sin(t * 1.4)), 6) * .08;
         // ataque: a batuta sobe e corta para baixo e para a frente; revelar: braços caídos que se erguem
@@ -10026,7 +13292,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const mix = (o, k2, v, w) => { o[k2] = o[k2] * (1 - w) + v * w; };
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.9 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const tt = t + des;
         nuc.pulso(tt);
         // pesos das ações: endireitar, agarrar, golpe de cima (ataque); pescoço quebrado, aceno e reverência (revelar)
@@ -10051,8 +13320,8 @@
         prox -= dt; if (prox <= 0) { prox = 3 + ra() * 4; alvoIncl = (ra() < .7 ? 1 : -1) * (.25 + ra() * .2); }
         incl += (alvoIncl - incl) * Math.min(1, dt * .8);
         cab.rotation.z = incl; cab.rotation.x = .08 + Math.sin(tt * .4) * .03; cab.rotation.y = Math.sin(tt * .25) * .12;
-        ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 4);
-        if (andando) fase += dt * 3.6;
+        ritmo = kA;
+        fase += mv.ritmo(dt, 3.6, .9);
         const sn = Math.sin(fase), R = ritmo;
         pernas.forEach((p, i) => {
           const s2 = i ? -sn : sn;
@@ -10061,7 +13330,7 @@
           ap(p.tornozelo.rotation, 'x', s2 * .15 * R, 10, dt);
         });
         corpo.position.y = -R * Math.abs(Math.cos(fase)) * .012;
-        corpo.rotation.z = R * sn * .02;
+        corpo.rotation.z = R * sn * .02 + bank;
         peito.rotation.y = -R * sn * .06;
         // mão direita erguida num aceno lento; a esquerda pende com os dedos abertos
         ap(D.ombro.rotation, 'x', -.35, 4, dt); ap(D.ombro.rotation, 'z', .55 + Math.sin(tt * .6) * .04, 4, dt);
@@ -10399,7 +13668,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const matTela = tela.material, eTela = matTela.emissiveIntensity;
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.5 : 1.9 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.2 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         nuc.pulso(t);
         // pesos das ações: grito e abraço (ataque); foto surgindo, todos se viram, convite (revelar)
         let grito = 0, abraco = 0, avanca = 0, surge = 1, encara = 0, convite = 0, ativo = false;
@@ -10419,7 +13691,7 @@
         // braços abertos que "acolhem": abrem e fecham devagar, dedos dobrando como quem chama
         const ab = Math.sin(t * .45) * .12;
         bracos.forEach((B, i) => {
-          B.b.rotation.z = B.sx * (.75 + ab) + (andando ? Math.sin(fase + i * 3) * .05 : 0);
+          B.b.rotation.z = B.sx * (.75 + ab) + Math.sin(fase + i * 3) * .05 * kA;
           B.b.rotation.x = Math.sin(t * .6 + i) * .05;
           B.cot.rotation.z = -B.sx * (.35 - ab * .5);
           B.dedos.forEach((d, j) => { d.rotation.x = -.35 - Math.max(0, Math.sin(t * 1.4 - j * .5 + i * 2)) * .7 * (1 - abraco) - abraco * (1.5 + (j === 4 ? -.6 : 0)) + convite * .3; });
@@ -10439,7 +13711,7 @@
         tronco.rotation.x = -.03 + avanca * .22;
         corpo.position.z = avanca * .2;
         // farrapos e pingos
-        trapos.forEach((p, i) => { p.rotation.x = Math.sin(t * 1.6 + i) * (andando ? .25 : .07); p.rotation.z = Math.sin(t * 1.1 + i * 2) * .05; });
+        trapos.forEach((p, i) => { p.rotation.x = Math.sin(t * 1.6 + i) * (.07 + .18 * kA); p.rotation.z = Math.sin(t * 1.1 + i * 2) * .05; });
         pingos.forEach(P => { P.f += dt * .25; if (P.f > 1) P.f = 0; P.p.scale.y = P.comp * (.3 + P.f * .9); });
         // a pintura muda: olhos que andam juntos, piscadas, sorriso crescendo, alguém vira o rosto, velas tremendo
         tOlhar -= dt; if (tOlhar <= 0) { tOlhar = .8 + R() * 2.5; alvoX = R() < .4 ? 0 : (R() - .5) * 2; alvoY = (R() - .5) * 1.2; }
@@ -10454,11 +13726,11 @@
         if (encara > 0) { est.vira = -1; est.olhoX = 0; est.olhoY = 0; est.pisca = -1; est.sorriso = est.sorriso * (1 - encara) + 1.15 * encara; tVira = Math.max(tVira, 1.5); }
         matTela.emissiveIntensity = eTela * (1 + grito * 2.5 + encara * 1.2) * (.25 + surge * .75);
         tPint -= dt; if (tPint <= 0) { tPint = ativo ? .05 : .14; for (let i = 0; i < 5; i++) est.chama[i] = (.75 + R() * .45) * (1 + convite * .7 + grito * .4); pintar(est); }
-        if (andando) {
+        if (kA > .01) {
           // passos duros e compridos, ombros quase parados
-          fase += dt * 4.5; const a = Math.sin(fase);
+          fase += mv.ritmo(dt, 4.5, 1.2); const a = Math.sin(fase) * kA;
           pernas[0].p.rotation.x = a * .42; pernas[1].p.rotation.x = -a * .42;
-          corpo.position.y = Math.abs(Math.cos(fase)) * .03; tronco.rotation.y = a * .06; casacoM.rotation.y = -a * .04;
+          corpo.position.y = Math.abs(Math.cos(fase)) * .03 * kA; tronco.rotation.y = a * .06; tronco.rotation.z = bank; casacoM.rotation.y = -a * .04;
         } else {
           pernas.forEach(P => { P.p.rotation.x *= .9; }); corpo.position.y *= .9; tronco.rotation.y *= .9;
           tronco.rotation.z = Math.sin(t * .4) * .02; casacoM.rotation.y = Math.sin(t * .5) * .015;
@@ -10953,12 +14225,15 @@
 
       /* ---------- animação ---------- */
       let desl = 0;
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0 });
       const anim = (dt, t, andando) => {
-        desl += ((andando ? 1 : 0) - desl) * Math.min(1, dt * 2.5);
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
+        desl = kA * Math.min(1.6, .55 + mv.vEf / 3.2);
         // desliza devagar, balançando de um lado para o outro
         corpo.position.y = desl * (.02 + Math.sin(t * 2) * .008);
         corpo.rotation.z = Math.sin(t * .5) * .02 + desl * Math.sin(t * 1.6) * .03;
-        corpo.rotation.x = desl * .04;
+        corpo.rotation.x = desl * .04 + ace; corpo.rotation.z += bank;
         // os braços apertam devagar e afrouxam; o corpo cede junto
         const aperto = Math.pow(.5 + .5 * Math.sin(t * .9), 2);
         tronco.scale.set(1 - aperto * .03, 1 + aperto * .006, 1 - aperto * .03);
@@ -11245,7 +14520,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const eOlho = olhoM.emissiveIntensity, eOlhinho = olhinho.emissiveIntensity, FRENTE = new T.Vector3(0, 1.1, 3.5);
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.4 : 1.9 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         nuc.pulso(t);
         // pesos das ações: olhos arregalados e travados na frente, corpo avançando, dedos em chicote, olhos fechados
         let arregala = 0, trava = 0, bote = 0, chicote = 0, fechados = 0, enrola = 0, acende = 0, uA = -1;
@@ -11296,8 +14574,8 @@
         });
         if (andando) {
           // anda em "quadros": congela, salta para outra pose, congela de novo
-          tPose -= dt; if (tPose <= 0) { tPose = .18 + R() * .25; poseA = R() * 6.283; quadro++; }
-          corpo.position.y = .04 + Math.abs(Math.sin(poseA)) * .06; corpo.rotation.z = Math.sin(poseA) * .08; corpo.rotation.x = .05 + Math.cos(poseA) * .05;
+          tPose -= dt * Math.max(.6, Math.min(2.2, mv.vEf / 1.4)); if (tPose <= 0) { tPose = .18 + R() * .25; poseA = R() * 6.283; quadro++; }
+          corpo.position.y = .04 + Math.abs(Math.sin(poseA)) * .06; corpo.rotation.z = Math.sin(poseA) * .08 + bank; corpo.rotation.x = .05 + Math.cos(poseA) * .05 + ace;
           cab.rotation.y = Math.sin(poseA * 3) * .3;
         } else {
           tPose = 0; corpo.position.y *= .8; corpo.rotation.z *= .8; corpo.rotation.x *= .8;
@@ -11515,7 +14793,10 @@
       const sua = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.45 : 1.95 }; };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kM = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kM, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kM;
         nuc.pulso(t);
         // pesos das ações: virar de estalo, agarrar, fechar a mão (ataque); cabeça baixa, orelhas abrindo, escutar (revelar)
         let estalo = 0, agarra = 0, fecha = 0, baixa = 0, abreO = 0, murcha = 0, escuta = 0;
@@ -11560,11 +14841,11 @@
         // respiração lenta, panos balançando
         const resp = Math.sin(t * .7);
         mantoM.scale.set(1 + resp * .012, 1, 1 + resp * .015);
-        tiras.forEach((T0, i) => { T0.piv.rotation.x = Math.sin(t * 1.2 + T0.f) * (andando ? .22 : .06); T0.piv.rotation.z = Math.sin(t * .8 + T0.f * 2) * .04; });
-        if (andando) {
+        tiras.forEach((T0, i) => { T0.piv.rotation.x = Math.sin(t * 1.2 + T0.f) * (.06 + .16 * kM); T0.piv.rotation.z = Math.sin(t * .8 + T0.f * 2) * .04; });
+        if (kM > .01) {
           // desliza sem passos: nada sobe e desce, só o pano ondula e o corpo se inclina para a frente
-          fase += dt * 2.2; tronco.rotation.x = .12 + Math.sin(fase) * .02; tronco.rotation.z = Math.sin(fase * .5) * .03;
-          bP.rotation.x = .15 + Math.sin(fase) * .08;
+          fase += mv.ritmo(dt, 2.2, 1.0); tronco.rotation.x = .05 + (.07 + Math.sin(fase) * .02) * kM + ace; tronco.rotation.z = Math.sin(fase * .5) * .03 * kM + bank;
+          bP.rotation.x = .05 + (.1 + Math.sin(fase) * .08) * kM;
         } else { tronco.rotation.x += (.05 - tronco.rotation.x) * .05; tronco.rotation.z *= .95; bP.rotation.x += (.05 + Math.sin(t * .5) * .03 - bP.rotation.x) * .05; }
         // ataque: o braço comprido sobe para a frente e o corpo se debruça sobre a vítima
         if (agarra > 0 || baixa > 0 || escuta > 0) {
@@ -11915,7 +15196,10 @@
       const A = acoes();
       let fase = 0, tTrem = 0, trem = V(0, 0, 0), servo = 0, tServo = 0, chicote = 0;
       const sW = V(0, 0, 0), mInv = new T.Matrix4();
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.9 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         A.passo(dt);
         const atq = A.ativo('ataque') ? A.k : -1, rev = A.ativo('revelar') ? A.k : -1;
         nuc.pulso(t, dt);
@@ -11942,20 +15226,20 @@
         bH.rotation.set(.05 + Math.sin(t * .5) * .03, 0, -.1); cotH.rotation.x = -.15; maoH.rotation.set(-.1, .3, 0);
         dedosH.forEach((d, i) => { d.rotation.x = -.25 - Math.max(0, Math.sin(t * 1.3 + i)) * .3; });
         // andar mancando: a perna de plástico quase não dobra
-        if (andando) {
-          fase += dt * 3.4; const a = Math.sin(fase);
+        if (kA > .01) {
+          fase += mv.ritmo(dt, 3.4, .9); const a = Math.sin(fase) * kA;
           const Pp = pernas[0], Pm = pernas[1];
           Pp.p.rotation.x = a * .3; Pp.joe.rotation.x = Math.max(0, -a) * .12; Pp.pe.rotation.x = -a * .1;
           Pm.p.rotation.x = -a * .42; Pm.joe.rotation.x = Math.max(0, a) * .75; Pm.pe.rotation.x = a * .2;
           // o corpo afunda e inclina quando pisa na perna de plástico
-          corpo.position.y = -Math.max(0, Math.sin(fase)) * .045 + Math.abs(Math.cos(fase)) * .015; corpo.rotation.z = Math.sin(fase) * .05;
-          tronco.rotation.z = -Math.sin(fase) * .04; bH.rotation.x += -a * .2; bR.rotation.x += a * .1;
+          corpo.position.y = (-Math.max(0, Math.sin(fase)) * .045 + Math.abs(Math.cos(fase)) * .015) * kA; corpo.rotation.z = Math.sin(fase) * .05 * kA + bank;
+          tronco.rotation.z = -Math.sin(fase) * .04 * kA; bH.rotation.x += -a * .2; bR.rotation.x += a * .1;
         } else {
           pernas.forEach(Pn => { Pn.p.rotation.x *= .9; Pn.joe.rotation.x *= .9; Pn.pe.rotation.x *= .9; Pn.p.rotation.z = Pn.sx * .03; });
           corpo.position.y *= .9; corpo.rotation.z *= .9; tronco.rotation.z = Math.sin(t * .37) * .02;
         }
         tronco.rotation.x = -.14 + Math.sin(t * 1.1) * .012 - (rev >= 0 ? sino(rev, .3, .4, .7) * .08 : 0);
-        camM.rotation.y = Math.sin(t * .8) * .02; cracha.rotation.x = Math.sin(t * 1.7) * .15 + (andando ? Math.sin(fase * 2) * .3 : 0); cracha.rotation.z = Math.sin(t * 1.1) * .1;
+        camM.rotation.y = Math.sin(t * .8) * .02; cracha.rotation.x = Math.sin(t * 1.7) * .15 + Math.sin(fase * 2) * .3 * kA; cracha.rotation.z = Math.sin(t * 1.1) * .1;
         // cabos: sobem até o teto balançando, ou esticam até a parede com pulsos de luz
         conectado += (querConectar - conectado) * Math.min(1, dt * 2.5);
         chicote = rev >= 0 ? sino(rev, 0, .3, .9) : Math.max(0, chicote - dt);
@@ -12348,9 +15632,12 @@
       /* ================= animação ================= */
       let fase = 0, kAnda = 0;
       const tmp = V3(), tmp2 = V3();
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.5 });
       const anim = (dt, t, andando) => {
-        kAnda += ((andando ? 1 : 0) - kAnda) * Math.min(1, dt * 3);
-        fase += dt * (.5 + .1 * Math.sin(t * .7)) * kAnda;
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
+        kAnda = kA;
+        fase += dt * (.5 + .1 * Math.sin(t * .7)) * kAnda * Math.max(.6, Math.min(3, mv.vEf / .55));
         // passadas: cada membro com seu ritmo (manco e desigual)
         let pesoE = 0, pesoD = 0;
         membros.forEach(m => {
@@ -12366,7 +15653,7 @@
         const resp = Math.sin(t * 1.15 + .5 * Math.sin(t * .37)) + .4 * Math.sin(t * 2.9), soluco = tique(t, 5.3, .35);
         torso.scale.set(1 + resp * .02, 1 + resp * .025 + soluco * .04, 1);
         corpo.position.set(0, -.04 * pesoE * kAnda + Math.sin(t * 1.15) * .015 - soluco * .03, Math.sin(fase * 6.283 * 2) * .04 * kAnda);
-        corpo.rotation.set(Math.sin(fase * 6.283) * .03 * kAnda, Math.sin(fase * 6.283) * .05 * kAnda, -.08 * pesoE * kAnda + .03 * pesoD * kAnda + Math.sin(t * .5) * .015);
+        corpo.rotation.set(Math.sin(fase * 6.283) * .03 * kAnda, Math.sin(fase * 6.283) * .05 * kAnda, -.08 * pesoE * kAnda + .03 * pesoD * kAnda + Math.sin(t * .5) * .015 + bank);
         const ex = acaoCorpo(dt, t);
         corpo.updateMatrix();
         // membros por IK (ombro preso ao corpo, mão/pé no alvo)
@@ -12711,7 +15998,10 @@
       const A = acoes();
       let fase = 0, tFalha = 1, falhaT = 0, alvoF = null, offF = V(0, 0, 0), tFant = 0, emit = 0;
       const falhaveis = [cab, bD.cot, bE.cot, casacoM, pernas[0].joe, tronco], bases = falhaveis.map(o => o.position.clone());
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.9 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         A.passo(dt);
         const atq = A.ativo('ataque') ? A.k : -1, rev = A.ativo('revelar') ? A.k : -1;
         U.uT.value = t; nuc.pulso(t, dt);
@@ -12725,16 +16015,16 @@
         bD.b.rotation.set(.05, 0, -.12); bD.cot.rotation.set(-.2, 0, .05); bD.cot.position.set(0, -.36, .015); bD.mao.rotation.set(-.1, .4, 0);
         bE.b.rotation.set(-.15, 0, .28); bE.cot.rotation.set(-.55, 0, -.1); bE.cot.position.set(0, -.36, .015); bE.mao.rotation.set(-.2, -.6, 0);
         bD.dedos.forEach((d, i) => { d.rotation.x = -.3 - Math.max(0, Math.sin(t * 1.5 + i * .6)) * .5; });
-        if (andando) {
+        if (kA > .01) {
           // passos longos e lisos, sem balanço: desliza; deixa uma cópia para trás de tempos em tempos
-          fase += dt * 3.6; const a = Math.sin(fase);
+          fase += mv.ritmo(dt, 3.6, .9); const a = Math.sin(fase) * kA;
           pernas[0].p.rotation.x = a * .4; pernas[1].p.rotation.x = -a * .4;
           pernas[0].joe.rotation.x = Math.max(0, -a) * .55; pernas[1].joe.rotation.x = Math.max(0, a) * .55;
           pernas[0].pe.rotation.x = -a * .15; pernas[1].pe.rotation.x = a * .15;
-          tronco.position.y = quadril + Math.abs(Math.cos(fase)) * .015; bD.b.rotation.x += -a * .2;
-          trapos.forEach((p, i) => { p.rotation.x = -.25 + Math.sin(t * 5 + i) * .15; });
+          tronco.position.y = quadril + Math.abs(Math.cos(fase)) * .015 * kA; tronco.rotation.z += bank; bD.b.rotation.x += -a * .2;
+          trapos.forEach((p, i) => { p.rotation.x = (-.25 + Math.sin(t * 5 + i) * .15) * kA; });
           casacoM.rotation.y = a * .03;
-          tFant -= dt; if (tFant <= 0) { tFant = .7; soltarFantasma(); }
+          if (andando) { tFant -= dt; if (tFant <= 0) { tFant = .7; soltarFantasma(); } }
         } else {
           pernas.forEach(P => { P.p.rotation.x *= .9; P.joe.rotation.x *= .9; P.pe.rotation.x *= .9; P.p.rotation.z = P.sx * .03; });
           trapos.forEach((p, i) => { p.rotation.x = Math.sin(t * 1.2 + i) * .06; p.rotation.z = Math.sin(t * .9 + i * 2) * .05; });
@@ -13053,7 +16343,10 @@
       const faixa = (u, a, b) => sua((u - a) / (b - a));
       const ePele = pele.emissiveIntensity, ePeleM = peleM.emissiveIntensity;
       const acao = tipo => { if (tipo === 'ataque' || tipo === 'revelar') { acA = { tipo, t: 0, dur: tipo === 'ataque' ? 1.4 : 1.9 }; falha = 0; } };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 0.95 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         nuc.pulso(t);
         // pesos das ações
         let bote = 0, pisca = 0, escreve = 1, acende = 0, olha = 0, uA = -1, tipoA = '';
@@ -13081,14 +16374,14 @@
         cab.rotation.x = -.62 + Math.sin(t * .5) * .08;
         // dedos inquietos
         bracos.forEach((B, j) => B.dedos.forEach((d, i) => { d.rotation.x = Math.sin(t * (2.1 + i * .7) + j * 3) * .18 + (Math.sin(t * 11 + i) > .93 ? .4 : 0); }));
-        if (andando) {
+        if (kA > .01) {
           // anda arrastando: passos curtos, tronco balançando, um pé que se arrasta
-          fase += dt * 4.2; const a = Math.sin(fase);
-          pernas[0].p.rotation.x = -.05 + a * .38; pernas[1].p.rotation.x = .05 - a * .22;
-          pernas[1].pe.rotation.x = .25 + a * .1;
-          corpo.rotation.z = Math.sin(fase) * .07; corpo.position.y = Math.abs(Math.cos(fase)) * .025;
-          tronco.rotation.x = .06 + Math.sin(fase * 2) * .04;
-          bracos.forEach((B, i) => { B.b.rotation.x = -.14 + (i ? -1 : 1) * a * .3; B.cot.rotation.x = (B.sx > 0 ? -.25 : -.45) + Math.sin(fase * 2 + i) * .15; });
+          fase += mv.ritmo(dt, 4.2, .95); const a = Math.sin(fase) * kA;
+          pernas[0].p.rotation.x = -.05 * kA + a * .38; pernas[1].p.rotation.x = .05 * kA - a * .22;
+          pernas[1].pe.rotation.x = .25 * kA + a * .1;
+          corpo.rotation.z = Math.sin(fase) * .07 * kA + Math.sin(t * .45) * .03 * (1 - kA) + bank; corpo.position.y = Math.abs(Math.cos(fase)) * .025 * kA;
+          tronco.rotation.x = -.04 + (.1 + Math.sin(fase * 2) * .04) * kA;
+          bracos.forEach((B, i) => { B.b.rotation.x = -.14 + (i ? -1 : 1) * a * .3; B.cot.rotation.x = (B.sx > 0 ? -.25 : -.45) + Math.sin(fase * 2 + i) * .15 * kA; });
         } else {
           pernas.forEach(P => { P.p.rotation.x += ((P.sx < 0 ? -.14 : .1) - P.p.rotation.x) * .1; P.pe.rotation.x *= .9; });
           corpo.rotation.z = Math.sin(t * .45) * .03; corpo.position.y *= .9;
@@ -13454,7 +16747,10 @@
       const ra = K.rngDe(K.semente + 51), des = ra() * 10;
       let fase = 0, ritmo = 0, ultPasso = 0;
       const ap = (o, k2, v, vel, dt) => { o[k2] += (v - o[k2]) * Math.min(1, dt * vel); };
+      // motor de movimento (tokens3d.js): velocidade real, curvas e pesos suaves entre parado e andando
+      const mv = NS.mov(g, { sem: s && s.semente, vPadrao: 1.0 });
       const anim = (dt, t, andando) => {
+        mv.passo(dt, andando); const kA = NS.movSuave(mv.k), bank = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .045)) * kA, ace = Math.max(-.06, Math.min(.09, mv.acel * .02)) * kA;
         const tt = t + des;
         const resp = Math.sin(tt * .9) + Math.sin(tt * .37) * .4;
         peito.scale.set(1 + resp * .018, 1 + resp * .01, 1 + resp * .025);
@@ -13462,8 +16758,8 @@
         cab.rotation.y = Math.sin(tt * .23) * .35 + Math.sin(tt * .71) * .05;
         cab.rotation.x = .05 + Math.sin(tt * .5) * .05;
         mand.rotation.x = .12 + Math.max(0, Math.sin(tt * .9)) * .12;
-        ritmo += ((andando ? 1 : 0) - ritmo) * Math.min(1, dt * 3);
-        if (andando) fase += dt * 2.2;
+        ritmo = kA;
+        fase += mv.ritmo(dt, 2.2, 1.0);
         const sn = Math.sin(fase), R = ritmo;
         pernas.forEach((p, i) => {
           const s2 = i ? -sn : sn;
@@ -13474,7 +16770,7 @@
         // impacto de cada passo: corpo afunda, ombros sacodem, anel de poeira
         const imp = Math.pow(Math.abs(Math.cos(fase)), 6);
         corpo.position.y = R * (-.05 - imp * .06) * esc;
-        corpo.rotation.z = R * sn * .07 + (1 - R) * Math.sin(tt * .3) * .015;
+        corpo.rotation.z = R * sn * .07 + (1 - R) * Math.sin(tt * .3) * .015 + bank;
         peito.rotation.x = .42 + R * imp * .05 + Math.sin(tt * .9) * .01;
         peito.rotation.y = -R * sn * .1;
         const passo = Math.floor((fase + Math.PI / 2) / Math.PI);
@@ -13748,23 +17044,79 @@
     r.computeBoundingSphere(); r.computeBoundingBox();
     return r;
   }
+  // cache da decimação pelo conteúdo da geometria: a mesma peça (outra cópia da forma, o 3D reaberto, outro andar) não é
+  // decimada de novo. A geometria guardada é compartilhada (só leitura) e tem teto de vértices.
+  const CACHE_DEC = new Map(); let vertsCache = 0; const TETO_CACHE = 600000;
+  function impressao(g) {
+    let h = 2166136261 >>> 0;
+    const mistura = a => { if (!a) return; const u = new Uint32Array(a.buffer, a.byteOffset, a.byteLength >> 2); for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619) >>> 0; } h ^= u.length; h = Math.imul(h, 16777619) >>> 0; };
+    Object.keys(g.attributes).sort().forEach(nm => { const at = g.attributes[nm]; if (at && at.array && !at.isInterleavedBufferAttribute) mistura(at.array); h ^= nm.length; });
+    if (g.index) mistura(g.index.array);
+    return h.toString(36) + ':' + g.attributes.position.count + ':' + (g.index ? g.index.count : 0);
+  }
+  function decimarC(T, g, k, miudaMin, kArea) {
+    let chave = null;
+    try { chave = impressao(g) + '|' + k + '|' + miudaMin.toFixed(5) + '|' + kArea; } catch (e) { chave = null; }
+    if (chave && CACHE_DEC.has(chave)) { const r = CACHE_DEC.get(chave); CACHE_DEC.delete(chave); CACHE_DEC.set(chave, r); return r; }
+    const r = decimar(T, g, k, miudaMin, kArea);
+    if (chave) {
+      CACHE_DEC.set(chave, r); vertsCache += r ? r.attributes.position.count : 0;
+      while (vertsCache > TETO_CACHE && CACHE_DEC.size > 1) { const [k0, v0] = CACHE_DEC.entries().next().value; CACHE_DEC.delete(k0); vertsCache -= v0 ? v0.attributes.position.count : 0; }
+    }
+    return r;
+  }
+  function niveisDe(T, F, x, alt) {
+    const g = x.g;
+    if (x.miuda) return { o: x.o, g, niveis: [g, g, g], v0: g.attributes.position.version };   // miúda: não decima, mas entra na silhueta
+    let m = null, l = null;
+    try { m = decimarC(T, g, LOD.kMedio, 0, .8); l = decimarC(T, g, LOD.kLonge, alt * .015, .65) || m; } catch (e) { m = l = null; }
+    if (l && m && l !== m && triangulos(l) >= triangulos(m)) l = m;   // a silhueta nunca pesa mais que o médio
+    if (m) F.guardar(m); if (l && l !== m) F.guardar(l);
+    return { o: x.o, g, niveis: [g, m || g, l || m || g], v0: g.attributes.position.version };
+  }
+  // fila dos níveis adiados (3D aberto): uma forma que entra aparece na hora, detalhada, e os níveis de longe são
+  // calculados depois, em fatias pequenas de tempo ocioso (a decimação era ~80% do custo de montar uma forma)
+  const FILA = []; let agendado = false, sessao = 0;
+  const ocioso = f => (window.requestIdleCallback ? requestIdleCallback(f, { timeout: 250 }) : setTimeout(() => f(null), 30));
+  function agendar() { if (agendado || !FILA.length) return; agendado = true; ocioso(rodarFila); }
+  function rodarFila(dl) {
+    agendado = false;
+    const t0 = performance.now(), prazo = () => dl && dl.timeRemaining ? dl.timeRemaining() > 2 && performance.now() - t0 < 8 : performance.now() - t0 < 6;
+    let feitos = 0;
+    while (FILA.length && (feitos === 0 || prazo())) {
+      const j = FILA[0];
+      if (j.sessao !== sessao || !j.r.g.parent) { FILA.shift(); j.r.__lodPend = false; continue; }
+      if (j.i < j.itens.length) { j.malhas.push(niveisDe(j.T, j.F, j.itens[j.i++], j.alt)); feitos++; continue; }
+      FILA.shift(); j.r.__lodPend = false;
+      try { montarLOD(j.F, j.r, j.T, j.malhas); } catch (e) { console.warn('3D LOD:', e); }
+      feitos++;
+    }
+    agendar();
+  }
+  // sala3d.js liga o adiamento enquanto o 3D está aberto; ao fechar, a fila é descartada
+  NS.lodAdiar = false;
+  NS.lodSessao = () => { sessao++; FILA.length = 0; };
+  NS.lodPendentes = () => FILA.length;
   // prepara os níveis de todas as malhas de uma forma montada ({ g, anim, ... }) e instala r.lod(dist)
   NS.prepararLOD = function (F, r) {
     const T = F.T || window.THREE; if (!T || !r || !r.g || !LOD.ligado) return r;
-    const malhas = [];
-    let alt = r.alt || 2;
+    if (r.lod || r.__lodPend) return r;
+    const itens = [];
+    const alt = r.alt || 2;
     r.g.traverse(o => {
       if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.isSprite) return;
       const g = o.geometry; if (!g || !g.attributes || !g.attributes.position || g.morphAttributes && Object.keys(g.morphAttributes).length) return;
       { const pa = g.attributes.position.array; for (let i = 0; i < pa.length; i++) if (!isFinite(pa[i])) return; }   // posição inválida: fica como está, sem LOD
       if (Array.isArray(o.material)) return;   // vários materiais na mesma geometria (grupos): fica detalhada
-      if (triangulos(g) < LOD.minTri) { malhas.push({ o, g, niveis: [g, g, g], v0: g.attributes.position.version }); return; }   // miúda: não decima, mas entra na silhueta
-      let m = null, l = null;
-      try { m = decimar(T, g, LOD.kMedio, 0, .8); l = decimar(T, g, LOD.kLonge, alt * .015, .65) || m; } catch (e) { m = l = null; }
-      if (l && m && l !== m && triangulos(l) >= triangulos(m)) { l.dispose(); l = m; }   // a silhueta nunca pesa mais que o médio
-      if (m) F.guardar(m); if (l && l !== m) F.guardar(l);
-      malhas.push({ o, g, niveis: [g, m || g, l || m || g], v0: g.attributes.position.version });
+      itens.push({ o, g, miuda: triangulos(g) < LOD.minTri });
     });
+    if (!NS.lodAdiar) return montarLOD(F, r, T, itens.map(x => niveisDe(T, F, x, alt)));
+    r.__lodPend = true;
+    FILA.push({ F, r, T, itens, malhas: [], i: 0, alt, sessao });
+    agendar();
+    return r;
+  };
+  function montarLOD(F, r, T, malhas) {
     const tri = [0, 0, 0];
     malhas.forEach(x => { for (let i = 0; i < 3; i++) tri[i] += x.niveis ? triangulos(x.niveis[i]) : triangulos(x.g); });
     // silhueta (> 20 m): as malhas do nível de longe fundidas por material (poucas chamadas de desenho por forma).

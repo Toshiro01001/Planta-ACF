@@ -172,6 +172,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--texto-dim); margin-top: 3px; text-transform: uppercase; letter-spacing: .1em;
 }
 .mostra-elementos .sala-el { display: block; }
+/* Parede de Desejos na sala (mapa/paredes): o símbolo do Eco em traço, na cor da forma atual; toque abre a Parede */
+.sala-parede { position: absolute; left: 6%; bottom: 7%; width: 46px; height: 46px; padding: 3px; border-radius: 8px; z-index: 2; cursor: pointer;
+  background: radial-gradient(circle, #24201c, #0d0b0a 75%); border: 1px solid color-mix(in srgb, var(--eco-b) 60%, #000); box-shadow: 0 0 10px color-mix(in srgb, var(--eco-b) 55%, transparent); }
+.sala-parede svg { width: 100%; height: 100%; display: block; fill: none; stroke: var(--eco-l); stroke-width: 2.6; stroke-linecap: round; filter: drop-shadow(0 0 2px var(--eco-b)); }
+.sala-parede .ec-v { stroke: rgba(130,170,60,.6); stroke-width: 1.4; fill: rgba(110,140,40,.22); filter: none; }
+.sala-parede .ec-o { fill: var(--eco-l); stroke: none; }
+.sala-parede:hover, .sala-parede:focus-visible { outline: 2px solid var(--eco-l); outline-offset: 2px; }
 .sala.neutra .sala-cn { color: #7fe3d6; }
 .sala.vazia-planta .sala-cn { color: rgba(236,230,247,.35); }
 
@@ -993,6 +1000,25 @@ body.em-persg .relogio { top: 46px; }
 .parede.porta-parede.porta-f, .parede.porta-parede.porta-p { background: linear-gradient(180deg, #8a909b, #3a3e46); border-top-color: #c9ced6; }
 .parede.porta-parede.v.porta-f, .parede.porta-parede.v.porta-p { background: linear-gradient(90deg, #3a3e46, #8a909b); border-right-color: #c9ced6; }
 .corredor.corr-fechado { filter: brightness(.55) saturate(.6); }
+/* duas portas por corredor (uma em cada ponta): folhas de aço que correm para os lados; aberta = só o batente e as
+   folhas recolhidas. A animação roda uma vez, quando o estado muda (as duas pontas juntas) */
+.porta-chao .folha { position: absolute; background: linear-gradient(180deg, #5d636d, #2b2f36); box-shadow: inset 0 0 0 1px #8a909b; pointer-events: none; }
+.porta-chao.eixo-h .folha { left: 0; right: 0; height: 50%; }
+.porta-chao.eixo-v .folha { top: 0; bottom: 0; width: 50%; }
+.porta-chao.eixo-h .f1 { top: 0; } .porta-chao.eixo-h .f2 { bottom: 0; }
+.porta-chao.eixo-v .f1 { left: 0; } .porta-chao.eixo-v .f2 { right: 0; }
+.porta-chao.porta-a { background: none; box-shadow: inset 0 0 0 1px rgba(150,158,170,.55); }
+.porta-chao.porta-a.eixo-h .folha { height: 15%; }
+.porta-chao.porta-a.eixo-v .folha { width: 15%; }
+.porta-chao.porta-p .folha { filter: brightness(1.25); }
+.porta-chao span, .porta-chao .botao-2d { z-index: 1; }
+.porta-chao.agora.eixo-h .folha { animation: folha-h .7s ease-in-out; }
+.porta-chao.agora.eixo-v .folha { animation: folha-v .7s ease-in-out; }
+.porta-chao.agora.porta-a { --de: 50%; }
+.porta-chao.agora:not(.porta-a) { --de: 15%; }
+@keyframes folha-h { from { height: var(--de); } }
+@keyframes folha-v { from { width: var(--de); } }
+@media (prefers-reduced-motion: reduce) { .porta-chao.agora .folha { animation: none; } }
 .dica-porta { font-size: 13px; color: var(--texto-dim); margin: 6px 0; }
 .btn-botao-vermelho { border: 1px solid #d1121f !important; color: #ffe3e6 !important; background: #3a0d14 !important; border-radius: 5px; padding: 6px 12px; font-weight: 600; }
 .so-mestre-txt { font-size: 12px; color: #c9a7ff; margin: 8px 0 2px; }
@@ -2683,6 +2709,11 @@ body.parede-aberta { overflow: hidden; }
 @media (max-width: 560px) { .pd-entrada { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .pd-grao, .pd-respira, .pd-titulo, .pd-oferecer.pensando, .pd-eco { animation: none; } }
 /* lista de desejos no painel do Mestre */
+.pd-m-salas { border-top: 1px solid var(--linha); margin-top: 8px; padding-top: 6px; }
+.pd-m-chips { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 6px; }
+.pd-m-chips .chave { font-size: 13px; }
+.pd-m-salas .mesa-linha { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pd-m-salas #pdmCn { width: 76px; min-width: 0; font-size: 16px; }
 .pd-m-lista summary { cursor: pointer; font-size: 13px; color: var(--texto-dim); margin-top: 6px; }
 .pd-m-lista article { border-top: 1px solid var(--linha); padding: 6px 0; font-size: 13px; }
 .pd-m-lista header { display: flex; align-items: center; gap: 6px; color: var(--texto-dim); font-size: 12px; }

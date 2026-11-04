@@ -925,7 +925,7 @@ async function urlDoSom(id) {
   return src;
 }
 function ligarSons() {
-  if (!A.mestre) { if (SONS.off) { SONS.off(); SONS.off = null; } return; }
+  if (!A.mestre && !A.aux) { if (SONS.off) { SONS.off(); SONS.off = null; } return; }
   if (SONS.off) return;
   SONS.off = () => {};
   A.garantirLogin().then(() => { SONS.off = A.Rede.on('sonsIdx', v => { SONS.idx = v || {}; const c = $('#mesaAmb'); if (c) { c.dataset.f = ''; desenharMesaAmb(true); } }, () => {}); });
@@ -1083,15 +1083,15 @@ function desenharMesaAmb(forcar) {
     <label class="chave"><input type="checkbox" id="ambTrilhaOn" ${(est().trilha || {}).on ? 'checked' : ''}><span>Ligar a trilha por andar</span></label>
     <div class="amb-trilha">${[1, 2, 3, 4, 5].map(n => `<label>${n}º andar <select data-trilha="${n}">${opcoesTrilha((est().trilha || {})['a' + n] || '', sons)}</select></label>`).join('')}</div>
     <p class="mesa-k">SONS PRÓPRIOS</p>
-    ${sons.length ? `<ul class="amb-sons">${sons.map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>${s.tipo === 'link' ? '🔗' : '🎵'} ${esc(s.n)}${s.tam ? ` <small>${s.tam / 1.37 < 1048576 ? Math.max(1, Math.round(s.tam / 1.37 / 1024)) + ' KB' : (s.tam / 1.37 / 1048576).toFixed(1) + ' MB'}</small>` : ''}</span><button data-mi="amb-som" data-k="${k}" title="Tocar em repetição para todos">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}" title="Tocar uma vez para todos">🔔 Uma vez</button><button data-mi="amb-del" data-k="${k}" class="perigo" aria-label="Apagar">×</button></li>`).join('')}</ul>` : '<p class="mini">Nenhum ainda. Envie um áudio (até 4 MB) ou cole um link direto de mp3/ogg (pode ser um arquivo dentro do próprio repositório, como audio/chuva.mp3).</p>'}
-    <div class="mesa-linha"><label class="amb-arq">⬆ Enviar áudio<input type="file" id="ambArq" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden></label><button data-mi="amb-link">🔗 Link</button><button data-mi="amb-exp" ${sons.length ? '' : 'disabled'}>⬇ Exportar</button><label class="amb-arq">⬆ Importar<input type="file" id="ambImp" accept=".json,application/json" hidden></label></div>`;
+    ${sons.length ? `<ul class="amb-sons">${sons.map(([k, s]) => `<li class="${a.som === k ? 'on' : ''}"><span>${s.tipo === 'link' ? '🔗' : '🎵'} ${esc(s.n)}${s.tam ? ` <small>${s.tam / 1.37 < 1048576 ? Math.max(1, Math.round(s.tam / 1.37 / 1024)) + ' KB' : (s.tam / 1.37 / 1048576).toFixed(1) + ' MB'}</small>` : ''}</span><button data-mi="amb-som" data-k="${k}" title="Tocar em repetição para todos">${a.som === k ? '■ Parar' : '▶ Ambiente'}</button><button data-mi="amb-fx" data-k="${k}" title="Tocar uma vez para todos">🔔 Uma vez</button>${A.mestre ? `<button data-mi="amb-del" data-k="${k}" class="perigo" aria-label="Apagar">×</button>` : ''}</li>`).join('')}</ul>` : `<p class="mini">${A.mestre ? 'Nenhum ainda. Envie um áudio (até 4 MB) ou cole um link direto de mp3/ogg (pode ser um arquivo dentro do próprio repositório, como audio/chuva.mp3).' : 'Nenhum som enviado pelo Mestre.'}</p>`}
+    ${A.mestre ? `<div class="mesa-linha"><label class="amb-arq">⬆ Enviar áudio<input type="file" id="ambArq" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden></label><button data-mi="amb-link">🔗 Link</button><button data-mi="amb-exp" ${sons.length ? '' : 'disabled'}>⬇ Exportar</button><label class="amb-arq">⬆ Importar<input type="file" id="ambImp" accept=".json,application/json" hidden></label></div>` : '<p class="mini">Enviar, apagar e importar sons fica com o Mestre.</p>'}`;
   const tro = $('#ambTrilhaOn', c); if (tro) tro.onchange = () => A.definir(['trilha', 'on'], tro.checked || null);
   $$('[data-trilha]', c).forEach(sel => sel.onchange = () => A.definir(['trilha', 'a' + sel.dataset.trilha], sel.value || null));
   const vi = $('#ambVol', c);
   vi.oninput = () => { c.querySelector('.amb-vol output').textContent = vi.value + '%'; };
   vi.onchange = () => A.definir(['amb'], { ...(est().amb || {}), vol: int(vi.value), ts: Date.now() });
-  $('#ambArq', c).onchange = e => { enviarArquivoSom(e.target.files[0]); e.target.value = ''; };
-  $('#ambImp', c).onchange = e => { importarSons(e.target.files[0]); e.target.value = ''; };
+  const arq = $('#ambArq', c); if (arq) arq.onchange = e => { enviarArquivoSom(e.target.files[0]); e.target.value = ''; };
+  const imp = $('#ambImp', c); if (imp) imp.onchange = e => { importarSons(e.target.files[0]); e.target.value = ''; };
 }
 function desenharMesaRol() {
   if (!semFoco('#mesaRol')) return;
@@ -1122,7 +1122,8 @@ function desenharMesaAmea() {
 function aoClicarMesa(e) {
   const b = e.target.closest('[data-mi]'); if (!b || !(A.mestre || A.aux)) return;
   const a = b.dataset.mi, inv = est().inv || {};
-  if (!A.mestre && !['memb-ok', 'memb-tudo', 'fichas'].includes(a)) return;   // auxiliar: só o que foi dividido com ele
+  // auxiliar: só o que foi dividido com ele (membrana, fichas e o Ambiente: tocar e parar sons; enviar e apagar fica com o Mestre)
+  if (!A.mestre && !['memb-ok', 'memb-tudo', 'fichas', 'amb', 'amb-som', 'amb-fx'].includes(a)) return;
   if (a === 'ini') {
     const g = URGENCIA.find(u => u[0] === $('#mesaUrg').value) || URGENCIA[2];
     A.definir(['inv'], { on: true, grau: g[0], max: g[2], rod: 1, falhas: 0, r3: !!$('#mesaR3').checked, pistas: {}, ts: Date.now() });
@@ -1666,7 +1667,7 @@ function tudo() {
 // auxiliares: Ameaças e Membrana (Cena e Escudo é fixo no HTML; NEX e Parede ficam em ferramentas.js)
 function desenharMesaAux() {
   if (A.mestre || !A.aux) { if (!A.mestre && !A.aux && ameaOff) { ameaOff(); ameaOff = null; } return; }
-  desenharMesaAmea(); desenharMesaMemb();
+  desenharMesaAmea(); desenharMesaMemb(); desenharMesaAmb();
 }
 // a trilha acompanha a troca de andar (que não passa pelo estado do mapa)
 setInterval(() => { try { if ((est().trilha || {}).on) verAmbiente(); } catch (e) {} }, 1500);

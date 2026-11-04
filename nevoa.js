@@ -137,6 +137,8 @@
     </div>`;
   }
   function blocoPublico(cn) {
+    // auxiliar: liga, desliga e limpa a névoa como o Mestre (condução da cena)
+    if (A().aux && !A().mestre) return blocoMestre(cn);
     return escondida(cn) ? '<div class="nv-bloco"><span class="mini">🌫 Sala na névoa: sua cobaia ainda não passou por aqui.</span></div>' : '';
   }
   function ligar(c, cn) {

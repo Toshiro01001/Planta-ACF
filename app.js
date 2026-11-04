@@ -614,6 +614,7 @@ const funcaoDe = id => (mestre && Segredos.dados[id]) || '';
    Jogador: só a própria cobaia. Auxiliar: os Filhos e o próprio robô.
    Ninguém além do Mestre troca andar, ocultação, coloca ou tira fichas. */
 function recusaLocal(caminho, valor) {
+  if (aux && auxConduz(caminho, valor)) return '';
   if (caminho[0] === 'portas' && caminho.length === 2) {
     const atual = (Store.state.portas || {})[caminho[1]] || null;
     const txt = typeof valor === 'string' ? valor : '';
@@ -648,12 +649,28 @@ function recusaLocal(caminho, valor) {
   // auxiliar: coloca o PRÓPRIO robô S.T.A.F.F. (vai oculto, com pedido "pr"; a tela do Mestre publica)
   if (aux && caminho[1] === aux && valor && valor.s === aux && valor.h === true && valor.pr === 1 && (!atual || atual.h)) return '';
   if (!atual || !valor) return 'Só o Mestre pode colocar ou tirar tokens do mapa.';
+  // auxiliar conduzindo a perseguição: o começo da vez e o "refazer rota" mexem só na posição e no deslocamento
+  if (aux && Object.keys({ ...atual, ...valor }).every(c => ['x', 'y', 'x0', 'y0', 'm'].includes(c) || JSON.stringify(atual[c]) === JSON.stringify(valor[c]))) return '';
   if (!podeMover(atual)) return meu ? 'Você só pode mover a sua própria cobaia.' : 'Você não pode mover esse token.';
   const igual = c => (valor[c] === undefined ? null : valor[c]) === (atual[c] === undefined ? null : atual[c]);
   if (!igual('s') || !igual('a') || !igual('h') || !igual('vf')) return 'Só o Mestre pode mudar o andar ou a ocultação de um token.';
   // campos das características dos Filhos (forma de objeto, cópia, ocultação especial): só Mestre e auxiliares
   if (!aux && ['fo', 'cp', 'cpd', 'oc', 'pi', 'rv', 'pp'].some(c => !igual(c))) return 'Só o Mestre pode fazer isso.';
   return '';
+}
+
+// o que a conta dos auxiliares grava no mapa além das ferramentas divididas (regras do Firebase, ramo mapa/$outro):
+// o estado da cena e da sessão (Desfazer, Retrato, luzes, portas, ambiente, perseguição, condições, sons e efeitos).
+// Ficam só com o Mestre: configuração, senhas, nomes revelados, loja, recompensas e o que depende da Balança.
+const AUX_FORA = ['senhasAndar', 'trancaAndar', 'restauracao', 'regrasPub', 'docs', 'cifras', 'cifraRev', 'nomes', 'cego', 'loja', 'melhorias', 'hud', 'momentos', 'cameras', 'cfg', 'recomp', 'var3d', 'paredes'];
+// ramos com regra própria (formato conferido mais abaixo, igual para todos)
+const AUX_PROPRIOS = ['tokens', 'fil', 'chamado', 'inter', 'barricadas', 'fuga'];
+function auxConduz(caminho, valor) {
+  const k = caminho[0];
+  if (!k || AUX_FORA.includes(k) || AUX_PROPRIOS.includes(k) || k.length > 24) return false;
+  if (k === 'portas') return caminho.length === 2 && /^a[1-5]c\d{1,2}$/.test(caminho[1]) && (valor === null || (typeof valor === 'string' && valor.length <= 40));
+  if (k === 'estoque') return caminho.length === 2 && (valor === null || (typeof valor === 'number' && valor >= 0 && valor <= 999));
+  return true;
 }
 
 // recusa do servidor: aviso passageiro; o mapa volta sozinho ao estado certo
@@ -781,7 +798,7 @@ let gesto = null;
 viewport.addEventListener('contextmenu', e => e.preventDefault());
 
 viewport.addEventListener('pointerdown', e => {
-  if (e.target.closest('.ficha')) return;
+  if (e.target.closest('.ficha, .sala-parede')) return;   // (ícone da Parede de Desejos: o toque é dele, não do gesto)
   viewport.setPointerCapture(e.pointerId);
   ponteiros.set(e.pointerId, { x: e.clientX, y: e.clientY });
   esconderDica();
@@ -1001,7 +1018,7 @@ function montarAndar() {
         ${V().mestre && !revelada ? '<span class="sala-oculta">oculta aos jogadores</span>' : ''}
         ${nome ? `<span class="sala-nome">${nome}</span>` : ''}
         ${elm !== '?' && elm !== 'N' ? `<span class="sala-el">${elemento.nome}</span>` : ''}
-      </div>`;
+      </div>${visivel && paredeNaSala(cn) ? iconeParede(cn) : ''}`;
     stage.appendChild(d);
 
     const { r, c } = POS[p];
@@ -1125,7 +1142,9 @@ function assinatura() {
   for (let p = 1; p <= 25; p++) nomes.push(infoSala(andarAtual, cnDe(andarAtual, p)).join('|'));
   const portas = Object.entries(Store.state.portas || {}).filter(([k]) => k.startsWith('a' + andarAtual + 'c')).map(kv => kv.join('=')).sort();
   const obst = vv.mestre ? Object.entries((Priv.dados && Priv.dados.portas) || {}).filter(([k]) => k.startsWith('a' + andarAtual + 'c')).map(kv => kv.join('=')).sort().join(',') : '';
-  return t + '|' + saidaCN(andarAtual) + '|' + subtituloDe(andarAtual) + '|' + nomes.join(';') + '|' + portas.join(',') + '|' + obst;
+  // Parede de Desejos: salas com a parede neste andar e a forma do símbolo (muda a cor do ícone)
+  let pds = ''; for (let p = 1; p <= 25; p++) pds += paredeNaSala(cnDe(andarAtual, p)) ? '1' : '0';
+  return t + '|' + saidaCN(andarAtual) + '|' + subtituloDe(andarAtual) + '|' + nomes.join(';') + '|' + portas.join(',') + '|' + obst + '|' + pds + formaEco();
 }
 
 function atualizarElementos() {
@@ -1249,6 +1268,8 @@ function desenharFichas() {
     // características dos Filhos: token que pisca (jogadores), ocultação especial e marca do sentido (Mestre e auxiliares)
     f.classList.toggle('pisca-filho', !!tk.pi && !V().mestre && !V().aux);
     f.classList.toggle('oculta-especial', (V().mestre || !!V().aux) && !!(tk.oc || tk.fo || tk.pp));
+    // disfarce3d.js: "invisível" (valor do campo da Forma de Objeto): fantasma só na tela do Mestre e dos auxiliares
+    f.classList.toggle('disf-invisivel', (V().mestre || !!V().aux) && tk.fo === 'invisível');
     // filhos.js: cria pequena, etiqueta "amigável", imagem falsa, só por lente, Flash, forma rolada e cobaia olhando por uma lente
     const xf = window.ACF_FILHOS && ACF_FILHOS.extraFicha ? ACF_FILHOS.extraFicha(id, tk) : null;
     if (xf) {
@@ -1710,7 +1731,7 @@ function desenharCartao() {
   acoes += gtk;
   const cv = condicoesVisiveis(selecionado);
   const condTxt = cv.length ? `<p class="cond-lista">${cv.map(k => `<span>${COND[k].i} ${COND[k].n}</span>`).join('')}</p>` : '';
-  const condMestre = mestre && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
+  const condMestre = (mestre || aux) && !espiar && (s.tipo === 'cobaia' || s.tipo === 'npc') ? htmlCondMestre(selecionado) : '';
   const fichaMinha = !mestre && tk.s === meu ? `<div class="cartao-ficha">${barrasFicha(fichaComVitais(meu))}</div>` : '';
   const fichaEdit = mestre && s.tipo === 'cobaia' ? htmlEditarFicha(s.id) : '';
   if (c.dataset.ficha === selecionado && c.contains(document.activeElement) && document.activeElement.matches('input')) return;
@@ -2311,7 +2332,11 @@ function rolar() {
     `<div class="dados-faces">${dados.map((v, i) => `<span class="face${i === iEsc ? ' usada' : ''}${v === 20 ? ' crit' : ''}${v === 1 ? ' falha' : ''}">${v}</span>`).join('')}</div>
      <p class="dados-conta">${desv ? 'Menor' : 'Maior'} dado <b>${escolhido}</b> ${bonus >= 0 ? '+' : '−'} ${Math.abs(bonus)} = <span class="dados-total">${total}</span></p>`;
   Som.tom(520, 0, 0.06, 'triangle', 0.08);
-  if (mestre) {
+  if (aux && !mestre && alvoDados) {
+    // auxiliar rolando a iniciativa de um participante (cartão da perseguição): vai para o campo, como o Mestre
+    const inp = $(`#setupPersg input.ini[data-id="${alvoDados}"]`);
+    if (inp) inp.value = total;
+  } else if (mestre) {
     if (alvoDados) {
       const inp = $(`#setupPersg input.ini[data-id="${alvoDados}"]`);
       if (inp) inp.value = total;
@@ -2450,7 +2475,9 @@ function desenharPerseguicao() {
     }
   }
 
-  if (!mestre) return;
+  if (!mestre && !aux) return;
+  // auxiliar: o cartão só é montado enquanto está à vista (abre: o observador abaixo desenha na hora)
+  if (!mestre) { const blk = $('#blocoSahPers'); if (!blk || blk.hidden || !blk.offsetParent) return; }
   $('#persgSetup').hidden = !!p.on;
   $('#persgAtiva').hidden = !p.on;
   if (!p.on) { desenharSetup(); return; }
@@ -2491,7 +2518,7 @@ function verificarPedidoIniciativa() {
 $('#btnPedirIni').addEventListener('click', () => { Store.definir(['persg'], { ...P(), on: false, req: Date.now() }); aviso('Pedido enviado aos jogadores.'); });
 // começa a perseguição com a ordem dada ([{id, ini, lim}]); usado pelo botão e pelo Encontro (momento.js)
 function iniciarPerseguicao(ordem, extra) {
-  if (!mestre) return false;
+  if (!mestre && !aux) return false;
   ordem = (ordem || []).filter(o => o && Store.state.tokens[o.id]).map(o => {
     const tk = Store.state.tokens[o.id], s = SER[tk.s] || {};
     return { id: o.id, ini: +o.ini || 0, lim: Math.max(1, +o.lim || 9), lado: o.lado === 'cacador' || o.lado === 'presa' ? o.lado : ladoPadrao(s) };
@@ -2538,6 +2565,7 @@ $('#btnRefazerVez').addEventListener('click', () => { const v = vezAtual(); if (
 $('#btnRefazerMinha').addEventListener('click', () => { const v = vezAtual(); const tk = v && Store.state.tokens[v]; if (tk && podeMover(tk)) refazerRota(v); });
 $('#btnEncerrarPersg').addEventListener('click', () => { if (confirm('Encerrar a perseguição? A faixa some para todos.')) encerrarPerseguicao(); });
 $('#chkLivre').addEventListener('change', e => { movLivre = e.target.checked; });
+{ const blk = $('#blocoSahPers'); if (blk) new MutationObserver(() => { if (aux && !mestre) setTimeout(desenharPerseguicao, 30); }).observe(blk, { attributes: true, attributeFilter: ['class', 'hidden'] }); }
 
 /* ---------- Cronômetro de decisão (perseguição) ----------
    cfg.tempoVez = segundos por vez (0 = desligado). persg.vts = quando a vez começou. */
@@ -3369,7 +3397,7 @@ async function pacoteBackup() {
   const privado = { ...Priv.dados }; delete privado.tokens;
   // a Calculadora de NEX mora em "nexCalc" (Mestre e auxiliares): vai junto no backup
   const nexCalc = await Rede.once('nexCalc').catch(() => null);
-  return { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), mapa: Store.state, segredos: Segredos.dados, privado, nexCalc };
+  return { tipo: 'planta-acf-backup', versao: 2, salvoEm: Date.now(), perfil: mestre ? 'mestre' : 'aux', mapa: Store.state, segredos: mestre ? Segredos.dados : {}, privado, nexCalc };
 }
 $('#btnBackup').addEventListener('click', async () => {
   const pacote = await pacoteBackup();
@@ -3389,26 +3417,65 @@ $('#arqBackup').addEventListener('change', async e => {
 });
 // devolve um pacote de backup (arquivo ou backup automático); quem chama já confirmou
 function restaurarPacote(pacote, origem) {
-  if (!mestre || !pacote || !pacote.mapa) return;
+  if (!pacote || !pacote.mapa) return;
+  if (!mestre) { if (aux) restaurarPacoteAux(pacote, origem); return; }
   const m = pacote.mapa;
+  // retrato feito pela conta dos auxiliares não traz segredos: os do Mestre e os nomes secretos ficam como estão
+  const semSeg = pacote.perfil === 'aux' || !pacote.segredos || !Object.keys(pacote.segredos).length;
   Diario.reiniciar = true;
   Diario.pend = {}; Diario.pilha = []; pilhaLocal.length = 0;
   Store.state = { ...CAMPOS_VAZIOS(), ...m, tokens: m.tokens || {} };
   Store.gravarTudo();
-  if (pacote.privado) ['salas', 'saidas', 'andares'].forEach(k => Priv.gravar([k], pacote.privado[k] || null));
+  if (pacote.privado && !semSeg) ['salas', 'saidas', 'andares'].forEach(k => Priv.gravar([k], pacote.privado[k] || null));
   { const nx = pacote.nexCalc || (pacote.segredos || {})._nex; if (nx) Rede.set('nexCalc', nx).catch(erroGravacao); }
   // backup feito antes de "Restaurar o site": devolve também chat, relatório e o resto que foi apagado
   if (pacote.extras && typeof pacote.extras === 'object') Object.entries(pacote.extras).forEach(([cam, v]) => Rede.set(cam, v).catch(erroGravacao));
   if (pacote.privTokens && typeof pacote.privTokens === 'object') Object.entries(pacote.privTokens).forEach(([id, v]) => Rede.set('privado/tokens/' + id, v).catch(erroGravacao));
-  const seg = { ...(pacote.segredos || {}) };
-  delete seg._diario;
-  if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
-  Segredos.substituir(seg);
+  if (!semSeg) {
+    const seg = { ...(pacote.segredos || {}) };
+    delete seg._diario;
+    if (Segredos.dados._diario) seg._diario = Segredos.dados._diario;
+    Segredos.substituir(seg);
+  }
   Diario.registrar('sessao', `Backup ${origem ? origem + ' ' : ''}restaurado (salvo em ${dataCurta(pacote.salvoEm)} ${hora(pacote.salvoEm)})`);
   selecionar(null);
   montarAndar();
   atualizarTudo();
   aviso('Backup restaurado.');
+}
+
+// auxiliar: devolve o estado do jogo com o que a conta dos auxiliares grava (sem segredos, senhas, configuração
+// do Mestre e nomes secretos). Cada ramo vai numa gravação própria: um ramo recusado não derruba os outros.
+const AUX_POR_CHAVE = ['portas', 'estoque', 'inter', 'barricadas'];
+async function restaurarPacoteAux(pacote, origem) {
+  const m = pacote.mapa;
+  const pode = k => !AUX_FORA.includes(k) && !['tokens', 'fuga', 'chamado'].includes(k) && k.length <= 24;
+  if (Store.modo !== 'firebase') {
+    const novo = { ...CAMPOS_VAZIOS(), ...m, tokens: m.tokens || {} };
+    AUX_FORA.forEach(k => { if (Store.state[k] !== undefined) novo[k] = Store.state[k]; else delete novo[k]; });
+    Store.state = novo; Store.salvarLocal(); Store.avisar();
+  } else {
+    const pub = Store.pub || {}, ops = [];
+    const vale = v => (v === undefined ? null : v);
+    const porChave = (cam, a, b) => { const upd = {}; new Set([...Object.keys(a || {}), ...Object.keys(b || {})]).forEach(c => { upd[c] = vale((b || {})[c]); }); if (Object.keys(upd).length) ops.push(Store.db.ref(cam).update(upd)); };
+    new Set([...Object.keys(pub), ...Object.keys(m)]).forEach(k => {
+      if (!pode(k)) return;
+      if (AUX_POR_CHAVE.includes(k)) porChave('mapa/' + k, pub[k], m[k]);
+      else if (JSON.stringify(vale(pub[k])) !== JSON.stringify(vale(m[k]))) ops.push(Store.db.ref('mapa/' + k).set(vale(m[k])));
+    });
+    ['r', 's'].forEach(t => porChave('mapa/fuga/' + t, (pub.fuga || {})[t], (m.fuga || {})[t]));
+    const tp = {}, tv = {};
+    Object.entries(m.tokens || {}).forEach(([id, tk]) => { (ehPrivado(tk) ? tv : tp)[id] = tk; });
+    porChave('mapa/tokens', pub.tokens, tp);
+    ops.push(Store.db.ref('privado/tokens').set(Object.keys(tv).length ? tv : null));
+    const nx = pacote.nexCalc; if (nx) ops.push(Rede.set('nexCalc', nx));
+    const r = await Promise.allSettled(ops), falhas = r.filter(x => x.status === 'rejected').length;
+    if (falhas) { console.warn('retrato do auxiliar:', falhas, 'gravações recusadas'); aviso(`Retrato restaurado em parte: ${falhas} ramo(s) recusado(s) pelo servidor.`); }
+  }
+  selecionar(null);
+  montarAndar();
+  atualizarTudo();
+  aviso(`Retrato ${origem ? origem + ' ' : ''}restaurado (estado do jogo; os segredos do Mestre não mudam).`);
 }
 
 /* =========================================================
@@ -3438,7 +3505,7 @@ const REST_CATS = [
   { id: 'funcoes', n: 'Funções e nomes secretos das salas', d: 'As funções das cobaias, quem vê no apagão e os nomes secretos das salas.', on: false, seg: ['_apagao', '_apagaoVe', '*funcoes'], priv: ['salas', 'saidas', 'andares'] },
 ];
 // o que cada aparelho apaga ao ver o carimbo (o Caderno e as fichas ficam)
-const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-', 'acf-conq-vistas-', 'acf-sustos-'];
+const LIMPAR_LOCAL = ['acf-visoes-', 'acf-resp-', 'acf-relaxou-', 'acf-parede-hist', 'acf-parede-visto', 'acf-memb-ch', 'acf-memb-ef', 'acf-dil-', 'acf-bz-trad', 'acf-avisos-visto', 'acf-visitadas-', 'acf-term-saida', 'acf-sus-', 'acf-sug-nex', 'acf-cx-', 'acf-arq-lidos-', 'acf-cofres', 'acf-mapa-estado', 'acf-mvp-', 'acf-bau-', 'acf-dest-', 'acf-conq-vistas-', 'acf-sustos-', 'acf-qol-mapa-'];
 function verRestauracao() {
   const r = Store.state.restauracao;
   if (!r || !r.ts) return;
@@ -3619,7 +3686,11 @@ async function verificarApagao() {
 
 const apagaoVe = () => (mestre && Segredos.dados._apagaoVe) || {};
 function desenharApagaoMestre() {
-  if (!mestre) return;
+  if (!mestre) {
+    // auxiliar: só o botão (quem continua enxergando é segredo do Mestre)
+    if (aux) { const b = $('#btnApagao'); b.textContent = apagaoAtivo() ? 'Desligar apagão' : 'Ligar apagão'; b.classList.toggle('pronto', apagaoAtivo()); }
+    return;
+  }
   const caixa = $('#listaApagaoVe');
   if (!caixa.contains(document.activeElement)) {
     const ve = apagaoVe();
@@ -3639,6 +3710,15 @@ function desenharApagaoMestre() {
 // grava no mapa só um sorteio e códigos (com alguns falsos, para não revelar quantos são)
 async function publicarApagao(ligar) {
   if (!ligar) { Store.definir(['ap'], null); return; }
+  // auxiliar: liga sem a lista de quem continua enxergando (segredo do Mestre), com o pedido "pa";
+  // a tela do Mestre, aberta, completa os códigos logo em seguida (como no robô do auxiliar)
+  if (!mestre) {
+    const n = Math.random().toString(36).slice(2, 10), v = [];
+    while (v.length < 4) v.push(await hash(n + ':' + Math.random().toString(36)));
+    v.sort();
+    Store.definir(['ap'], { on: true, n, v, pa: 1 });
+    return;
+  }
   const n = Math.random().toString(36).slice(2, 10);
   const ids = Object.keys(apagaoVe()).filter(id => apagaoVe()[id]);
   const v = await Promise.all(ids.map(id => hash(n + ':' + id)));
@@ -3649,6 +3729,14 @@ async function publicarApagao(ligar) {
 $('#btnApagao').addEventListener('click', async () => {
   if (apagaoAtivo()) { await publicarApagao(false); return; }
   if (confirm('Ligar o apagão? Os jogadores passam a enxergar só o próprio token até você desligar.')) await publicarApagao(true);
+});
+// tela do Mestre: apagão ligado por um auxiliar ganha a lista de quem continua enxergando
+let apCompletando = false;
+Store.aoMudar(() => {
+  const ap = Store.state.ap;
+  if (!mestre || apCompletando || !ap || !ap.on || ap.pa !== 1 || (Store.modo === 'firebase' && !Segredos.pronto)) return;
+  apCompletando = true;
+  publicarApagao(true).finally(() => { setTimeout(() => { apCompletando = false; }, 1500); });
 });
 
 /* =========================================================
@@ -3711,6 +3799,62 @@ function desenharEco() {
   caixa.title = nome;
   caixa.setAttribute('aria-label', nome);
 }
+// forma do símbolo que este aparelho pode saber (o Mestre calcula; os outros leem só o rótulo público mapa/eco)
+const formaEco = () => (mestre && Segredos.pronto ? estagioEco(balanca()) : ((Store.state.eco || {}).e || 'neutro'));
+
+/* =========================================================
+   PAREDE DE DESEJOS NAS SALAS (mapa/paredes)
+   A CN 09 sempre tem a Parede (o Mestre pode desligar); o Mestre sorteia mais 1 ou 2 salas por andar.
+   Estado público pequeno, só o Mestre grava: c<CN> = 1 (ligada) ou 0 (desligada) e ts (quando sorteou).
+   O símbolo pintado segue a forma pública do Eco (neutro, tingido ou consagrado, para o Rei ou para a Mãe).
+   No 3D (sala3d.js) é uma parede de concreto numa parede livre da sala; no mapa, um ícone. Os dois abrem a
+   mesma Parede de Desejos do site (ferramentas.js: mesmas regras, mesmo preço, mesma gravação).
+   ========================================================= */
+const CN_PAREDE_FIXA = 9;
+function paredeNaSala(cn) {
+  const v = (Store.state.paredes || {})['c' + cn];
+  return cn === CN_PAREDE_FIXA ? v !== 0 : v === 1;
+}
+function sortearParedes() {
+  if (!mestre) return;
+  const pd = Store.state.paredes || {}, novo = { ts: Date.now() };
+  novo['c' + CN_PAREDE_FIXA] = pd['c' + CN_PAREDE_FIXA] === 0 ? 0 : 1;
+  for (let a = 1; a <= 5; a++) {
+    const cands = [];
+    for (let p = 1; p <= 24; p++) { const cn = cnDe(a, p); if (cn !== CN_PAREDE_FIXA) cands.push(cn); }   // (a Zona Neutra fica de fora)
+    const n = Math.random() < .5 ? 1 : 2;
+    for (let i = 0; i < n && cands.length; i++) novo['c' + cands.splice(Math.floor(Math.random() * cands.length), 1)[0]] = 1;
+  }
+  Store.definir(['paredes'], novo);
+  Diario.registrar('sala', 'Parede de Desejos: salas sorteadas de novo (' + Object.keys(novo).filter(k => k !== 'ts' && novo[k]).map(k => 'CN ' + pad2(+k.slice(1))).join(', ') + ')');
+}
+function ligarParedeSala(cn, on) {
+  if (!mestre || !(cn >= 1 && cn <= 125)) return;
+  Store.definir(['paredes', 'c' + cn], on ? 1 : 0);
+}
+// primeira vez (missão nova ou restauração): o Mestre sorteia sozinho, depois que o mapa do Firebase chegou
+let paredesSorteadas = false;
+Store.aoMudar(() => {
+  if (Store.state.paredes) { paredesSorteadas = false; return; }   // (apagado depois, numa restauração: sorteia de novo)
+  if (!mestre || paredesSorteadas || (Store.modo === 'firebase' && !Store.pub)) return;
+  paredesSorteadas = true; sortearParedes();
+});
+// ícone do mapa: o símbolo em traço, na cor da forma atual do Eco
+const COR_ECO_ICONE = { neutro: ['#ecebb0', '#9b4dff'], 'rei-t': ['#e8d68a', '#d9b44a'], 'rei-c': ['#d8b25a', '#f0c020'], 'mae-t': ['#e6b0a0', '#b0303a'], 'mae-c': ['#d77a68', '#8a0d12'] };
+function iconeParede(cn) {
+  const [l, b] = COR_ECO_ICONE[formaEco()] || COR_ECO_ICONE.neutro;
+  return `<button type="button" class="sala-parede" data-parede="${cn}" title="Parede de Desejos" aria-label="Parede de Desejos (CN ${pad2(cn)})" style="--eco-l:${l};--eco-b:${b}">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="36" r="11" class="ec-v"/><circle cx="32" cy="12" r="7"/><ellipse cx="32" cy="12" rx="1.6" ry="3.4" class="ec-o"/>
+    <path d="M32 19V56M27.5 29l9-2M27.5 36l9-1.5M27.5 42l9-2M27.5 50l9-1.5M20 22C10 30 12 52 30 55C47 57 54 40 46 28C42 22 36 19 33 20"/></svg></button>`;
+}
+stage.addEventListener('click', e => {
+  const b = e.target.closest('.sala-parede'); if (!b) return;
+  e.stopPropagation();
+  const F = window.ACF_FERRAMENTAS;
+  if (!(mestre || aux) && !(Store.state.parede || {}).on) { aviso('A Parede de Desejos ainda não despertou.'); return; }
+  if (F && F.abrirParede) F.abrirParede();
+});
+
 // no celular, tocar mostra o nome por alguns segundos
 let ecoTimer = null;
 $('#ecoSimbolo').addEventListener('click', () => {
@@ -4008,10 +4152,15 @@ function textoPorta(v) {
   if (v === 'a') return 'aberta';
   return TIPOS_PORTA[v] ? TIPOS_PORTA[v].toLowerCase() : 'fechada';
 }
-// faixa no meio do corredor onde fica a porta
-function barreira(c) {
-  return c.eixo === 'h' ? { x: c.x + c.w / 2 - 0.3, y: c.y, w: 0.6, h: c.h } : { x: c.x, y: c.y + c.h / 2 - 0.3, w: c.w, h: 0.6 };
+// faixas das DUAS portas do corredor: uma em cada ponta, no vão que dá para cada sala (as duas mudam juntas)
+function barreiras(c) {
+  const E = 0.05, L = 0.3;
+  return c.eixo === 'h'
+    ? [{ x: c.x + E, y: c.y, w: L, h: c.h }, { x: c.x + c.w - E - L, y: c.y, w: L, h: c.h }]
+    : [{ x: c.x, y: c.y + E, w: c.w, h: L }, { x: c.x, y: c.y + c.h - E - L, w: c.w, h: L }];
 }
+// último estado desenhado de cada porta (andar + corredor): a mudança anima as folhas das duas pontas juntas
+const portas2dVistas = {};
 function bloqueadoPorPorta(andar, x, y) {
   for (let ci = 0; ci < CORREDORES.length; ci++) {
     // porta fechada: nem o corredor dá para pisar. Só a ponta encostada na sala fica livre
@@ -4030,20 +4179,26 @@ function desenharPortas(paredes) {
     const pub = portaDe(andarAtual, ci);
     const corr = $(`.corredor[data-ci="${ci}"]`, stage);
     if (corr) corr.classList.toggle('corr-fechado', pub !== 'a');
-    if (pub === 'a') return;
-    const t = apertada(pub) ? 'p' : digitada(pub) || pub === 'tk' ? 't' : OBSTACULOS.includes(pub) ? pub : 'f';
+    const t = pub === 'a' ? 'a' : apertada(pub) ? 'p' : digitada(pub) || pub === 'tk' ? 't' : OBSTACULOS.includes(pub) ? pub : 'f';
     const revelado = OBSTACULOS.includes(pub) || digitada(pub);
     const secreto = verSegredo && !revelado ? obstaculoDe(andarAtual, ci) : null;
-    const b = barreira(c);
-    const chao = el('div', 'porta-chao porta-' + t, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
-    // porta fechada: botão vermelho simples (2D), flutuando acima da porta
-    chao.innerHTML = revelado ? `<span>${SINAL_PORTA[digitada(pub) ? 'tk' : pub]}</span>` : `<i class="botao-2d${t === 'p' ? ' apertado' : ''}"></i>`;
-    if (secreto) chao.innerHTML += `<em class="porta-secreta" title="Só você vê: ${TIPOS_PORTA[secreto]}">${SINAL_PORTA[secreto]}</em>`;
-    stage.appendChild(chao);
-    const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
-    const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
-    pw.classList.add('porta-parede', 'porta-' + t);
-    paredes.push(pw);
+    // porta de aço (fechada, abrindo ou aberta): duas folhas que correm para os lados; anima só quando o estado muda
+    const kv = andarAtual + ':' + ci, aco = t === 'f' || t === 'p' || t === 'a', antes = portas2dVistas[kv];
+    const agora = aco && antes !== undefined && (antes === 'a') !== (t === 'a') ? ' agora' : '';
+    portas2dVistas[kv] = t;
+    barreiras(c).forEach((b, k) => {
+      const chao = el('div', `porta-chao porta-${t} eixo-${c.eixo}${agora}`, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) });
+      chao.dataset.ci = ci; chao.dataset.ponta = k;
+      // porta fechada: botão vermelho simples (2D), flutuando acima de cada porta
+      chao.innerHTML = (aco ? '<b class="folha f1"></b><b class="folha f2"></b>' : '') + (t === 'a' ? '' : revelado ? `<span>${SINAL_PORTA[digitada(pub) ? 'tk' : pub]}</span>` : `<i class="botao-2d${t === 'p' ? ' apertado' : ''}"></i>`);
+      if (secreto && !k) chao.innerHTML += `<em class="porta-secreta" title="Só você vê: ${TIPOS_PORTA[secreto]}">${SINAL_PORTA[secreto]}</em>`;
+      stage.appendChild(chao);
+      if (t === 'a') return;
+      const xm = b.x + b.w / 2, ym = b.y + b.h / 2;
+      const pw = c.eixo === 'h' ? parede(xm, c.y, xm, c.y + c.h) : parede(c.x, ym, c.x + c.w, ym);
+      pw.classList.add('porta-parede', 'porta-' + t);
+      paredes.push(pw);
+    });
   });
 }
 // a cobaia precisa estar numa das duas salas ligadas pelo corredor (ou dentro dele)
@@ -4176,7 +4331,7 @@ function desenharCartaoCorredor() {
          <form class="teclado-porta" autocomplete="off"><input id="tecladoCodigo" inputmode="text" maxlength="12" placeholder="Código"><button class="btn-botao-vermelho">Digitar</button></form>`
       : `<p class="dica-porta">A porta está trancada e tem um teclado. ${podeApertar.motivo}</p>`;
   } else if (OBSTACULOS.includes(pub)) acoes = `<p class="dica-porta">${pub === 't' || pub === 'tk' ? 'O botão vermelho não responde: a porta não abre.' : 'A porta abriu, mas não dá para passar.'}</p>`;
-  else if (!mestre) {
+  else if (!mestre && !aux) {
     acoes = podeApertar.ok
       ? `<div class="acoes portas-acoes">${pub === 'a' ? '<button data-acao="fechar">Fechar a porta</button>' : '<button data-acao="abrir" class="btn-botao-vermelho">● Apertar o botão vermelho</button>'}</div>`
       : `<p class="dica-porta">${podeApertar.motivo}</p>`;
@@ -4195,6 +4350,11 @@ function desenharCartaoCorredor() {
     ${obst === 't' ? `<label class="campo-linha so-mestre-txt">Código do teclado (vazio = sem teclado)
       <input id="codigoPorta" value="${esc(codigoDe(andarAtual, ci))}" maxlength="12" placeholder="ex.: 0451"></label>` : ''}
     ${obst && !OBSTACULOS.includes(pub) ? '<p class="so-mestre-txt">Os jogadores ainda não sabem. Aparece quando alguém apertar o botão.</p>' : ''}
+    <div class="acoes portas-acoes"><button data-todas="a">Abrir todas do andar</button><button data-todas="">Fechar todas do andar</button></div>` : aux ? `
+    <p class="so-mestre-txt">Conduzir a porta (Mestre e auxiliares; o que há atrás dela continua valendo):</p>
+    <div class="acoes portas-acoes">
+      <button data-acao="abrir" class="${pub === 'a' ? 'on' : ''}">Abrir</button>
+      <button data-acao="fechar" class="${!pub ? 'on' : ''}">Fechar</button></div>
     <div class="acoes portas-acoes"><button data-todas="a">Abrir todas do andar</button><button data-todas="">Fechar todas do andar</button></div>` : '';
   c.innerHTML = `<button class="fechar" aria-label="Fechar">×</button>
     <div class="cartao-topo"><div class="cartao-bola sala-bola"></div><div><h3>Corredor</h3><span class="cod">${nomeC}</span></div></div>
@@ -4226,10 +4386,12 @@ function desenharCartaoCorredor() {
   $$('[data-acao]', c).forEach(b => b.onclick = () => {
     const ok = quemApertaPorta(ci);
     if (!ok.ok) { aviso(ok.motivo); return; }
+    // Mestre e auxiliar conduzem a porta direto (o auxiliar lê os segredos das portas no privado, como o Mestre)
     if (b.dataset.acao === 'abrir') {
       if (mestre && pub) Store.definir(['portas', chavePorta(andarAtual, ci)], 'a');
+      else if (aux && !mestre) Store.definir(['portas', chavePorta(andarAtual, ci)], pub && !apertada(pub) && !digitada(pub) ? 'a' : resultadoAbrir(andarAtual, ci));
       else abrirPorta(andarAtual, ci);
-    } else if (mestre) Store.definir(['portas', chavePorta(andarAtual, ci)], null);
+    } else if (mestre || aux) Store.definir(['portas', chavePorta(andarAtual, ci)], null);
     else fecharPorta(andarAtual, ci);
     refazer();
   });
@@ -6562,6 +6724,9 @@ window.ACF = {
   get pronto() { return Store.modo === 'firebase' || !FIREBASE; },
   garantirLogin: () => (Store.modo === 'firebase' && !mestre && Store.auth && !Store.auth.currentUser ? Store.garantirLogin() : Promise.resolve()),
   get mestre() { return mestre; }, get meu() { return meu; }, get aux() { return aux; },
+  // câmera do mapa 2D (zoom/posição) e presença, para as telas de qualidade de vida
+  get camera2D() { return { ...cam }; }, set camera2D(o) { if (o) { Object.assign(cam, o); aplicarCamera(); } },
+  online: id => Presenca.online(id),
   get firebase() { return Store.modo === 'firebase'; },
   // sala (CN) onde está a ficha; null fora do mapa
   salaDe(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a) return null; const p = salaEm(tk.a, tk.x, tk.y); return p ? cnDe(tk.a, p) : null; },
@@ -6575,7 +6740,7 @@ window.ACF = {
   ganchoSala: g => { ganchosSala.push(g); },
   ganchoToken: g => { ganchosToken.push(g); },
   iniciarPerseguicao: (o, x) => iniciarPerseguicao(o, x),
-  novaRodadaPersg: () => { if (mestre) novaRodadaPersg(); }, encerrarPerseguicao: () => { if (mestre) encerrarPerseguicao(); },
+  novaRodadaPersg: () => { if (mestre || aux) novaRodadaPersg(); }, encerrarPerseguicao: () => { if (mestre || aux) encerrarPerseguicao(); },
   chatLocal(m) { if (!m || !m.t) return; Chat.locais.push({ a: '', n: '', t: String(m.t).slice(0, 200), ts: m.ts || Date.now(), local: true }); Chat.locais = Chat.locais.slice(-20); Chat.atualizar(); },
   get selecionado() { return selecionado; }, selecionar: id => selecionar(id), abrirDados: (t, id) => abrirDados(t, id),
   ganchoChat: f => { ganchosChat.push(f); },
@@ -6600,6 +6765,8 @@ window.ACF = {
   limiteDe: id => limiteDe(id),
   participa: id => !!participante(id),
   portaDe: (a, ci) => portaDe(a, ci),
+  // Parede de Desejos nas salas (mapa/paredes) e a forma pública do símbolo do Eco
+  paredeNaSala: cn => paredeNaSala(cn), formaEco: () => formaEco(), sortearParedes: () => sortearParedes(), ligarParedeSala: (cn, on) => ligarParedeSala(cn, on),
   get apagao() { return apagaoAtivo(); },
   get protocolo() { return !!(Store.state.ruido || {}).p; },
   geo: { M, R, G, CW, W, H, CORREDORES, retSala, retSaida: a => retSaida(saidaDoAndar(a)), saidaDoAndar, salaEm, corredorEm: (x, y) => corredorEm(x, y), M_POR_UNID, M_CORREDOR },
