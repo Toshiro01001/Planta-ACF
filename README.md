@@ -1037,3 +1037,7 @@ Sem Firebase, o site funciona em **modo local**: as posições ficam no navegado
 As regras completas e atualizadas (incluindo `mapa/fil`, `privado/filhosEstado`, `filAcoes`, `filResp`, `filMsg` e `leituras` das características dos Filhos, e `mapa/encontro`, `mapa/cameras`, `mapa/corpos`, `mapa/pilhas`, `ecos3d` e `sustos` do `momento.js`) ficam no arquivo `regras-firebase.json`, fora do repositório; o bloco acima é o resumo antigo.
 
 Com isso: todo mundo vê o mapa público; Filhos, NPCs e robôs ocultos, nomes secretos das salas e o canal Filhos só chegam ao Mestre e à conta dos auxiliares; funções, anotações, diário e Balança só ao Mestre; os jogadores só movem a própria cobaia.
+
+---
+
+Desenvolvido por Rodrigo Terroso Junior. O Claude, da Anthropic, foi usado como ferramenta durante o desenvolvimento.
