@@ -15,8 +15,6 @@
 (() => {
   'use strict';
   const NS = window.ACF3D = window.ACF3D || {};
-  const LOADER = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  const SKUTIL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js';
 
   /* ================= utilidades ================= */
   // cores escritas como aparecem na tela: a tela sai em sRGB, então a cor do material vai para o espaço linear
@@ -117,6 +115,99 @@
     br.cot.quaternion.setFromUnitVectors(BX, d2.applyQuaternion(br.braco.quaternion.clone().invert()));
     br.fixo = true;
   }
+
+  /* ================= movimento: velocidade real, curvas, pesos suaves e vida no parado ================= */
+  // A sala só diz se o token está andando; o motor de cada token lê o próprio deslocamento a cada quadro e entrega
+  // a velocidade em m/s, o giro (rad/s, para inclinar nas curvas), a aceleração, os pesos suaves de andar e correr
+  // (sem estalo entre estados: 150 a 300 ms) e sorteios com semente para o parado (olhar em volta, piscar, trocar
+  // o peso de perna), cada token no seu próprio ritmo. Nada é alocado por quadro.
+  const suave = (x, alvo, k, dt) => { const a = k * dt; return x + (alvo - x) * (a / (1 + a + a * a * .5)); };   // ~1 - e^(-k·dt), sem exp
+  const sstep = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+  const semDe = id => { let h = 2166136261; const s = String(id == null ? '' : id); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 1000003) / 1000003; };
+  let semPendente = null;   // semente do token que está sendo montado agora (criarToken)
+  function motor(g, op = {}) {
+    const sem = op.sem != null ? (typeof op.sem === 'number' ? op.sem : semDe(op.sem)) : semPendente != null ? semPendente : Math.random();
+    let r = Math.floor(sem * 2147483000) + 1;
+    const rnd = () => (r = r * 16807 % 2147483647) / 2147483647;
+    const m = {
+      sem, rnd, v: 0, vf: 0, vEf: 0, k: 0, kc: 0, giro: 0, acel: 0, dist: 0, mov: 0, andando: false,
+      vPadrao: op.vPadrao || 1.8, vCorre: op.vCorre || 3.2,
+      oy: 0, op: 0, oyA: 0, opA: 0, tOlhar: .8 + sem * 3, pisca: 0, tPisca: .6 + sem * 3, piscaT: 0, duplo: false,
+      peso: 0, pesoA: 0, tPeso: 2 + sem * 5, x: NaN, z: NaN, ry: NaN,
+    };
+    // um passo do motor: chame no começo da anim, com o dt que a anim recebeu
+    m.passo = (dt, andando) => {
+      const px = g.position.x, pz = g.position.z, ry = g.rotation.y;
+      let inst = 0, fr = 0, gi = 0;
+      if (dt > 1e-5 && m.x === m.x) {
+        const dx = px - m.x, dz = pz - m.z, d = Math.sqrt(dx * dx + dz * dz);
+        if (d < 1.5) { inst = Math.min(12, d / dt); fr = d > 1e-6 ? inst * (dx * Math.sin(ry) + dz * Math.cos(ry)) / d : 0; }   // salto grande é teleporte
+        let dr = ry - m.ry; dr -= Math.round(dr / 6.283185) * 6.283185; gi = Math.max(-6, Math.min(6, dr / dt));
+      }
+      m.x = px; m.z = pz; m.ry = ry; m.andando = !!andando;
+      if (dt <= 0) return m;
+      const v0 = m.v;
+      m.v = suave(m.v, inst, 6, dt); m.vf = suave(m.vf, fr, 6, dt);
+      m.mov = suave(m.mov, inst > .12 ? 1 : 0, inst > .12 ? 8 : 1.2, dt);
+      // andando sem sair do lugar (prévia, disfarce): usa a velocidade de passeio
+      m.vEf = andando ? m.v * m.mov + m.vPadrao * (1 - m.mov) : m.v;
+      m.k = suave(m.k, andando ? 1 : 0, 9, dt);
+      m.kc = suave(m.kc, andando ? sstep((m.vEf - m.vCorre + .5) / 1.1) : 0, 6, dt);
+      m.giro = suave(m.giro, gi, 7, dt);
+      m.acel = suave(m.acel, Math.max(-12, Math.min(12, (m.v - v0) / dt)), 5, dt);
+      m.dist += m.vEf * dt;
+      return m;
+    };
+    // vida no parado: para onde olha, piscadas e o peso nas pernas (sorteados com a semente do token)
+    m.vida = dt => {
+      m.tOlhar -= dt;
+      if (m.tOlhar <= 0) { const q = rnd(); m.oyA = q < .3 ? 0 : (rnd() - .5) * 1.7; m.opA = (rnd() - .5) * .4; m.tOlhar = 1.2 + rnd() * 3.8; }
+      m.oy = suave(m.oy, m.oyA, 4.5, dt); m.op = suave(m.op, m.opA, 3.5, dt);
+      m.tPisca -= dt;
+      if (m.tPisca <= 0) { m.piscaT = .15; if (m.duplo) { m.duplo = false; m.tPisca = .22; } else { m.duplo = rnd() < .18; m.tPisca = 2 + rnd() * 4; } }
+      if (m.piscaT > 0) { m.piscaT -= dt; m.pisca = Math.sin(Math.max(0, 1 - m.piscaT / .15) * Math.PI); } else m.pisca = 0;
+      m.tPeso -= dt;
+      if (m.tPeso <= 0) { const q = rnd(); m.pesoA = q < .25 ? 0 : q < .62 ? -1 : 1; m.tPeso = 3.5 + rnd() * 6; }
+      m.peso = suave(m.peso, m.pesoA, 1.6, dt);
+      return m;
+    };
+    // fase de um ciclo preso ao chão: avanço em radianos para um passo (ciclo completo) de comprimento L metros
+    m.avanco = (dt, L) => m.vEf * dt * 6.283185 / Math.max(.05, L);
+    // avanço de uma fase que a forma já tinha (K rad/s pensado para a velocidade vRef): acompanha a velocidade real
+    m.ritmo = (dt, K, vRef) => dt * K * Math.max(.35, Math.min(2.4, m.vEf / (vRef || m.vPadrao))) * (m.k > .02 ? 1 : 0);
+    return m;
+  }
+  // quadros-chave sem alocação: K = [[t, v0, v1, ...], ...]; escreve em out os valores no instante u (suavizado)
+  function chave(K, u, out) {
+    const n = K[0].length;
+    let i = 1; while (i < K.length && u > K[i][0]) i++;
+    if (i >= K.length) { for (let j = 1; j < n; j++) out[j] = K[K.length - 1][j]; return out; }
+    const a = K[i - 1], b = K[i], f = sstep((u - a[0]) / Math.max(1e-4, b[0] - a[0]));
+    for (let j = 1; j < n; j++) out[j] = a[j] + (b[j] - a[j]) * f;
+    return out;
+  }
+  // IK de dois ossos sem alocação: devolve em qB e qC as rotações do braço e do antebraço (espaço do corpo)
+  let IKV = null;
+  function ikQ(T, br, ax, ay, az, px, py, pz, qB, qC) {
+    if (!IKV) IKV = { P: new T.Vector3(), Tg: new T.Vector3(), u: new T.Vector3(), pv: new T.Vector3(), d1: new T.Vector3(), d2: new T.Vector3(), c: new T.Vector3(), BX: new T.Vector3(0, -1, 0), qi: new T.Quaternion() };
+    const { P, Tg, u, pv, d1, d2, c, BX, qi } = IKV;
+    P.copy(br.ombro.position); Tg.set(ax, ay, az);
+    u.subVectors(Tg, P); let d = u.length(); if (d < 1e-5) { u.set(0, -1, 0); d = 1e-3; } else u.multiplyScalar(1 / d);
+    const L1 = br.Lb, L2 = br.La;
+    d = Math.max(Math.abs(L1 - L2) + 1e-3, Math.min(d, (L1 + L2) * .999));
+    const ang = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+    pv.set(px, py, pz); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-8) pv.set(0, 0, 1); pv.normalize();
+    d1.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(pv, Math.sin(ang)).normalize();
+    c.copy(P).addScaledVector(d1, L1);
+    d2.subVectors(Tg, c).normalize();
+    qB.setFromUnitVectors(BX, d1);
+    qi.copy(qB).invert(); d2.applyQuaternion(qi);
+    qC.setFromUnitVectors(BX, d2);
+  }
+  // ataque com o que a ficha mandou: arma de fogo, arma branca ou de mãos vazias (pelo nome do golpe)
+  const RE_FOGO = /pistol|rev[oó]lver|espingard|escopet|fuzil|rifle|carabin|metralhad|submetral|arma de fogo|\btiro|dispar|calibre|\.38|\.45|9 ?mm|sniper|garrucha|bacamarte|mosquet|arcabuz/i;
+  const RE_BRANCA = /faca|fac[aã]o|punhal|adaga|machad|espada|katana|l[aâ]mina|foice|serra|bisturi|navalha|martelo|marreta|\btaco|bast[aã]o|cassetete|p[eé].de.cabra|lan[cç]a|tesoura|picareta|enxada|chave de roda|cutelo|estilete|garra|corrente|vara|cano|ferro|bengala|tridente|alabarda|sabre|florete|clava|ma[cç]a\b/i;
+  const tipoGolpe = (nome, padrao) => { const n = String(nome || ''); if (/soco ingl|desarmad|soco|chute|cabe[cç]ada|punho/i.test(n)) return 'soco'; if (RE_FOGO.test(n)) return 'fogo'; if (RE_BRANCA.test(n)) return 'branca'; return padrao || 'soco'; };
 
   // gira um objeto para ficar com esta orientação no espaço do token (o token ainda está parado na origem)
   function alinhar(F, obj, rx, ry, rz) {
@@ -670,28 +761,159 @@
     const partes = { F, g, corpo, cab, cabeca, pernas, bracos, tronco, quadril, pesc, mt, Y, W, R, s, A, sxC, szC, Lb, La, posar: (br, alvo, polo) => posar(F, br, alvo, polo) };
     if (op.extras) op.extras(partes);
 
-    // animação: respira parado; andando, pernas e braços balançam (com o joelho dobrando)
-    let fase = 0;
-    const amp = cri ? .38 : .45, giro = op.giroCabeca ?? .15;
+    // animação: o motor lê a velocidade real e o passo fica preso ao chão (o ciclo cresce e acelera na corrida);
+    // braço oposto à perna, quadril girando, tronco subindo e descendo, inclinação ao correr e nas curvas, cabeça
+    // estável. Parado: respira, troca o peso de perna e olha em volta. Ações (ataque, conjuração, ritual) entram por
+    // cima com mistura suave e devolvem o corpo à pose de antes.
+    const mv = motor(g, { vPadrao: cri ? 1.4 : 1.8, vCorre: cri ? 2.6 : 3.2 });
+    const giro = op.giroCabeca ?? .15, kOlhar = Math.min(1.2, giro / .15) * .42;
+    const B0 = { cy: corpo.position.y, cz: corpo.position.z, cx: corpo.position.x, rx: corpo.rotation.x, ry: corpo.rotation.y, rz: corpo.rotation.z,
+      kx: cab.rotation.x, ky: cab.rotation.y, kz: cab.rotation.z, cot: bracos.map(b => b.cot.rotation.x), oz: bracos.map(b => b.ombro.rotation.z), mao: bracos.map(b => b.mao.visible) };
+    const qB = [new T.Quaternion(), new T.Quaternion()], qC = [new T.Quaternion(), new T.Quaternion()];
+    const Lperna = Y.quadril - Y.tornozelo;
+    let fase = mv.sem * 6.283;
+    partes.mv = mv; partes.acaoPeso = 0;
+    // ação em curso: { K (quadros), dur, t, tipo }
+    let ac = null; const AK = new Float32Array(12);
+    const acao = (tipo, nome) => {
+      let K = null;
+      if (tipo === 'ataque') { const tp = tipoGolpe(nome, op.golpe); K = tp === 'fogo' ? GOLPE_FOGO : tp === 'branca' ? GOLPE_BRANCA : GOLPE_SOCO; }
+      else if (tipo === 'ritual') K = RITUAL; else if (tipo === 'conjurar') K = CONJURAR;
+      if (K) ac = { K, dur: K[K.length - 1][0], t: 0, tipo };
+    };
     const anim = (dt, t, andando) => {
-      if (op.semAnimPadrao) { if (op.anim) op.anim(dt, t, andando, partes); return; }
-      if (andando) {
-        fase += dt * (cri ? 8.5 : 7);
-        const a = Math.sin(fase) * amp, cf = Math.cos(fase);
-        pernas[0].quad.rotation.x = a; pernas[1].quad.rotation.x = -a;
-        pernas[0].joelho.rotation.x = Math.max(0, -cf) * .85; pernas[1].joelho.rotation.x = Math.max(0, cf) * .85;
-        bracos.forEach((b, i) => { if (!b.fixo) { b.ombro.rotation.x = (i ? a : -a) * .75; b.cot.rotation.x = -.2 - Math.max(0, i ? -a : a) * .5; } });
-        corpo.position.y = Math.abs(Math.cos(fase)) * .025 * s;
-      } else {
-        pernas.forEach(p => { p.quad.rotation.x *= .85; p.joelho.rotation.x *= .85; });
-        bracos.forEach(b => { if (!b.fixo) { b.ombro.rotation.x *= .85; b.cot.rotation.x = b.cot.rotation.x * .85 - .12 * .15; } });
-        corpo.position.y *= .8; cab.rotation.y = Math.sin(t * .5) * giro;
-        tronco.scale.x = 1 + Math.sin(t * 2) * .012; tronco.scale.z = 1 + Math.sin(t * 2) * .02;
+      if (op.semAnimPadrao) { mv.passo(dt, andando); if (op.anim) op.anim(dt, t, andando, partes); return; }
+      mv.passo(dt, andando).vida(dt);
+      const k = sstep(mv.k), kc = sstep(mv.kc), kp = 1 - k;
+      // ciclo do passo: comprimento cresce com a corrida; passos curtos quando anda devagar
+      const ciclo = A * (.86 + .55 * kc) * (cri ? .95 : 1);
+      fase += mv.avanco(dt, ciclo);
+      const sf_ = Math.sin(fase), cf = Math.cos(fase), c2 = Math.cos(2 * fase);
+      const curto = Math.min(1, .55 + mv.vEf / 3.2);
+      const aQ = (.44 + .22 * kc) * curto * k * (cri ? .92 : 1);
+      // pernas: coxa, joelho (dobra na volta e mais ainda correndo) e pé (plano no apoio, ponta caída no ar)
+      const peso = mv.peso * kp;
+      for (let i = 0; i < 2; i++) {
+        const p = pernas[i], si = i ? -sf_ : sf_, ci = i ? -cf : cf;
+        // corrida: a coxa vai pouco para trás e bem à frente; na recuperação o calcanhar sobe em direção ao glúteo
+        // com a coxa já passando à frente (pico com a coxa na vertical), e o pé de trás fica perto da altura do joelho
+        // da outra perna; o contato é com o joelho levemente dobrado e o apoio cede um pouco
+        const qAnda = si * aQ, qCorre = (si > 0 ? si * .3 : si * .74) * curto * k - .08 * k;
+        const q = qAnda + (qCorre - qAnda) * kc;
+        const apoio = sstep(ci * 1.6 + .5);
+        const jAnda = Math.max(0, -ci) * .78 + .06;
+        const jCorre = (ci < 0 ? .28 + 1.32 * (-ci) * Math.sqrt(Math.max(0, 1 - Math.abs(si) * .35)) : .28 + .22 * ci);
+        let j = k * (jAnda + (jCorre - jAnda) * kc);
+        // parado: a perna sem peso dobra um pouco o joelho
+        const solta = i ? Math.max(0, -peso) : Math.max(0, peso);
+        j += solta * .16;
+        const qq = q - solta * .05;
+        p.quad.rotation.set(qq, 0, 0); p.joelho.rotation.set(j, 0, 0);
+        p.pe.rotation.set(-(qq + j) * (kp + k * (.45 + .55 * apoio)) + k * (1 - apoio) * .12, 0, 0);
       }
+      // tronco: sobe e desce (anda: alto na passagem; corre: voo nas passadas), balança para o lado do apoio,
+      // quadril gira com a perna, inclina para frente ao correr e para dentro nas curvas
+      const bob = k * s * ((1 - kc) * .02 * c2 + kc * (-.022 * c2 - .004));
+      const bank = Math.max(-.22, Math.min(.22, -mv.giro * mv.vEf * .05)) * k;
+      corpo.position.set(B0.cx - k * (1 - kc * .6) * cf * .016 * s + peso * .022 * s, B0.cy + bob - kp * Math.abs(mv.peso) * .006 * s, B0.cz);
+      corpo.rotation.set(B0.rx + k * (.035 + .17 * kc + (1 - kc) * .012 * c2) + Math.max(-.06 * (1 - kc), Math.min(.1, mv.acel * .018)) * k,
+        B0.ry - k * (.07 + .05 * kc) * sf_, B0.rz + k * (1 - kc) * .02 * cf + bank + peso * .018);
+      // respiração (mais funda depois de correr: kc demora a cair)
+      const resp = Math.sin(t * (1.9 + kc * 1.6) + mv.sem * 9);
+      tronco.scale.x = 1 + resp * (.01 + .006 * kc); tronco.scale.z = 1 + resp * (.018 + .01 * kc);
+      // braços: oposto à perna, cotovelo dobrando na ida e bem dobrado na corrida
+      const aB = (.36 + .16 * kc) * curto * k;
+      for (let i = 0; i < 2; i++) {
+        const b = bracos[i], bal = (i ? sf_ : -sf_) * aB;
+        // cada quadro parte da pose de origem do braço (a ação do quadro anterior não acumula)
+        b.braco.quaternion.copy(b.q0B);
+        if (b.fixo) { b.cot.quaternion.copy(b.q0C); b.ombro.rotation.set(bal * .18 + kp * Math.sin(t * .8 + i * 2 + mv.sem * 5) * .015, 0, 0); continue; }
+        b.ombro.rotation.set(bal - kc * .1 * k + kp * (Math.sin(t * .7 + i * 2.1 + mv.sem * 7) * .025 + resp * .01), 0, B0.oz[i] + (i ? 1 : -1) * (kc * .1 * k + kp * Math.abs(mv.peso) * .02));
+        // cotovelo: no passeio dobra na ida; na corrida fica perto de 90 graus
+        b.cot.rotation.set(B0.cot[i] - k * ((1 - kc) * (.12 + Math.max(0, -bal) * .45) + kc * (1.42 + Math.max(0, -bal) * .12)), 0, 0);
+      }
+      // cabeça: compensa o tronco (fica estável), olha para a curva e, parada, olha em volta
+      cab.rotation.set(B0.kx - (corpo.rotation.x - B0.rx) * .8 + kp * mv.op * .5 - k * .015 * c2,
+        B0.ky - (corpo.rotation.y - B0.ry) * .9 + mv.oy * kOlhar * (1 - k * .75) + Math.max(-.3, Math.min(.3, mv.giro * .1)) * k,
+        B0.kz - (corpo.rotation.z - B0.rz) * .7);
+      // ação por cima (ataque, conjuração, ritual)
+      let w = 0;
+      if (ac) {
+        ac.t += dt; const u = ac.t;
+        if (u >= ac.dur) ac = null;
+        else {
+          chave(ac.K, u, AK);
+          w = sstep(u / .14) * sstep((ac.dur - u) / Math.min(.4, ac.dur * .3));
+          const ss = s, tr = ac.tipo === 'ritual' && u > .55 && u < 1.6 ? Math.sin((u - .55) / 1.05 * Math.PI) : 0, tre = ac.tipo !== 'ataque' && u > 1.4 ? Math.sin(t * 41) * .006 : 0;
+          corpo.rotation.y += AK[7] * w; corpo.rotation.x += AK[8] * w;
+          corpo.position.y += AK[9] * ss * w; corpo.position.z += AK[10] * ss * w;
+          cab.rotation.x += (AK[11] - AK[8] * .6) * w; cab.rotation.y += -AK[7] * .7 * w;
+          // passo à frente no golpe e joelhos dobrando ao agachar
+          pernas[1].quad.rotation.x -= AK[10] * 3.2 * w; pernas[0].quad.rotation.x += AK[10] * 2 * w;
+          pernas[0].joelho.rotation.x += Math.max(0, -AK[9]) * 3.5 * w; pernas[1].joelho.rotation.x += Math.max(0, -AK[9]) * 4 * w + AK[10] * 1.2 * w;
+          for (let i = 0; i < 2; i++) {
+            const b = bracos[i], o = i ? 4 : 1, sx = i ? 1 : -1;
+            // traço do sigilo no ar (ritual) e mãos tremendo na conjuração
+            const cx = tr * Math.cos(t * 13 + i * 3.1) * .06, cy2 = tr * Math.sin(t * 13 + i * 3.1) * .06;
+            ikQ(T, b, (AK[o] + cx) * ss, (AK[o + 1] + cy2) * ss + tre, AK[o + 2] * ss, sx * .9, -.5, -.35, qB[i], qC[i]);
+            b.ombro.rotation.x *= 1 - w; b.ombro.rotation.z += (0 - b.ombro.rotation.z) * w;
+            b.braco.quaternion.slerp(qB[i], w); b.cot.quaternion.slerp(qC[i], w);
+            if (!B0.mao[i]) b.mao.visible = w > .3;
+          }
+        }
+      }
+      if (!ac && partes.acaoPeso) bracos.forEach((b, i) => { b.mao.visible = B0.mao[i]; });   // a ação acabou: mãos como eram
+      partes.acaoPeso = w;
       if (op.anim) op.anim(dt, t, andando, partes);
     };
-    return { g, alt: A, anim, partes };
+    // pose original dos braços posados (para voltar depois de uma ação)
+    bracos.forEach(b => { b.q0B = b.braco.quaternion.clone(); b.q0C = b.cot.quaternion.clone(); });
+    return { g, alt: A, anim, partes, acao };
   }
+  // quadros das ações (metros para um adulto de 1,72 m; o corpo multiplica pela escala):
+  // [t (s), mão direita x y z, mão esquerda x y z, giro do tronco, inclinação, agacha, avança, cabeça]
+  // soco: puxa e gira (antecipação), estica rápido com o passo (golpe), segura (follow-through) e volta
+  const GOLPE_SOCO = [
+    [0, -.2, 1.0, .06, .2, 1.0, .06, 0, 0, 0, 0, 0],
+    [.22, -.2, 1.27, -.12, .1, 1.4, .24, -.38, -.04, -.04, -.02, .05],
+    [.31, -.05, 1.37, .56, .13, 1.36, .15, .32, .12, -.05, .09, -.05],
+    [.5, -.01, 1.35, .57, .14, 1.33, .12, .36, .1, -.045, .09, -.04],
+    [.78, -.18, 1.24, .22, .13, 1.3, .18, .06, .03, -.02, .03, 0],
+    [1.0, -.2, 1.05, .08, .2, 1.05, .08, 0, 0, 0, 0, 0]];
+  // arma branca: ergue por cima do ombro, corta em diagonal para baixo e atravessa o corpo, recupera
+  const GOLPE_BRANCA = [
+    [0, -.2, 1.0, .06, .2, 1.0, .06, 0, 0, 0, 0, 0],
+    [.34, -.3, 1.78, -.08, .16, 1.22, .25, -.42, -.08, -.02, -.03, -.05],
+    [.47, .16, 1.1, .44, .24, 1.12, .12, .42, .22, -.08, .1, .1],
+    [.64, .3, .96, .26, .25, 1.06, .06, .48, .2, -.08, .1, .08],
+    [.92, -.08, 1.12, .16, .2, 1.1, .1, .1, .05, -.03, .04, 0],
+    [1.2, -.2, 1.05, .08, .2, 1.05, .08, 0, 0, 0, 0, 0]];
+  // arma de fogo: ergue e mira com as duas mãos, o tiro dá o coice para cima, segura a mira e abaixa
+  const GOLPE_FOGO = [
+    [0, -.2, 1.0, .06, .2, 1.0, .06, 0, 0, 0, 0, 0],
+    [.28, -.06, 1.42, .52, -.02, 1.36, .44, .1, .02, -.02, .02, 0],
+    [.46, -.06, 1.42, .53, -.02, 1.36, .45, .1, .02, -.02, .02, 0],
+    [.52, -.06, 1.52, .44, -.02, 1.43, .38, .1, -.06, -.015, -.01, -.06],
+    [.7, -.06, 1.42, .52, -.02, 1.36, .44, .1, .02, -.02, .02, 0],
+    [.95, -.08, 1.38, .48, -.01, 1.33, .42, .08, .02, -.02, .02, 0],
+    [1.3, -.2, 1.05, .08, .2, 1.05, .08, 0, 0, 0, 0, 0]];
+  // ritual (o sigilo do site dura 4,2 s e brilha mais em 1,5 s): junta as mãos e baixa a cabeça, abre os braços
+  // traçando o sigilo no ar até o pico do brilho, desce as mãos espalmadas para o chão e solta no fim do brilho
+  const RITUAL = [
+    [0, -.2, 1.0, .06, .2, 1.0, .06, 0, 0, 0, 0, 0],
+    [.5, -.04, 1.3, .24, .04, 1.3, .24, 0, .08, -.02, 0, .3],
+    [1.0, -.4, 1.56, .26, .4, 1.56, .26, 0, -.06, 0, 0, -.25],
+    [1.5, -.48, 1.64, .2, .48, 1.64, .2, 0, -.08, .01, 0, -.32],
+    [2.1, -.3, 1.0, .38, .3, 1.0, .38, 0, .14, -.08, .02, .25],
+    [2.7, -.32, .95, .4, .32, .95, .4, 0, .16, -.1, .02, .3],
+    [3.0, -.44, .86, .5, .44, .86, .5, 0, .2, -.12, .04, .18],
+    [3.8, -.2, 1.05, .08, .2, 1.05, .08, 0, 0, 0, 0, 0]];
+  // conjuração curta (habilidade): uma mão erguida à frente, a outra junto do peito
+  const CONJURAR = [
+    [0, -.2, 1.0, .06, .2, 1.0, .06, 0, 0, 0, 0, 0],
+    [.35, -.12, 1.5, .46, .12, 1.25, .2, .12, .04, -.02, .02, -.08],
+    [1.05, -.12, 1.52, .47, .12, 1.25, .2, .12, .04, -.02, .02, -.08],
+    [1.6, -.2, 1.05, .08, .2, 1.05, .08, 0, 0, 0, 0, 0]];
 
   /* ================= Mostarda: escorpião de sangue meio humano ================= */
   function carapacaTex(F) {
@@ -704,6 +926,8 @@
       return fazTex(F, c, [2, 1]);
     });
   }
+  // bote do escorpião: [t, cauda (- enrola, + bote), avanço do corpo, pinças, agacha]
+  const BOTE = [[0, 0, 0, 0, 0], [.32, -1.2, -.08, .2, .25], [.44, 2.6, .22, 1, -.1], [.62, 2.4, .2, 1, -.1], [.95, .6, .05, .4, 0], [1.25, 0, 0, 0, 0]];
   function escorpiao(F) {
     const T = F.T, { G, cy, sf } = F, m = (c, o) => M(F, c, o);
     const g = G(), bicho = G(); g.add(bicho);
@@ -782,27 +1006,53 @@
       return mov;
     });
     h.partes.bracos.forEach((b, k) => { b.fixo = true; b.ombro.rotation.x = -.5; b.ombro.rotation.z = (k ? 1 : -1) * .35; });
-    let fase = 0;
+    // anda com as oito patas em ondas alternadas (passo preso ao chão), inclina nas curvas; o ataque é o bote da
+    // cauda por cima da cabeça com as pinças fechando; o ritual usa os braços do homem
+    const mv = motor(g, { vPadrao: 1.6, vCorre: 3 });
+    let fase = mv.sem * 6.283, ac = null, kAc = 0;
+    const AKE = new Float32Array(5);
+    const ptW = new T.Vector3();
     const anim = (dt, t, andando) => {
+      mv.passo(dt, andando).vida(dt);
+      const k = sstep(mv.k), kc = sstep(mv.kc);
       h.anim(dt, t, false);
-      h.partes.bracos.forEach((b, k) => { b.ombro.rotation.x = -.5 + Math.sin(t * 1.3 + k) * .12; b.ombro.rotation.z = (k ? 1 : -1) * (.35 + Math.sin(t * .9 + k * 2) * .06); b.cot.rotation.x = -.5; });
-      if (andando) fase += dt * 9;
+      fase += mv.avanco(dt, .62 + .25 * kc);
+      // ataque: [cauda enrola (-) / dá o bote (+), avanço do corpo, pinças fechando, corpo abaixa]
+      let ab = 0, av = 0, pz = 0, ag = 0;
+      if (ac) {
+        ac.t += dt; const u = ac.t;
+        if (u >= ac.dur) ac = null;
+        else if (ac.tipo === 'ataque') { chave(BOTE, u, AKE); ab = AKE[1]; av = AKE[2]; pz = AKE[3]; ag = AKE[4]; }
+      }
+      const wH = h.partes.acaoPeso || 0;
+      h.partes.bracos.forEach((b, i) => {
+        b.ombro.rotation.x = (-.5 + Math.sin(t * 1.3 + i) * .12 - pz * .35) * (1 - wH) + b.ombro.rotation.x * wH;
+        b.ombro.rotation.z = ((i ? 1 : -1) * (.35 + Math.sin(t * .9 + i * 2) * .06)) * (1 - wH) + b.ombro.rotation.z * wH;
+        if (!wH) b.cot.rotation.x = -.5;
+      });
       patas.forEach(({ p, sx, i }) => {
         const f = fase + i * 1.4 + (sx > 0 ? Math.PI : 0);
-        p.rotation.y = andando ? Math.sin(f) * .28 : p.rotation.y * .9;
-        p.rotation.z = andando ? Math.max(0, Math.cos(f)) * .18 * sx : p.rotation.z * .9;
+        p.rotation.y = Math.sin(f) * (.28 + .1 * kc) * k;
+        p.rotation.z = Math.max(0, Math.cos(f)) * (.18 + .08 * kc) * sx * k;
       });
-      bicho.position.y = andando ? Math.abs(Math.sin(fase * 2)) * .02 : 0;
-      // a cauda balança devagar e às vezes dá o bote
-      const bote = Math.max(0, Math.sin(t * .7) - .92) * 9;
-      cauda.forEach((c, i) => { if (i) c.rotation.x = .47 + Math.sin(t * 1.4 + i * .5) * .05 - bote * .12; c.rotation.y = Math.sin(t * .8 + i * .3) * .08; });
-      pincas.forEach((pm, k) => { pm.rotation.z = -.1 - Math.max(0, Math.sin(t * 2.2 + k * 1.7)) * .45; });
-      abd.scale.y = 1 + Math.sin(t * 2) * .03;
-      // gotas: caem do ferrão até o chão e recomeçam
-      g.updateWorldMatrix(true, true); const ptW = pontaFim.getWorldPosition(new T.Vector3()); g.worldToLocal(ptW);
+      bicho.position.y = Math.abs(Math.sin(fase * 2)) * .02 * k - ag * .08;
+      bicho.position.z = av;
+      bicho.rotation.z = Math.max(-.15, Math.min(.15, -mv.giro * mv.vEf * .04)) * k;
+      bicho.rotation.x = k * .04 * kc + Math.max(-.05, Math.min(.06, mv.acel * .012)) * k + ag * .1;
+      // a cauda balança devagar e às vezes dá o bote (sozinha ou no ataque)
+      const bote = Math.max(0, Math.sin(t * .7 + mv.sem * 5) - .92) * 9 * (ac ? 0 : 1) + ab;
+      cauda.forEach((c, i) => { if (i) c.rotation.x = .47 + Math.sin(t * 1.4 + i * .5) * .05 - bote * .12; c.rotation.y = Math.sin(t * .8 + i * .3) * .08 * (1 - Math.abs(ab) * .8); });
+      pincas.forEach((pm, i) => { pm.rotation.z = -.1 - Math.max(0, Math.sin(t * 2.2 + i * 1.7)) * .45 * (1 - pz) - pz * .55; });
+      abd.scale.y = 1 + Math.sin(t * 2 + mv.sem * 4) * .03;
+      // gotas: caem do ferrão até o chão e recomeçam (só a cadeia da cauda é atualizada)
+      pontaFim.updateWorldMatrix(true, false); ptW.setFromMatrixPosition(pontaFim.matrixWorld); g.worldToLocal(ptW);
       gotas.forEach(o => { const q = (t * .6 + o.f) % 1; o.gt.position.set(ptW.x, Math.max(.03, ptW.y * (1 - q * q)), ptW.z + .03); o.gt.visible = q < .97; });
     };
-    return { g, alt: 2.05, anim, raioBase: .62 };
+    const acao = (tipo, nome) => {
+      if (tipo === 'ataque') ac = { tipo, t: 0, dur: BOTE[BOTE.length - 1][0] };
+      else if (h.acao) h.acao(tipo, nome);
+    };
+    return { g, alt: 2.05, anim, acao, raioBase: .62 };
   }
 
   /* ================= detalhes de roupa usados por mais de uma cobaia ================= */
@@ -850,7 +1100,7 @@
       } }),
     // Sabonete: capa azul-escura esfarrapada com capuz aberto na frente, máscara de caveira dourada com olhos
     // vermelhos acesos e um tubo de respiração, cachecol vermelho, couraça de bronze gravada e um revólver longo
-    sabonete: F => humano(F, { alt: 1.8, pele: '#5a4a3a', camisa: '#22252e', calca: '#24252b', sapato: '#2e2218', bota: true, maos: '#3a2618', manga: '#1d2436',
+    sabonete: F => humano(F, { alt: 1.8, golpe: 'fogo', pele: '#5a4a3a', camisa: '#22252e', calca: '#24252b', sapato: '#2e2218', bota: true, maos: '#3a2618', manga: '#1d2436',
       rosto: { bandagem: '#000', semOlhos: true }, cabelo: { tipo: 'nenhum' }, semNariz: true, semOrelhas: true, giroCabeca: .05,
       extras: ({ F, corpo, cab, cabeca, bracos, Y, W, R, sxC, szC, s, mt, posar }) => {
         const { G, T } = F, m = (c, o) => M(F, c, o);
@@ -1043,8 +1293,8 @@
       },
       anim: (dt, t, andando, p) => {
         // parada, balança devagar e inclina a cabeça de um jeito estranho
-        if (!andando) { p.corpo.rotation.z = Math.sin(t * .9) * .025; p.cab.rotation.z = Math.sin(t * .45) * .12 + .05; }
-        else { p.corpo.rotation.z *= .9; p.cab.rotation.z *= .9; }
+        const kp = 1 - p.mv.k;
+        p.corpo.rotation.z += Math.sin(t * .9) * .025 * kp; p.cab.rotation.z += (Math.sin(t * .45) * .12 + .05) * kp;
       } }),
   };
 
@@ -1069,6 +1319,10 @@
       return fazTex(F, c);
     });
   }
+  // ações dos robôs: [t, ombro dir., cotovelo dir., golpe (gira o tronco e fecha a garra), ombro esq., cotovelo esq., peso]
+  const ROBO_GOLPE = [[0, 0, -.75, 0, 0, -.75, 0], [.12, .35, -1.3, -.3, .1, -.9, 1], [.3, .45, -1.45, -.5, .15, -1, 1], [.4, -1.35, -.15, 1, .1, -.9, 1], [.62, -1.3, -.2, 1, .1, -.9, 1], [.9, -.4, -.6, .3, .05, -.8, 1], [1.1, 0, -.75, 0, 0, -.75, 0]];
+  const ROBO_RITUAL = [[0, 0, -.75, 0, 0, -.75, 0], [.6, -2.3, -.3, 0, -2.3, -.3, 1], [2.6, -2.4, -.25, 0, -2.4, -.25, 1], [3.0, -1.1, -.4, 0, -1.1, -.4, 1], [3.8, 0, -.75, 0, 0, -.75, 0]];
+  const ROBO_CONJ = [[0, 0, -.75, 0, 0, -.75, 0], [.35, -1.5, -.2, 0, -.2, -.9, 1], [1.1, -1.5, -.2, 0, -.2, -.9, 1], [1.6, 0, -.75, 0, 0, -.75, 0]];
   function robo(F, id, s) {
     const T = F.T, { G, bx, cy, sf } = F, m = (c, o) => M(F, c, o), cfg = ROBOS[id] || { cor: s.cor || '#888', nome: (s.nome || id || '').toUpperCase(), torso: 'branco', botao: '#ffc12a', base: 'cor', antebraco: 'cor', braco: 'cor', ombro: 'cor' };
     const g = G();
@@ -1181,8 +1435,9 @@
     const ol = cfg.olhos;
     const olhoM = ol ? m('#2a1600', { r: .2, e: ol, ei: 1.6 }) : m('#050505', { r: .08, me: .3 });
     const brilhoM = m('#ffffff', { e: '#ffffff', ei: 1.2 });
+    const olhosR = [];
     [-1, 1].forEach(sx => {
-      const o2 = sf(cab, .055, olhoM, sx * .078, .015, RH * .8, 18); o2.scale.set(1, 1.05, .55);
+      const o2 = sf(cab, .055, olhoM, sx * .078, .015, RH * .8, 18); o2.scale.set(1, 1.05, .55); olhosR.push(o2);
       if (ol) { const aro = new T.Mesh(F.guardar(new T.TorusGeometry(.055, .01, 6, 18)), m('#1a1a1a', { r: .5 })); aro.position.set(sx * .078, .015, RH * .8 + .012); aro.rotation.y = sx * .35; cab.add(aro); }
       else { sf(cab, .013, brilhoM, sx * .078 - .018, .036, RH * .8 + .028, 6); sf(cab, .006, brilhoM, sx * .078 + .016, -.008, RH * .8 + .028, 6); }
     });
@@ -1194,18 +1449,62 @@
 
     });
     if (ol) F.luz(cab, ol, .25, 1.6, 0, .02, .35);
+    // movimento: as rodas giram com a distância real (sem patinar); o tronco tem peso, numa mola com amortecimento:
+    // ao arrancar fica para trás, ao frear vai para frente e volta; nas curvas tomba para fora. A cabeça mira como um
+    // servo (vai e assenta), os braços balançam com atraso e, parado, há pequenos ajustes hidráulicos: o cotovelo muda
+    // de posição num tranco curto, a garra abre e fecha, os olhos piscam e a mola respira.
+    const mv = motor(g, { vPadrao: 1.6, vCorre: 3 });
+    const S = { p: 0, pv: 0, r: 0, rv: 0, ky: 0, kyv: 0, kx: 0, kxv: 0, mol: 0, molv: 0, tH: 1 + mv.sem * 2, alvoCt: [-.75, -.75], ct: [-.75, -.75], garra: [0, 0], alvoG: [0, 0], om0: 0, omv0: 0, om1: 0, omv1: 0 };
+    // mola amortecida sem alocar: S[x] e S[v] são a posição e a velocidade
+    const mola2 = (x, v, alvo, kk, c, dt) => { S[v] += ((alvo - S[x]) * kk - S[v] * c) * dt; S[x] += S[v] * dt; return S[x]; };
+    let ac = null; const AKB = new Float32Array(7);
     const anim = (dt, t, andando) => {
-      if (andando) rodas.forEach(r => { r.rotation.x += dt * 9; });
-      mola.scale.y = 1 + Math.sin(t * (andando ? 14 : 2)) * (andando ? .08 : .03);
+      mv.passo(dt, andando).vida(dt);
+      const k = sstep(mv.k), kp = 1 - k, h = Math.min(dt, .05);
+      // rodas: ângulo = distância / raio (andando no lugar, gira na velocidade de passeio)
+      const vr = mv.mov > .5 ? mv.vf : mv.vEf * k;
+      for (let i = 0; i < rodas.length; i++) rodas[i].rotation.x += vr * dt / .175;
+      // peso do tronco: inclinação para trás ao acelerar, para frente ao frear; tomba para fora nas curvas
+      S.p = Math.max(-.3, Math.min(.3, mola2('p', 'pv', -mv.acel * .035 + k * .04, 70, 7, h)));
+      S.r = Math.max(-.2, Math.min(.2, mola2('r', 'rv', mv.giro * mv.vEf * .035, 60, 6, h)));
+      // mola da cintura: comprime com o peso, vibra no chão irregular e respira devagar parada
+      mola2('mol', 'molv', -Math.abs(mv.acel) * .01 + Math.sin(t * 2 + mv.sem * 6) * .025 * kp, 90, 8, h);
+      mola.scale.y = 1 + S.mol + Math.sin(t * 31 + mv.sem * 3) * .012 * k * Math.min(1, mv.vEf / 2);
       tronco.position.y = .86 + (mola.scale.y - 1) * .26;
-      cab.rotation.z = Math.sin(t * .7) * .12; cab.rotation.y = Math.sin(t * .4) * .25;
-      bracos.forEach((b, i) => {
-        b.om.rotation.x = andando ? Math.sin(t * 8 + i * Math.PI) * .35 : Math.sin(t * 1.3 + i) * .06;
-        b.ct.rotation.x = -.75 + Math.sin(t * 1.1 + i * 2) * .08;
-        const ab = .15 + Math.max(0, Math.sin(t * .9 + i * 1.7)) * .4; b.dedos.forEach(d => { d.rotation.x = -.3 - ab; });
-      });
+      tronco.rotation.set(S.p, tronco.rotation.y, S.r);
+      // cabeça: alvo do olhar com passos de servo (mola rígida que assenta com um leve tremor) e compensação do tronco
+      mola2('ky', 'kyv', mv.oy * .55 * (1 - k * .6) + Math.max(-.35, Math.min(.35, mv.giro * .15)) * k, 140, 15, h);
+      mola2('kx', 'kxv', mv.op * .4 * kp, 120, 13, h);
+      cab.rotation.set(S.kx - S.p * .7, S.ky, Math.sin(t * .7 + mv.sem * 4) * .06 * kp - S.r * .6);
+      // olhos piscam (a tampa é a escala vertical do olho)
+      const pis = 1 - mv.pisca * .92; for (let i = 0; i < olhosR.length; i++) olhosR[i].scale.y = 1.05 * pis;
+      // ajustes hidráulicos parado: troca o ângulo de um cotovelo e a abertura da garra de tempos em tempos
+      S.tH -= dt;
+      if (S.tH <= 0) { const i = mv.rnd() < .5 ? 0 : 1; S.alvoCt[i] = -.55 - mv.rnd() * .45; S.alvoG[i] = mv.rnd() < .4 ? .45 : 0; S.tH = 1.5 + mv.rnd() * 3.5; }
+      let w = 0;
+      if (ac) {
+        ac.t += dt; const u = ac.t;
+        if (u >= ac.dur) ac = null; else { chave(ac.K, u, AKB); w = 1; }
+      }
+      for (let i = 0; i < 2; i++) {
+        const b = bracos[i];
+        // braço balança com atraso (pêndulo pesado) contra a aceleração e no ritmo das rodas
+        const alvoOm = k * (Math.sin(mv.dist * 2.4 + i * Math.PI) * .22 - mv.acel * .03) + kp * Math.sin(t * 1.3 + i + mv.sem * 4) * .04;
+        mola2(i ? 'om1' : 'om0', i ? 'omv1' : 'omv0', alvoOm, 40, 5, h);
+        // cotovelo: anda em degraus curtos (tranco hidráulico) até o alvo
+        const d = S.alvoCt[i] - S.ct[i]; S.ct[i] += Math.sign(d) * Math.min(Math.abs(d), dt * 2.6);
+        S.garra[i] += (S.alvoG[i] - S.garra[i]) * Math.min(1, dt * 9);
+        let om = i ? S.om1 : S.om0, ct = S.ct[i] + Math.sin(t * 1.1 + i * 2) * .03 * kp, gz = 0, ab = .15 + S.garra[i] + Math.max(0, Math.sin(t * .9 + i * 1.7)) * .15 * kp;
+        if (w) { const e = i ? AKB[4] : AKB[1]; om = om + (e - om) * AKB[6]; ct = ct + ((i ? AKB[5] : AKB[2]) - ct) * AKB[6]; gz = (i ? 1 : -1) * AKB[3] * .5; ab = ab + ((i ? .1 : AKB[3] > .5 ? -.1 : .7) - ab) * AKB[6]; }
+        b.om.rotation.set(om, 0, gz); b.ct.rotation.set(ct, 0, 0);
+        for (let j = 0; j < b.dedos.length; j++) b.dedos[j].rotation.x = -.3 - ab;
+      }
+      if (w) { tronco.rotation.y = AKB[3] * .35 * AKB[6]; tronco.position.z = AKB[3] * .06 * AKB[6]; cab.rotation.x -= AKB[6] * (ac && ac.tipo !== 'ataque' ? .35 : 0); }
+      else { tronco.rotation.y *= Math.max(0, 1 - dt * 8); tronco.position.z *= Math.max(0, 1 - dt * 8); }
     };
-    return { g, alt: 1.55, anim };
+    // ataque: o braço direito recua, dá o golpe com a garra fechada e volta; ritual e conjuração: ergue os braços
+    const acao = tipo => { const K = tipo === 'ataque' ? ROBO_GOLPE : tipo === 'ritual' ? ROBO_RITUAL : tipo === 'conjurar' ? ROBO_CONJ : null; if (K) ac = { K, t: 0, dur: K[K.length - 1][0], tipo }; };
+    return { g, alt: 1.55, anim, acao };
   }
 
   /* ================= NPCs (cobaias de outros ciclos): macacão laranja e a cor do token no braço ================= */
@@ -1357,6 +1656,11 @@
 
   /* ================= NPCs com modelo próprio (s.id) ================= */
   const vetor = (F, a) => new F.T.Vector3(a[0], a[1], a[2]);
+  // rastejante: [t, recua/avança, bote do braço, ergue o tronco]
+  const BOTE_RAST = [[0, 0, 0, 0], [.28, -.12, -.15, 0], [.42, .3, 1, 0], [.66, .26, .9, 0], [1.1, 0, 0, 0]];
+  const RITUAL_RAST = [[0, 0, 0, 0], [.7, 0, 0, 1], [2.6, 0, 0, 1], [3.0, .1, 0, .3], [3.8, 0, 0, 0]];
+  const CONJ_RAST = [[0, 0, 0, 0], [.4, 0, 0, .6], [1.1, 0, 0, .6], [1.6, 0, 0, 0]];
+  const AKR = new Float32Array(4);
   const NPCS = {
     // Coelho: enorme e musculoso, sem camisa; máscara branca de coelho rachada e suja de sangue, orelhas compridas,
     // cabelo preto atrás, barba por fazer; pele rachada e com veias; calça cargo preta com cinto, corrente e coldre de
@@ -1397,7 +1701,7 @@
     // Cara Pálida: alto e magro, um pouco curvado, braços compridos; cabeça lisa e branca sem rosto nenhum; terno
     // preto de três peças (paletó, colete com botões, camisa branca, gravata preta, lenço no bolso), luvas e sapatos
     // pretos; uma lâmina longa e escura na mão, arrastando atrás
-    'cara-palida': (F, s) => humano(F, { alt: 2.0, porte: .86, bracoLongo: 1.1, pele: '#e8e6e2', camisaTex: tecidoTex(F, '#0e0e11', { sem: 81, dobras: true, costuras: [0, .5] }),
+    'cara-palida': (F, s) => humano(F, { alt: 2.0, golpe: 'branca', porte: .86, bracoLongo: 1.1, pele: '#e8e6e2', camisaTex: tecidoTex(F, '#0e0e11', { sem: 81, dobras: true, costuras: [0, .5] }),
       calcaTex: tecidoTex(F, '#0d0d10', { sem: 82, dobras: true, costuras: [.25, .75] }), manga: '#101013', sapato: '#070707', sola: '#050505', maos: '#0c0c0e',
       cabecaMat: matTex(F, semRostoTex(F), { r: .22 }), escalaCabeca: [1, 1.12, 1.02], semNariz: true, semOrelhas: true, cabelo: { tipo: 'nenhum' }, giroCabeca: .12,
       gola: 'camisa', corGola: '#ecebe6',
@@ -1472,19 +1776,20 @@
           corpo.rotation.x = 1.3; corpo.position.set(0, 0, -1.1);
           cab.rotation.x = -1.5;
           const pernasIK = pernas.map((pp, i) => ({ ombro: pp.quad, braco: pp.quad, cot: pp.joelho, Lb: Y.quadril - Y.joelho, La: Y.joelho - Y.tornozelo, k: i ? 1 : -1 }));
-          const local = a => { corpo.updateMatrix(); return vetor(F, a).applyMatrix4(corpo.matrix.clone().invert()); };
-          const dir = a => vetor(F, a).applyQuaternion(corpo.quaternion.clone().invert());
-          const ik = (br, alvo, polo) => { const l = local(alvo), d = dir(polo); posar(F, br, [l.x, l.y, l.z], [d.x, d.y, d.z]); };
-          // passo do rastejar: braço de um lado anda junto com a perna do outro
-          p.rastejar = (f, amp) => {
+          // IK no espaço do mundo do token, convertido para o corpo deitado (sem alocar por quadro)
+          const Mi = new T.Matrix4(), Qi = new T.Quaternion(), vA = new T.Vector3(), vP = new T.Vector3(), qb = new T.Quaternion(), qc = new T.Quaternion();
+          const ik = (br, ax, ay, az, px, py, pz) => { vA.set(ax, ay, az).applyMatrix4(Mi); vP.set(px, py, pz).applyQuaternion(Qi); ikQ(T, br, vA.x, vA.y, vA.z, vP.x, vP.y, vP.z, qb, qc); br.ombro.rotation.set(0, 0, 0); br.braco.quaternion.copy(qb); br.cot.quaternion.copy(qc); br.fixo = true; };
+          // passo do rastejar: braço de um lado anda junto com a perna do outro; alc estica o braço direito à frente
+          // (bote) e ergue os dois (ritual)
+          p.rastejar = (f, amp, alc = 0, ergue = 0) => {
+            corpo.updateMatrix(); Mi.copy(corpo.matrix).invert(); Qi.copy(corpo.quaternion).invert();
             bracos.forEach((b, i) => {
-              const ph = f + (i ? Math.PI : 0);
-              ik(b, [b.k * .3, .03 + Math.max(0, Math.cos(ph)) * .07 * amp, .55 + Math.sin(ph) * .12 * amp], [b.k, .7, -.4]);
+              const ph = f + (i ? Math.PI : 0), r = i ? 0 : alc;
+              ik(b, b.k * .3 * (1 - r * .5) * (1 - ergue * .3), .03 + Math.max(0, Math.cos(ph)) * .07 * amp + r * .3 + ergue * .55, .55 + Math.sin(ph) * .12 * amp + r * .5 - ergue * .25, b.k, .7, -.4);
             });
             pernasIK.forEach((pp, i) => {
               const ph = f + (i ? 0 : Math.PI);
-              ik(pp, [pp.k * .24, .06 + Math.max(0, Math.cos(ph)) * .05 * amp, -.3 + Math.sin(ph) * .1 * amp], [pp.k * .3, -.3, 1]);
-
+              ik(pp, pp.k * .24, .06 + Math.max(0, Math.cos(ph)) * .05 * amp, -.3 + Math.sin(ph) * .1 * amp, pp.k * .3, -.3, 1);
             });
           };
           // pés descalços dobrados para trás, rente ao chão
@@ -1492,12 +1797,22 @@
           p.rastejar(0, 0);
           p.fase = 0;
         },
+        // de quatro: o passo fica preso ao chão pela velocidade real; parado, respira e olha em volta devagar.
+        // Ataque: recua e dá o bote com o braço; ritual: ergue o tronco e os braços
         anim: (dt, t, andando, p) => {
-          if (andando) { p.fase += dt * 5; p.rastejar(p.fase, 1); p.corpo.position.x = Math.sin(p.fase) * .02; p.corpo.rotation.z = Math.sin(p.fase) * .05; }
-          else { p.corpo.position.x *= .9; p.corpo.rotation.z *= .9; p.rastejar(p.fase, 0); }
-          p.cab.rotation.y = Math.sin(t * .35) * .22; p.cab.rotation.z = Math.sin(t * .6) * .1;
-          p.tronco.scale.x = 1 + Math.sin(t * 2.2) * .02;
+          const mv = p.mv.vida(dt), k = sstep(mv.k);
+          p.fase += mv.avanco(dt, .8);
+          let dz = 0, alc = 0, erg = 0;
+          if (p.ac) { p.ac.t += dt; const u = p.ac.t; if (u >= p.ac.K[p.ac.K.length - 1][0]) p.ac = null; else { chave(p.ac.K, u, AKR); dz = AKR[1]; alc = AKR[2]; erg = AKR[3]; } }
+          p.corpo.rotation.x = 1.3 - erg * .55;
+          p.corpo.position.set(Math.sin(p.fase) * .02 * k, erg * .12, -1.1 + dz + erg * .35);
+          p.corpo.rotation.z = Math.sin(p.fase) * .05 * k + Math.max(-.12, Math.min(.12, -mv.giro * mv.vEf * .04)) * k;
+          p.rastejar(p.fase, k, alc, erg);
+          p.cab.rotation.x = -1.5 + erg * .45 - alc * .15;
+          p.cab.rotation.y = mv.oy * .3 * (1 - k * .6) + Math.sin(t * .35 + mv.sem * 6) * .08; p.cab.rotation.z = Math.sin(t * .6) * .1;
+          p.tronco.scale.x = 1 + Math.sin(t * 2.2 + mv.sem * 5) * .02;
         } });
+      h.acao = tipo => { const K = tipo === 'ataque' ? BOTE_RAST : tipo === 'ritual' ? RITUAL_RAST : tipo === 'conjurar' ? CONJ_RAST : null; if (K) h.partes.ac = { K, t: 0 }; };
       h.alt = .95; h.raioBase = .55;
       return h;
     },
@@ -1604,10 +1919,14 @@
       return { om, b, ct, dedos, k };
     });
     let lean = 0;
+    const mv = motor(g, { vPadrao: 1.5 });
+    // flutua: inclina com a velocidade real e para dentro das curvas, a mortalha arrasta atrás
     const anim = (dt, t, andando) => {
-      flut.position.y = .2 + Math.sin(t * 1.1) * .06;
-      lean += ((andando ? .28 : 0) - lean) * Math.min(1, dt * 3);
-      flut.rotation.x = lean;
+      mv.passo(dt, andando).vida(dt);
+      const k = sstep(mv.k);
+      flut.position.y = .2 + Math.sin(t * 1.1 + mv.sem * 6) * .06;
+      lean += ((.12 + .1 * Math.min(1.6, mv.vEf / 2)) * k + Math.max(-.08, Math.min(.12, mv.acel * .03)) * k - lean) * Math.min(1, dt * 3);
+      flut.rotation.x = lean; flut.rotation.z = Math.max(-.2, Math.min(.2, -mv.giro * mv.vEf * .05)) * k;
       fiapos.forEach((f, i) => { f.rotation.x = Math.sin(t * 1.3 + i) * .22 - lean * 1.4; f.rotation.z = Math.cos(t * 1.1 + i * 2) * .2; });
       sud.rotation.y = Math.sin(t * .7) * .05;
       // a cabeça às vezes dá um tranco para o lado
@@ -1638,7 +1957,8 @@
       const pernas = [];
       for (let i = 0; i < 4; i++) { const sx = i % 2 ? 1 : -1, sz = i < 2 ? .55 : -.55; const p = G(); p.position.set(sx * .2, .9, sz); corpo.add(p); const a = cy(p, .06, .05, .8, matPele, 0, 0, 0, 8); a.position.set(sx * .35, .2, 0); a.rotation.z = sx * 1.1; const b = cy(p, .05, .03, 1.1, matPele, 0, 0, 0, 8); b.position.set(sx * .75, -.45, 0); b.rotation.z = -sx * .35; pernas.push(p); }
       const cab = sf(corpo, .18, matPele, 0, .7, .85, 14); cab.scale.set(.8, 1, 1.3); [-1, 1].forEach(s2 => sf(corpo, .03, brilho, s2 * .06, .72, 1.06, 8));
-      anim = (dt, t, andando) => { pernas.forEach((p, i) => { p.rotation.x = Math.sin(t * (andando ? 9 : 1.5) + i * 1.6) * (andando ? .35 : .05); }); corpo.position.y = Math.sin(t * 2) * .02; cab.rotation.z = Math.sin(t * 3) * .3; };
+      const mv = motor(g, { vPadrao: 1.6 }); let fase = 0;
+      anim = (dt, t, andando) => { mv.passo(dt, andando); const k = sstep(mv.k); fase += mv.avanco(dt, .9) + dt * 1.5 * (1 - k); pernas.forEach((p, i) => { p.rotation.x = Math.sin(fase + i * 1.6) * (.05 + .3 * k); }); corpo.position.y = Math.sin(t * 2) * .02; cab.rotation.z = Math.sin(t * 3) * .3; };
     } else if (forma === 'enxame') {
       alt = 2.3; const massa = sf(corpo, .7, matPele, 0, 1.2, 0, 18); massa.scale.set(1, 1.3, .9);
       const rostos = []; const r = NS.rng(81);
@@ -1667,10 +1987,16 @@
       if (forma === 'mecanico') { for (let i = 0; i < 4; i++) { const pts = [new T.Vector3(-.1 + i * .07, alt * .25, .1), new T.Vector3(.2, alt * .1, .3), new T.Vector3(.35, -.1, .1)]; tronco.add(new T.Mesh(F.guardar(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 12, .015, 5)), m('#1a1a1a'))); } F.luz(tronco, '#9fd8ff', .4, 2, .35, 0, .2, true); }
       if (forma === 'luz') F.luz(corpo, '#ffffff', 1.4, 7, 0, alt * .6, .4);
       if (forma === 'sombra') { const r = NS.rng(95); for (let i = 0; i < 10; i++) { const n2 = sf(corpo, .25 + r() * .25, m('#000000', { unico: true, op: .25 }), (r() - .5) * .6, .3 + r() * alt * .8, (r() - .5) * .4, 10); } }
-      let fase = 0;
+      const mv = motor(g, { vPadrao: forma === 'colosso' ? 1.3 : 1.8 });
+      let fase = mv.sem * 6.283;
       anim = (dt, t, andando) => {
-        if (andando) { fase += dt * (forma === 'colosso' ? 4 : 6); const a = Math.sin(fase) * .45; pernas[0].rotation.x = a; pernas[1].rotation.x = -a; bracos[0].rotation.x = -a * .7; bracos[1].rotation.x = a * .7; }
-        else { pernas.forEach(p => { p.rotation.x *= .9; }); bracos.forEach((b, i) => { b.rotation.x = Math.sin(t * .9 + i) * .08; }); }
+        mv.passo(dt, andando);
+        const k = sstep(mv.k);
+        fase += mv.avanco(dt, alt * (forma === 'colosso' ? .75 : .85));
+        const a = Math.sin(fase) * .45 * k;
+        pernas[0].rotation.x = a; pernas[1].rotation.x = -a;
+        bracos[0].rotation.x = -a * .7 + Math.sin(t * .9) * .08 * (1 - k); bracos[1].rotation.x = a * .7 + Math.sin(t * .9 + 1) * .08 * (1 - k);
+        corpo.rotation.z = Math.max(-.15, Math.min(.15, -mv.giro * mv.vEf * .04)) * k;
         // espasmos: a cabeça vira de repente
         cab.rotation.y = Math.sin(t * .6) * .4 + (Math.sin(t * 7.3) > .97 ? .8 : 0);
         cab.rotation.z = Math.sin(t * 1.7) * .1;
@@ -1691,7 +2017,7 @@
     if (pedindo) return pedindo;
     pedindo = fetch('modelos/modelos.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(async j => {
       manifesto = j || {};
-      if (Object.keys(manifesto).length && window.THREE && !THREE.GLTFLoader) { try { await carregarScript(LOADER); await carregarScript(SKUTIL); } catch (e) { manifesto = {}; } }
+      if (Object.keys(manifesto).length && window.THREE && !THREE.GLTFLoader) { try { await V2.carregarLibs(THREE); } catch (e) { manifesto = {}; } }
       return manifesto;
     });
     return pedindo;
@@ -1727,6 +2053,486 @@
     return { g, alt, anim };
   }
 
+  /* ================= modelos V2 (.glb feitos no Blender) =================
+     V1 = a miniatura montada em código (acima); V2 = o modelo .glb da mesma forma, em modelos/v2/<arquivo>.
+     - Sob demanda: só baixa o .glb de uma forma quando um token dessa forma aparece (uma vez por arquivo; vários
+       tokens iguais dividem a mesma cópia baixada). Bibliotecas r128 servidas pelo próprio site (lib/), com cache.
+     - A V1 aparece na hora; a V2 entra no lugar quando termina de carregar. Se falhar ou passar de V2_PRAZO, a V1 fica.
+     - Altura fixa por forma (do catálogo), sem medir caixa (a caixa de um modelo com esqueleto sai errada).
+     - Cada cópia: SkeletonUtils.clone (geometria, materiais e texturas divididos), um AnimationMixer, malhas com
+       esqueleto sem corte por câmera (a caixa da pose de repouso cortava braço e cabeça animados).
+     - Níveis *_lod0/1/2: só um visível por distância (8 e 20 m, com folga para não ficar trocando).
+     - Animação: perto, todo quadro; LOD médio, metade; longe, ~10 Hz; fora da câmera ou além de V2_CONGELA, parada
+       (o ritmo é o mesmo das V1: ritmoDe abaixo).
+     - Clipes: parado, andar, correr, ataque, revelar, curvada (+ parado_extra, o tique). Os humanoides dividem um
+       pacote de animações (rig 'humanoide': anim_humanoide.glb), ligado pelo nome dos ossos. O que não tem clipe
+       (ritual, conjurar) é feito por cima dos ossos, no próprio código (braços sobem, cabeça vai para trás).
+     - Qualidade: só com a qualidade Alta (Opções › Gráficos; desempenho.js decide no Automático).
+     Para entrar uma forma nova: o .glb em modelos/v2/ e uma linha em V2_CAT (v = versão do arquivo, troca a cada
+     entrega para o cache do aparelho baixar de novo). */
+  const TOK_V = ((document.currentScript && document.currentScript.src) || '').split('?')[1] || '';
+  const LIB = 'lib/';
+  const LIB_V = '?v=r128';
+  const V2_DIR = 'modelos/v2/';
+  const V2_PRAZO = 20000;       // ms: passou disso sem a V2, o token fica com a V1 nesta sessão
+  const V2_PERTO = 8, V2_LONGE = 20, V2_FOLGA = 1, V2_CONGELA = 40;
+  // forma (a mesma chave das formas V1) → arquivo, versão, altura em metros, esqueleto
+  // pronto: false = arquivo ainda não entregue (nem tenta baixar; a V1 fica)
+  const V2_CAT = {
+    freira_cranio_equino: { arq: 'freira_cranio_equino.glb', v: '20261104d', alt: 3.4, rig: 'proprio' },
+    mascara_sorriso: { arq: 'mascara_sorriso_cachecol.glb', v: '20261104e', alt: 2.0, rig: 'humanoide' },
+    manto_coroa_tentaculos: { arq: 'manto_coroa_tentaculos.glb', v: '20261104e', alt: 4.07, rig: 'humanoide' },
+    esqueleto_foice: { arq: 'esqueleto_foice.glb', v: '20261104e', alt: 2.2, rig: 'humanoide' },
+    chama_soldado: { arq: 'chama_soldado_v3.glb', v: '20261105a', alt: 2.25, rig: 'humanoide', chama: true, v3: true },   // humano V3 (decisão do Mestre)
+    sobretudo_vazio: { arq: 'sobretudo_vazio.glb', v: '20261105a', alt: 2.2, rig: 'humanoide' },
+    esfolado: { arq: 'esfolado.glb', v: '20261105a', alt: 2.19, rig: 'humanoide' },
+    tita_algemado: { arq: 'tita_algemado.glb', v: '20261105a', alt: 3.4, rig: 'humanoide' },
+    aureola_mascara: { arq: 'aureola_mascara.glb', v: '20261104g', alt: 2.4, rig: 'humanoide' },
+    afogada: { arq: 'afogada.glb', v: '20261105a', alt: 2.32, rig: 'humanoide' },
+    marionetista: { arq: 'marionetista.glb', v: '20261105a', alt: 2.5, rig: 'humanoide' },
+    muitos_bracos: { arq: 'muitos_bracos.glb', v: '20261105a', alt: 2.36, rig: 'humanoide' },
+    cabelos_longos: { arq: 'cabelos_longos.glb', v: '20261105a', alt: 3.0, rig: 'humanoide' },
+    // humanos em V3 (low-poly pintado, decisão do Mestre): entram quando o arquivo chegar (pronto: false até lá; V1)
+    coroa_espinhos_sobretudo: { arq: 'coroa_espinhos_sobretudo_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
+    encapuzada_meia_mascara: { arq: 'encapuzada_meia_mascara_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
+  };
+  /* corpo V2 das cobaias: UM arquivo com o corpo e todas as peças (cobaia_base.glb); o script montador (cobaia_v3.js) junta as peças de
+     cada token numa malha só (+ cabelo, + peças exclusivas da aparência num arquivo próprio, cobaia_x_<aparência>.glb,
+     baixado só quando ela está na sessão) e pinta pelas tintas. Cobaias completas na V2 e os NPCs (macacão na cor do
+     token); as de outro corpo (escorpião, criança) seguem na V1. Presets do agente das
+     cobaias (cobaia_presets.json): peças, morfos, tintas, marcas, etiqueta (3 últimos dígitos do código), altura. */
+  // trocar de versão do corpo dos humanos = trocar só esta linha (arquivo, versão, script montador e o nome global dele)
+  const V2_COB_ARQ = { arq: 'cobaia_v3.glb', v: '20261105a', script: 'cobaia_v3.js', global: 'CobaiaV3' };   // arq: corpo padrão (o preset diz o seu em 'arquivo': masculino, feminino, criança)
+  const V2_COBAIA = {"luva":{"alt":1.84,"pecas":["camiseta","calca","tenis","cinto","cab_baguncado","rosto_olho_roxo"],"morfos":{"feminino":0,"forte":0.3},"tintas":{"pele":"#d9a88a","cabelo":"#5a3a22","iris":"#4a5a6a","cima":"#ef6a14","baixo":"#e8650f","sapato":"#eeeeea","acessorio":"#141414"},"barba":1,"sardas":0,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,6],"ferimento":0.45,"sangueFresco":0.35,"arquivo":"cobaia_v3.glb"},"faca":{"alt":1.62,"pecas":["camiseta","calca","botas","cinto","cab_coque","x_faca_bolsa","x_faca_planta","x_faca_frasco","x_faca_alca","x_faca_bolsinhas","x_faca_bolsos","oculos_redondos"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#e2bea4","cabelo":"#3b2416","iris":"#5a4422","cima":"#e4dccb","baixo":"#56603e","sapato":"#7a3a2a","acessorio":"#2a2220"},"barba":0,"sardas":1,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,1],"ferimento":0.2,"sangueFresco":0.3,"pose":"pose_faca","arquivo":"cobaia_v3_f.glb"},"papelao":{"alt":1.92,"pecas":["macacao","botas","band_cabeca","x_papelao_sobretudo","x_papelao_ombreiras","x_papelao_faixas","x_papelao_avental","x_papelao_garras"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#8a8a82","cabelo":"#202020","iris":"#ffd84a","cima":"#2e2e30","baixo":"#2a2a2c","sapato":"#121212","acessorio":"#8f8d84"},"barba":0,"sardas":0,"sobrancelhas":0,"marca":0,"etiqueta":[0,0,4],"ferimento":0.25,"sangueFresco":0.2,"olhosBrilho":1,"corBrilho":"#ffc21a","arquivo":"cobaia_v3.glb"},"papel":{"alt":1.7,"pecas":["calca","tenis","brincos","cab_trancas","x_papel_jaleco","x_papel_camisa"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#5a3a2a","cabelo":"#140e0b","iris":"#2a1a10","cima":"#121214","baixo":"#111113","sapato":"#0c0c0c","acessorio":"#111111"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,5],"ferimento":0.1,"sangueFresco":0.3,"pose":"pose_papel","esconderMaos":true,"arquivo":"cobaia_v3_f.glb"},"sabonete":{"alt":1.8,"pecas":["macacao","botas","x_sabonete_capa","x_sabonete_capuz","x_sabonete_mascara","x_sabonete_tubo","x_sabonete_cachecol","x_sabonete_couraca","x_sabonete_revolver"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#5a4a3a","cabelo":"#202020","iris":"#ff2a1a","cima":"#22252e","baixo":"#24252b","sapato":"#2e2218","acessorio":"#3a3328"},"barba":0,"sardas":0,"sobrancelhas":0,"marca":0,"etiqueta":[0,0,2],"ferimento":0.15,"olhosBrilho":1,"corBrilho":"#ff1a0a","pose":"pose_sabonete","arquivo":"cobaia_v3.glb"},"velcro":{"alt":1.2,"arquivo":"cobaia_v3_c.glb","pecas":["tenis","cab_franja_longa","x_velcro_vestido","x_velcro_meias"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#ecd8c8","cabelo":"#151214","iris":"#d9781c","cima":"#262427","baixo":"#262427","sapato":"#141214","acessorio":"#141214"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":0,"etiqueta":[0,0,0],"ferimento":0,"sangueFresco":0.3,"pose":"pose_velcro"}};
+  const V2_NPC = {"alt":1.74,"pecas":["macacao","tenis","cab_baguncado"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#cfa588","cabelo":"#2b1d14","iris":"#3a2a1a","cima":"#d9661f","baixo":"#cf5f1a","sapato":"#2a2a2a","acessorio":"#1a1a1a"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":0,"etiqueta":[0,0,0],"ferimento":0.05,"sangueFresco":0.3,"arquivo":"cobaia_v3.glb"};
+  const V2_ANIM = { humanoide: { arq: 'anim_humanoide.glb', v: '20261104g' } };
+  const V2 = {
+    libs: null, cache: new Map(), falhas: new Set(), ap: null, vivos: new Set(), tSoltar: 0,
+    stats: { pedidos: 0, prontos: 0, falhas: 0, trocas: 0, msBaixar: 0, msParse: 0, bytes: 0 },
+    // a qualidade decide (desempenho.js); sem o seletor carregado, vale a V2
+    ligado() { try { return !window.ACF_QUALIDADE || ACF_QUALIDADE.v2() !== false; } catch (e) { return true; } },
+    entrada(forma) { const e = forma && Object.prototype.hasOwnProperty.call(V2_CAT, forma) ? V2_CAT[forma] : null; return e && e.pronto !== false ? e : null; },
+    entradaCobaia(s) {
+      if (!s) return null;
+      let p = s.tipo === 'cobaia' ? V2_COBAIA[s.id] : s.tipo === 'npc' ? V2_NPC : null;
+      if (!p) return null;
+      p = JSON.parse(JSON.stringify(p));
+      if (s.tipo === 'npc' && s.cor) { p.tintas.cima = s.cor; p.tintas.baixo = s.cor; }
+      const dg = String(s.codigo || '').replace(/\D/g, '').slice(-3).padStart(3, '0'); if (dg) p.etiqueta = dg.split('').map(Number);
+      return { cobaia: true, preset: p, alt: p.alt || 1.75, arq: p.arquivo || V2_COB_ARQ.arq, v: V2_COB_ARQ.v, rig: 'humanoide' };
+    },
+    // um corpo-base das cobaias (uma vez por arquivo e por sessão do 3D; só baixa o corpo de quem está em cena)
+    cobaiaBase(T, arq) {
+      arq = arq || V2_COB_ARQ.arq;
+      if (!this.cob) this.cob = new Map();
+      if (this.cob.has(arq)) return this.cob.get(arq);
+      this.stats.pedidos++;
+      const pr = (async () => {
+        await this.carregarLibs(T);
+        if (!window[V2_COB_ARQ.global]) await carregarScript(V2_COB_ARQ.script + (TOK_V ? '?' + TOK_V : ''));
+        const t0 = performance.now(), M = window[V2_COB_ARQ.global];
+        const b = await M.carregar(T, this.url({ arq, v: V2_COB_ARQ.v }), this.url(V2_ANIM.humanoide), window.MeshoptDecoder);
+        b.extrasV2 = new Map();
+        this.stats.msParse += performance.now() - t0; this.stats.prontos++;
+        return b;
+      })();
+      this.cob.set(arq, pr);
+      pr.catch(e => { this.stats.falhas++; this.falhas.add(this.url({ arq, v: V2_COB_ARQ.v })); console.warn('cobaia V3:', e); if (this.cob) this.cob.delete(arq); });
+      return pr;
+    },
+    url(e) { return V2_DIR + e.arq + '?v=' + e.v; },
+    urls() { return Object.values(V2_CAT).filter(e => e.pronto !== false).concat(Object.values(V2_ANIM), [...new Set([V2_COB_ARQ.arq, ...Object.values(V2_COBAIA).map(p => p.arquivo).filter(Boolean)])].map(arq => ({ arq, v: V2_COB_ARQ.v }))).map(e => new URL(this.url(e), location.href).href); },
+    carregarLibs(T) {
+      if (this.libs) return this.libs;
+      const um = f => carregarScript(LIB + f + LIB_V);
+      this.libs = (async () => {
+        if (!T.GLTFLoader) await um('GLTFLoader.js');
+        if (!T.SkeletonUtils) await um('SkeletonUtils.js');
+        if (!window.MeshoptDecoder) await um('meshopt_decoder.js');
+        if (window.MeshoptDecoder && MeshoptDecoder.ready) await MeshoptDecoder.ready;
+      })();
+      this.libs.catch(() => { this.libs = null; });
+      return this.libs;
+    },
+    // KTX2 (Basis): só quando um arquivo usa (o transcodificador tem ~0,5 MB)
+    async ktx2(T, ren) {
+      if (this.ktx) return this.ktx;
+      if (!T.BasisTextureLoader) await carregarScript(LIB + 'BasisTextureLoader.js' + LIB_V);
+      if (!T.KTX2Loader) await carregarScript(LIB + 'KTX2Loader.js' + LIB_V);
+      const k = new T.KTX2Loader(); k.setTranscoderPath(LIB + 'basis/'); k.setWorkerLimit(1);
+      if (ren) k.detectSupport(ren);
+      this.ktx = k; return k;
+    },
+    // baixa e lê um arquivo (uma vez): devolve o gltf
+    gltf(T, url) {
+      let p = this.cache.get(url);
+      if (p) return p;
+      this.stats.pedidos++;
+      p = (async () => {
+        await this.carregarLibs(T);
+        const t0 = performance.now();
+        const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status);
+        const buf = await r.arrayBuffer(); const t1 = performance.now();
+        const ld = new T.GLTFLoader();
+        if (window.MeshoptDecoder) ld.setMeshoptDecoder(MeshoptDecoder);
+        // o arquivo usa texturas KTX2? (procura no cabeçalho JSON do .glb, sem ler o resto)
+        if (/KHR_texture_basisu/.test(new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(buf.byteLength, 65536))))) ld.setKTX2Loader(await this.ktx2(T, this.ap && this.ap.ren));
+        const g = await new Promise((ok, falha) => ld.parse(buf, url.replace(/[^/]*$/, ''), ok, falha));
+        const t2 = performance.now();
+        this.stats.msBaixar += t1 - t0; this.stats.msParse += t2 - t1; this.stats.bytes += buf.byteLength; this.stats.prontos++;
+        enxugarClipes(g);
+        return g;
+      })();
+      p.catch(e => { this.stats.falhas++; this.falhas.add(url); console.warn('modelo V2:', url, e); });
+      this.cache.set(url, p);
+      return p;
+    },
+    // clipes de uma forma (uma vez por arquivo): os do pacote do esqueleto + os do próprio arquivo (estes mandam).
+    // Do pacote saem as trilhas de ossos que o modelo não tem (evita avisos e trabalho à toa) e a posição da pelve,
+    // que é absoluta, é escalada para a altura do quadril deste modelo (rig/LEIAME.md)
+    async clipes(T, e, g) {
+      if (g.userData.clipesV2) return g.userData.clipesV2;
+      const m = new Map();
+      if (e.rig && V2_ANIM[e.rig]) {
+        try {
+          const pa = await this.gltf(T, this.url(V2_ANIM[e.rig]));
+          const nomes = new Set(); let hM = 0, hP = 0;
+          g.scene.traverse(o => { nomes.add(o.name); if (o.name === 'pelve') hM = o.position.y; });
+          pa.scene.traverse(o => { if (o.name === 'pelve') hP = o.position.y; });
+          const k = hM > 0 && hP > 0 ? hM / hP : 1;
+          pa.animations.forEach(c0 => {
+            const c = c0.clone();
+            c.tracks = c.tracks.filter(tr => nomes.has(tr.name.split('.')[0]));
+            if (Math.abs(k - 1) > 1e-3) c.tracks.forEach(tr => { if (tr.name === 'pelve.position') { const v = tr.values; for (let i = 0; i < v.length; i++) v[i] *= k; } });
+            m.set(c.name, c);
+          });
+        } catch (er) {}
+      }
+      g.animations.forEach(c => m.set(c.name, c));
+      g.userData.clipesV2 = m;
+      return m;
+    },
+    // ao fechar o 3D: solta o que foi lido (a 2ª abertura pega o arquivo do cache do aparelho)
+    soltar() {
+      this.cache.forEach(p => p.then(g => {
+        g.scene.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(mt => { Object.values(mt).forEach(v => { if (v && v.isTexture) { try { if (v.image && v.image.close) v.image.close(); } catch (er) {} v.dispose(); } }); mt.dispose(); }); o.geometry.dispose(); });
+      }).catch(() => {}));
+      this.cache.clear(); this.vivos.clear(); this.cob = null;
+    },
+    // a qualidade mudou com o 3D aberto (desempenho.js): sem a Alta, as cópias V2 voltam para a V1 na hora
+    aplicarQualidade() {
+      if (this.ligado()) return;
+      this.vivos.forEach(w => { if (!w.g.parent) { this.vivos.delete(w); return; } w.voltarV1(); });
+    },
+    estado() { return { ...this.stats, ligado: this.ligado(), arquivos: this.cache.size, falhas: [...this.falhas] }; },
+  };
+  // trilhas que não mexem em nada (valor constante igual ao do osso em repouso) saem do clipe: o mixer só
+  // calcula o que se move (os arquivos exportados trazem posição e escala de todos os ossos)
+  function enxugarClipes(g) {
+    const nos = new Map(); g.scene.traverse(o => { nos.set(o.name, o); });
+    const igual = (a, b, n) => { for (let i = 0; i < n; i++) if (Math.abs(a[i] - b[i]) > 1e-4) return false; return true; };
+    g.animations.forEach(c => {
+      c.tracks = c.tracks.filter(tr => {
+        const [nome, prop] = tr.name.split('.'); const o = nos.get(nome); if (!o) return true;
+        const n = tr.getValueSize(), v = tr.values, k = v.length / n;
+        for (let i = 1; i < k; i++) if (!igual(v.subarray(i * n, i * n + n), v, n)) return true;   // mexe: fica
+        const rep = prop === 'position' ? o.position.toArray() : prop === 'scale' ? o.scale.toArray() : prop === 'quaternion' ? o.quaternion.toArray() : null;
+        return !(rep && igual(v, rep, n));
+      });
+      c.resetDuration();
+    });
+  }
+  // por cima dos ossos (o que não tem clipe): gira o osso no espaço do mundo em volta do eixo lateral do corpo
+  function sobreposicao(T, raiz) {
+    const ossos = { bd: null, be: null, cab: null, pesc: null };
+    raiz.traverse(o => {
+      if (!o.isBone) return; const n = o.name.toLowerCase();
+      if (!ossos.bd && /^(braco|upper_?arm|arm)[._]?(d|r|right)$/.test(n)) ossos.bd = o;
+      else if (!ossos.be && /^(braco|upper_?arm|arm)[._]?(e|l|left)$/.test(n)) ossos.be = o;
+      else if (!ossos.cab && /^(cabeca|head)$/.test(n)) ossos.cab = o;
+      else if (/^(pescoco|neck)\d*$/.test(n)) ossos.pesc = o;
+    });
+    if (!ossos.bd && !ossos.be && !ossos.cab) return null;
+    const qp = new T.Quaternion(), qd = new T.Quaternion(), qi = new T.Quaternion(), eixo = new T.Vector3(), q0 = new T.Quaternion();
+    // osso que nenhum clipe mexe (a trilha constante saiu): sem o mixer para reescrever, o giro somaria a cada quadro;
+    // guarda a rotação de antes e volta a ela se ninguém mexeu desde o último quadro
+    const mem = new Map();
+    [ossos.bd, ossos.be, ossos.cab, ossos.pesc].forEach(o => { if (o) mem.set(o, { antes: o.quaternion.clone(), depois: o.quaternion.clone() }); });
+    // dq (mundo) vira local: local' = (pai⁻¹ · dq · pai) · local
+    function girar(osso, eixoMundo, ang) {
+      if (!osso) return;
+      const m = mem.get(osso);
+      if (osso.quaternion.equals(m.depois)) osso.quaternion.copy(m.antes); else m.antes.copy(osso.quaternion);
+      if (ang) {
+        osso.parent.getWorldQuaternion(qp); qi.copy(qp).invert();
+        qd.setFromAxisAngle(eixoMundo, ang);
+        q0.copy(qi).multiply(qd).multiply(qp);
+        osso.quaternion.premultiply(q0);
+      }
+      m.depois.copy(osso.quaternion);
+    }
+    return function (k, t, tipo) {
+      raiz.updateMatrixWorld(true);
+      // eixo lateral do corpo (o grupo do token olha para +Z, então o lado é o X do token)
+      eixo.set(1, 0, 0).applyQuaternion(raiz.getWorldQuaternion(qp)).normalize();
+      const ex = eixo.clone();
+      const forte = tipo === 'ritual' ? 1 : .6;
+      girar(ossos.bd, ex, -2.1 * k * forte + Math.sin(t * 5) * .06 * k);
+      girar(ossos.be, ex, -2.1 * k * forte + Math.sin(t * 5 + 1) * .06 * k);
+      girar(ossos.pesc, ex, -.25 * k * forte);
+      girar(ossos.cab, ex, -.45 * k * forte + Math.sin(t * 9) * .03 * k);
+    };
+  }
+  // as "peças" no formato das miniaturas V1 (cab, pesc, tronco, corpo, braços com a mão, pernas com o joelho e o raio
+  // da cabeça R), apontando para os ossos do esqueleto humanoide: os detalhes da cópia (disfarce3d.js) usam as mesmas
+  // chaves nos dois. Sem os ossos, null (a decoração fica só com o que não depende do corpo).
+  function partesDeOssos(cena, e, skel) {
+    const o = {}; cena.traverse(x => { if (x.isBone) o[x.name] = x; });
+    if (!o.cabeca) return null;
+    // um ponto do modelo em repouso (metros, como no Blender exportado: y para cima, frente +Z) nas coordenadas do osso
+    const noOsso = (nome, p) => { const b = o[nome]; if (!b || !skel) return null; const i = skel.bones.indexOf(b); if (i < 0) return null; return new b.position.constructor(p[0], p[1], p[2]).applyMatrix4(skel.boneInverses[i]); };
+    const R = .115 * (e.alt || 1.75) / 1.75;
+    return { R, sxC: .82, szC: .92, cab: o.cabeca, pesc: o.pescoco || o.pescoco1 || null, tronco: o.peito || o.coluna2 || null, corpo: cena,
+      bracos: [['e', -1], ['d', 1]].filter(([l]) => o['mao_' + l]).map(([l, k]) => ({ mao: o['mao_' + l], braco: o['braco_' + l], cot: o['antebraco_' + l], k })),
+      pernas: [['e', -1], ['d', 1]].filter(([l]) => o['canela_' + l]).map(([l, k]) => ({ quad: o['coxa_' + l], joelho: o['canela_' + l], pe: o['pe_' + l], k })), ossos: o, noOsso };
+  }
+  // chama (catálogo chama: true): o emissivo tremeluz, deslocando um pouco a UV só nos texels roxos/rosa do emissivo
+  // (a chama) e variando o brilho; o tempo só anda quando alguma cópia está à vista (é a animação dela que avança)
+  const CHAMA_T = { value: 0 };
+  function chamaCompilar(sh) {
+    sh.uniforms.uTempo = CHAMA_T;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTempo;')
+      .replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP
+  vec4 eC0 = texture2D(emissiveMap, vUv);
+  vec2 eD = vec2(sin(uTempo * 9.0 + vUv.y * 70.0), cos(uTempo * 7.0 + vUv.x * 55.0)) * .004;
+  vec4 eC1 = texture2D(emissiveMap, vUv + eD);
+  float roxo = smoothstep(.08, .3, eC0.b - eC0.g);
+  vec4 eC = mix(eC0, eC1, roxo); eC.rgb = emissiveMapTexelToLinear(eC).rgb;
+  totalEmissiveRadiance *= eC.rgb * (1.0 + roxo * (.3 * sin(uTempo * 13.0 + vUv.y * 40.0) + .15 * sin(uTempo * 31.0)));
+#endif`);
+  }
+  // V3: o .glb diz o retângulo da cabeça de chama no atlas (asset.extras.rolagem.retangulo_uv, UV do glTF); dentro dele
+  // a cor e o emissivo rolam em v (o padrão é periódico): a chama sobe. Fora do retângulo nada muda.
+  function chamaV3Compilar(sh) {
+    const r = this.userData.retChama; sh.uniforms.uTempo = CHAMA_T;
+    const R = `vec4(${r.map(x => (+x).toFixed(5)).join(', ')})`;
+    const uvc = `vec2 cUv = vUv; vec4 cR = ${R};
+  if (cUv.x > cR.x && cUv.x < cR.z && cUv.y > cR.y && cUv.y < cR.w) cUv.y = cR.y + fract((cUv.y - cR.y) / (cR.w - cR.y) + uTempo * .35) * (cR.w - cR.y);`;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTempo;')
+      .replace('#include <map_fragment>', `#ifdef USE_MAP
+  { ${uvc}
+  vec4 texelColor = mapTexelToLinear(texture2D(map, cUv)); diffuseColor *= texelColor; }
+#endif`)
+      .replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP
+  { ${uvc}
+  totalEmissiveRadiance *= emissiveMapTexelToLinear(texture2D(emissiveMap, cUv)).rgb * (1.0 + .15 * sin(uTempo * 13.0)); }
+#endif`);
+  }
+  function prepararChama(g) {
+    if (g.userData.chamaOk) return; g.userData.chamaOk = 1;
+    const rol = (((g.parser || {}).json || {}).asset || {}).extras;
+    const ret = rol && rol.rolagem && rol.rolagem.retangulo_uv;
+    if (ret && ret.length === 4) {
+      g.scene.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(m => { if (m && m.onBeforeCompile !== chamaV3Compilar) { m.userData.retChama = ret; m.onBeforeCompile = chamaV3Compilar; m.customProgramCacheKey = () => 'chamaV3' + ret.join(','); m.needsUpdate = true; } }); });
+      return;
+    }
+    g.scene.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(m => { if (m && m.emissiveMap && m.onBeforeCompile !== chamaCompilar) { m.onBeforeCompile = chamaCompilar; m.customProgramCacheKey = () => 'chama'; m.needsUpdate = true; } }); });
+  }
+  // uma cópia da V2 para um token (chamada quando o arquivo terminou de ler)
+  // pronta: cópia já montada por fora (cobaia_v2.js: grupo, mixer, lod por troca de geometria, slots do detalhe)
+  function instanciaV2(T, g, clipes, e, pronta) {
+    const cena = pronta ? pronta.grupo : T.SkeletonUtils.clone(g.scene);
+    if (pronta) cena.scale.setScalar((e.alt || 1.75) / ((g && g.meta && g.meta.altura) || 1.75));
+    const lods = [[], [], []], sempre = [];
+    let skel = null;
+    cena.traverse(o => {
+      if (!o.isMesh) return;
+      o.onBeforeRender = marcarCam;
+      if (o.isSkinnedMesh) {
+        o.frustumCulled = false;
+        // um esqueleto só para as malhas da cópia (uma atualização dos ossos por quadro em vez de uma por malha)
+        if (!skel) skel = o.skeleton;
+        else if (o.skeleton.bones.length === skel.bones.length && o.skeleton.bones.every((b, i) => b === skel.bones[i]) && o.skeleton.boneInverses.every((m, i) => m.equals(skel.boneInverses[i]))) o.bind(skel, o.bindMatrix);
+      }
+      const m = pronta ? null : /_lod(\d)$/.exec(o.name);
+      if (m) lods[Math.min(2, +m[1])].push(o); else sempre.push(o);
+      o.castShadow = !m || +m[1] < 2; o.receiveShadow = false;
+    });
+    const temLod = lods[1].length || lods[2].length;
+    const mixer = pronta ? pronta.mixer : new T.AnimationMixer(cena), acts = {};
+    if (pronta) mixer.stopAllAction();
+    clipes.forEach((c, nome) => { acts[nome] = mixer.clipAction(c); });
+    ['ataque', 'revelar', 'parado_extra', 'morto'].forEach(n => { const a = acts[n]; if (a) { a.setLoop(T.LoopOnce, 1); a.clampWhenFinished = true; } });
+    // a passada natural dos clipes é a de um corpo de 1,75 m: corpo maior dá passo maior
+    const escPasso = Math.max(.5, (e.alt || 1.75) / 1.75);
+    let estBase = '', corpoAnt = '';
+    let base = null, uma = null, curvada = false, nivel = -1, tExtra = 8 + Math.random() * 8, kSob = 0, alvoSob = 0, tSob = 0, tipoSob = '';
+    const sob = sobreposicao(T, cena);
+    // cobaia: pose fixa da V1 (braço/antebraço) por cima dos clipes que não pedem os braços (cobaia_v3.js: aplicarPose)
+    const POSE = pronta && pronta.cfg && pronta.cfg.pose && pronta.poses ? pronta.poses[pronta.cfg.pose] : null;
+    const COM_POSE = ['parado', 'andar', 'correr', 'agachar', 'curvada'];
+    let nomeBase = '';
+    function trocarBase(nome) {
+      const a = acts[nome] || acts.parado; if (!a || a === base) return;
+      nomeBase = acts[nome] ? nome : 'parado';
+      a.reset().setEffectiveWeight(1).play();
+      if (base && !uma) base.crossFadeTo(a, .3, false); else a.fadeIn(.3);
+      if (base && uma) base.fadeOut(.3);
+      base = a;
+    }
+    mixer.addEventListener('finished', ev => {
+      if (ev.action !== uma) return;
+      const a = uma; uma = null;
+      if (base) { base.reset().play(); a.crossFadeTo(base, .35, false); }
+    });
+    function tocarUma(nome) {
+      const a = acts[nome]; if (!a) return false;
+      if (uma && uma !== a) uma.fadeOut(.2);
+      a.reset().setEffectiveWeight(1).play();
+      if (base) base.crossFadeTo(a, .2, false); else a.fadeIn(.2);
+      uma = a; return true;
+    }
+    trocarBase('parado');
+    if (base) { base.time = Math.random() * base.getClip().duration; }
+    mixer.update(0);
+    return {
+      g: cena, mixer,
+      // vel: m/s do token (o andar acompanha a passada); corpo: '' | 'ferido' | 'morrendo' | 'morto' | 'agachado'
+      anim(dt, andando, vel, corpo) {
+        // cobaia: o ferimento e o sangue acompanham o estado do corpo (máscaras do material, sem modelo novo)
+        if (pronta && corpo !== corpoAnt) {
+          corpoAnt = corpo; const c0 = pronta.cfg0 || (pronta.cfg0 = { f: +pronta.cfg.ferimento || 0, s: +pronta.cfg.sangueFresco || 0 });
+          pronta.definir(corpo === 'morrendo' || corpo === 'morto' ? { ferimento: .9, sangueFresco: 1 } : corpo === 'ferido' ? { ferimento: Math.min(1, c0.f + .3), sangueFresco: Math.max(c0.s, .6) } : { ferimento: c0.f, sangueFresco: c0.s });
+        }
+        let quer;
+        if (corpo === 'morto' && acts.morto) quer = 'morto';
+        else if (corpo === 'morrendo' && acts.caido) quer = 'caido';
+        else if (estBase) quer = estBase;
+        else if (curvada && acts.curvada) quer = 'curvada';
+        else if (andando) quer = corpo === 'ferido' && acts.ferido ? 'ferido' : vel > 2.2 && acts.correr ? 'correr' : acts.andar ? 'andar' : 'correr';
+        else quer = corpo === 'agachado' && acts.agachar ? 'agachar' : corpo === 'ferido' && acts.curvada ? 'curvada' : 'parado';
+        // passada: o clipe anda na velocidade natural do pacote (andar 1,3 m/s, correr 2,9 m/s, ferido 0,8 m/s)
+        const nat = { andar: 1.3, correr: 2.9, ferido: .8 }[quer];
+        if (nat && vel > .05 && acts[quer]) acts[quer].timeScale = Math.max(.6, Math.min(1.7, vel / (nat * escPasso)));
+        if (!uma) trocarBase(quer); else if (acts[quer] && acts[quer] !== base) { base = acts[quer]; }
+        // o tique de vez em quando, parado
+        if (!andando && !uma && acts.parado_extra) { tExtra -= dt; if (tExtra <= 0) { tExtra = 9 + Math.random() * 9; tocarUma('parado_extra'); } }
+        mixer.update(dt);
+        if (POSE && !uma && COM_POSE.includes(nomeBase)) { const O = pronta.ossos; for (const n in POSE) if (O[n]) O[n].quaternion.copy(POSE[n]); }
+        // ritual / conjurar: por cima dos ossos, sobe, segura e desce
+        if (sob && (kSob > 0 || alvoSob > 0)) {
+          tSob += dt; if (tSob > (tipoSob === 'ritual' ? 2.8 : 1.6)) alvoSob = 0;
+          kSob += (alvoSob - kSob) * Math.min(1, dt * 5); if (kSob < .01 && !alvoSob) kSob = 0;
+          sob(kSob, tSob, tipoSob);   // (com k = 0 devolve os ossos à pose do clipe)
+        }
+      },
+      acao(tipo) {
+        const n = tipo === 'atacar' ? 'ataque' : tipo;
+        if (acts[n]) return tocarUma(n);
+        if ((tipo === 'ritual' || tipo === 'conjurar') && sob) { tipoSob = tipo; tSob = 0; alvoSob = 1; return true; }
+        return false;
+      },
+      estado(nome) {
+        if (nome === 'curvada' || nome === 'curvado') { curvada = true; estBase = ''; }
+        else if (nome === 'ereta' || nome === 'ereto' || nome === 'padrao' || !nome) { curvada = false; estBase = ''; }
+        else if (acts[nome] && acts[nome].loop !== T.LoopOnce) estBase = nome;   // escalar, rastejar…: o clipe do estado vira a base
+      },
+      partes: partesDeOssos(cena, e, skel),
+      cobaia: pronta || null,
+      lod(dist) {
+        if (pronta) return pronta.lod(dist);
+        if (!temLod) return 0;
+        let n = nivel < 0 ? (dist > V2_LONGE ? 2 : dist > V2_PERTO ? 1 : 0) : nivel;
+        if (nivel >= 0) {
+          if (dist > V2_LONGE + (nivel < 2 ? V2_FOLGA : 0)) n = 2;
+          else if (dist < V2_LONGE - (nivel >= 2 ? V2_FOLGA : 0) && dist > V2_PERTO + (nivel < 1 ? V2_FOLGA : 0)) n = 1;
+          else if (dist < V2_PERTO - (nivel >= 1 ? V2_FOLGA : 0)) n = 0;
+        }
+        if (n !== nivel) { nivel = n; lods.forEach((l, i) => l.forEach(o => { o.visible = i === n || (!lods[n].length && i === 0); })); }
+        return n;
+      },
+    };
+  }
+  // embrulha a miniatura V1 de uma forma que tem V2: o token devolvido é o mesmo para o site (g, anim, acao, estado,
+  // lod), e por dentro troca da V1 para a V2 quando ela chega
+  function comV2(F, v1, e, id) {
+    const T = F.T;
+    const g = new T.Group(); g.add(v1.g);
+    const w = { g, alt: v1.alt, raioBase: v1.raioBase, v1, v2: null, nivelLOD: 0 };
+    let st = '', dist = 0;
+    let px = 0, pz = 0, vel = 0;
+    w.anim = (dt, tt, andando) => {
+      if (w.pend) w.trocar();
+      if (!w.v2) return v1.anim ? v1.anim(dt, tt, andando) : undefined;
+      // velocidade do token (o sala3d.js move o grupo): suavizada, para o andar acompanhar a passada
+      const dx = g.position.x - px, dz = g.position.z - pz; px = g.position.x; pz = g.position.z;
+      if (dt > 0) vel += (Math.min(8, Math.hypot(dx, dz) / dt) - vel) * Math.min(1, dt * 6);
+      if (dist > V2_CONGELA) return;
+      if (e.chama) CHAMA_T.value = tt;
+      w.v2.anim(dt, andando, vel, w.estCorpo || '');
+    };
+    w.acao = (tipo, nome) => {
+      if (w.v2) { if (w.v2.acao(tipo)) return; }
+      if (typeof v1.acao === 'function') return v1.acao(tipo, nome);
+    };
+    w.estado = nome => { st = nome; if (w.v2) w.v2.estado(nome); if (typeof v1.estado === 'function') v1.estado(nome); };
+    w.lod = d => {
+      dist = d;
+      if (w.v2) return (w.nivelLOD = w.v2.lod(d));
+      if (typeof v1.lod === 'function') { v1.lod(d); w.nivelLOD = v1.nivelLOD || 0; }
+      return w.nivelLOD;
+    };
+    const nomeY = alt => g.children.forEach(c => { if (c.isSprite) c.position.y = alt + .32; });
+    w.voltarV1 = () => { w.pend = null; if (!w.v2) return; const pai = w.pai || g; pai.remove(w.v2.g); w.v2.mixer.stopAllAction(); w.v2 = null; w.alt = v1.alt; pai.add(v1.g); nomeY(v1.alt); V2.vivos.delete(w); };
+    // peças do corpo para quem decora a miniatura (disfarce3d.js): as da V1 ou, com a V2, os ossos equivalentes
+    Object.defineProperty(w, 'partes', { configurable: true, enumerable: true, get: () => (w.v2 ? w.v2.partes : v1.partes) });
+    if (!V2.ligado() || V2.falhas.has(V2.url(e))) return w;
+    const t0 = performance.now();
+    (e.cobaia ? V2.cobaiaBase(T, e.arq).then(async b => {
+      // peças exclusivas da aparência (uma vez por arquivo)
+      let x = null;
+      if (e.preset.extras) { const u = V2.url({ arq: e.preset.extras, v: V2_COB_ARQ.v }); if (!b.extrasV2.has(u)) b.extrasV2.set(u, window[V2_COB_ARQ.global].carregarExtras(T, b, u, window.MeshoptDecoder)); x = await b.extrasV2.get(u); }
+      return { cob: b, extras: x };
+    }) : V2.gltf(T, V2.url(e))).then(async gl => {
+      const clipes = gl.cob ? new Map(Object.entries(gl.cob.clipes)) : await V2.clipes(T, e, gl);
+      // o token já saiu de cena, ou demorou demais: fica a V1
+      if (!g.parent || performance.now() - t0 > V2_PRAZO) return;
+      if (!V2.ligado()) return;
+      if (e.chama && !gl.cob) prepararChama(gl);
+      // humanos V3 (low-poly pintado): pixels nítidos de perto (Nearest só nestes)
+      if (e.v3 && !gl.cob && !gl.userData.v3ok) { gl.userData.v3ok = 1; gl.scene.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'aoMap'].forEach(k => { const t = m && m[k]; if (t && t.magFilter !== T.NearestFilter) { t.magFilter = T.NearestFilter; t.needsUpdate = true; } })); }); }
+      const x = gl.cob ? instanciaV2(T, gl.cob, clipes, e, Object.assign(window[V2_COB_ARQ.global].montar(T, gl.cob, gl.extras ? { ...e.preset, extras: gl.extras } : e.preset), { poses: gl.cob.poses || null })) : instanciaV2(T, gl, clipes, e);
+      const tok = g.userData.token;
+      x.g.traverse(o => { if (tok !== undefined) o.userData.token = tok; });
+      if (st) x.estado(st);
+      x.lod(dist || 0);
+      // entra escondida: o aquecedor do 3D sobe as texturas em fatias; a troca acontece quando ele terminar (ou em
+      // até 3 s), sem engasgo no quadro da troca. Cópias seguintes da mesma forma já acham tudo pronto.
+      w.pend = x; w.tPend = performance.now();
+      try { const ctx = V2.ap && V2.ap.ctx; if (ctx && ctx.aquecer) ctx.aquecer(x.g); else w.tPend = 0; } catch (er) { w.tPend = 0; }
+    }).catch(() => {});
+    // a troca de fato (chamada a cada quadro enquanto há uma cópia esperando)
+    w.trocar = () => {
+      const x = w.pend, aq = V2.ap && V2.ap.ctx && V2.ap.ctx.aq;
+      if (!V2.ligado()) { w.pend = null; return; }
+      if (w.tPend && performance.now() - w.tPend < 3000 && aq && aq.pendentes()) return;
+      w.pend = null; w.v2 = x; w.alt = e.alt;
+      // a V1 sai da árvore (outros módulos que acendem os filhos do token não a trazem de volta) e a V2 entra
+      w.pai = v1.g.parent || g; w.pai.remove(v1.g); w.pai.add(x.g); V2.vivos.add(w);   // (pai: o grupo do corpo das cobaias)
+      // o nome (posto pelo sala3d.js em cima da V1) acompanha a altura da V2
+      nomeY(e.alt);
+      V2.stats.trocas++;
+    };
+    return w;
+  }
+  NS.v2 = V2;
+  // a vista 3D avisa quando abre e fecha (o aquecedor e a renderização vêm dela; ao fechar solta os arquivos lidos)
+  // (fechar e abrir de novo logo em seguida, como na troca de andar, reaproveita o que já foi lido)
+  (NS.vista = NS.vista || []).push({
+    iniciar(ap) { V2.ap = ap; clearTimeout(V2.tSoltar); },
+    fechar() { V2.ap = null; V2.vivos.clear(); clearTimeout(V2.tSoltar); V2.tSoltar = setTimeout(() => { if (!V2.ap) V2.soltar(); }, 8000); },
+  });
+
   /* ---------- o corpo mostra o estado (vitais publicadas pela ficha ativa) ----------
      ferido (PV abaixo da metade): manca ao andar; morrendo (PV 0): cai e se arrasta pelo chão;
      enlouquecendo (SAN 0): treme. A base da miniatura não se mexe. */
@@ -1744,8 +2550,16 @@
       return '';
     };
     t.anim = (dt, tt, andando) => {
-      if (animO) animO(dt, tt, andando);
       tE -= dt; if (tE <= 0) { tE = .5; est = estadoDe(); }
+      // modelo V2: o estado vira clipe (ferido, caído) e máscara de ferimento; aqui só o tremor de quem enlouquece
+      if (t.v2) {
+        t.estCorpo = est === 'enlouquecendo' ? '' : est;
+        if (animO) animO(dt, tt, andando);
+        kt += ((est === 'enlouquecendo' ? 1 : 0) - kt) * Math.min(1, dt * 4);
+        corpo.rotation.set(0, kt * (Math.random() - .5) * .08, kt * (Math.random() - .5) * .05); corpo.position.set(kt * (Math.random() - .5) * .02, 0, 0);
+        return;
+      }
+      if (animO) animO(dt, tt, andando);
       const suave = (x, alvo) => x + (alvo - x) * Math.min(1, dt * 4);
       kc = suave(kc, est === 'morrendo' ? 1 : 0); kf = suave(kf, est === 'ferido' ? 1 : 0); kt = suave(kt, est === 'enlouquecendo' ? 1 : 0);
       const passo = Math.sin(tt * 6);
@@ -1762,7 +2576,8 @@
   function criarToken(F, id, s, forma) {
     const T = F.T;
     let t = modeloDe(T, id, s);
-    if (!t) {
+    semPendente = semDe(id);
+    try { if (!t) {
       if (s.tipo === 'cobaia' && COBAIAS[s.id]) t = COBAIAS[s.id](F);
       else if (s.tipo === 'robo') t = robo(F, s.id, s);
       else if (s.tipo === 'filho') {
@@ -1773,9 +2588,11 @@
       }
       else if (s.tipo === 'espectro') t = espectro(F, s);
       else t = npc(F, s);
-    }
+    } } finally { semPendente = null; }
     // LOD (filhos3d.js): cobaias, robôs e criaturas genéricas também ganham os 3 níveis por distância
     if (NS.prepararLOD && !t.lod) { try { NS.prepararLOD(F, t); } catch (e) {} }
+    // modelo V2 (.glb) da forma, se existir: a V1 fica por dentro e aparece até a V2 chegar
+    if (!String(id).startsWith('_ensaio_')) { const e2 = s.tipo === 'filho' ? V2.entrada(forma) : (s.tipo === 'cobaia' || s.tipo === 'npc') ? V2.entradaCobaia(s) : null; if (e2) t = comV2(F, t, e2, id); }
     // base redonda na cor do token (como a base de uma miniatura)
     const base = new T.Group();
     const R = t.raioBase || (s.tipo === 'filho' ? .55 : .32);
@@ -1789,9 +2606,98 @@
     t.aro = aro; t.base = base;
     t.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
     if (s.tipo === 'cobaia' || s.tipo === 'npc') estadoDoCorpo(T, t, id);
+    if (typeof t.acao === 'function' && s.tipo !== 'filho') ganchosAcao(t, id);
+    ritmoDe(T, t);
     return t;
   }
 
+  /* ---------- ações das miniaturas: o golpe usa a arma do efeito; conjuração e ritual vêm do site ---------- */
+  // o site chama acao('ataque') sem dizer a arma: o nome do golpe está no efeito publicado no token (fx.n).
+  // A habilidade (fx.t 'hab') vira o gesto de conjurar; o ritual conjurado (nó "efeito", sigilo) vira o ritual.
+  const REG = new Map();   // id do token -> miniaturas com ações
+  let ouvindo = false, ultEf = 0;
+  function ganchosAcao(t, id) {
+    const ac0 = t.acao;
+    t.acao = (tipo, nome) => {
+      if (tipo === 'ataque' && nome == null) { try { const fx = ((((window.ACF || {}).estado || {}).tokens || {})[id] || {}).fx; if (fx && fx.t === 'atk') nome = fx.n; } catch (e) {} }
+      return ac0(tipo, nome);
+    };
+    let set = REG.get(id); if (!set) REG.set(id, set = new Set());
+    set.forEach(x => { if (!x.g.parent) set.delete(x); }); set.add(t);
+    if (!ouvindo) { ouvindo = true; ouvirEfeitos(0); }
+    // habilidade: olha o fx do token duas vezes por segundo (o mesmo que o site já publica)
+    let ultFx = 0, tFx = 0; const animA = t.anim;
+    t.anim = (dt, tt, andando) => {
+      animA(dt, tt, andando);
+      tFx -= dt; if (tFx > 0) return; tFx = .5;
+      try {
+        const fx = ((((window.ACF || {}).estado || {}).tokens || {})[id] || {}).fx;
+        if (fx && fx.ts && fx.ts !== ultFx) { const novo = ultFx !== 0; ultFx = fx.ts; if (novo && fx.t === 'hab' && Date.now() - fx.ts < 6000) t.acao('conjurar'); }
+      } catch (e) {}
+    };
+  }
+  function ouvirEfeitos(n) {
+    const b = window.ACF;
+    if (b && b.Rede && b.Rede.on && b.pronto) {
+      try {
+        b.Rede.on('efeito', e => {
+          if (!e || !e.ts || e.ts <= ultEf) return; const velho = !ultEf; ultEf = e.ts;
+          if (velho && Date.now() - e.ts > 8000) return;
+          if (e.t !== 'sigilo' || !e.quem) return;
+          const set = REG.get(e.quem); if (!set) return;
+          set.forEach(x => { if (!x.g.parent) { set.delete(x); return; } try { x.acao('ritual'); } catch (er) {} });
+        }, () => {});
+      } catch (e) {}
+    } else if (n < 240) setTimeout(() => ouvirEfeitos(n + 1), 500);
+  }
+
+  /* ---------- ritmo da animação: perto, todo quadro; LOD médio, metade; silhueta, ~10 Hz; fora da câmera, nada ----------
+     A câmera é a última que desenhou alguma miniatura (onBeforeRender das malhas). Chamadas com tempo que não segue o
+     relógio (prévias, o LOD testando materiais) rodam sempre, inteiras. NS.animTudo = true desliga o corte. */
+  let camVista = null, FR = null, PV = null, tFR = -1, ESF = null;
+  function marcarCam(r, cena, cam) { if (cam !== camVista && cam.isPerspectiveCamera && !(cam.parent && cam.parent.type === 'CubeCamera')) camVista = cam; }
+  function naVista(T, t, tt) {
+    if (!camVista) return true;
+    if (!FR) { FR = new T.Frustum(); PV = new T.Matrix4(); ESF = new T.Sphere(); }
+    if (tt !== tFR) { tFR = tt; PV.multiplyMatrices(camVista.projectionMatrix, camVista.matrixWorldInverse); FR.setFromProjectionMatrix(PV); }
+    ESF.center.setFromMatrixPosition(t.g.matrixWorld); ESF.center.y += (t.alt || 1.7) * .5; ESF.radius = (t.alt || 1.7) * .8 + (t.raioBase || .4) + .6;
+    return FR.intersectsSphere(ESF);
+  }
+  function ritmoDe(T, t) {
+    if (!t || typeof t.anim !== 'function' || t.__ritmo) return;
+    t.__ritmo = true;
+    t.g.traverse(o => { if (o.isMesh && o.onBeforeRender === T.Object3D.prototype.onBeforeRender) o.onBeforeRender = marcarCam; });
+    // cada miniatura vive no seu próprio relógio (deslocado pela semente): os parados não ficam sincronizados
+    const anim = t.anim, sm0 = semDe(t.g.uuid), desl = Math.floor(sm0 * 6), off = 10 + sm0 * 50;
+    let acc = 0, tUlt = -1, n = 0, poseQ = 0;
+    t.anim = (dt, tt, andando) => {
+      const segue = tUlt >= 0 && tt > tUlt && Math.abs(tt - tUlt - dt) < .25 && dt < .25; tUlt = tt;
+      if (!segue || NS.animTudo) { acc = 0; anim(dt, tt + off, andando); poseQ++; return; }
+      acc += dt; n++;
+      if (!t.g.visible || !naVista(T, t, tt)) { t.__parado = true; return; }
+      const nv = t.nivelLOD || 0;
+      if (nv === 1 && ((n + desl) & 1)) return;
+      if (nv >= 2 && acc < .1) return;
+      const d = Math.min(acc, .25); acc = 0; t.__parado = false;
+      anim(d, tt + off, andando); poseQ++;
+    };
+    // o LOD reassa a silhueta a partir da pose: só quando a pose mudou (ou a distância mudou bastante)
+    let lodW = null, qUlt = -1, dUlt = -99;
+    const embrulha = f => function (dist) {
+      if (poseQ !== qUlt || Math.abs(dist - dUlt) > .8 || (t.nivelLOD || 0) < 2) { qUlt = poseQ; dUlt = dist; return f.call(this, dist); }
+      return t.nivelLOD;
+    };
+    const atual = t.lod;
+    try {
+      Object.defineProperty(t, 'lod', { configurable: true, enumerable: true, get: () => lodW, set: f => { lodW = typeof f === 'function' ? embrulha(f) : f; } });
+      t.lod = atual;
+    } catch (e) {}
+    // malhas criadas depois (silhuetas do LOD) também marcam a câmera
+    t.marcarCam = marcarCam;
+  }
+
   Object.assign(NS, { criarToken, carregarModelos, FORMAS, NOMES_FORMA });
+  // para as formas dos Filhos (filhos3d.js): o mesmo motor de movimento e a curva suave
+  NS.mov = motor; NS.movSuave = sstep;
   NS.preparoTokens = F => { F.T = F.T || window.THREE; };
 })();

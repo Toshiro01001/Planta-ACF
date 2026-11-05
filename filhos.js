@@ -178,6 +178,9 @@ const tokens = () => est().tokens || {};
 const SERd = id => (A().SER || {})[id];
 const tipoDe = tk => tk && SERd(tk.s) ? SERd(tk.s).tipo : '';
 const ehFilho = tk => tipoDe(tk) === 'filho';
+// "invisível" é um valor do campo da Forma de Objeto (disfarce3d.js): some para os jogadores, mas não é objeto
+const FO_INV = 'invisível';
+const foObj = tk => !!(tk && tk.fo && tk.fo !== FO_INV);
 const ehCobaia = tk => tipoDe(tk) === 'cobaia';
 const cena = () => (est().cena || {}).id || '0';
 const P = () => I().P();
@@ -411,7 +414,7 @@ function travado(id, tk) {
   if (!tk || !ehFilho(tk) || !regraVale(id)) return '';
   if (tk.dc) return 'Imagem falsa (interferência): não se move.';
   const c = cfgTk(tk); if (!c) return '';
-  if (tk.fo) { const tr = window.ACF_DISFARCE ? ACF_DISFARCE.travaObjeto(id, tk) : null; if (tr !== '') return tr || 'Em forma de objeto: volte à forma normal para se mover.'; }   // disfarce3d.js: "só se move quando ninguém olha"
+  if (foObj(tk)) { const tr = window.ACF_DISFARCE ? ACF_DISFARCE.travaObjeto(id, tk) : null; if (tr !== '') return tr || 'Em forma de objeto: volte à forma normal para se mover.'; }   // disfarce3d.js: "só se move quando ninguém olha"
   if (c.mov === 'imovel') return 'Este Filho não se move no mapa (imóvel).';
   if (c.mov === 'escuro') { const cn = cnTk(tk); const corrEsc = !cn && (I().apagao() || (est().luz || {})['a' + tk.a] === 'off'); if (!(cn ? escuroEm(tk.a, cn) : corrEsc)) return 'Só se move no escuro: este lugar está iluminado.'; }
   const tv = (ef().trava || {})[id];
@@ -671,7 +674,7 @@ const USAR = {
     return `Silêncio Absoluto: ${Object.keys(al).map(k => SERd(k).nome).join(', ')}`;
   },
   objeto(id, tk) {
-    if (tk.fo) {
+    if (foObj(tk)) {
       const obk = ((ef().obj || {})[id]);
       if (obk) gravarPub(['ob', obk], null);
       gravarEstado(['obj', id], null);
@@ -825,6 +828,7 @@ function usar(id, k) {
   if (!souGM()) return;
   if (tk.dc) return A().aviso('Esta é uma imagem falsa (interferência).');
   const c = cfgTk(tk) || {};
+  if (k === 'invisivel') { if (window.ACF_DISFARCE) ACF_DISFARCE.usar(id, k, tk, c); return; }   // disfarce3d.js: ficar invisível
   if (!hab(c, k) && !souMestre()) return A().aviso('Este Filho não tem essa habilidade.');
   const b = bloqueioUso(id, c, k); if (b) return A().aviso(b);
   if (window.ACF_DISFARCE && ACF_DISFARCE.usar(id, k, tk, c)) return;   // disfarce3d.js: objeto e cópia (modo Disfarce no 3D)
@@ -876,12 +880,17 @@ function resumoCfg(c) {
 function htmlBotoes(id, tk, c, cls) {
   const ks = Object.keys(HABS).filter(k => hab(c, k));
   if (!ks.length) return '';
-  return `<div class="${cls || 'fil-btns'}">${ks.map(k => { const b = bloqueioUso(id, c, k); const nome = k === 'objeto' && tk.fo ? 'Voltar à forma' : k === 'copiar' && tk.cp ? 'Desfazer cópia' : HABS[k].n; return `<button type="button" data-fil-hab="${k}" title="${esc(HABS[k].d + (b ? ' · ' + b : ''))}" class="${b ? 'usado' : ''}${(k === 'objeto' && tk.fo) || (k === 'copiar' && tk.cp) ? ' on' : ''}"><i aria-hidden="true">${HABS[k].i}</i><span>${esc(nome)}</span>${limiteHab(c, k) === 'cena' ? '<small>1/cena</small>' : limiteHab(c, k) === 'rodadas3' ? '<small>3 rod.</small>' : ''}</button>`; }).join('')}</div>`;
+  // quem se disfarça (Forma de Objeto ou Copiar) também fica invisível (disfarce3d.js)
+  const inv = window.ACF_DISFARCE && (hab(c, 'objeto') || hab(c, 'copiar')) ? (tk.fo === FO_INV
+    ? '<button type="button" data-fil-hab="invisivel" class="on" title="Os jogadores voltam a ver este Filho"><i aria-hidden="true">👁</i><span>Voltar a ser visível</span></button>'
+    : '<button type="button" data-fil-hab="invisivel" title="Some para os jogadores (2.5D e 3D); o Mestre e os auxiliares veem um fantasma"><i aria-hidden="true">👻</i><span>Ficar invisível</span></button>') : '';
+  return `<div class="${cls || 'fil-btns'}">${ks.map(k => { const b = bloqueioUso(id, c, k); const nome = k === 'objeto' && foObj(tk) ? 'Voltar à forma' : k === 'copiar' && tk.cp ? 'Desfazer cópia' : HABS[k].n; return `<button type="button" data-fil-hab="${k}" title="${esc(HABS[k].d + (b ? ' · ' + b : ''))}" class="${b ? 'usado' : ''}${(k === 'objeto' && foObj(tk)) || (k === 'copiar' && tk.cp) ? ' on' : ''}"><i aria-hidden="true">${HABS[k].i}</i><span>${esc(nome)}</span>${limiteHab(c, k) === 'cena' ? '<small>1/cena</small>' : limiteHab(c, k) === 'rodadas3' ? '<small>3 rod.</small>' : ''}</button>`; }).join('')}${inv}</div>`;
 }
 function estadoTk(tk) {
   const l = [];
   if (tk.dc) l.push(['📡', 'imagem falsa (interferência)']);
-  if (tk.fo) l.push(['🪑', 'objeto: ' + (OBJETOS.find(o => o[0] === tk.fo) || ['', tk.fo])[1].toLowerCase()]);
+  if (tk.fo === FO_INV) l.push(['👻', 'invisível para os jogadores']);
+  else if (tk.fo) l.push(['🪑', 'objeto: ' + (OBJETOS.find(o => o[0] === tk.fo) || ['', tk.fo])[1].toLowerCase()]);
   if (tk.cp && SERd(tk.cp)) l.push(['🎭', 'copiando ' + SERd(tk.cp).nome + (tk.cpd ? ' · ' + (DETALHES.find(d => d[0] === tk.cpd) || ['', tk.cpd])[1].toLowerCase() : '')]);
   if (tk.oc) l.push(['👻', 'oculto dos jogadores']);
   if (tk.cd) l.push(['🕯', 'fingindo ser um candelabro (sem anel nem nome para os jogadores)']);
@@ -1630,7 +1639,7 @@ const Motor = {
     Object.entries(tks).forEach(([id, tk]) => {
       if (!ehFilho(tk) || tk.dc || !hab(cfgTk(tk), 'estudar')) return;
       const e = (ef().estudo || {})[id];
-      if (!tk.fo) { if (e) gravarEstado(['estudo', id], null); return; }
+      if (!foObj(tk)) { if (e) gravarEstado(['estudo', id], null); return; }
       const lugar = chaveLugar(tk);
       if (!e || e.cena !== c0 || e.sala !== lugar) { if (!e || e.sala !== lugar || e.cena !== c0) gravarEstado(['estudo', id], { cena: c0, sala: lugar, parcial: true, ts: agora() }); return; }
       if (e.parcial || !e.cands) return;
@@ -1770,7 +1779,7 @@ const Motor = {
   },
   novaCena(antes, nova) {
     Object.entries(tokens()).forEach(([id, tk]) => {
-      if (!ehFilho(tk) || !tk.fo) return;
+      if (!ehFilho(tk) || !foObj(tk)) return;
       const e = (ef().estudo || {})[id], lugar = chaveLugar(tk);
       if (e && e.cena === antes && e.sala === lugar && !e.parcial && e.cands) Object.keys(e.cands).forEach(cob => gravarEstado(['estudaveis', id, cob], agora()));
       const aqui = cobaiasNoAndar(tk.a).filter(([, t]) => chaveLugar(t) === lugar).map(([k]) => k);

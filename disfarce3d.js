@@ -57,6 +57,11 @@ const priv = () => (I() && I().Priv && I().Priv.dados) || {};
 const ef = () => priv().filhosEstado || {};
 const pub = () => est().fil || {};
 const cfgTk = tk => (FIL() && FIL().cfgTk ? FIL().cfgTk(tk) : null);
+// "Ficar invisível": um valor do mesmo campo da Forma de Objeto (tokens.<id>.fo), sem caminho novo no Firebase. Como
+// todo token com fo, sai do mapa público (os jogadores nem recebem) e some de todas as vistas dos jogadores
+const FO_INV = 'invisível';
+const invisivel = tk => !!tk && tk.fo === FO_INV;
+const emObjeto = tk => !!(tk && tk.fo && tk.fo !== FO_INV);
 const hab = (c, k) => !!(c && c.hab && c.hab[k]);
 const persg = () => est().persg || { on: false };
 const ordemP = () => (persg().ordem ? Object.values(persg().ordem) : []);
@@ -492,7 +497,49 @@ function decorarObjeto(T, g, det, semente, info) {
    DETALHES DAS COBAIAS: no token (a miniatura da cobaia copiada)
    t = { g, alt, anim, partes? } (tokens3d.js). Os ticks rodam DEPOIS da animação normal.
    ========================================================= */
+// a cópia com o corpo V2 das cobaias (qualidade Alta): o detalhe errado usa os slots do material e os ossos
+// (COORDENACAO.md, seção Cobaias); o que não tem slot fica igual ao da V1, preso ao osso certo
+function decorarCobaiaV2(T, t, det, semente) {
+  const c = t.v2.cobaia, P = t.partes, O = (P && P.ossos) || {}, r = rngDe('c' + semente + det), ticks = [];
+  const deco = (pai, me) => { me.userData.disfDeco = 1; me.raycast = () => {}; pai.add(me); return me; };
+  const lado = r() < .5 ? 'e' : 'd';
+  switch (det) {
+    case 'fhp': { const d = (c.cfg.etiqueta || [0, 0, 0]).slice(); const tmp = d[1]; d[1] = d[2]; d[2] = tmp === d[2] ? (tmp + 1) % 10 : tmp; c.definir({ etiqueta: d }); break; }
+    case 'roupa': c.definir({ marca: -(+c.cfg.marca || 1) }); t.v2.g.scale.x = -Math.abs(t.v2.g.scale.x); break;
+    case 'olhos': { c.definir({ corBrilho: '#ffe8a0' }); c.uniforms.uCorBrilho.value.set('#ffe8a0').convertSRGBToLinear();
+      ticks.push((dt, tt, k, cx) => { const v = cx && cx.luzEm ? cx.luzEm(t.g, 9) : 0; c.uniforms.uBrilho.value = clamp(v * (.35 + .5 * k), 0, .85); }); break; }
+    case 'pele': { const p = new T.Color(c.cfg.tintas.pele).lerp(new T.Color('#8f9296'), .35); c.definir({ tintas: { pele: '#' + p.getHexString() } }); break; }
+    case 'pescoco': if (O.pescoco) ticks.push(() => { O.pescoco.scale.y = 1.25; }); break;
+    case 'bracos': ticks.push(() => { ['braco_e', 'braco_d', 'antebraco_e', 'antebraco_d'].forEach(n => { if (O[n]) O[n].scale.y = 1.08; }); }); break;
+    case 'dedo': {
+      const b = O['minimo1_' + lado]; if (!b) break;
+      const m = new T.MeshStandardMaterial({ color: new T.Color(c.cfg.tintas.pele).convertSRGBToLinear(), roughness: .6 });
+      const dd = deco(b, new T.Mesh(guardar(new T.CylinderGeometry(.0075, .0065, .05, 6)), guardar(m))); dd.position.set(lado === 'e' ? .013 : -.013, .02, 0); dd.rotation.z = lado === 'e' ? -.25 : .25;
+      break;
+    }
+    case 'pisca': {
+      if (!P || !P.noOsso || !O.cabeca) break;
+      const m = guardar(new T.MeshStandardMaterial({ color: new T.Color(c.cfg.tintas.pele).convertSRGBToLinear(), roughness: .6 }));
+      const palp = [-1, 1].map(sx => { const p = P.noOsso('cabeca', [sx * .032, 1.648, .078]); const me = deco(O.cabeca, new T.Mesh(guardar(new T.SphereGeometry(.016, 10, 6)), m)); if (p) me.position.copy(p); me.scale.set(1, .02, .6); return me; });
+      const per = 5.5 + r() * 2;
+      ticks.push((dt, tt, k) => { const u = tt % per; palp.forEach((me, i) => { const u2 = u - i * .8, f = u2 > 0 && u2 < 1.1 ? Math.sin(u2 / 1.1 * Math.PI) : 0; me.scale.y = .02 + f * (k > .3 ? 1 : 0) * .98; }); });
+      break;
+    }
+    case 'sorriso': {
+      if (!P || !P.noOsso || !O.cabeca) break;
+      const mat = matBasico(T, { map: texSorriso(T), opacity: 0 });
+      const me = deco(O.cabeca, new T.Mesh(guardar(new T.PlaneGeometry(.11, .04)), mat)); const p = P.noOsso('cabeca', [0, 1.592, .093]); if (p) me.position.copy(p);
+      ticks.push((dt, tt, k) => { mat.opacity = .08 + .62 * k; });
+      break;
+    }
+    // os outros (sombra, cabeça, respiração, joelhos, parado, desliza, espelho, anel, alto) são os da V1: as peças
+    // apontam para os ossos equivalentes
+    default: return null;
+  }
+  return ticks;
+}
 function decorarCobaia(T, t, det, semente) {
+  if (t.v2 && t.v2.cobaia) { const k = decorarCobaiaV2(T, t, det, semente); if (k) return k; }
   const P = t.partes, r = rngDe('c' + semente + det), ticks = [];
   const eyeY = P ? -P.R * .03 : 0, eyeX = P ? P.R * .33 * (P.sxC || .82) / .82 : 0, eyeZ = P ? P.R * (P.szC || .92) * .92 : 0;
   const deco = (pai, me) => { me.userData.disfDeco = 1; me.raycast = () => {}; pai.add(me); return me; };
@@ -701,7 +748,21 @@ function virarCobaia(id, cob, det) {
   logFilhos(`${nomeTk(tk)} copiou ${SERd(cob).nome} · detalhe: ${DCOB[d][1].toLowerCase()}`);
   return true;
 }
-const MOTIVOS = { voltou: 'voltou à forma', atacou: 'atacou: o disfarce caiu', acertado: 'foi acertado: o disfarce caiu', revelado: 'o Mestre revelou o disfarce' };
+// ficar invisível: sai de outra forma de disfarce (objeto ou cópia) e some para os jogadores
+function ficarInvisivel(id) {
+  const tk = tokens()[id]; if (!tk || tipoDe(tk) !== 'filho' || !souGM()) return false;
+  if (invisivel(tk)) return true;
+  const cv = custoVez(id); if (!cv.ok) { avisar(cv.motivo); return false; }
+  const n = { ...tk, fo: FO_INV };
+  delete n.cp; delete n.cpd;
+  if (tk.fo) { const obk = (ef().obj || {})[id]; if (obk) A().definir(['fil', 'ob', obk], null); gravarObjEstado(id, null); }
+  if (cv.m) n.m = cv.m;
+  A().definir(['tokens', id], n);
+  logFilhos(`${nomeTk(tk)} ficou invisível`);
+  if (souMestre() && A().diario) A().diario('filhos', `Disfarce: ${nomeTk(tk)} ficou invisível`);
+  return true;
+}
+const MOTIVOS = { voltou: 'voltou à forma', visivel: 'voltou a ser visível', atacou: 'atacou: o disfarce caiu', acertado: 'foi acertado: o disfarce caiu', revelado: 'o Mestre revelou o disfarce' };
 function quebrar(id, motivo) {
   const tk = tokens()[id]; if (!tk || !(tk.fo || tk.cp) || !souGM()) return false;
   const n = { ...tk }; delete n.fo; delete n.cp; delete n.cpd;
@@ -719,10 +780,17 @@ function quebrar(id, motivo) {
    ========================================================= */
 // botões "Forma de Objeto" e "Copiar" (devolve true quando cuidou)
 function usar(id, k, tk) {
+  // "Ficar invisível" / "Voltar a ser visível" (botão extra de quem tem Forma de Objeto ou Copiar)
+  if (k === 'invisivel') {
+    const c = cfgTk(tk) || {};
+    if (!hab(c, 'objeto') && !hab(c, 'copiar') && !souMestre()) { avisar('Este Filho não se disfarça.'); return true; }
+    if (invisivel(tk)) quebrar(id, 'visivel'); else ficarInvisivel(id);
+    return true;
+  }
   if (k !== 'objeto' && k !== 'copiar') return false;
   if (tk.fo || tk.cp) {
     // apertar de novo: volta à forma (com a animação de quebrar). Copiando e pedindo objeto (ou o contrário): troca
-    if ((k === 'objeto' && tk.fo) || (k === 'copiar' && tk.cp)) { quebrar(id, 'voltou'); return true; }
+    if ((k === 'objeto' && emObjeto(tk)) || (k === 'copiar' && tk.cp)) { quebrar(id, 'voltou'); return true; }
   }
   const ap = api3();
   if (ap && meuCtrl() === id) { Ctrl.abrirPop(k === 'objeto' ? 'objeto' : 'cobaia'); return true; }
@@ -801,6 +869,9 @@ const Escolha = {
    ESTILO
    ========================================================= */
 const CSS = `
+.ficha.disf-invisivel { opacity: .3 !important; }
+.ficha.disf-invisivel .ficha-cabeca { outline: 2px dashed #bcd6ff; outline-offset: 2px; }
+.ficha.disf-invisivel .ficha-pino::before { content: '👻'; order: -1; font-size: 13px; line-height: 1; pointer-events: none; }
 .disf-barra { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px); z-index: 4; display: flex; gap: 5px; pointer-events: auto; }
 .disf-barra[hidden], .disf-pop[hidden], .disf-card[hidden], .disf-mira[hidden], .disf-rep[hidden], .disf-res[hidden] { display: none; }
 .disf-bt { min-width: 54px; min-height: 48px; padding: 4px 7px 3px; display: grid; justify-items: center; align-content: center; gap: 1px; border-radius: 12px; border: 1px solid rgba(231,111,81,.6); background: rgba(22,10,12,.88); color: #f6e8e4; font: 600 10.5px/1.05 var(--mono, monospace); cursor: pointer; -webkit-tap-highlight-color: transparent; backdrop-filter: blur(3px); }
@@ -888,9 +959,11 @@ const Ctrl = {
     const L = [];
     if (this.modo === 'mira') { L.push(['lista', '📋', 'Lista', 'Escolher da lista (cadeira, caixote, maca…)']); L.push(['sair', '✕', 'Cancelar', 'Sair do modo Disfarce']); }
     else if (this.modo !== 'colocar') {
-      if (f.tk.fo || f.tk.cp) L.push(['voltar', '↩', 'Voltar', 'Voltar à forma (desfaz o disfarce)', 'perigo']);
-      if (f.obj) L.push(['objeto', '🪑', f.tk.fo ? 'Trocar' : 'Objeto', f.tk.fo ? 'Trocar de objeto' : 'Virar um objeto da sala']);
+      const inv = invisivel(f.tk);
+      if (emObjeto(f.tk) || f.tk.cp) L.push(['voltar', '↩', 'Voltar', 'Voltar à forma (desfaz o disfarce)', 'perigo']);
+      if (f.obj) L.push(['objeto', '🪑', emObjeto(f.tk) ? 'Trocar' : 'Objeto', emObjeto(f.tk) ? 'Trocar de objeto' : 'Virar um objeto da sala']);
       if (f.cop) L.push(['cobaia', '🧍', 'Cobaia', 'Virar uma cobaia (a cópia)']);
+      L.push(inv ? ['invis', '👁', 'Visível', 'Voltar a ser visível', 'perigo'] : ['invis', '👻', 'Invisível', 'Ficar invisível (some para os jogadores)']);
     }
     const sig = L.map(x => x.join('|')).join('#') + this.pop;
     if (sig !== this.sig) {
@@ -906,6 +979,7 @@ const Ctrl = {
     if (document.pointerLockElement && k !== 'objeto') document.exitPointerLock();
     const f = filhoCtrl(); if (!f) return;
     if (k === 'voltar') { this.fecharPop(); quebrar(f.id, 'voltou'); return; }
+    if (k === 'invis') { this.fecharPop(); if (invisivel(f.tk)) quebrar(f.id, 'visivel'); else if (ficarInvisivel(f.id)) Efx.flash(); return; }
     if (k === 'objeto') { this.fecharPop(); this.entrarMira(); return; }
     if (k === 'cobaia') { this.pop === 'cobaia' ? this.fecharPop() : this.abrirPop('cobaia'); return; }
     if (k === 'lista') { this.pop === 'lista' ? this.fecharPop() : this.abrirPop('lista'); return; }
@@ -1189,9 +1263,34 @@ const Efx = {
     g.position.copy(pos); (Vista.grupo).add(g);
     this.animar(g, 1100, k => { ps.forEach(m => { m.position.addScaledVector(m.userData.v, .016); m.userData.v.y -= .06; m.rotation.x += .2; m.rotation.y += .15; }); mat.opacity = 1 - k; }, () => g.parent && g.parent.remove(g));
   },
+  // Alta: a criatura V2 aparece (ou some) por partes; de = corte inicial, ate = final (0 = nada, 1 = inteira)
+  revelar(g, de, ate, dur, atraso = 0, tok = null) {
+    const ap = api3(); if (!ap || !g || !v2Alta()) return false;
+    let t = tok; if (!t) ap.tok.mapa.forEach(o => { if (o.t.g === g) t = o.t; });
+    if (!t || !t.v2) return false;
+    const r = Rev.aplicar(ap.T, t.v2, t.alt); if (!r) return;
+    r.k(de); const t0 = performance.now() + atraso * this.escala;
+    this.animar(g, dur + atraso, () => { const k = clamp((performance.now() - t0) / (dur * this.escala), 0, 1); r.k(lerp(de, ate, suave(k)) * 1.04 - .02); }, () => r.tirar());
+    return true;
+  },
+  // Alta: o objeto se dobra e se estica até a altura da criatura antes de sumir
+  esticar(g, alvo) {
+    const ap = api3(); if (!ap || !g || !v2Alta()) return false;
+    const b = new ap.T.Box3().setFromObject(g), h = Math.max(.2, b.max.y - b.min.y), s0 = g.scale.clone(), r0 = g.rotation.y, kH = clamp((alvo || 1.8) / h, 1, 6);
+    g.traverse(o => { o.raycast = () => {}; });
+    this.animar(g, 1300, k => {
+      const a = suave(Math.min(1, k / .6)), b2 = suave(Math.max(0, (k - .6) / .4));
+      g.scale.set(s0.x * lerp(1, .22, a) * (1 - b2 * .9), s0.y * lerp(1, kH, a) * (1 - b2 * .95), s0.z * lerp(1, .22, a) * (1 - b2 * .9));
+      g.rotation.y = r0 + a * 2.6 + Math.sin(k * 31) * .05 * (1 - b2);
+      g.rotation.z = Math.sin(k * 9) * .12 * a * (1 - b2);
+    }, () => { try { g.parent && g.parent.remove(g); } catch (e) {} });
+    return true;
+  },
   // a forma falsa (objeto ou cobaia) se deforma e some; a criatura cresce no lugar
   quebra(g, alturaFarelo) {
     const ap = api3(); if (!ap || !g) return;
+    // Alta: o objeto se dobra e se estica até a altura da criatura (a criatura V2 aparece por partes, em surgir)
+    if (!g.userData.disfOv && this.esticar(g, alturaFarelo)) { const T2 = ap.T, w2 = new T2.Vector3(); g.getWorldPosition(w2); this.farelos(T2, w2, '#3a0a10', 10, Math.max(.4, alturaFarelo || 1)); return; }
     const T = ap.T, w = new T.Vector3(); g.getWorldPosition(w);
     if (!g.parent) Vista.grupo.add(g);
     const s0 = g.scale.clone(), r0 = g.rotation.y, y0 = g.position.y;
@@ -1207,17 +1306,134 @@ const Efx = {
   },
   // a criatura (ou a forma nova) surge crescendo e se esticando
   surgir(g, dur = 1000, atraso = 250) {
-    if (!g) return; dur *= this.escala; atraso *= this.escala; const s0 = g.scale.clone(), t0 = performance.now() + atraso;
+    if (!g) return;
+    // Alta: a criatura V2 aparece por partes (cachecol e mãos primeiro, a máscara por último)
+    this.revelar(g, 0, 1, dur + 500, atraso); dur *= this.escala; atraso *= this.escala; const s0 = g.scale.clone(), t0 = performance.now() + atraso;
     g.userData.disfSurgindo = 1;
     this.animar(g, (dur + atraso) / this.escala, () => { const k = clamp((performance.now() - t0) / dur, 0, 1), e = suave(k), st = 1 + Math.sin(k * Math.PI) * .25; g.scale.set(s0.x * Math.max(.05, e), s0.y * Math.max(.05, e) * st, s0.z * Math.max(.05, e)); }, () => { g.scale.copy(s0); delete g.userData.disfSurgindo; });
   },
   // a criatura encolhe torcendo para virar a forma falsa
   sumir(g, dur = 900) {
     const ap = api3(); if (!ap || !g) return;
+    // Alta: a criatura V2 some por partes (a máscara primeiro) enquanto se torce
+    this.revelar(g, 1, 0, dur);
     if (!g.parent) Vista.grupo.add(g);
     const s0 = g.scale.clone(), r0 = g.rotation.y;
     g.traverse(o => { o.raycast = () => {}; });
     this.animar(g, dur, k => { const e = 1 - suave(k); g.scale.set(s0.x * (e + Math.sin(k * 30) * .05), s0.y * e * (1 + k * .4), s0.z * (e + Math.cos(k * 30) * .05)); g.rotation.y = r0 + k * k * 5; }, () => { try { if (g.parent === Vista.grupo) Vista.grupo.remove(g); } catch (e) {} g.scale.copy(s0); g.rotation.y = r0; });
+  },
+};
+
+/* =========================================================
+   TRANSFORMAÇÃO V2 (qualidade Alta, junto dos modelos V2)
+   - Objeto → criatura: o objeto se dobra e se estica até a altura da criatura (só transformações do grupo, serve
+     para qualquer objeto, sem shader nem modelo baixado por objeto) e a criatura V2 aparece por partes: a ordem vem
+     do atributo de vértice _revelar do .glb (0 = primeiro: cachecol e mãos; 1 = por último: a máscara). Sem o
+     atributo, a ordem é de baixo para cima (a cabeça por último).
+   - Criatura → objeto: o inverso (some a máscara primeiro, o corpo se dobra para dentro do objeto).
+   O corte é um shader por cima dos materiais da própria V2 (cópias dos materiais só durante o efeito; um programa
+   por material da V2, compilados de antemão pelo aquecedor ao abrir o 3D na Alta).
+   ========================================================= */
+const v2Alta = () => { try { return !!(window.ACF_QUALIDADE && ACF_QUALIDADE.v2()); } catch (e) { return false; } };
+function revCompilar(sh) {
+  const u = this.userData.rev; sh.uniforms.uRev = u.k; sh.uniforms.uAlt = u.alt;
+  const temAttr = !!this.userData.revAttr;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vRev;\nuniform float uAlt;' + (temAttr ? '\nattribute float _revelar;' : ''))
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (temAttr ? 'vRev = _revelar;' : 'vRev = clamp(position.y / max(.01, uAlt), 0., 1.);'));
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vRev;\nuniform float uRev;')
+    .replace('#include <map_fragment>', '#include <map_fragment>\nif (vRev > uRev) discard;\nfloat revB = 1. - smoothstep(0., .04, uRev - vRev);')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(.35, .02, .03) * revB;');
+}
+const Rev = {
+  // troca os materiais das malhas da V2 por cópias com o corte; devolve { k(v), tirar() }
+  aplicar(T, v2, alt) {
+    if (!v2 || !v2.g) return null;
+    const ms = []; v2.g.traverse(x => { if (x.isMesh && !Array.isArray(x.material)) ms.push(x); });
+    if (!ms.length) return null;
+    // as cópias ficam na própria V2 (reaproveitadas; o programa compilado não é solto entre um efeito e outro)
+    const R = v2.rev || (v2.rev = { u: { k: { value: 0 }, alt: { value: alt || 1.8 } }, copias: new Map() });
+    const u = R.u, copias = R.copias, orig = [];
+    ms.forEach(x => {
+      const attr = !!(x.geometry && x.geometry.attributes && x.geometry.attributes._revelar), ch = x.material.uuid + attr;
+      let m = copias.get(ch);
+      if (!m) { m = x.material.clone(); m.userData = { rev: u, revAttr: attr }; m.onBeforeCompile = revCompilar; m.customProgramCacheKey = () => 'rev' + attr + x.material.type; copias.set(ch, guardar(m)); }
+      orig.push([x, x.material]); x.material = m;
+    });
+    return { k(v) { u.k.value = v; }, tirar() { orig.forEach(([x, m]) => { x.material = m; }); } };
+  },
+  // compila de antemão (no tempo ocioso, alguns segundos depois de abrir) os materiais com corte das V2 dos Filhos que
+  // têm Forma de Objeto ou Copiar: a 1ª transformação não engasga compilando shader
+  aquecer(ap) {
+    if (!v2Alta() || !ap) return;
+    const vez = () => { if (api3() !== ap) return; try {
+      ap.tok.mapa.forEach((o, id) => {
+        const c = cfgTk(tokens()[id]); if (!o.t.v2 || o.t.v2.revOk || !(hab(c, 'objeto') || hab(c, 'copiar'))) return;
+        const r = this.aplicar(ap.T, o.t.v2, o.t.alt); if (!r) return;
+        r.k(1); try { ap.ren.compile(ap.cena, ap.camera); } catch (e) {} r.tirar(); o.t.v2.revOk = 1;
+      });
+    } catch (e) {} };
+    setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(vez, { timeout: 4000 }) : vez()), 9000);
+  },
+};
+/* =========================================================
+   INVISÍVEL: o fantasma que o Mestre e os auxiliares veem (os jogadores nem recebem o token)
+   Um material fantasma por cena, travado (opacidade, cor e brilho não mudam nem se a animação da forma mexer
+   no material da peça), e um material "nada" por tipo de peça (brilhos, partículas, linhas e a sombra redonda
+   somem). Troca de material só quando o estado muda: o LOD troca a geometria e liga a silhueta, mas a silhueta
+   também está com o fantasma, então nada volta a aparecer opaco. O nome e o anel da base ficam como estão.
+   ========================================================= */
+const texFantasma = T => tex(T, 'invisivel', 128, 128, (x, w, h) => {
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = 'rgba(214,232,255,.92)'; x.strokeStyle = 'rgba(40,60,96,.9)'; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(30, 110); x.lineTo(30, 56); x.arc(64, 56, 34, Math.PI, 0); x.lineTo(98, 110);
+  for (let i = 0; i < 4; i++) { const x0 = 98 - i * 17; x.quadraticCurveTo(x0 - 4, 96, x0 - 8.5, 110); x.quadraticCurveTo(x0 - 13, 96, x0 - 17, 110); }
+  x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = 'rgba(30,40,60,.95)'; [50, 78].forEach(cx => { x.beginPath(); x.ellipse(cx, 58, 6, 9, 0, 0, 7); x.fill(); });
+});
+const Invis = {
+  mats: null,
+  materiais(T) {
+    if (this.mats) return this.mats;
+    // propriedades fixas: o que a animação escrever é ignorado; a cor volta ao valor certo a cada leitura do desenho
+    const fixo = (m, o) => { Object.entries(o).forEach(([k, v]) => Object.defineProperty(m, k, { configurable: true, get: () => (v && v.isColor ? v.setHex(v.userData0) : v), set: () => {} })); return guardar(m); };
+    const cor = h => { const c = new T.Color(h); c.userData0 = c.getHex(); return c; };
+    const fant = fixo(new T.MeshStandardMaterial({ roughness: .7, metalness: 0 }), { color: cor('#c4dcff'), emissive: cor('#22385a'), emissiveIntensity: 1, opacity: .3, transparent: true, depthWrite: false });
+    // modelos V2 (com esqueleto): o mesmo fantasma, deformando com a animação (a silhueta da V2)
+    const fantK = fixo(new T.MeshStandardMaterial({ roughness: .7, metalness: 0, skinning: true }), { color: cor('#c4dcff'), emissive: cor('#22385a'), emissiveIntensity: 1, opacity: .3, transparent: true, depthWrite: false });
+    const nada = {
+      mesh: fixo(new T.MeshBasicMaterial(), { visible: false }),
+      sprite: fixo(new T.SpriteMaterial(), { visible: false }),
+      points: fixo(new T.PointsMaterial(), { visible: false }),
+      line: fixo(new T.LineBasicMaterial(), { visible: false }),
+    };
+    const icone = guardar(new T.SpriteMaterial({ map: texFantasma(T), transparent: true, depthWrite: false, opacity: .85, toneMapped: false }));
+    return (this.mats = { fant, fantK, nada, icone });
+  },
+  aplicar(ap, o, liga) {
+    const T = ap.T, M = this.materiais(T), g = o.t.g, sombra = g.userData.momSombra;
+    const pular = x => x === o.nome || x === o.t.aro || x === o.t.base || (x.userData && (x.userData.disfOv || x.userData.disfInvIcone));
+    const andar = x => {
+      if (pular(x)) return;
+      if (x.isMesh || x.isSprite || x.isPoints || x.isLine) {
+        const u = x.userData;
+        if (liga) {
+          if (!('invMat0' in u)) { u.invMat0 = x.material; u.invSombra0 = x.castShadow; }
+          const alvo = x.isSprite ? M.nada.sprite : x.isPoints ? M.nada.points : x.isLine ? M.nada.line : x === sombra ? M.nada.mesh : x.isSkinnedMesh ? M.fantK : M.fant;
+          if (x.material !== alvo) x.material = alvo;
+          x.castShadow = false;
+        } else if ('invMat0' in u) { x.material = u.invMat0; x.castShadow = u.invSombra0; delete u.invMat0; delete u.invSombra0; }
+      }
+      for (let i = 0; i < x.children.length; i++) andar(x.children[i]);
+    };
+    andar(g);
+    // ícone discreto em cima da cabeça (um sprite por Filho invisível, material e textura compartilhados)
+    let ic = g.userData.disfInvIc;
+    if (liga && !ic) {
+      ic = new T.Sprite(M.icone); ic.userData.disfInvIcone = 1; ic.raycast = () => {}; ic.scale.set(.42, .42, 1);
+      const b = new T.Box3(); g.children.forEach(ch => { if (!pular(ch)) b.expandByObject(ch); });
+      const topo = b.isEmpty() ? 1.8 : Math.min(4, b.max.y - g.position.y);
+      ic.position.set(0, (topo > .2 ? topo : 1.8) + .35, 0); g.add(ic); g.userData.disfInvIc = ic;
+    } else if (!liga && ic) { g.remove(ic); delete g.userData.disfInvIc; }
   },
 };
 
@@ -1338,6 +1554,7 @@ const Vista = {
     estilo();
     this.ap = ap; const T = ap.T;
     this.grupo = new T.Group(); this.grupo.name = 'disfarce'; ap.cena.add(this.grupo);
+    try { Rev.aquecer(ap); } catch (e) {}
     this.tokAnt = new Map(); this.obAnt = new Map(); this.sumidos = []; this.crescer = []; this.cresc = new Map(); this.primeiro = true; this.sinalVisto = new Map(); this.realces = [];
     const d = ap.V.d;
     if (d) {
@@ -1368,6 +1585,7 @@ const Vista = {
     ['disfBarra', 'disfPop', 'disfCard', 'disfMira', 'disfMiraTxt', 'disfRep', 'disfRes', 'disfFlash'].forEach(id => { const x = $('#' + id); if (x) x.remove(); });
     document.removeEventListener('pointerdown', this.fora, true);
     REG.obj.clear(); REG.cob.forEach(e => this.tirarCob(e)); REG.cob.clear();
+    Invis.mats = null;
     Efx.vivas = [];
     // o quadro anterior guardava os tokens (malhas, animação): sem isso a cena inteira ficava presa depois de fechar
     this.tokAnt = new Map(); this.obAnt = new Map(); this.sumidos = []; this.crescer = []; this.cresc = new Map(); this.realces = [];
@@ -1402,11 +1620,17 @@ const Vista = {
     // Filho em Forma de Objeto: o Mestre e quem controla veem só o anel e o nome (o objeto fala por ele); o auxiliar que não
     // controla (e o teste "ocultarFo") vê só o objeto clonado, sem anel, sombra, nome ou seleção. Os jogadores nem recebem o token.
     if (gm) ap.tok.mapa.forEach((o, id) => {
-      const tk = tokens()[id]; const fo = !!(tk && tk.fo && !o.t.g.userData.disfSurgindo && !o.t.g.userData.disfSumindo);
+      const tk = tokens()[id]; const fo = !!(emObjeto(tk) && !o.t.g.userData.disfSurgindo && !o.t.g.userData.disfSumindo);
+      // invisível: Mestre e auxiliares veem o fantasma (troca de material só quando o estado muda ou chegam peças novas)
+      // (a troca V1 → V2 tira uma peça e põe outra: o número de filhos não muda, então confere também qual V2 está)
+      const iv = invisivel(tk) ? 1 : 0, nch = o.t.g.children.length, v2 = o.t.v2 || null;
+      if (o.disfIv !== iv || (iv && (o.disfIvN !== nch || o.disfIvV2 !== v2))) { Invis.aplicar(ap, o, !!iv); o.disfIv = iv; o.disfIvN = o.t.g.children.length; o.disfIvV2 = v2; }
       const limpo = fo && (this.ocultarFo || (souAux() && meuCtrl() !== id));
       // o perseg3d.js e o sala3d.js reacendem a base, a sombra e o nome a cada quadro: some pela escala
       [o.t.base, o.nome, o.t.g.userData.momSombra].forEach(x => { if (x) { const e = limpo ? .0001 : 1; if (x.userData.disfEsc0 === undefined) x.userData.disfEsc0 = x.scale.clone(); if (limpo) x.scale.setScalar(e); else if (x.userData.disfLimpo) x.scale.copy(x.userData.disfEsc0); x.userData.disfLimpo = limpo; } });
-      const ch0 = fo + ':' + limpo; if (o.disfFo !== ch0) { o.disfFo = ch0; o.t.g.children.forEach(ch => { if (ch !== o.t.base && ch !== o.nome && ch !== o.t.g.userData.momSombra && !ch.userData.disfOv) ch.visible = !fo; }); }
+      const ch0 = fo + ':' + limpo, mudou = o.disfFo !== ch0; o.disfFo = ch0;
+      // em Forma de Objeto, o que chegar depois (forma detalhada, silhueta do LOD) também fica escondido; ao sair, a silhueta só volta se o LOD estiver longe
+      if (mudou || fo) o.t.g.children.forEach(ch => { if (ch !== o.t.base && ch !== o.nome && ch !== o.t.g.userData.momSombra && !ch.userData.disfOv) { const v = !fo && (!ch.userData.silhueta || o.t.nivelLOD === 2); if (ch.visible !== v) ch.visible = v; } });
     });
     Ctrl.quadro(ap);
     Olhar.quadro(ap, dt);
@@ -1470,6 +1694,12 @@ const Vista = {
         e.t = alvo; e.ticks = decorarCobaia(ap.T, alvo, det, id + tk.cp);
         REG.cob.set(id, e);
       }
+      // peças que chegam depois (forma detalhada montada mais tarde, silhueta do LOD): também ficam por baixo da figura
+      if (e.ov && e.esc) o.t.g.children.forEach(ch => { if (ch !== e.ov.g && ch !== o.nome && ch !== o.t.g.userData.momSombra && ch.visible && !ch.userData.disfOv) { ch.visible = false; if (!e.esc.includes(ch)) e.esc.push(ch); } });
+      // a figura trocou para o modelo V2 (Alta): o detalhe errado é refeito nos ossos do corpo V2
+      if (e.t.v2 && e.v2 !== e.t.v2) {
+        e.v2 = e.t.v2; e.ticks = decorarCobaia(ap.T, e.t, det, id + tk.cp);
+      }
       const andando = !!(Vista.forcarAndar || o.andando > 0);
       if (e.ov) e.ov.anim(dt, tt, andando); else if (Vista.forcarAndar) o.t.anim(dt, tt, true);
       Olhar.atencao(ap, { get g() { return e.t.g; }, alt: .9, raio: .45, get at() { return e.at; }, set at(v) { e.at = v; } }, cx, dt);
@@ -1480,14 +1710,14 @@ const Vista = {
     REG.cob.forEach((e, id) => { if (!vistos.has(id)) { this.tirarCob(e); REG.cob.delete(id); } });
   },
   tirarCob(e) {
-    if (e.ov) { try { e.ov.g.parent && e.ov.g.parent.remove(e.ov.g); } catch (er) {} (e.esc || []).forEach(ch => { ch.visible = true; }); e.ov = null; }
+    if (e.ov) { try { e.ov.g.parent && e.ov.g.parent.remove(e.ov.g); } catch (er) {} (e.esc || []).forEach(ch => { ch.visible = ch.userData.silhueta ? !!(e.o && e.o.t && e.o.t.nivelLOD === 2) : true; }); e.ov = null; }
   },
 
   /* ---------- transformações vistas por todos (pela mudança no estado, sem caminho novo no Firebase) ---------- */
   correlacionar(ap) {
     const T = ap.T, t = performance.now(), gm = souGM();
     const atual = new Map();
-    ap.tok.mapa.forEach((o, id) => { const tk = tokens()[id]; if (!tk) return; atual.set(id, { o, g: o.t.g, x: o.x, z: o.z, filho: tipoDe(tk) === 'filho', fo: !!tk.fo, cp: tk.cp || '', apk: o.ap || '', ov: (REG.cob.get(id) || {}).ov || null }); });
+    ap.tok.mapa.forEach((o, id) => { const tk = tokens()[id]; if (!tk) return; atual.set(id, { o, g: o.t.g, x: o.x, z: o.z, filho: tipoDe(tk) === 'filho', fo: emObjeto(tk), cp: tk.cp || '', apk: o.ap || '', ov: (REG.cob.get(id) || {}).ov || null }); });
     const obs = new Map(); REG.obj.forEach((e, k) => { if (e.g.parent && e.g.parent !== this.grupo) obs.set(k, e); });
     if (this.primeiro) { this.primeiro = false; this.tokAnt = atual; this.obAnt = obs; return; }
     // tokens que sumiram neste quadro (para o jogador, o Filho que virou objeto some do mapa público)
@@ -1550,8 +1780,12 @@ const Vista = {
     const t = performance.now();
     this.cresc.forEach((c, id) => {
       const o = ap.tok.mapa.get(id); if (!o) { if (t - c.t0 > c.dur + 4000) this.cresc.delete(id); return; }
-      if (c.g !== o.t.g) { if (c.g && c.s0) c.g.scale.copy(c.s0); c.g = o.t.g; c.s0 = o.t.g.scale.clone(); }
-      const k = clamp((t - c.t0) / c.dur, 0, 1), e = Math.max(.05, suave(k)), st = 1 + Math.sin(k * Math.PI) * .25;
+      if (c.g !== o.t.g) {
+        if (c.g && c.s0) c.g.scale.copy(c.s0); c.g = o.t.g; c.s0 = o.t.g.scale.clone();
+        // Alta com a V2: a criatura aparece por partes (cachecol e mãos primeiro, a máscara por último), sem encolher
+        c.rev = Efx.revelar(c.g, 0, 1, c.dur / Efx.escala + 500, Math.max(0, c.t0 - t) / Efx.escala, o.t);
+      }
+      const k = clamp((t - c.t0) / c.dur, 0, 1), e = c.rev ? 1 : Math.max(.05, suave(k)), st = c.rev ? 1 : 1 + Math.sin(k * Math.PI) * .25;
       c.g.userData.disfSurgindo = k < 1 ? 1 : 0;
       c.g.scale.set(c.s0.x * e, c.s0.y * e * st, c.s0.z * e);
       if (k >= 1) { c.g.scale.copy(c.s0); delete c.g.userData.disfSurgindo; this.cresc.delete(id); }
@@ -1569,14 +1803,16 @@ const Vista = {
   },
   menu(add) {
     const f = filhoCtrl(); if (!f) return;
-    if (f.tk.fo || f.tk.cp) add('↩', 'Voltar à forma', () => quebrar(f.id, 'voltou'), 'desfaz o disfarce');
-    if (f.obj) add('🪑', f.tk.fo ? 'Trocar de objeto' : 'Virar um objeto', () => Ctrl.entrarMira(), 'modo Disfarce');
+    if (emObjeto(f.tk) || f.tk.cp) add('↩', 'Voltar à forma', () => quebrar(f.id, 'voltou'), 'desfaz o disfarce');
+    if (f.obj) add('🪑', emObjeto(f.tk) ? 'Trocar de objeto' : 'Virar um objeto', () => Ctrl.entrarMira(), 'modo Disfarce');
     if (f.cop) add('🧍', 'Virar uma cobaia', () => Ctrl.abrirPop('cobaia'), 'a cópia');
+    if (invisivel(f.tk)) add('👁', 'Voltar a ser visível', () => quebrar(f.id, 'visivel'), 'os jogadores voltam a ver');
+    else add('👻', 'Ficar invisível', () => ficarInvisivel(f.id), 'some para os jogadores');
   },
   // painel do token escolhido (Mestre): quebrar o disfarce de quem está disfarçado
   painelToken(id) {
     const tk = tokens()[id]; if (!tk || tipoDe(tk) !== 'filho' || !(tk.fo || tk.cp) || !souGM()) return '';
-    return `<p class="mini">🎭 Disfarçado: ${tk.fo ? 'objeto (' + esc(tk.fo) + ')' : 'cópia de ' + esc((SERd(tk.cp) || {}).nome || '')}</p><div class="s3d-op"><button type="button" data-disf-quebrar="${esc(id)}">💥 Revelar o disfarce</button></div>`;
+    return `<p class="mini">🎭 Disfarçado: ${invisivel(tk) ? 'invisível (os jogadores não veem)' : tk.fo ? 'objeto (' + esc(tk.fo) + ')' : 'cópia de ' + esc((SERd(tk.cp) || {}).nome || '')}</p><div class="s3d-op"><button type="button" data-disf-quebrar="${esc(id)}">💥 Revelar o disfarce</button></div>`;
   },
   ligarPainel(p, id) { const b = p.querySelector('[data-disf-quebrar]'); if (b) b.onclick = () => quebrar(b.dataset.disfQuebrar, 'revelado'); },
 };
@@ -1687,7 +1923,7 @@ window.ACF_DISFARCE = {
   // ganchos: filhos.js (usar, travaObjeto, aoReparar) e sala3d.js (modelo, assinatura)
   usar, travaObjeto, aoReparar, modelo, assinatura,
   // ações e dados (outras telas e testes)
-  virarObjeto, virarCobaia, quebrar, opc, PAD, DET_OBJ, DET_COB, sortearObj, sortearCob, nomeTipo, listaCopia, quemOlha,
+  virarObjeto, virarCobaia, quebrar, ficarInvisivel, invisivel, FO_INV, Invis, opc, PAD, DET_OBJ, DET_COB, sortearObj, sortearCob, nomeTipo, listaCopia, quemOlha,
   // para testes
   Vista, Ctrl, Olhar, Efx, REG, copiavel, decorarObjeto, decorarCobaia, montarModelo,
 };

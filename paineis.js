@@ -443,6 +443,8 @@
   }
   function tique() {
     if (!lancOn()) return;
+    // 3D aberto e o painel fora da gaveta do 3D: ninguém vê o lançador (redesenhar lia o layout à toa a cada 1,2 s)
+    if (body.classList.contains('s3d-aberta') && !painel.closest('#s3dGaveta:not([hidden])')) return;
     if (aberto) {
       // o bloco aberto sumiu (perfil, aba, fim de perseguição): volta à lista
       if (aberto.hidden || !painel.contains(aberto) || (aberto.classList.contains('fora-da-aba') && !painel.classList.contains('buscando') && !aberto.classList.contains('pn-atalho'))) { fechar(); return; }

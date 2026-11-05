@@ -271,12 +271,24 @@ const DEGRAUS = [
   { esc: .72, part: 1, fum: 1, cam: 'off', somb: 1, nome: 'resolução 72%, sem câmeras e sombras' },
   { esc: .6, part: 1, fum: 1, cam: 'off', somb: 1, luz: 1, nome: 'resolução 60%, menos luzes' },
 ];
+// Decisão (uma amostra por segundo, FPS medido numa janela de 2 s):
+// - carência: os quadros logo depois de a aba sumir e voltar, de a janela perder ou ganhar o foco, de abrir o 3D, de
+//   trocar de andar, de mudar o tamanho da janela e de trocar de degrau não contam (engasgos de passagem);
+// - desce um degrau só com queda sustentada (QUEDA segundos seguidos abaixo do limite baixo) e com a janela em foco
+//   (sem foco o navegador desenha menos quadros de propósito: Alt+Tab, outra janela por cima);
+// - sobe um degrau por vez com folga sustentada (SOBE segundos acima de 92% do teto, 55 FPS a 60; um segundo
+//   entre 80% e 92% só desconta dois, para a oscilação normal perto do teto não impedir a subida);
+// - histerese: o limite de descer (26 FPS) fica bem abaixo do de subir; se cair logo depois de subir, a espera para
+//   subir de novo dobra (até ESPERA_MAX) e volta ao normal depois de um minuto firme no degrau.
+const QUEDA = 5, SOBE = 10, ESPERA_MAX = 60;
 const Qual = {
-  ap: null, nivel: 0, aplicado: null, base: 1, quadros: [], seg: 0, baixo: 0, alto: 0, espera: 15, ultSubida: 0, ignorarAte: 0, t1: 0, luzes: [], sombra0: false,
+  ap: null, nivel: 0, aplicado: null, base: 1, quadros: [], seg: 0, baixo: 0, alto: 0, espera: SOBE, ultSubida: 0, ultTroca: 0, ignorarAte: 0, t1: 0, luzes: [], sombra0: false,
   ligado() { return opc('autoQual', true) !== false; },
+  // janela de carência: zera a medida e ignora os próximos ms
+  carencia(ms) { const t = performance.now(); this.ignorarAte = Math.max(this.ignorarAte, t + ms); this.quadros = []; this.baixo = 0; this.alto = 0; },
   iniciar(ap) {
-    this.ap = ap; this.base = ap.ren.getPixelRatio(); this.quadros = []; this.baixo = 0; this.alto = 0; this.espera = 15; this.ultSubida = 0; this.aplicado = null;
-    this.ignorarAte = performance.now() + 5000;
+    this.ap = ap; this.base = ap.ren.getPixelRatio(); this.quadros = []; this.baixo = 0; this.alto = 0; this.espera = SOBE; this.ultSubida = 0; this.ultTroca = agora(); this.aplicado = null;
+    this.ignorarAte = performance.now() + 5000; this.primeiro = true; this.andar = ap.a;
     this.luzes = ap.mundo.raiz.children.filter(o => o.isPointLight);
     this.sombra0 = !!ap.lanterna.castShadow;
     // começa no degrau em que o aparelho ficou da última vez (sobe sozinho se sobrar folga)
@@ -306,7 +318,7 @@ const Qual = {
     this.luzes.forEach((L, i) => { L.visible = i < lim; });
     if (ant !== null && n > ant && !ls.get('acf-imr-qaviso', false)) { ls.set('acf-imr-qaviso', true); avisar('⚙ Qualidade ajustada sozinha para ficar fluido (Opções › Gráficos).'); }
     ls.set('acf-imr-qual', { n, ts: agora() });
-    this.ignorarAte = performance.now() + 2500;
+    this.carencia(2500);
   },
   resolucao(esc) {
     const ap = this.ap, ren = ap.ren, quer = Math.max(.35, this.base * esc);
@@ -317,6 +329,8 @@ const Qual = {
   cam() { return this.ap && this.aplicado !== null ? DEGRAUS[this.aplicado].cam || '' : ''; },
   quadro(ap) {
     const t = performance.now();
+    // o 1º quadro (a abertura prepara a sala antes de desenhar) e a troca de andar também têm carência
+    if (this.primeiro || this.andar !== ap.a) { this.primeiro = false; this.andar = ap.a; this.carencia(4000); }
     if (DEGRAUS[this.nivel].part && M() && M().Vista && M().Vista.beam && !this.manual('poeira', true)) M().Vista.beam.pts.visible = false;
     // quadro muito longo (aba em segundo plano, materiais compilando): recomeça a medir
     const ult = this.quadros[this.quadros.length - 1];
@@ -330,18 +344,24 @@ const Qual = {
     if (this.aplicado !== null) this.resolucao(this.manual('escala', 1) ? 1 : DEGRAUS[this.aplicado].esc);
     if (!this.ligado()) { if (this.nivel) this.aplicar(0); this.baixo = this.alto = 0; return; }
     if (t < this.ignorarAte || document.hidden || this.quadros.length < 2) return;
+    // a janela de 2 s ainda tem quadros de antes da carência: espera encher de novo
+    if (this.quadros[0] < this.ignorarAte) return;
     const fps = (this.quadros.length - 1) * 1000 / (this.quadros[this.quadros.length - 1] - this.quadros[0]);
     this.fps = fps;
     const teto = num(ap.CFG.fps, 0) > 0 ? num(ap.CFG.fps) : 60;
-    const baixo = fps < Math.min(26, teto * .8), alto = fps >= teto * .92;
+    const foco = typeof document.hasFocus !== 'function' || document.hasFocus();
+    const baixo = foco && fps < Math.min(26, teto * .8), alto = fps >= teto * .92;
     this.baixo = baixo ? this.baixo + 1 : 0;
-    this.alto = alto ? this.alto + 1 : 0;
-    if (this.baixo >= 4 && this.nivel < DEGRAUS.length - 1) {
-      // caiu logo depois de subir: espera o dobro para tentar subir de novo
-      if (agora() - this.ultSubida < 40000) this.espera = Math.min(240, this.espera * 2);
-      this.baixo = 0; this.alto = 0; this.aplicar(this.nivel + 1);
+    // folga: um segundo um pouco abaixo (oscilação normal perto do teto) só desconta; queda de verdade zera
+    this.alto = alto ? this.alto + 1 : fps >= teto * .8 ? Math.max(0, this.alto - 2) : 0;
+    // um minuto firme no degrau depois de subir: a espera para subir volta ao normal
+    if (this.espera > SOBE && agora() - this.ultTroca > 60000) this.espera = SOBE;
+    if (this.baixo >= QUEDA && this.nivel < DEGRAUS.length - 1) {
+      // caiu logo depois de subir: espera o dobro para tentar subir de novo (sem ficar oscilando)
+      if (agora() - this.ultSubida < 30000) this.espera = Math.min(ESPERA_MAX, this.espera * 2);
+      this.baixo = 0; this.alto = 0; this.ultTroca = agora(); this.aplicar(this.nivel + 1);
     } else if (this.alto >= this.espera && this.nivel > 0) {
-      this.alto = 0; this.baixo = 0; this.ultSubida = agora(); this.aplicar(this.nivel - 1);
+      this.alto = 0; this.baixo = 0; this.ultSubida = this.ultTroca = agora(); this.aplicar(this.nivel - 1);
     }
   },
   desc() { return this.aplicado === null ? 'abra o 3D' : `degrau ${this.aplicado} de ${DEGRAUS.length - 1} (${DEGRAUS[this.aplicado].nome})${this.fps ? ` · ${Math.round(this.fps)} quadros/s` : ''}`; },
@@ -1063,6 +1083,10 @@ function ganchosMomento() {
 function iniciar() {
   if (!window.ACF || !window.ACF._int) { setTimeout(iniciar, 300); return; }
   Vib.instalar();
+  // qualidade automática: engasgos de passagem (aba sumiu e voltou, Alt+Tab, janela redimensionada) não contam
+  document.addEventListener('visibilitychange', () => Qual.carencia(3000));
+  addEventListener('blur', () => Qual.carencia(2500)); addEventListener('focus', () => Qual.carencia(2500));
+  addEventListener('resize', () => Qual.carencia(2000));
   let tentativas = 0; (function g() { if (!ganchosMomento() && ++tentativas < 40) setTimeout(g, 300); })();
   setInterval(() => { try { Cor.vigiar(); Cor.tick(); } catch (e) { console.warn('imersão:', e); } }, 120);
   setInterval(() => {

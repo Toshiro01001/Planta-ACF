@@ -33,6 +33,13 @@
   ]).then(r => { if (r.includes(false)) extrasP = null; }));
   const ACF = () => window.ACF;
   const NS = () => window.ACF3D;
+  // Mapa V2 ligado? pela API de qualidade do infra (desempenho.js: Alta = V2) ou, sem ela, pelo seletor guardado
+  const mapaV2Ligado = () => {
+    try { const Q = window.ACF_QUALIDADE; if (Q && typeof Q.v2 === 'function') return !!Q.v2(); } catch (e) {}
+    const cel = Math.min(innerWidth, innerHeight) < 700 || matchMedia('(pointer: coarse)').matches;
+    let v = null; try { v = JSON.parse(localStorage.getItem('acf-s3d-qualidade')); } catch (e) { v = null; }
+    return (v === 'alta' || v === 'baixa' ? v : (cel ? 'baixa' : 'alta')) === 'alta';
+  };
   // extensões da vista (momento.js): iniciar(api), quadro(dt, t), perto(x, z), fechar()
   const EXT = () => ((window.ACF3D || {}).vista) || [];
   // objeto de cena "campo_infinito": a figura flutuante (triângulo invertido) com o campo em volta.
@@ -116,7 +123,9 @@
      "cfgEfetivo": com o modo ligado, as chaves abaixo valem o valor leve, sem mexer no que a pessoa escolheu. ----- */
   const LEVE = { cameras: false, sombras: false, brilho: false, aberr: false, poeira: false, fumaca: false, ambiente: false, visaoMeia: true, particulas: false, desempenhoAtivo: true };
   let degrauQual = 0;   // degrau da qualidade automática (imersao.js avisa)
-  const desempenhoAtivo = () => CFG.desempenho === true || (CFG.desempenho === 'auto' && degrauQual >= 3);
+  // a qualidade Leve (desempenho.js: Opções › Gráficos › Qualidade) também liga o Modo Desempenho automático
+  const qualLeve = () => { try { return !!(window.ACF_QUALIDADE && ACF_QUALIDADE.leve()); } catch (e) { return false; } };
+  const desempenhoAtivo = () => CFG.desempenho === true || (CFG.desempenho === 'auto' && (degrauQual >= 3 || qualLeve()));
   const cfgEfetivo = new Proxy(CFG, {
     get(t, k) { if (desempenhoAtivo() && k in LEVE) return LEVE[k]; return t[k]; },
     set(t, k, v) { t[k] = v; return true; },
@@ -880,9 +889,12 @@
         const l2 = criarLote(T, ctx.descartes); parede(l2, mPar, mRod, eixoX, fixo, de, ate, vao, sinal); s.casca.push(...l2.montar(g));
         s.paredes[lado] = g;
       });
-      const lt3 = criarLote(T, ctx.descartes);
-      lt3.plano(F.m(teto.c || tema.sala.teto, { tex: teto.tex || 'concreto', rep: [2 * KR, 2 * KR] }), s.x1 - s.x0, s.z1 - s.z0, s.cx, ALT, s.cz, Math.PI / 2);
+      const lt3 = criarLote(T, ctx.descartes), mTeto = F.m(teto.c || tema.sala.teto, { tex: teto.tex || 'concreto', rep: [2 * KR, 2 * KR] });
+      lt3.plano(mTeto, s.x1 - s.x0, s.z1 - s.z0, s.cx, ALT, s.cz, Math.PI / 2);
       s.casca.push(...lt3.montar(tetos));
+      // Mapa V2 (mapa_v2.js, qualidade Alta): troca só a pele destes materiais; a casca refeita volta a ser remendada
+      s.mats = { piso: mPiso, parede: mPar, teto: mTeto };
+      if (ctx.v2casca) ctx.v2casca(s);
     }
     Object.values(S).forEach(s => {
       casca(s);
@@ -933,6 +945,7 @@
     const ltC = criarLote(T, ctx.descartes), ltCT = criarLote(T, ctx.descartes);
     const virtCorr = [];      // luzes virtuais dos corredores
     const paineisTeto = [];   // lâmpadas do forro: fundidas numa malha por material
+    const paineisInfo = [];   // (para o Mapa V2: onde fica cada lâmpada e se morreu)
     const decalques = new T.Group(); raiz.add(decalques);
     const cpos = (q, ao, lin, y) => q.h ? new T.Vector3(ao, y, lin) : new T.Vector3(lin, y, ao);
     CS.forEach((c, k) => {
@@ -954,7 +967,7 @@
         const morta = sorte < tema.mortas, pisca = !morta && sorte < tema.mortas + tema.pisca;
         const mat = morta ? mPainelMorto : pisca ? mPainelPisca : mPainel;
         const pp = cpos(q, ao, q.linha, CORR_H - .012);
-        const pm = new T.Mesh(F.guardar(new T.PlaneGeometry(.55, .55)), mat); pm.rotation.x = Math.PI / 2; pm.position.copy(pp); raiz.add(pm); paineisTeto.push(pm);
+        const pm = new T.Mesh(F.guardar(new T.PlaneGeometry(.55, .55)), mat); pm.rotation.x = Math.PI / 2; pm.position.copy(pp); raiz.add(pm); paineisTeto.push(pm); paineisInfo.push({ ci: c.ci, p: pp.clone(), morta });
         if (!morta) { const l = new T.PointLight(tema.luz, .85, 5.2, 2); virtCorr.push({ l, p: cpos(q, ao, q.linha, CORR_H - .3), base: .85, pisca, f: rr() * 9, corr: true }); }
       }
       // sangue (mais nos andares de baixo)
@@ -1464,6 +1477,8 @@
     setTimeout(() => { try { sincExpo(); } catch (e) {} }, 0);
     return {
       a, S, CS, portas, interativos, carregadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
+      // o que o Mapa V2 (mapa_v2.js) precisa para trocar a aparência sem mexer em posição nem colisão
+      v2: { S, CS, corr3D, CORR_W, CORR_H, ALT, ESP, raiz, tetos, portas, paineis: paineisInfo, corr: { parede: mParC, chao: mChaoC, teto: mTetoC } },
       livre3D, area3D, atualizarPortas, atualizarParedes, recarregar, recarregarCena, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
@@ -2310,13 +2325,15 @@
     prepararMapa();
     const palco = $('.s3d-palco', d);
     const celular = Math.min(innerWidth, innerHeight) < 700 || ehToque();
-    const alta = lsG('acf-s3d-qualidade', celular ? 'baixa' : 'alta') === 'alta';
+    // qualidade (desempenho.js): Automático, Leve ou Alta; decide sombras, o teto do pixel ratio e os modelos V2
+    const Qp = window.ACF_QUALIDADE ? ACF_QUALIDADE.perfil(celular) : null;
+    const alta = Qp ? Qp.alta : lsG('acf-s3d-qualidade', celular ? 'baixa' : 'alta') === 'alta';
     registrarDescarte(T);
     // níveis de longe das formas (filhos3d.js): calculados depois, em fatias, enquanto este 3D estiver aberto
     if (NS().lodSessao) { NS().lodSessao(); NS().lodAdiar = true; }
     const ren = new T.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     ren.setPixelRatio(1);
-    const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x
+    const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, Qp ? Qp.prMax : alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x (Leve: 1)
     const sombras = (CFG.sombras === 'auto' ? alta : !!CFG.sombras) && !desempenhoAtivo();
     ren.outputEncoding = T.sRGBEncoding; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.25;
     ren.shadowMap.enabled = sombras; ren.shadowMap.type = T.PCFSoftShadowMap;
@@ -2381,6 +2398,9 @@
       teclas: new Set(), correr: false, joy: null, quem, ctrl: ctrlJog, ctrlMestre: op.manter ? op.manter.ctrl : null, autoAlvo: null, pos, envRT, alta, celular,
       sig: assinatura(a), escondido: null, ultMov: 0, movendo: false, ultToast: 0, sombras0: CFG.sombras === 'auto' ? alta : !!CFG.sombras };
     if (op.ctrl && ctrlJog === op.ctrl) V.ctrlMestre = op.ctrl;
+    ctx.camera = cam;
+    // Mapa V2 (kit de terror do Blender): só na qualidade Alta; o arquivo e o kit baixam aqui, na primeira vez
+    if (mapaV2Ligado()) { const ligar = () => { if (V && V.mundo === mundo && NS().mapaV2) NS().mapaV2.montar(ctx, mundo); }; if (NS().mapaV2) setTimeout(ligar, 0); else baixar('mapa_v2.js').then(ligar); }
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
     pintarBarra();
 
@@ -2722,7 +2742,7 @@
     // extensões (momento.js): recebem as peças da vista
     ctx.extraSalas = new Set();
     V.api = { T, A, a, cena: cenaT, camera: cam, ren, est, mundo, tok, pos, lanterna, celular, alta, CFG: cfgEfetivo, ALT, SALA_M, ctx, Som, poeira,
-      leve: desempenhoAtivo, degrau(n) { const antes = desempenhoAtivo(); degrauQual = n | 0; if (antes !== desempenhoAtivo()) aplicarDesempenho(); },
+      leve: desempenhoAtivo, aplicarDesempenho, degrau(n) { const antes = desempenhoAtivo(); degrauQual = n | 0; if (antes !== desempenhoAtivo()) aplicarDesempenho(); },
       get V() { return V; }, toast, primeiraP, imersivo, extraSalas: ctx.extraSalas, descartes,
       planta3D: (x, y) => planta3D(a, x, y), plantaDe3D: (x, z) => plantaDe3D(a, x, z), salaNoPonto3D: (x, z) => salaNoPonto3D(a, x, z),
       fabrica: () => { const F = NS().criarFabrica(T, [], [], descartes, { alt: ALT }); F.T = T; return F; },
@@ -2780,21 +2800,24 @@
     else if (q === 'mestre') { const id = V.ctrl || V.sel; if (id) { r = A.ruidoDe(id); rot = 'Sala do token'; } else { r = A.ruidoPior(); rot = r ? r.onde : ''; } }
     else if (q === 'aux' && A.aux) { r = A.ruidoDe(A.aux); rot = 'Sala do seu robô'; }
     const db = $('#s3dDb');
+    // (4 vezes por segundo: só escreve no DOM o que mudou; reescrever o HTML igual refazia o layout do HUD toda vez)
     if (r) {
       let barras = ''; for (let i = 5; i >= 1; i--) barras += `<i class="${i <= r.n ? 'on n' + i : ''}"></i>`;
-      db.innerHTML = `<b>DECIBELÍMETRO</b><div class="s3d-db-col">${barras}</div><span>${esc(r.nome)}${r.db ? ` · ${r.db} dB` : ''}</span><small>${esc(rot)}</small>`;
-      db.hidden = false; db.classList.toggle('alerta', r.n >= 4);
-    } else db.hidden = true;
+      const h = `<b>DECIBELÍMETRO</b><div class="s3d-db-col">${barras}</div><span>${esc(r.nome)}${r.db ? ` · ${r.db} dB` : ''}</span><small>${esc(rot)}</small>`;
+      if (db.__h !== h) { db.innerHTML = h; db.__h = h; }
+      if (db.hidden) db.hidden = false; db.classList.toggle('alerta', r.n >= 4);
+    } else if (!db.hidden) db.hidden = true;
     $('#s3dProt').hidden = !A.protocolo;
     // metros andados pelo seu token (mapa 2D e 3D), contados neste aparelho
     const mt = $('#s3dMetros');
-    if (q !== 'mestre' && A.metros && (A.meu || A.aux)) { mt.style.top = db.hidden ? '' : (db.offsetTop + db.offsetHeight + 6) + 'px'; $('span', mt).textContent = `🚶 ${A.fmtM(A.metros())} m`; mt.title = 'Metros que o seu token andou (mapa 2D e 3D, contados neste aparelho)'; mt.hidden = false; } else mt.hidden = true;
+    if (q !== 'mestre' && A.metros && (A.meu || A.aux)) { const tp = db.hidden ? '' : (db.offsetTop + db.offsetHeight + 6) + 'px'; if (mt.style.top !== tp) mt.style.top = tp; const tx = `🚶 ${A.fmtM(A.metros())} m`, sp = $('span', mt); if (sp.textContent !== tx) sp.textContent = tx; mt.title = 'Metros que o seu token andou (mapa 2D e 3D, contados neste aparelho)'; mt.hidden = false; } else mt.hidden = true;
     const pg = $('#s3dPersg'), estP = (A.estado || {}).persg;
     if (estP && estP.on) {
       const vez = A.vez, tkv = vez && ((A.estado || {}).tokens || {})[vez];
       const minha = V.ctrl && vez === V.ctrl, part = V.ctrl && A.participa(V.ctrl);
       const tkc = V.ctrl && ((A.estado || {}).tokens || {})[V.ctrl], lim = V.ctrl ? A.limiteDe(V.ctrl) : null;
-      pg.innerHTML = `PERSEGUIÇÃO · Vez de ${esc(tkv ? (A.visivelPara(tkv) ? A.rotulo(tkv) : '???') : '—')}${part ? (minha ? ` · <b>Sua vez: ${fmtM((tkc && tkc.m) || 0)} / ${lim || '?'} m</b>` : ' · aguarde a sua vez') : ''}`;
+      const hp = `PERSEGUIÇÃO · Vez de ${esc(tkv ? (A.visivelPara(tkv) ? A.rotulo(tkv) : '???') : '—')}${part ? (minha ? ` · <b>Sua vez: ${fmtM((tkc && tkc.m) || 0)} / ${lim || '?'} m</b>` : ' · aguarde a sua vez') : ''}`;
+      if (pg.__h !== hp) { pg.innerHTML = hp; pg.__h = hp; }
       pg.hidden = false; pg.classList.toggle('minha', !!minha);
     } else pg.hidden = true;
   }
@@ -3175,7 +3198,7 @@
   let abaOp = 'graficos';
   function desenharOpcoes() {
     const o = $('#s3dOpcoes'); if (!o) return;
-    const alta = lsG('acf-s3d-qualidade', V && V.celular ? 'baixa' : 'alta') === 'alta';
+    const QD = window.ACF_QUALIDADE, qEsc = QD ? QD.escolha() : lsG('acf-s3d-qualidade', V && V.celular ? 'baixa' : 'alta');
     const sel = (k, ops, rot) => `<label class="s3d-lin"><span>${rot}</span><select data-cfg="${k}">${ops.map(([v, t]) => `<option value="${esc(String(v))}" ${String(CFG[k]) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
     const chave = (k, rot) => `<label class="chave"><input type="checkbox" data-cfgb="${k}" ${CFG[k] ? 'checked' : ''}><span>${rot}</span></label>`;
     const faixa = (k, min, max, passo, rot, fmt) => `<label class="s3d-lin s3d-faixa"><span>${rot} <output>${fmt(CFG[k])}</output></span><input type="range" data-cfgr="${k}" min="${min}" max="${max}" step="${passo}" value="${CFG[k]}"></label>`;
@@ -3185,7 +3208,7 @@
       <nav class="s3d-op-abas">${[['graficos', 'Gráficos'], ['camera', 'Câmera e mouse'], ['controles', 'Controles'], ['audio', 'Áudio e chat']].map(([k, t]) => `<button type="button" data-aba-op="${k}" class="${abaOp === k ? 'on' : ''}">${t}</button>`).join('')}</nav>`;
     if (abaOp === 'graficos') {
       h += `<section><p class="mini">Abaixe o que pesar no seu aparelho. As marcadas com ↻ reabrem o 3D na hora.</p>
-        <label class="s3d-lin"><span>Predefinição ↻</span><select data-qual><option value="alta" ${alta ? 'selected' : ''}>Alta (computador)</option><option value="baixa" ${!alta ? 'selected' : ''}>Leve (celular, máquina fraca)</option></select></label>
+        <label class="s3d-lin"><span>Qualidade ↻</span><select data-qual>${(QD ? [['auto', 'Automático']] : []).concat([['alta', 'Alta (modelos V2)'], ['baixa', 'Leve (simples, menos efeitos)']]).map(([v, t]) => `<option value="${v}" ${qEsc === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         ${faixa('escala', .5, 1.5, .05, 'Escala de resolução ↻', pct)}
         ${sel('sombras', auto, 'Sombras da lanterna ↻')}
         ${sel('brilho', auto, 'Brilho das luzes (bloom)')}
@@ -3238,7 +3261,7 @@
     };
     $('[data-op-x]', o).onclick = () => { o.hidden = true; };
     o.querySelectorAll('[data-aba-op]').forEach(b => b.onclick = () => { abaOp = b.dataset.abaOp; desenharOpcoes(); });
-    const q = $('[data-qual]', o); if (q) q.onchange = () => { lsS('acf-s3d-qualidade', q.value); reabrir(); };
+    const q = $('[data-qual]', o); if (q) q.onchange = () => { if (window.ACF_QUALIDADE) ACF_QUALIDADE.definir(q.value); else lsS('acf-s3d-qualidade', q.value); reabrir(); };
     o.querySelectorAll('[data-cfg]').forEach(x => x.onchange = () => { const k = x.dataset.cfg, v = x.value; CFG[k] = v === 'auto' ? 'auto' : v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; depois(k); });
     o.querySelectorAll('[data-cfgb]').forEach(x => x.onchange = () => { CFG[x.dataset.cfgb] = x.checked; depois(x.dataset.cfgb); });
     o.querySelectorAll('[data-cfgr]').forEach(x => {
@@ -3395,6 +3418,7 @@
       removeEventListener('resize', V.tamanho);
       if (V.movendo && V.ctrl) { try { const q = plantaDe3D(V.a, V.cam.px, V.cam.pz); ACF().moverToken3D(V.ctrl, q.x, q.y, true); } catch (e) {} }
       try { V.tok.descartar(); } catch (e) {}
+      try { if (NS().mapaV2) NS().mapaV2.desmontar(V.mundo); } catch (e) {}
       try { V.mundo.descartar(); } catch (e) {}
       try { V.pos.descartar(); } catch (e) {}
       try { V.envRT.dispose(); } catch (e) {}

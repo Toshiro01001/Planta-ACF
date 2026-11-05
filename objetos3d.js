@@ -8,18 +8,63 @@
   function rng(seed) { let a = (seed * 2654435761) >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
 
+  /* ---------- telas das texturas geradas: guardadas para o site inteiro (com teto de memória) ----------
+     Desenhar uma textura de 512 px são dezenas de milhares de retângulos; cada sala montava as suas de novo. Agora cada
+     desenho é feito uma vez por aparelho e reaproveitado. Com NS.texAdiar ligado (o 3D abrindo), as telas novas saem na
+     cor de base e são desenhadas em fatias de tempo ocioso; quando ficam prontas, as texturas que as usam sobem de novo. */
+  const Telas = {
+    mapa: new Map(), pix: 0, fila: [], agendado: false,
+    TETO: Math.min(innerWidth, innerHeight) < 700 ? 6e6 : 12e6,
+    pegar(chave, tam, cor, desenhar) {
+      let e = this.mapa.get(chave);
+      if (e) { this.mapa.delete(chave); this.mapa.set(chave, e); return e; }
+      const [c, x] = tela(tam, tam); x.fillStyle = cor; x.fillRect(0, 0, tam, tam);
+      e = { c, x, pronto: false, texs: new Set(), desenhar, tam };
+      this.mapa.set(chave, e); this.pix += tam * tam;
+      if ((window.ACF3D || {}).texAdiar) { this.fila.push(e); this.agendar(); }
+      else this.desenhar(e);
+      // teto: as telas mais antigas saem do guardado (as texturas que já usam continuam com elas)
+      while (this.pix > this.TETO && this.mapa.size > 1) { const [k0, v0] = this.mapa.entries().next().value; if (!v0.pronto) break; this.mapa.delete(k0); this.pix -= v0.tam * v0.tam; }
+      return e;
+    },
+    desenhar(e) {
+      if (e.pronto) return;
+      try { e.desenhar(e.x); } catch (er) { console.warn('3D textura:', er); }
+      e.pronto = true; e.texs.forEach(t => { t.needsUpdate = true; }); e.texs.clear();
+    },
+    agendar() {
+      if (this.agendado || !this.fila.length) return; this.agendado = true;
+      const f = dl => {
+        this.agendado = false; const t0 = performance.now();
+        do { const e = this.fila.shift(); if (e) this.desenhar(e); } while (this.fila.length && (dl && dl.timeRemaining ? dl.timeRemaining() > 4 && performance.now() - t0 < 10 : performance.now() - t0 < 8));
+        this.agendar();
+      };
+      if (window.requestIdleCallback) requestIdleCallback(f, { timeout: 200 }); else setTimeout(() => f(null), 20);
+    },
+    // desenha já o que estiver na fila (antes de mostrar a sala de quem abriu)
+    tudo() { while (this.fila.length) this.desenhar(this.fila.shift()); },
+    get pendentes() { return this.fila.length; },
+  };
   function criarFabrica(T, anim, luzes, descartes, op = {}) {
     const ALT = op.alt || 3.0;
     const cacheM = new Map(), cacheT = new Map();
     const guardar = x => { descartes.push(x); return x; };
     const texCanvas = (c, rep) => { const t = guardar(new T.CanvasTexture(c)); t.encoding = T.sRGBEncoding; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rep[0], rep[1]); } return t; };
+    // textura de superfície desenhada numa tela guardada para o site inteiro (outra sala, o 3D reaberto, outro andar
+    // usam a mesma tela sem redesenhar); com o adiamento ligado (sala3d.js), sai na cor de base e o desenho vem depois
+    const texTela = (chave, tam, cor, rep, desenhar) => {
+      const e = Telas.pegar(chave, tam, cor, desenhar);
+      const t = texCanvas(e.c, rep || [1, 1]);
+      if (!e.pronto) e.texs.add(t);
+      return t;
+    };
 
     // texturas de superfície geradas na hora (nada de imagem externa)
     function texturaBase(tipo, cor, rep) {
       const k = tipo + cor + (rep || '');
       if (cacheT.has(k)) return cacheT.get(k);
-      const [c, x] = tela(256, 256), r = rng(tipo.length * 31 + cor.length);
-      x.fillStyle = cor; x.fillRect(0, 0, 256, 256);
+      const t = texTela('b' + tipo + '|' + cor, 256, cor, rep, x => {
+      const r = rng(tipo.length * 31 + cor.length);
       const ruido = (n, a, tam) => { for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '255,255,255'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
       if (tipo === 'azulejo' || tipo === 'xadrez' || tipo === 'xadrez_pb') {
         if (tipo === 'xadrez') { x.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2) x.fillRect(i * 64, j * 64, 64, 64); }
@@ -39,7 +84,7 @@
         x.fillStyle = 'rgba(0,0,0,.45)'; for (let i = 0; i <= 256; i += 64) for (let j = 32; j <= 256; j += 64) { x.beginPath(); x.arc(i, j, 4, 0, 7); x.fill(); x.beginPath(); x.arc(i + 32, j - 32, 4, 0, 7); x.fill(); }
       } else if (tipo === 'espuma') { x.fillStyle = 'rgba(0,0,0,.4)'; for (let i = 0; i < 256; i += 32) for (let j = 0; j < 256; j += 32) { x.beginPath(); x.moveTo(i, j + 32); x.lineTo(i + 16, j); x.lineTo(i + 32, j + 32); x.fill(); } }
       else ruido(1200, .04, 2);
-      const t = texCanvas(c, rep || [1, 1]);
+      });
       cacheT.set(k, t); return t;
     }
 
@@ -54,6 +99,7 @@
       if (o.mapa) p.map = o.mapa;
       if (o.lado === 2) p.side = T.DoubleSide;
       const mat = guardar(new T.MeshStandardMaterial(p));
+      if (o.tex) mat.userData.tex = o.tex;   // (a superfície pedida: o Mapa V2 troca a pele por ela)
       if (!o.unico) cacheM.set(k, mat);
       return mat;
     }
@@ -483,16 +529,15 @@
       if (EXTRA[tipo]) {
         const k = 'x' + tipo + cor + (rep || '');
         if (cacheT.has(k)) return cacheT.get(k);
-        const [c, x] = tela(512, 512); x.fillStyle = cor; x.fillRect(0, 0, 512, 512);
-        EXTRA[tipo](x, 512, rng(tipo.length * 97 + cor.length * 13), cor);
-        const t = texCanvas(c, rep || [1, 1]); cacheT.set(k, t); return t;
+        const t = texTela('x' + tipo + '|' + cor, 512, cor, rep, x => EXTRA[tipo](x, 512, rng(tipo.length * 97 + cor.length * 13), cor));
+        cacheT.set(k, t); return t;
       }
       const NOVAS = ['papel_parede', 'carpete_umido', 'forro', 'marmore', 'areia', 'grama', 'carne', 'osso', 'tijolo', 'estrelas', 'nomes', 'veludo', 'terra', 'agua', 'vagao', 'ceu_noite', 'ceu_nublado', 'ceu_branco', 'asfalto'];
       if (!NOVAS.includes(tipo)) return texturaBase(tipo, cor, rep);
       const k = tipo + cor + (rep || '');
       if (cacheT.has(k)) return cacheT.get(k);
-      const [c, x] = tela(256, 256), r = rng(tipo.length * 53 + cor.length * 7);
-      x.fillStyle = cor; x.fillRect(0, 0, 256, 256);
+      const t = texTela('n' + tipo + '|' + cor, 256, cor, rep, x => {
+      const r = rng(tipo.length * 53 + cor.length * 7);
       const ruido = (n, a, tam, claro) => { for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${claro === undefined ? (r() < .5 ? '0,0,0' : '255,255,255') : claro ? '255,255,255' : '0,0,0'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
       const blob = (n, rgba, rmin, rmax) => { for (let i = 0; i < n; i++) { x.fillStyle = rgba; x.beginPath(); x.ellipse(r() * 256, r() * 256, rmin + r() * (rmax - rmin), rmin + r() * (rmax - rmin) * .7, r() * 3, 0, 7); x.fill(); } };
       if (tipo === 'papel_parede') {
@@ -540,7 +585,7 @@
       else if (tipo === 'ceu_branco') { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 256, 256); blob(10, 'rgba(255,250,230,.4)', 30, 80); }
       else if (tipo === 'asfalto') { ruido(12000, .16, 1); x.fillStyle = 'rgba(240,240,220,.6)'; x.fillRect(120, 0, 16, 90); x.fillRect(120, 160, 16, 96); }
       else if (tipo === 'vagao') { ruido(1500, .04, 2); x.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 256; i += 64) x.fillRect(i, 0, 3, 256); }
-      const t = texCanvas(c, rep || [1, 1]);
+      });
       cacheT.set(k, t); return t;
     }
 
@@ -1203,5 +1248,5 @@
     if (alt && typeof it.h === 'number' && it.h >= 2.8) o.h = +(it.h + alt - 3).toFixed(2);
     return o;
   }
-  window.ACF3D = Object.assign(window.ACF3D || {}, { criarFabrica, rng, tela, caixasColisao, ajustarItem });
+  window.ACF3D = Object.assign(window.ACF3D || {}, { criarFabrica, rng, tela, caixasColisao, ajustarItem, telas: Telas });
 })();

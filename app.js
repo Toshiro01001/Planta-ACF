@@ -3947,7 +3947,9 @@ $('#telaProtocolo').addEventListener('click', e => { e.currentTarget.hidden = tr
   document.addEventListener('scroll', ev => { const e = ev.target; if (e && e.matches && e.matches(SEL)) marcar(e); }, { capture: true, passive: true });
   // as setas mudam quando o conteúdo ou o tamanho muda: varredura depois de cada redesenho (uma por quadro),
   // no redimensionamento e, por garantia, a cada 3 s com a aba visível (era a cada 700 ms, sempre)
-  const varrer = () => $$(SEL).forEach(e => { if (e.offsetParent) marcar(e); });
+  // (com o 3D aberto as barras ficam por baixo dele: ler o layout do 2D a cada redesenho só custava; ao fechar, a
+  // varredura volta no próximo redesenho ou em até 3 s)
+  const varrer = () => { if (document.body.classList.contains('s3d-aberta')) return; $$(SEL).forEach(e => { if (e.offsetParent) marcar(e); }); };
   let agV = false;
   const agendarVarrer = () => { if (agV) return; agV = true; requestAnimationFrame(() => { agV = false; varrer(); }); };
   // só tokens andaram: as barras de abas não mudaram (a varredura lê o layout, cara num palco grande)
