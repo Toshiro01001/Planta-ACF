@@ -142,7 +142,10 @@
       if (this.escolha() !== 'auto' || !this.ap || document.hidden) { this.baixo = this.alto = 0; return; }
       const foco = typeof document.hasFocus !== 'function' || document.hasFocus();
       if (this.efetiva() === 'alta') {
-        this.baixo = foco && fps < QD_FPS_BAIXO ? this.baixo + 1 : 0;
+        // fps de 1 a 3: é o navegador segurando os quadros (janela coberta, tela bloqueada, aba sem foco real), não peso
+        // do jogo; não conta para a queda
+        const segurado = fps <= 3;
+        this.baixo = foco && !segurado && fps < QD_FPS_BAIXO ? this.baixo + 1 : (segurado ? this.baixo : 0);
         if (this.baixo >= QD_QUEDA) {
           this.baixo = 0; ls.set(QA, { n: 'leve', ts: Date.now() });
           // troca já: os modelos V2 voltam para a V1 e o Modo Desempenho liga
