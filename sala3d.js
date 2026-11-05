@@ -658,6 +658,25 @@
     const ensaio = new T.Scene(), camE = new T.PerspectiveCamera();
     const SLOTS = ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'bumpMap', 'aoMap', 'lightMap', 'displacementMap', 'specularMap'];
     let sigLuz = '', agendado = 0, vivo = true, total = 0, prontos = 0, luzes = [];
+    /* compilação em segundo plano (KHR_parallel_shader_compile): no Windows (Direct3D), cada shader novo leva
+       centenas de milissegundos para compilar e, perguntado na hora, trava a página inteira. Aqui o pedido de
+       compilação sai e a página segue; a pergunta ao programa ainda em compilação vira uma exceção (o three guarda o
+       programa e refaz o resto quando ele estiver pronto). Sem a extensão (ou com a conferência de erros ligada),
+       tudo segue como antes. */
+    const gl = ren.getContext(), KHR = gl.getExtension('KHR_parallel_shader_compile');
+    const PRONTO = KHR ? KHR.COMPLETION_STATUS_KHR : 0, NAO_PRONTO = { naoPronto: true }, espera = [];
+    const MAX_ESPERA = 6;   // compilações ao mesmo tempo na placa
+    let esperando = false, ligados = null;
+    if (KHR) {
+      const gpp = gl.getProgramParameter.bind(gl), lnk = gl.linkProgram.bind(gl);
+      gl.getProgramParameter = function (p, n) { if (esperando && n !== PRONTO && !gpp(p, PRONTO)) throw NAO_PRONTO; return gpp(p, n); };
+      gl.linkProgram = function (p) { if (ligados) ligados.push(p); return lnk(p); };
+    }
+    const assinc = () => !!KHR && !ren.debug.checkShaderErrors;
+    const prontoNaPlaca = j => !j.progs || j.progs.every(p => { try { return gl.getProgramParameter(p, PRONTO); } catch (e) { return true; } });
+    // ensaio desenhado: o Direct3D ainda termina parte do shader no 1º desenho (com o formato da tela de verdade);
+    // um desenho num alvo de 4×4 do mesmo formato faz isso fora da vista (e sobe a geometria junto)
+    let alvoE = null;
     // luzes de ensaio: mesmo tipo e mesma sombra das luzes à vista (a chave do shader depende só dessas contagens)
     let tLuz = -1e9;
     function luzesDeEnsaio() {
@@ -679,6 +698,8 @@
       if (k === 'l') return new T.Line(o.geometry, m);
       if (k === 'r') return new T.Sprite(m);
       if (k === 'm') return new T.Mesh(o.geometry, m);
+      // malha com esqueleto (personagens, Filhos): o mesmo esqueleto (só lido aqui)
+      if (k === 'k' && o.skeleton) { const s = new T.SkinnedMesh(o.geometry, m); s.bind(o.skeleton, o.bindMatrix); return s; }
       return null;
     }
     const textura = t => {
@@ -703,33 +724,64 @@
     // os comandos do WebGL vão numa fila para o processo da placa: sem esperar o fim de cada trabalho, as fatias
     // empilhavam segundos de compilação e envio de texturas que travavam o quadro seguinte de uma vez só
     // (ler um pixel obriga a esperar; getError não espera)
-    const gl = ren.getContext(), px1 = new Uint8Array(4);
+    const px1 = new Uint8Array(4);
     const esperarPlaca = () => { try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); } catch (e) {} };
+    // devolve false quando o shader ficou compilando na placa (o trabalho volta para a espera)
     function trabalho(j) {
-      if (j.fn) { try { j.fn(); } catch (e) {} esperarPlaca(); return; }
+      if (j.fn) { try { j.fn(); } catch (e) {} esperarPlaca(); return true; }
       let placa = false;
       if (!j.so) {
-        const d = substituto(j.o, j.m, j.k), n0 = ren.info.programs.length;
-        if (d) { d.frustumCulled = false; ensaio.add(d); try { ren.compile(ensaio, camE); } catch (e) {} ensaio.remove(d); }
-        placa = ren.info.programs.length !== n0;
+        const d = j.d || (j.d = substituto(j.o, j.m, j.k)), n0 = ren.info.programs.length;
+        if (d) {
+          d.frustumCulled = false; ensaio.add(d);
+          let pronto = true;
+          if (assinc()) {
+            esperando = true; ligados = [];
+            try { ren.compile(ensaio, camE); } catch (e) { if (e === NAO_PRONTO) pronto = false; }
+            esperando = false;
+            if (ligados.length) j.progs = (j.progs || []).concat(ligados);
+            ligados = null;
+          } else { try { ren.compile(ensaio, camE); } catch (e) {} }
+          ensaio.remove(d);
+          if (ren.info.programs.length !== n0) j.novo = true;
+          if (!pronto) return false;
+          // shader novo: um desenho de ensaio fora da vista (o formato da tela é o do pós-processamento)
+          if (j.novo && alvoE && !j.semTex && j.k !== 'r') {
+            ensaio.add(d);
+            const rt0 = ren.getRenderTarget(), ar = ren.autoClear;
+            try { ren.setRenderTarget(alvoE); ren.render(ensaio, camE); } catch (e) {}
+            ren.setRenderTarget(rt0); ren.autoClear = ar;
+            ensaio.remove(d);
+          }
+          placa = j.novo;
+        }
+        j.d = null;
       }
       if (!j.semTex) SLOTS.forEach(s => { const t = j.m[s]; if (textura(t)) { try { ren.initTexture(t); placa = true; } catch (e) {} } });
       if (placa) esperarPlaca();
+      return true;
     }
     // uma fatia: até "ms" milissegundos (um shader ou uma textura grande podem passar disso sozinhos)
     function fatia(ms) {
       const t0 = performance.now(), TL = (window.ACF3D || {}).telas;
       let luzOk = false;
+      // os que estavam compilando na placa: só voltam quando a placa disser que terminou (uma olhada por fatia)
+      for (let i = 0; i < espera.length && vivo && performance.now() - t0 < ms; i++) {
+        const j = espera[i]; if (!prontoNaPlaca(j)) continue;
+        if (!luzOk) { luzesDeEnsaio(); luzOk = true; }
+        if (trabalho(j)) { espera.splice(i, 1); i--; prontos++; }
+      }
       while (vivo && performance.now() - t0 < ms) {
         if (TL && TL.fila.length) { TL.desenhar(TL.fila.shift()); prontos++; continue; }
+        if (espera.length >= MAX_ESPERA) break;
         if (!jobs.length && fila.length) { abrir(fila.shift()); continue; }
         const j = jobs.shift(); if (!j) break;
         if (!luzOk) { luzesDeEnsaio(); luzOk = true; }
-        trabalho(j); prontos++;
+        if (trabalho(j)) prontos++; else espera.push(j);
       }
       return pendentes();
     }
-    const pendentes = () => fila.length + jobs.length + (((window.ACF3D || {}).telas || {}).fila || []).length;
+    const pendentes = () => fila.length + jobs.length + espera.length + (((window.ACF3D || {}).telas || {}).fila || []).length;
     function agendar() {
       if (agendado || !vivo || !pendentes()) return;
       const f = dl => { agendado = 0; if (!vivo) return; fatia(dl && dl.timeRemaining ? Math.max(3, Math.min(10, dl.timeRemaining() - 1)) : 6); agendar(); };
@@ -753,7 +805,10 @@
         });
       },
       pendentes, agendar,
-      parar() { vivo = false; fila.length = 0; jobs.length = 0; },
+      // alvo do ensaio desenhado (4×4, mesmo formato da tela do pós-processamento)
+      set alvo(rt) { alvoE = rt; },
+      get assinc() { return assinc(); },
+      parar() { vivo = false; fila.length = 0; jobs.length = 0; espera.length = 0; },
     };
   }
   /* ================= Parede de Desejos: concreto rachado com o símbolo do Eco (desenhado em canvas) =================
@@ -1355,7 +1410,8 @@
       if (falta) carregar(falta);
       const aqLivre = !(ctx.aq && ctx.aq.pendentes());
       carregadas.forEach((c, p) => {
-        if (c.oculta && (aqLivre || p === pFoco || performance.now() - c.oculta > 2000)) { c.oculta = 0; c.g.visible = !c.extra; }
+        // com a compilação em segundo plano a espera não trava nada: a vizinha só aparece pronta (10 s no máximo)
+        if (c.oculta && (aqLivre || p === pFoco || performance.now() - c.oculta > (ctx.aq && ctx.aq.assinc ? 10000 : 2000))) { c.oculta = 0; c.g.visible = !c.extra; }
         const ex = extra.has(p); if (c.extra !== ex) { c.extra = ex; if (!c.oculta) c.g.visible = !ex; }
       });
       // véus: salas que você não pode ver ficam escuras na porta
@@ -1633,7 +1689,8 @@
       prepFeito = false;
       const f = dl => { prepAg = 0; if (!prepVivo) return;
         // o aquecedor ainda trabalhando ou pouco tempo livre neste quadro: tenta depois
-        if ((ctx.aq && ctx.aq.pendentes()) || (dl && !dl.didTimeout && dl.timeRemaining() < 8)) { agendarPrep(300); return; }
+        // montar um Filho é trabalho grosso (dezenas de ms): só com a câmera parada, para nunca engasgar quem anda
+        if ((ctx.aq && ctx.aq.pendentes()) || (ctx.parado && !ctx.parado()) || (dl && !dl.didTimeout && dl.timeRemaining() < 8)) { agendarPrep(300); return; }
         if (prepUm()) agendarPrep(120); else prepFeito = true; };
       prepAg = setTimeout(() => { prepAg = window.requestIdleCallback ? requestIdleCallback(f, { timeout: 3000 }) : setTimeout(() => f(null), 50); }, ms || 0);
     }
@@ -1671,6 +1728,19 @@
       return false;
     }
     function preparar() { prepVivo = true; agendarPrep(0); }
+    // tudo de uma vez, atrás da barra de carregamento (a vista ainda não roda: nada engasga); devolve uma promessa
+    function prepTudo() {
+      prepVivo = true;
+      return new Promise(ok => {
+        const passo = () => {
+          if (!prepVivo) { ok(); return; }
+          const t = performance.now(); let mais = true;
+          while (mais && performance.now() - t < 40) { try { mais = prepUm(); } catch (e) { mais = false; } }
+          if (mais) setTimeout(passo, 0); else { prepFeito = true; ok(); }
+        };
+        passo();
+      });
+    }
     // ganchos das formas detalhadas (filhos3d.js): estado(nome) persistente e acao('revelar') quando o Filho aparece aos jogadores
     function ganchosForma(o, tk, novo) {
       const st = tk.st || '';
@@ -1782,7 +1852,7 @@
     function objetos() { return grupo.children; }
     function posDe(id) { const o = mapa.get(id); return o ? [o.x, o.z] : null; }
     sincronizar();
-    return { sincronizar, atualizar, objetos, posDe, set selecionado(v) { selecionado = v; }, get selecionado() { return selecionado; }, mapa, objsFil, preparar, reserva, get prepPronto() { return prepFeito && !prepAg; },
+    return { sincronizar, atualizar, objetos, posDe, set selecionado(v) { selecionado = v; }, get selecionado() { return selecionado; }, mapa, objsFil, preparar, prepTudo, reserva, get prepPronto() { return prepFeito && !prepAg; },
       descartar() { prepVivo = false; [...reserva.keys()].forEach(soltarReserva); ctx.cena.remove(guarda); [...mapa.keys()].forEach(remover); ctx.cena.remove(grupo); } };
   }
   /* ================= som ambiente (gerado na hora, sem arquivos) ================= */
@@ -1957,7 +2027,9 @@
         final.uniforms.tCena.value = rtCena.texture; final.uniforms.tBrilho.value = rtA.texture; final.uniforms.uTempo.value = t;
         passar(final, null);
       },
-      descartar() { [rtCena, rtA, rtB, brilho, borrao, final, quad.geometry].forEach(x => x.dispose()); },
+      // alvo minúsculo do mesmo formato da cena (o ensaio desenhado do aquecedor)
+      alvoEnsaio() { if (!this.rtE) this.rtE = ms ? new T.WebGLMultisampleRenderTarget(4, 4, opt) : new T.WebGLRenderTarget(4, 4, opt); return this.rtE; },
+      descartar() { [rtCena, rtA, rtB, brilho, borrao, final, quad.geometry, this.rtE].forEach(x => x && x.dispose()); },
       // compila os três shaders da tela (cena própria, sem luzes) antes do 1º quadro
       aquecer() { const m0 = quad.material; [brilho, borrao, final].forEach(m => { quad.material = m; try { ren.compile(cenaQ, camO); } catch (e) {} }); quad.material = m0; }
     };
@@ -2433,11 +2505,13 @@
     descartes.push(geoP, poeira.material); poeira.visible = !!cfgEfetivo.poeira;
 
     const pos = criarPos(T, ren, alta);
+    aq.alvo = pos.alvoEnsaio();
     V = { op, a, ren, cena: cenaT, cam: est, camera: cam, mundo, tok, descartes, amb, lanterna: op.manter ? op.manter.lanterna : false, rodando: true, raf: 0, d,
       teclas: new Set(), correr: false, joy: null, quem, ctrl: ctrlJog, ctrlMestre: op.manter ? op.manter.ctrl : null, autoAlvo: null, pos, envRT, alta, celular,
       sig: assinatura(a), escondido: null, ultMov: 0, movendo: false, ultToast: 0, sombras0: CFG.sombras === 'auto' ? alta : !!CFG.sombras };
     if (op.ctrl && ctrlJog === op.ctrl) V.ctrlMestre = op.ctrl;
     ctx.camera = cam;
+    ctx.parado = () => !!V && performance.now() - (V.ultCam || 0) > 1200;
     // Mapa V2 (kit de terror do Blender): só na qualidade Alta; o arquivo e o kit baixam aqui, na primeira vez
     if (mapaV2Ligado()) { const ligar = () => { if (V && V.mundo === mundo && NS().mapaV2) NS().mapaV2.montar(ctx, mundo); }; if (NS().mapaV2) setTimeout(ligar, 0); else baixar('mapa_v2.js').then(ligar); }
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
@@ -2687,6 +2761,9 @@
       if (CFG.verFps) { fpsN++; if (agora - fpsT > 1000) { const f = $('#s3dFps'); if (f) { f.hidden = false; const inf = ren.info.render, ms = fpsN ? (agora - fpsT) / fpsN : 0; f.textContent = `${Math.round(fpsN * 1000 / (agora - fpsT))} fps · ${ms.toFixed(1)} ms\n${V.hudCalls || inf.calls} calls · ${Math.round((V.hudTri || inf.triangles) / 1000)}k tri · degrau ${degrauQual}${desempenhoAtivo() ? ' · leve' : ''}`; } fpsN = 0; fpsT = agora; } }
       const dt = Math.max(0, Math.min(.05, (agora - t0) / 1000)) || 0; t0 = agora; tt += dt;
       const andou = mover(dt); if (!andou) talvezFechar();
+      // câmera parada? (o trabalho grosso de fundo espera por isso: ver ctx.parado)
+      const sigCam = est.px.toFixed(2) + est.pz.toFixed(2) + est.yaw.toFixed(2) + est.theta.toFixed(2) + est.r.toFixed(1) + est.ax.toFixed(1) + est.az.toFixed(1);
+      if (sigCam !== V.sigCam) { V.sigCam = sigCam; V.ultCam = agora; }
       // token controlado: se o Mestre (ou o mapa 2D) o mover, a câmera vai junto
       if (V.ctrl && !V.movendo && !V.escondido) {
         const tk = ((A.estado || {}).tokens || {})[V.ctrl];
@@ -2802,8 +2879,15 @@
     V.retomar = () => { if (V && !V.rodando && !V.aquecendo) { V.rodando = true; t0 = performance.now(); V.raf = requestAnimationFrame(quadro); } };
     V.aquecendo = true;
     progresso('Preparando a sala…', .45);
-    aq.tudo(f => { if (V === Vaqui) progresso('Preparando a sala…', .45 + .55 * f); }).then(() => {
+    aq.tudo(f => { if (V === Vaqui) progresso('Preparando a sala…', .45 + .55 * f); }).then(async () => {
       if (V !== Vaqui) return;
+      // no computador, os Filhos que podem aparecer são montados e compilados ainda atrás da barra (montar um Filho
+      // durante o jogo era um dos engasgos ao andar); no celular, para não alongar a abertura, ficam para depois
+      if (!celular && tok.prepTudo) {
+        progresso('Preparando os Filhos…', .92);
+        await tok.prepTudo(); if (V !== Vaqui) return;
+        await aq.tudo(f => { if (V === Vaqui) progresso('Preparando os Filhos…', .92 + .08 * f); }); if (V !== Vaqui) return;
+      }
       V.aquecendo = false;
       $('#s3dMsg').hidden = true;
       if (document.hidden) { V.rodando = false; return; }
@@ -3581,6 +3665,8 @@
     abrir, fechar, cenaDe, podeAbrir, publicar: agendarPublicar, andarTeste, interagir, abrirDireto, controlar, carregarThree,
     virar(yaw) { if (V) V.cam.yaw = yaw; }, modo: definirModo,
     get aberta() { return !!V; },
+    // câmera parada há mais de 1,2 s (trabalho grosso de outras partes do site espera por isso)
+    get parado() { return V && V.api && V.api.ctx && V.api.ctx.parado ? V.api.ctx.parado() : true; },
     get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe(), preso: V.preso || null, campos: V.mundo.campos.length } : null; },
     _livre: (x, z) => !!(V && V.mundo.livre3D(x, z)),
     _centro: p => V && V.mundo.centro(p),

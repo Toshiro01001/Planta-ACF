@@ -7,10 +7,9 @@
       segundos, baixa um degrau (resolução, poeira, fumaça, câmeras de segurança, sombras,
       luzes do conjunto) e sobe de volta quando sobra folga, com histerese. O que o jogador
       escolheu à mão nas Opções manda (só mexe no que está no padrão).
-   2. CORAÇÃO E RESPIRAÇÃO do próprio personagem (só o jogador ouve): o batimento acelera
+   2. CORAÇÃO do próprio personagem (só o jogador ouve): o batimento acelera
       com PV baixo, com um Filho à vista perto, com um eco de som perto e na perseguição;
-      respiração ofegante depois de correr (Shift no 3D) ou de uma perseguição. Som gerado
-      na hora (WebAudio), respeita o mudo e o volume do ambiente.
+      som gerado na hora (WebAudio), respeita o mudo e o volume do ambiente.
    3. VIBRAÇÃO DO CELULAR: dano no próprio personagem e susto (as vibrações que o site já
       tinha, como Encontro e "o chão treme", passam a obedecer a mesma opção).
    4. AMBIENTE QUE REAGE: um Filho passando perto (posição real na tela do Mestre e dos
@@ -136,7 +135,7 @@ const Vib = {
    2. CORAÇÃO E RESPIRAÇÃO (só o jogador, no próprio aparelho)
    ========================================================= */
 const Cor = {
-  k: 0, prox: 0, ecoTs: 0, ecoD: 99, sustoTs: 0, ofeg: null, proxResp: 0, pvAnt: null, part: false, persgOn: null, corrida: 0, parado: 0,
+  k: 0, prox: 0, ecoTs: 0, ecoD: 99, sustoTs: 0, pvAnt: null, part: false, persgOn: null,
   ativo() { return !!euJog() && opc('coracao', true) !== false; },
   // Filho à vista mais perto (metros de regra), do jeito que o jogador enxerga
   filhoPerto(tk) {
@@ -179,25 +178,10 @@ const Cor = {
         this.prox += 60 / bpm;
       }
     }
-    // respiração ofegante
-    const o = this.ofeg;
-    if (o && agora() < o.ate) {
-      if (!this.proxResp || this.proxResp < t) this.proxResp = t + .05;
-      const prog = 1 - (o.ate - agora()) / o.dur, per = .9 + prog * 1.1, v = (.11 - prog * .07) * o.f;
-      while (this.proxResp < t + .35) {
-        Som.ruido(this.proxResp, out, { bp: 1250, q: .7, v, ataque: per * .18, dur: per * .38 });
-        Som.ruido(this.proxResp + per * .42, out, { bp: 720, q: .6, v: v * 1.15, ataque: per * .08, dur: per * .5 });
-        this.proxResp += per;
-      }
-    } else { this.ofeg = null; this.proxResp = 0; }
   },
-  ofegar(seg, f = 1) {
-    if (!this.ativo()) return;
-    const ate = agora() + seg * 1000;
-    if (this.ofeg && this.ofeg.ate > ate) return;
-    this.ofeg = { ate, dur: seg * 1000, f };
-  },
-  // dano no próprio personagem (vitais publicadas no token): vibra; fim da perseguição: ofega
+  // a respiração ofegante saiu do site (pedido do Mestre em 05/11: o chiado lembrava vassoura e incomodava)
+  ofegar() {},
+  // dano no próprio personagem (vitais publicadas no token): vibra
   vigiar() {
     const eu = euJog(), tk = eu && tokens()[eu], v = tk && tk.vit;
     const pv = v && typeof v.pv === 'number' ? v.pv : null, nome = (v && v.nome) || '', pvM = v ? num(v.pvM) : 0;
@@ -211,18 +195,11 @@ const Cor = {
     const p = persg(), on = !!p.on, part = !!(eu && ordemP().some(o => o.id === eu));
     if (this.persgOn === null) this.persgOn = on;
     if (on && part) this.part = true;
-    if (this.persgOn && !on) { if (this.part) this.ofegar(8, 1); this.part = false; }
+    if (this.persgOn && !on) this.part = false;
     this.persgOn = on;
   },
-  // 3D: correr (Shift ou joystick no fim) por mais de 1,2 s deixa ofegante ao parar
-  quadro(ap, dw) {
-    if (!euJog()) return;
-    const V = ap.V; if (!V) return;
-    const p = [ap.est.px, ap.est.pz], u = this.posAnt; this.posAnt = p;
-    const moveu = u && Math.hypot(p[0] - u[0], p[1] - u[1]) > .01;
-    const corre = !!(V.correr || (V.joy && Math.hypot(V.joy.x, V.joy.y) > .92)) && moveu;
-    if (corre) { this.corrida += dw; this.parado = 0; }
-    else if (this.corrida > 0) { this.parado += dw; if (this.parado > .5) { if (this.corrida > 1.2) this.ofegar(clamp(3 + this.corrida * .8, 4, 10), clamp(.6 + this.corrida * .08, .6, 1.1)); this.corrida = 0; this.parado = 0; } }
+  // 3D: a respiração ofegante depois de correr saiu; nada a acompanhar por quadro
+  quadro() {
   },
 };
 
@@ -617,7 +594,8 @@ const Bk = {
   async tick() {
     if (!this.pronto() || this.salvando) return;
     if (this.idx === null) { await this.lerIdx(); this.prox = Math.max(agora() + 60000, this.ultimo() + this.PER); this.desenhar(); return; }
-    if (agora() >= this.prox) await this.salvar(false);
+    // com o 3D aberto e a câmera andando, espera ela parar (o backup monta e confere o estado inteiro de uma vez)
+    if (agora() >= this.prox && !(window.Sala3D && Sala3D.aberta && Sala3D.parado === false)) await this.salvar(false);
   },
   async salvar(manual) {
     if (this.salvando || !this.pronto()) return false;

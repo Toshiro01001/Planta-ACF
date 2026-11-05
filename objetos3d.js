@@ -1238,7 +1238,9 @@
     if (b.isEmpty()) return out;
     const w = b.max.x - b.min.x, d = b.max.z - b.min.z;
     const filhos = obj.children.filter(c => !c.isLight && !c.isSprite && !c.isPoints);
-    if (prof < 4 && filhos.length > 1 && (w * d > 3.2 || Math.max(w, d) > 3.4 || obj.userData.temFolha)) { filhos.forEach(c => caixasColisao(T, c, out, prof + 1)); return out; }
+    // quem carrega uma folha sempre desce até ela, mesmo com um filho só (a dobradiça do portão da gaiola): senão a caixa
+    // do grupo inteiro, feita com o portão fechado, vira uma parede fixa no vão e o portão aberto não deixa passar
+    if (prof < 4 && filhos.length && ((filhos.length > 1 && (w * d > 3.2 || Math.max(w, d) > 3.4)) || obj.userData.temFolha)) { filhos.forEach(c => caixasColisao(T, c, out, prof + 1)); return out; }
     out.push(b);
     return out;
   }

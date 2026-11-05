@@ -220,6 +220,16 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
     uni.mv2C.value.set(u.manter ? 1 : 0, u.relevo || 1, u.sat ?? .72, u.suj ?? 1);
     uni.mv2D.value.set(u.ex || 0, u.ruina ?? -1, u.ruinaM || 2, comumAtual && comumAtual.v3 ? 1 : 0);
   }
+  // sala central do 1º andar (o abrigo dos jogadores, sala 25 de cada andar): fica conservada, como na referência do
+  // Mestre; nos andares de baixo ela segue a degradação do andar
+  const salaAbrigo = (a, s) => a === 1 && s && s.p === 25;
+  // cópia limpa (sem o remendo do V2) de um material da fábrica, para uma sala ter pele própria
+  function copiaMat(T, M) {
+    const v = M.userData.mv2 ? M.userData.mv2.v1 : M;
+    const c = new T.MeshStandardMaterial({ color: v.color, map: v.map, normalMap: v.normalMap, roughness: v.roughness, metalness: v.metalness, envMapIntensity: v.envMapIntensity, side: M.side, transparent: M.transparent, opacity: M.opacity, depthWrite: M.depthWrite });
+    if (M.userData.tex) c.userData.tex = M.userData.tex;
+    return c;
+  }
   function restaurar(M) {
     const d = M.userData.mv2; if (!d) return;
     const v = d.v1;
@@ -391,6 +401,11 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
       const chao = (nome, x, z, ang, esc = 1) => { const d = DEC[nome]; porQuad(T, lotePt(x, z).dec, d[0], d[1] * esc, d[2] * esc, M(x, yd, z, ang, -Math.PI / 2), 1); yd += .0012; marcas.push(['d_' + nome, +x.toFixed(2), +z.toFixed(2)]); };
       const hx = (s.x1 - s.x0) / 2 - .5, hz = (s.z1 - s.z0) / 2 - .5;
       const pt = () => [s.cx + (r() - .5) * 2 * hx, s.cz + (r() - .5) * 2 * hz];
+      // sala conservada: só um pouco de poeira nos cantos; nada de sangue, poça nem arranhão
+      if (salaAbrigo(a, s)) {
+        [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => chao('fuligem', s.cx + sx * (hx - .3), s.cz + sz * (hz - .3), Math.atan2(sx, sz) + Math.PI, 1.4 + r() * .4));
+        out.push(parede); return;
+      }
       // sujeira nos 4 cantos e no pé de algumas paredes
       [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => chao('fuligem', s.cx + sx * (hx - .3), s.cz + sz * (hz - .3), Math.atan2(sx, sz) + Math.PI, 2.2 + r()));
       for (let i = 0; i < 1 + (r() < .6) + (r() < .3) + Math.round(e * 2.5 * r()); i++) { const [x, z] = pt(); chao('poca', x, z, r() * 6, 1 + r() * 1.2 + e); }
@@ -436,6 +451,7 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
   const vivos = new Set();
   function desmontar(W) {
     const st = W && W.__mv2; if (!st) return;
+    st.ab.forEach(l => l.forEach(z => { if (z.me.material === z.c) z.me.material = z.o; z.c.dispose(); })); st.ab.clear();
     st.mats.forEach(restaurar); st.mats.clear();
     st.grupos.forEach(g => { if (g.parent) g.parent.remove(g); g.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); });
     st.lixo.forEach(x => { try { x.dispose(); } catch (e) {} });
@@ -448,7 +464,7 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
     const T = ctx.T;
     if (!ctx.ren.capabilities.isWebGL2) return;         // textureGrad: fica no V1 em quem só tem WebGL 1
     geracao++;
-    const st = W.__mv2 = { ctx, mats: new Set(), grupos: [], lixo: [], on: false };
+    const st = W.__mv2 = { ctx, mats: new Set(), grupos: [], lixo: [], on: false, ab: new Map() };
     let tex;
     const est = estilo(); st.estilo = est;
     try { tex = await carregar(T, est); } catch (e) { delete W.__mv2; return; }
@@ -461,13 +477,26 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
     // salas: piso, paredes e teto com a textura que a cena de cada sala pede (cor e identidade do V1 mantidas)
     const D = degr(W.a), E = extra(D); st.degradacao = D;
     const casca = s => {
-      const ms = s.mats; if (!ms) return; const c = s.cena || {};
+      let ms = s.mats; if (!ms) return; const c = s.cena || {};
+      // a sala conservada ganha materiais próprios (os da fábrica são compartilhados por cor: remendar o original
+      // mudaria também as outras salas da mesma cor); os da casca anterior desta sala são liberados
+      if (salaAbrigo(W.a, s)) {
+        const velhos = st.ab.get(s); if (velhos) velhos.forEach(z => { st.mats.delete(z.c); restaurar(z.c); z.c.dispose(); });
+        const novos = [], troca = new Map();
+        const meu = M => { if (!M) return M; if (!troca.has(M)) troca.set(M, copiaMat(T, M)); return troca.get(M); };
+        ms = { piso: meu(ms.piso), parede: meu(ms.parede), teto: meu(ms.teto) };
+        (s.casca || []).forEach(me => { const n = troca.get(me.material); if (n) { novos.push({ me, o: me.material, c: n }); me.material = n; } });
+        st.ab.set(s, novos);
+      }
       const kp = (c.piso || {}).tex || 'concreto', kw = (c.parede || {}).tex || 'concreto', kt = (c.teto || {}).tex || 'concreto';
       const tp = PISO[kp], tw = PAREDE[kw], tt = TETO[kt];
-      const rwP = tw && tw[0] !== L.metal && tw[0] !== L.acolchoado ? L.descascado : -1, rwC = tp && tp[0] !== L.grade ? L.concreto : -1;
-      pat(ms.piso, { t: tp || [0, 1, 0, 1, 0], manter: !tp, molhado: Math.min(1, (MOLHADO[kp] ?? .4) * 1.15), topo: V.ALT, relevo: 1.3, escuro: .7, sat: .62, suj: 1.35, ex: E, ruina: rwC, ruinaM: 2.5 });
-      pat(ms.parede, { t: tw || [0, 1, 0, 1, 0], manter: !tw, topo: V.ALT, relevo: 1.3, escuro: .66, sat: .6, suj: 1.4, ex: E, ruina: rwP, ruinaM: 2.2 });
-      pat(ms.teto, { t: tt || [0, 1, 0, 1, 0], manter: !tt, topo: V.ALT, relevo: 1.2, escuro: .62, sat: .6, suj: 1.3, ex: E, ruina: tt ? L.concreto_teto : -1, ruinaM: 3 });
+      // sala central do 1º andar (abrigo): conservada, o mesmo concreto do V2 mas limpo e liso, sem poças,
+      // sem descascar nem ruína; o V2 entra só na sombra assada e numa sujeira leve
+      const ab = salaAbrigo(W.a, s), Ez = ab ? 0 : E, sj = ab ? .5 : 1;
+      const rwP = !ab && tw && tw[0] !== L.metal && tw[0] !== L.acolchoado ? L.descascado : -1, rwC = !ab && tp && tp[0] !== L.grade ? L.concreto : -1;
+      pat(ms.piso, { t: tp || [0, 1, 0, 1, 0], manter: !tp, molhado: ab ? 0 : Math.min(1, (MOLHADO[kp] ?? .4) * 1.15), topo: V.ALT, relevo: ab ? .7 : 1.3, escuro: ab ? .8 : .7, sat: .62, suj: 1.35 * sj, ex: Ez, ruina: rwC, ruinaM: 2.5 });
+      pat(ms.parede, { t: tw || [0, 1, 0, 1, 0], manter: !tw, topo: V.ALT, relevo: 1.3, escuro: ab ? .74 : .66, sat: .6, suj: 1.4 * sj, ex: Ez, ruina: rwP, ruinaM: 2.2 });
+      pat(ms.teto, { t: tt || [0, 1, 0, 1, 0], manter: !tt, topo: V.ALT, relevo: 1.2, escuro: ab ? .7 : .62, sat: .6, suj: 1.3 * sj, ex: Ez, ruina: !ab && tt ? L.concreto_teto : -1, ruinaM: 3 });
     };
     Object.values(V.S).forEach(casca);
     st.aoCasca = s => { try { casca(s); } catch (e) {} };
