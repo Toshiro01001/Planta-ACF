@@ -1202,8 +1202,31 @@
 
     /* ----- conteúdo das salas: só perto de quem está olhando ----- */
     const carregadas = new Map(), campos = [];
+    /* ----- salas guardadas: a sala que sai de perto não é destruída; fica fora da cena, montada, num cache pequeno
+       (as últimas GUARDA_MAX). Voltar a ela é só pôr de volta (sem montar, sem compilar shader, sem subir textura).
+       A sala com outra versão (Rei/Mãe), outra cena ou com/sem Parede de Desejos é refeita. ----- */
+    const guardadas = new Map(), GUARDA_MAX = celular ? 2 : 5;
+    function guardar(p, c) {
+      guardadas.delete(p); guardadas.set(p, c);
+      while (guardadas.size > GUARDA_MAX) { const [p0, c0] = guardadas.entries().next().value; guardadas.delete(p0); destruir(c0); }
+    }
+    function destruir(c) { c.desc.forEach(x => { try { x.dispose(); } catch (e) {} }); }
+    function devolver(p) {
+      const c = guardadas.get(p), E = NS().salasGuardadas || (NS().salasGuardadas = { volta: 0, refeita: 0, nova: 0 });
+      if (!c) { E.nova++; return false; }
+      guardadas.delete(p);
+      const ver = ((est().var3d || {})['c' + S[p].cn]) || 'neutro';
+      if (c.ver !== ver || !!c.parede !== paredeAqui(S[p].cn) || c.cena !== S[p].cena) { E.refeita++; E.ult = [c.ver !== ver, !!c.parede !== paredeAqui(S[p].cn), c.cena !== S[p].cena]; destruir(c); return false; }
+      E.volta++;
+      raiz.add(c.g); carregadas.set(p, c);
+      (c.salvos || []).forEach(e => interativos.push(e)); (c.campos || []).forEach(e => campos.push(e)); c.salvos = c.campos = null;
+      if (NS().inter) NS().inter.aplicar(c, true);
+      atualizarItens(p); sincDocs(p); sincItensM(p);
+      return true;
+    }
     function carregar(p) {
       const s = S[p]; if (carregadas.has(p)) return;
+      if (devolver(p)) return;
       const ver = ((est().var3d || {})['c' + s.cn]) || 'neutro';
       const desc = [], anim = [], luzes = [], g = new T.Group();
       g.position.set(s.cx, 0, s.cz); raiz.add(g);
@@ -1237,13 +1260,15 @@
       // itens do livro jogados: aparecem quando o Mestre espalha (mapa/estoque/i_<CN>_<n>)
       g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; interativos.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
       if (pd) interativos.push({ tipo: 'parede', cn: s.cn, p, pos: pd.pos, obj: pd.obj });
-      const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN, parede: pd ? pd.obj : null };
+      const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN, parede: pd ? pd.obj : null, cena: s.cena };
       carregadas.set(p, c);
       if (NS().inter) NS().inter.aplicar(c, true);
       if (FUNDIR) { try { c.fusao = fundirEstaticos(T, g, desc, IN); } catch (e) { console.warn('3D fusão:', e); } }
       atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
-      // sala nova: shaders e texturas dela ficam prontos no tempo ocioso (antes de alguém olhar para ela)
-      if (ctx.aquecer) ctx.aquecer(g);
+      // sala nova: shaders e texturas dela ficam prontos no tempo ocioso (antes de alguém olhar para ela). A vizinha
+      // (atrás de uma porta) entra escondida e só aparece quando o aquecedor terminar (ou em 2 s): compilar e subir as
+      // texturas dela no quadro em que ela aparecia derrubava o FPS por alguns segundos ao entrar numa sala.
+      if (ctx.aquecer) { ctx.aquecer(g); if (p !== pFoco) { g.visible = false; c.oculta = performance.now(); } }
     }
     // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
     function atualizarItens(pSo) {
@@ -1290,12 +1315,16 @@
       });
     }
     function atualizarDocs() { carregadas.forEach((c, p) => sincDocs(p)); }
-    function descarregar(p) {
-      const c = carregadas.get(p); if (!c) return;
-      for (let i = campos.length - 1; i >= 0; i--) if (campos[i].p === p) campos.splice(i, 1);
-      raiz.remove(c.g); c.desc.forEach(x => { try { x.dispose(); } catch (e) {} });
-      for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc', 'int', 'parede'].includes(interativos[i].tipo) && interativos[i].p === p) interativos.splice(i, 1);
+    // manter = true (a sala só saiu de perto): vai para as guardadas em vez de ser destruída
+    function descarregar(p, manter) {
+      const c = carregadas.get(p); if (!c) { if (!manter && guardadas.has(p)) { destruir(guardadas.get(p)); guardadas.delete(p); } return; }
+      const cs = [], is = [];
+      for (let i = campos.length - 1; i >= 0; i--) if (campos[i].p === p) cs.push(campos.splice(i, 1)[0]);
+      raiz.remove(c.g);
+      for (let i = interativos.length - 1; i >= 0; i--) if (['esconderijo', 'uso', 'item', 'doc', 'int', 'parede'].includes(interativos[i].tipo) && interativos[i].p === p) is.push(interativos.splice(i, 1)[0]);
       carregadas.delete(p);
+      if (manter) { c.campos = cs.reverse(); c.salvos = is.reverse(); c.oculta = 0; c.g.visible = !c.extra; guardar(p, c); }
+      else destruir(c);
     }
     const vizinhas = p => CS.filter(c => !c.saida && (c.p1 === p || c.p2 === p)).map(c => [c.p1 === p ? c.p2 : c.p1, c.ci]);
     const centroMaisPerto = (x, z) => { let best = null, bd = 1e9; Object.values(S).forEach(s => { const d = (s.cx - x) ** 2 + (s.cz - z) ** 2; if (d < bd) { bd = d; best = s.p; } }); return best; };
@@ -1306,7 +1335,7 @@
       if (ctx.quem === 'aux') return !!A.salaRevelada(S[p].cn);
       return p === ctx.salaJogador();
     }
-    let tStream = 0, visAntes = '';
+    let tStream = 0, visAntes = '', pFoco = null;
     function streaming(x, z, modo) {
       const quer = new Set();
       if (ctx.quem === 'jog') { const pj = ctx.salaJogador(); if (pj) quer.add(pj); }
@@ -1319,16 +1348,22 @@
       [...quer].forEach(p => { if (!salaVisivel(p)) quer.delete(p); });
       // salas a mais, carregadas só para as câmeras de segurança (momento.js): ficam escondidas na vista normal
       const extra = new Set([...(ctx.extraSalas || [])].filter(p => S[p] && !quer.has(p)));
-      [...carregadas.keys()].forEach(p => { if (!quer.has(p) && !extra.has(p)) descarregar(p); });
-      const falta = [...quer].find(p => !carregadas.has(p)) || [...extra].find(p => !carregadas.has(p));
+      [...carregadas.keys()].forEach(p => { if (!quer.has(p) && !extra.has(p)) descarregar(p, true); });
+      // a sala da câmera primeiro (é a única que precisa aparecer na hora)
+      pFoco = ctx.quem === 'jog' ? ctx.salaJogador() : (salaNoPonto3D(a, x, z) || centroMaisPerto(x, z));
+      const falta = (quer.has(pFoco) && !carregadas.has(pFoco) ? pFoco : null) || [...quer].find(p => !carregadas.has(p)) || [...extra].find(p => !carregadas.has(p));
       if (falta) carregar(falta);
-      carregadas.forEach((c, p) => { const ex = extra.has(p); if (c.extra !== ex) { c.extra = ex; c.g.visible = !ex; } });
+      const aqLivre = !(ctx.aq && ctx.aq.pendentes());
+      carregadas.forEach((c, p) => {
+        if (c.oculta && (aqLivre || p === pFoco || performance.now() - c.oculta > 2000)) { c.oculta = 0; c.g.visible = !c.extra; }
+        const ex = extra.has(p); if (c.extra !== ex) { c.extra = ex; if (!c.oculta) c.g.visible = !ex; }
+      });
       // véus: salas que você não pode ver ficam escuras na porta
       const vis = Object.values(S).map(s => salaVisivel(s.p) ? 1 : 0).join('');
       if (vis !== visAntes) { visAntes = vis; Object.values(S).forEach(s => s.veus.forEach(v => { v.visible = !salaVisivel(s.p); })); }
     }
     // remontar uma sala (versão Rei/Mãe trocada, cena nova)
-    function recarregar(p) { if (carregadas.has(p)) { descarregar(p); carregar(p); } }
+    function recarregar(p) { if (guardadas.has(p)) { destruir(guardadas.get(p)); guardadas.delete(p); } if (carregadas.has(p)) { descarregar(p); carregar(p); } }
     // a cena desta sala mudou (importada ou revelada com o 3D aberto): só ela é refeita, sem remontar o andar
     // corte de detalhe na vista de fora (casa de bonecas, andar inteiro): objeto não fundido que fica pequeno na tela
     // (raio na tela abaixo de DET_PX pixels, uns 8 px de diâmetro: some sem se notar) sai da câmera pela camada 1 (o
@@ -1476,7 +1511,7 @@
 
     setTimeout(() => { try { sincExpo(); } catch (e) {} }, 0);
     return {
-      a, S, CS, portas, interativos, carregadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
+      a, S, CS, portas, interativos, carregadas, guardadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
       // o que o Mapa V2 (mapa_v2.js) precisa para trocar a aparência sem mexer em posição nem colisão
       v2: { S, CS, corr3D, CORR_W, CORR_H, ALT, ESP, raiz, tetos, portas, paineis: paineisInfo, corr: { parede: mParC, chao: mChaoC, teto: mTetoC } },
       livre3D, area3D, atualizarPortas, atualizarParedes, recarregar, recarregarCena, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
@@ -1506,7 +1541,8 @@
       },
       descartar() {
         if (expoCena) { try { expoCena.r.descartar && expoCena.r.descartar(); } catch (e) {} expoCena.desc.forEach(d => { try { d.dispose(); } catch (e) {} }); expoCena = null; }
-        [...carregadas.keys()].forEach(descarregar);
+        [...carregadas.keys()].forEach(p => descarregar(p));
+        guardadas.forEach(destruir); guardadas.clear();
         portas.forEach(P => P && P.desc.forEach(x => { try { x.dispose(); } catch (e) {} }));
       }
     };
@@ -2332,6 +2368,9 @@
     // níveis de longe das formas (filhos3d.js): calculados depois, em fatias, enquanto este 3D estiver aberto
     if (NS().lodSessao) { NS().lodSessao(); NS().lodAdiar = true; }
     const ren = new T.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    // conferir o erro de cada shader (getProgramInfoLog) obriga o navegador a esperar a compilação na hora, num quadro só:
+    // era o maior pico ao entrar numa sala nova. Fica ligado só no teste local (localhost), para os erros aparecerem.
+    ren.debug.checkShaderErrors = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && lsG('acf-3d-semconferir', false) !== true;
     ren.setPixelRatio(1);
     const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, Qp ? Qp.prMax : alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x (Leve: 1)
     const sombras = (CFG.sombras === 'auto' ? alta : !!CFG.sombras) && !desempenhoAtivo();

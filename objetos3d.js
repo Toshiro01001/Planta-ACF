@@ -45,6 +45,8 @@
     tudo() { while (this.fila.length) this.desenhar(this.fila.shift()); },
     get pendentes() { return this.fila.length; },
   };
+  const TexSessao = { mapa: new Map(), limpar() { this.mapa.forEach(t => { try { t.dispose(); } catch (e) {} }); this.mapa.clear(); } };
+  ((window.ACF3D = window.ACF3D || {}).vista = window.ACF3D.vista || []).push({ fechar() { TexSessao.limpar(); } });
   function criarFabrica(T, anim, luzes, descartes, op = {}) {
     const ALT = op.alt || 3.0;
     const cacheM = new Map(), cacheT = new Map();
@@ -52,9 +54,16 @@
     const texCanvas = (c, rep) => { const t = guardar(new T.CanvasTexture(c)); t.encoding = T.sRGBEncoding; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rep[0], rep[1]); } return t; };
     // textura de superfície desenhada numa tela guardada para o site inteiro (outra sala, o 3D reaberto, outro andar
     // usam a mesma tela sem redesenhar); com o adiamento ligado (sala3d.js), sai na cor de base e o desenho vem depois
+    // a MESMA textura (tela + repetição) serve a todas as salas enquanto o 3D estiver aberto: cada sala nova fazia uma
+    // CanvasTexture nova da mesma tela e a placa recebia a imagem de novo (dezenas de envios ao entrar numa sala).
+    // Não entra nos descartes da sala; sai ao fechar o 3D (TexSessao.limpar).
     const texTela = (chave, tam, cor, rep, desenhar) => {
       const e = Telas.pegar(chave, tam, cor, desenhar);
-      const t = texCanvas(e.c, rep || [1, 1]);
+      const r = rep || [1, 1], k = chave + '|' + tam + '|' + r[0] + ',' + r[1];
+      let t = TexSessao.mapa.get(k);
+      if (t && t.image === e.c) return t;
+      t = new T.CanvasTexture(e.c); t.encoding = T.sRGBEncoding; t.anisotropy = 4; t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(r[0], r[1]);
+      TexSessao.mapa.set(k, t);
       if (!e.pronto) e.texs.add(t);
       return t;
     };
