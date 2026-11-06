@@ -1317,6 +1317,8 @@
       if (pd) interativos.push({ tipo: 'parede', cn: s.cn, p, pos: pd.pos, obj: pd.obj });
       const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN, parede: pd ? pd.obj : null, cena: s.cena };
       carregadas.set(p, c);
+      // Móveis V2 (Média e Alta, moveis_v2.js): troca só a aparência, depois das colisões e antes da fusão
+      if (NS().moveisV2 && NS().moveisV2.ativo()) { try { NS().moveisV2.trocar(T, g, s.cena, desc); } catch (e) { console.warn('3D móveis V2:', e); } }
       if (NS().inter) NS().inter.aplicar(c, true);
       if (FUNDIR) { try { c.fusao = fundirEstaticos(T, g, desc, IN); } catch (e) { console.warn('3D fusão:', e); } }
       atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
@@ -1423,6 +1425,24 @@
     }
     // remontar uma sala (versão Rei/Mãe trocada, cena nova)
     function recarregar(p) { if (guardadas.has(p)) { destruir(guardadas.get(p)); guardadas.delete(p); } if (carregadas.has(p)) { descarregar(p); carregar(p); } }
+    // Móveis V2 chegaram com salas já montadas: cada sala sai da fusão, troca a aparência e é fundida de novo
+    function trocarMoveisV2() {
+      const MV = NS().moveisV2; if (!MV || !MV.ativo()) return 0; let n = 0;
+      [...carregadas.values(), ...guardadas.values()].forEach(c => {
+        if (!c || !c.g || c.g.userData.moveisV2) return;
+        const f = c.g.userData.fusao;
+        if (f) { desfundir(f.malhas, c.g); c.g.userData.fusao = null; f.objs.forEach(({ o }) => { o.userData.fundido = false; }); }
+        try { n += MV.trocar(T, c.g, c.cena, c.desc); } catch (e) { console.warn('3D móveis V2:', e); }
+        if (FUNDIR) { try { c.fusao = fundirEstaticos(T, c.g, c.desc, c.inter); } catch (e) { console.warn('3D fusão:', e); } }
+        if (ctx.aquecer) ctx.aquecer(c.g);
+      });
+      return n;
+    }
+    // qualidade caiu para a Leve com o 3D aberto: as salas voltam a ser montadas com o V1
+    function refazerSalasV1() {
+      [...guardadas.keys()].forEach(p => { destruir(guardadas.get(p)); guardadas.delete(p); });
+      [...carregadas.keys()].forEach(p => { if (carregadas.get(p).g.userData.moveisV2) { descarregar(p); carregar(p); } });
+    }
     // a cena desta sala mudou (importada ou revelada com o 3D aberto): só ela é refeita, sem remontar o andar
     // corte de detalhe na vista de fora (casa de bonecas, andar inteiro): objeto não fundido que fica pequeno na tela
     // (raio na tela abaixo de DET_PX pixels, uns 8 px de diâmetro: some sem se notar) sai da câmera pela camada 1 (o
@@ -1573,7 +1593,7 @@
       a, S, CS, portas, interativos, carregadas, guardadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
       // o que o Mapa V2 (mapa_v2.js) precisa para trocar a aparência sem mexer em posição nem colisão
       v2: { S, CS, corr3D, CORR_W, CORR_H, ALT, ESP, raiz, tetos, portas, paineis: paineisInfo, corr: { parede: mParC, chao: mChaoC, teto: mTetoC } },
-      livre3D, area3D, atualizarPortas, atualizarParedes, recarregar, recarregarCena, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
+      livre3D, area3D, atualizarPortas, atualizarParedes, recarregar, recarregarCena, trocarMoveisV2, refazerSalasV1, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
@@ -2517,6 +2537,8 @@
     ctx.parado = () => !!V && performance.now() - (V.ultCam || 0) > 1200;
     // Mapa V2 (kit de terror do Blender): só na qualidade Alta; o arquivo e o kit baixam aqui, na primeira vez
     if (mapaV2Ligado()) { const ligar = () => { if (V && V.mundo === mundo && NS().mapaV2) NS().mapaV2.montar(ctx, mundo); }; if (NS().mapaV2) setTimeout(ligar, 0); else baixar('mapa_v2.js').then(ligar); }
+    // Móveis V2 (Média e Alta): modelos e texturas baixam na primeira vez; as salas já montadas trocam ao chegar
+    if (mapaV2Ligado()) { const ligarM = () => { if (V && V.mundo === mundo && NS().moveisV2) NS().moveisV2.iniciar(ctx, mundo); }; if (NS().moveisV2) setTimeout(ligarM, 0); else baixar('moveis_v2.js').then(ligarM); }
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
     pintarBarra();
 

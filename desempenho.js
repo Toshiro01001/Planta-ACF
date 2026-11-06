@@ -161,6 +161,7 @@
           try { if (window.ACF3D && ACF3D.v2) ACF3D.v2.aplicarQualidade(); } catch (e) {}
           if (novo === 'leve') {
             try { if (window.ACF3D && ACF3D.mapaV2 && ACF3D.mapaV2.aplicarQualidade) ACF3D.mapaV2.aplicarQualidade(false); } catch (e) {}
+            try { if (window.ACF3D && ACF3D.moveisV2 && ACF3D.moveisV2.aplicarQualidade) ACF3D.moveisV2.aplicarQualidade(false); } catch (e) {}
             try { if (this.ap && typeof this.ap.aplicarDesempenho === 'function') this.ap.aplicarDesempenho(); } catch (e) {}
           }
           avisarQ(`⚙ O 3D estava pesado neste aparelho: qualidade ${NOME[novo]}. Para voltar, Opções › Gráficos › Qualidade.`);
