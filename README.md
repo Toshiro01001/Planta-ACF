@@ -31,6 +31,7 @@ Mapa 2.5D dos cinco andares da Caixa, com a posição das cobaias, das cobaias N
 | `momento.js` | Encontro (a passagem da exploração para a perseguição), cartas de ação na vez, sons dos Filhos, lanterna com bateria, mapa que mente, sustos que só um jogador vê, câmeras de segurança, corpos e o acabamento do 3D (fumaça, poeira na luz, sombras dos tokens). Código genérico: quem tem o quê fica nos dados secretos |
 | `imersao.js` | Imersão automática: qualidade do 3D que se ajusta sozinha, coração e respiração do personagem, vibração do celular, luzes e telas que reagem a um Filho por perto, marcas que ficam no 3D, backup automático, resumo da sessão, tutorial da primeira vez e modo foto (ver "Imersão automática"). Código genérico |
 | `fuga3d.js` | Fuga dos jogadores no 3D: rota com custo e "ele te pega aqui", olhar para trás, barricadas, esconderijo por dentro, barulho de propósito e sinais (ver "Fuga dos jogadores"). Código genérico |
+| `tela.js` | Modo Tela: a janela da TV da mesa (`?tv=1`) e o controle dela no bloco Mesa do Mestre; as duas janelas conversam por BroadcastChannel (ver "Modo Tela"). Código genérico |
 | `visao3d.js` | Visão da criatura: no Controle de um Filho (Mestre e auxiliares), a câmera vai para os olhos dele, com um filtro por forma 3D e os sentidos dele por cima (ver "Visão da criatura"). Código genérico |
 | `perseg3d.js` | Os Filhos na perseguição, do lado do Mestre: piloto automático (rota sugerida pelos sentidos), comportamento visível no 3D, abertura da perseguição, o Filho que para na porta da Zona Neutra, replay visto de cima e a linha de iniciativa no topo do 3D (ver "Os Filhos na perseguição"). Código genérico |
 | `disfarce3d.js` | Disfarce no 3D (Forma de Objeto e cópia, no espírito do Prop Hunt): virar qualquer modelo da sala ou qualquer cobaia, sempre com um detalhe errado que só se vê de perto, o "🔍 Reparar" dos jogadores e a quebra do disfarce (ver "Disfarce no 3D"). Código genérico |
@@ -146,7 +147,23 @@ Diário, anotações, funções, Balança e a lista do apagão ficam em `segredo
 - **Trilhas de Ausência:** no cartão da sala, "Sem sinal"; quem entrar vê só a própria ficha até sair.
 - **Exposição (NEX):** conta as entradas de cada cobaia em salas de cada elemento.
 - **Arquivos nas salas:** texto e imagem anexados pelo Mestre, revelados quando ele quiser; o jogador abre pelo cartão da sala.
-- **Tela da mesa:** `…/Planta-ACF/?tv=1` mostra só o mapa, com a visão dos jogadores, para uma TV.
+- **Tela da mesa:** `…/Planta-ACF/?tv=1` mostra só o mapa, com a visão dos jogadores, para uma TV. Ver "Modo Tela".
+
+### Modo Tela (TV da mesa)
+
+Para a TV ligada no computador do Mestre (cabo HDMI, 2º monitor). Bloco **Mesa** (aba Sessão) › **📺 Modo Tela**:
+
+- **Abrir a janela da Tela:** abre uma janela só com o mapa. Arraste-a para a TV e clique nela uma vez (tela cheia). O status mostra "● Tela conectada" com a resolução real.
+- **Vista:** 3D ou 2.5D. A Tela fica travada na vista escolhida, mesmo que você mude a sua.
+- **Câmera** (troque quando quiser):
+  - **Segue os jogadores:** vai para o andar com mais cobaias e enquadra todas; aproxima ou afasta conforme elas se espalham.
+  - **Eu escolho a sala ou o jogador:** lista os jogadores e as salas já reveladas.
+  - **Copia a minha câmera:** a Tela mostra o que o seu 3D (ou o seu 2.5D) está mostrando. Quando você controla um token que não seja uma cobaia à vista (um Filho, um NPC, uma cobaia oculta) ou entra na visão da criatura, a Tela **congela** na última imagem e o bloco avisa.
+- **Resolução do 3D:** 720p, 1080p, 4K ou a nativa da TV. Vale só para a Tela; a qualidade automática continua ajustando o resto (sombras, luzes), mas não mexe nessa resolução.
+- **Som na Tela:** começa desligado (o som do seu computador já sai). Ligue se a TV for a caixa de som da mesa.
+- **O que a Tela mostra:** o mesmo que a mesa enxerga. Cobaias à vista (inclusive as escondidas num esconderijo, como para um auxiliar), salvo as que você ocultou e durante o apagão; Filhos, NPCs e robôs pelas regras do jogador (ocultos, no teto, Forma de Objeto e lentes não aparecem); salas reveladas e as salas onde há cobaia; andares em que a mesa já está ou que têm sala revelada.
+- **Segurança:** a janela da Tela nunca usa a conta de quem a abriu. Se herdar a sessão do Mestre, ela sai dessa conta só nela mesma; nada do privado é lido. Os comandos e a câmera passam de uma janela à outra pelo navegador (BroadcastChannel), sem servidor: só funciona no mesmo computador e no mesmo navegador.
+- **Desempenho:** a Tela desenha o 3D de novo, na placa de vídeo do mesmo computador. Com o seu 3D aberto ao mesmo tempo, são duas cenas por quadro; em 4K, a Tela custa cerca de 4 vezes o que custa em 1080p.
 
 ## Loja do Maurício
 

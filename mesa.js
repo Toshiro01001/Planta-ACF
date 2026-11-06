@@ -60,7 +60,7 @@ function desenharHud() {
   let ids = [];
   if (A.mestre) ids = cobaias().map(c => c.id).filter(id => !hudOffMeu()[id]);
   else if (A.meu && !hudOffJog()[A.meu]) ids = [A.meu];
-  if (A.tv) ids = cobaias().map(c => c.id).filter(id => !hudOffJog()[id] && (est().tokens || {})[id]);
+  if (A.tv) ids = cobaias().map(c => c.id).filter(id => !hudOffJog()[id] && (est().tokens || {})[id] && !(est().tokens || {})[id].h);   // a cobaia que o Mestre ocultou não aparece na TV
   caixa.classList.toggle('muitos', ids.length > 1);
   caixa.hidden = !ids.length || !!ls.get('acf-hud-recolhido', false) && !A.mestre;
   const html = ids.map(id => {

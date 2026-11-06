@@ -129,6 +129,9 @@ function visivelPara(tk) {
   if (v.mestre) return true;
   const tipo = SER[tk.s].tipo;
   if (tipo === 'espectro') return !!v.aux || (!!v.meu && tk.vis === v.meu);
+  // Modo Tela (TV da mesa): as cobaias aparecem como para um auxiliar (escondidas também: a mesa toda sabe onde
+  // elas estão), salvo as que o Mestre ocultou e o apagão; o resto segue as regras do jogador, sem dono
+  if (TV && tipo === 'cobaia') return !tk.h && !apagaoAtivo();
   // auxiliar: vê tudo, a menos que esteja usando os sentidos de um Filho (filhos.js)
   if (v.aux) return window.ACF_FILHOS ? ACF_FILHOS.veAux(tk) : true;
   // ocultação especial dos Filhos (no teto, na parede, forma de objeto…): some para os jogadores
@@ -244,6 +247,9 @@ const Store = {
     // abertos no mesmo navegador sem um derrubar o outro
     try { await this.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch (e) {}
     this.auth.onAuthStateChanged(u => {
+      // Modo Tela: a janela pode ter herdado a sessão do Mestre (sessionStorage copiado pelo window.open); ela sai
+      // dessa conta só nesta janela e nunca vira Mestre nem auxiliar (nada do privado é lido aqui)
+      if (TV) { if (u && !u.isAnonymous) this.auth.signOut().catch(() => {}); return; }
       const ehAux = !!u && !u.isAnonymous && (u.email || '').toLowerCase() === EMAIL_AUXILIARES;
       const ehGM = !!u && !u.isAnonymous && !ehAux;
       // a conta do Mestre também pode jogar como auxiliar sem sair (as regras do Firebase permitem tudo ao Mestre)
@@ -915,7 +921,15 @@ function esconderDica() { if (!dicaFeita) { dicaFeita = true; $('#dica').style.o
    DESENHO DA PLANTA
    ========================================================= */
 let andarAtual = 1;
-const podeVer = a => mestre || !!aux || (liberados.has(a) && nInt(liberadosVer['a' + a]) >= versaoTranca(a));
+const podeVer = a => mestre || !!aux || (TV ? telaAndar(a) : liberados.has(a) && nInt(liberadosVer['a' + a]) >= versaoTranca(a));
+// Modo Tela: não depende das senhas digitadas neste navegador (o do Mestre); mostra o andar onde a mesa já está
+function telaAndar(a) {
+  if (a === 1) return true;
+  const st = Store.state || {};
+  if (Object.values(st.tokens || {}).some(tk => tk && tk.a === a && SER[tk.s] && SER[tk.s].tipo === 'cobaia' && !tk.h)) return true;
+  const sl = st.salas || {}; for (let p = 1; p <= 25; p++) if (sl['c' + (25 * (a - 1) + p)]) return true;
+  return false;
+}
 
 function el(tag, cls, estilo) {
   const e = document.createElement(tag);
@@ -4977,7 +4991,7 @@ function desenharMinhaFicha() {
    Só o mapa, com a visão dos jogadores; segue o andar onde estão as cobaias.
    ========================================================= */
 function seguirAndarTV() {
-  if (!TV) return;
+  if (!TV || window.ACF_TELA) return;
   const cont = {};
   Object.values(Store.state.tokens || {}).forEach(tk => {
     if (SER[tk.s] && SER[tk.s].tipo === 'cobaia' && visivelPara(tk) && podeVer(tk.a)) cont[tk.a] = (cont[tk.a] || 0) + 1;
@@ -4985,7 +4999,7 @@ function seguirAndarTV() {
   const melhor = Object.entries(cont).sort((x, y) => y[1] - x[1])[0];
   if (melhor && +melhor[0] !== andarAtual) irParaAndar(+melhor[0]);
 }
-$('#btnTV').addEventListener('click', () => window.open(location.pathname + '?tv=1', '_blank'));
+// o botão do Modo Tela fica com o tela.js (janela própria, sem herdar a sessão)
 
 /* ---------- Painel do Mestre: subtítulo, importação, opções ---------- */
 function desenharOpcoesMestre() {
@@ -5484,6 +5498,7 @@ function desenharConectados() {
    ========================================================= */
 let mudo = false;
 try { mudo = localStorage.getItem('acf-mudo') === '1'; } catch (e) {}
+if (TV) mudo = true;   // Modo Tela: começa calada; o Mestre liga o som da Tela no bloco Mesa (tela.js)
 function aplicarMudo() { $('#btnSom').textContent = mudo ? '🔇' : '🔊'; $('#btnSom').classList.toggle('ativo', mudo); }
 $('#btnSom').addEventListener('click', () => {
   mudo = !mudo;
@@ -6722,7 +6737,7 @@ function ruidoPior() {
 window.ACF = {
   Rede, SER, SERES, esc, aviso, imagemReduzida, rolagemDaFicha, Som, COND, publicarVitais, enviarChat, condicoesVisiveis,
   get estado() { return Store.state; }, aoMudar: fn => Store.aoMudar(fn), soTokens: () => Store.soTokens(), definir: (c, v) => Store.definir(c, v),
-  get mudo() { return mudo; }, get vez() { return vezAtual(); }, get tv() { return TV; },
+  get mudo() { return mudo; }, set mudoTela(v) { if (TV) mudo = !!v; }, get vez() { return vezAtual(); }, get tv() { return TV; },
   get pronto() { return Store.modo === 'firebase' || !FIREBASE; },
   garantirLogin: () => (Store.modo === 'firebase' && !mestre && Store.auth && !Store.auth.currentUser ? Store.garantirLogin() : Promise.resolve()),
   get mestre() { return mestre; }, get meu() { return meu; }, get aux() { return aux; },
@@ -6758,6 +6773,8 @@ window.ACF = {
   get auxLogado() { return !!aux && (Store.modo !== 'firebase' || auxLogado); },
   // holofote: leva a câmera até uma sala ou uma ficha (só se o andar estiver liberado para quem vê)
   focarSala(cn) { const a = Math.ceil(cn / 25), p = cn - 25 * (a - 1); if (!podeVer(a) || !POS[p]) return false; irParaAndar(a); const s = retSala(p); focar(s.x + s.w / 2, s.y + s.h / 2); if (salaVisivel(a, cn)) selecionarSala(cn); return true; },
+  focarPonto(x, y, s) { if (s) cam.s = s; focar(x, y); },
+  get escalaInteira() { const r = viewport.getBoundingClientRect(), t = cam.tilt * Math.PI / 180; return Math.min(r.width / (W * T), r.height / (H * T * Math.cos(t) + WH * T * Math.sin(t) + 80)) * 0.92; },
   focarToken(id) { const tk = (Store.state.tokens || {})[id]; if (!tk || !tk.a || !podeVer(tk.a)) return false; irParaAndar(tk.a); focar(tk.x, tk.y); return true; },
   get andarAtual() { return andarAtual; },
   irAndar: a => { if (a >= 1 && a <= 5) irParaAndar(a); },

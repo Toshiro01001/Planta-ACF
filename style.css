@@ -1099,16 +1099,44 @@ body.em-persg .relogio { top: 46px; }
 /* =========================================================
    TELA DA MESA (modo TV)
    ========================================================= */
-body.tv .corpo { grid-template-columns: 0 1fr 0; }
+/* elevador e painel somem (display: none): o mapa é o único item da grade e ocupa tudo */
+body.tv .corpo { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 body.tv .elevador, body.tv .painel, body.tv .topo-dir, body.tv .camera, body.tv .btn-dados,
 body.tv .btn-desfazer, body.tv .dica, body.tv .aba-painel, body.tv #perfil, body.tv .cartao { display: none !important; }
 body.tv .andar-legenda span { font-size: 34px; }
+/* Modo Tela: sem nada do 3D por cima do mapa (barra, dicas, contadores, menus) */
+body.tv #s3d .s3d-topo, body.tv #s3d .s3d-barra, body.tv #s3dDica, body.tv #s3dFps, body.tv #s3dDb, body.tv #s3dMetros,
+body.tv #s3dPrompt, body.tv #s3dToast, body.tv #s3dHab, body.tv #s3dJoy, body.tv #s3dPainel, body.tv #s3dMenu, body.tv #s3dMira,
+body.tv #s3dGaveta, body.tv #s3dOpcoes, body.tv .btn-chat, body.tv #painelChat, body.tv #aviso, body.tv #suaVez,
+body.tv #faixaConexao { display: none !important; }
+body.tv #stage { transition: transform .9s ease; }
+body.tv.tela-quieta, body.tv.tela-quieta * { cursor: none !important; }
+#telaCapa { position: fixed; z-index: 9999; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 8px;
+  align-items: center; text-align: center; padding: 22px 28px; max-width: min(520px, calc(100vw - 32px)); background: rgba(10, 8, 14, .92);
+  border: 1px solid #6b4fb0; border-radius: 14px; color: #efe8fa; font: 15px/1.4 system-ui, sans-serif; cursor: pointer !important;
+  transition: all .5s ease; }
+#telaCapa b { font-size: 22px; }
+#telaCapa small { opacity: .7; }
+#telaCapa.canto { left: auto; top: auto; right: 16px; bottom: 16px; transform: none; padding: 8px 12px; opacity: .35; }
+#telaCapa.canto span, #telaCapa.canto small { display: none; }
+#telaCapa.canto b { font-size: 13px; }
+#telaCapa.fora { opacity: 0; pointer-events: none; }
+/* controle no bloco Mesa (Mestre) */
+.tela-ctl { border: 1px solid rgba(160, 130, 230, .35); border-radius: 10px; padding: 10px 12px; margin: 10px 0; display: grid; gap: 8px; }
+.tela-ctl h3 { margin: 0; font-size: 14px; }
+.tela-ctl .ferramentas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.tela-st { font-size: 12px; opacity: .75; }
+.tela-st.on { color: #5fd38a; opacity: 1; }
+.tela-aviso { margin: 0; font-size: 12px; color: #e9b84a; }
+.tela-ctl > * { min-width: 0; max-width: 100%; box-sizing: border-box; margin-left: 0; margin-right: 0; }
+.tela-ctl select { width: 100%; max-width: 100%; box-sizing: border-box; }
+.tela-ctl .chave { box-sizing: border-box; width: 100%; }
 
 @media (max-width: 860px) {
   .painel-chat { width: auto; left: 0; top: var(--topo-h); z-index: 45; border-left: 0; }
   .btn-chat { padding: 9px 10px; }
   .relogio { top: 10px; font-size: 13px; }
-  body.tv .corpo { grid-template-rows: 0 1fr; }
+  body.tv .corpo { grid-template-rows: 1fr; }
 }
 /* chat aberto no computador: o símbolo do Eco e o cartão não ficam por baixo */
 @media (min-width: 861px) {

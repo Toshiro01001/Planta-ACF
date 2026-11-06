@@ -298,9 +298,11 @@ const Qual = {
     this.carencia(2500);
   },
   resolucao(esc) {
-    const ap = this.ap, ren = ap.ren, quer = Math.max(.35, this.base * esc);
+    const ap = this.ap, ren = ap.ren, el = ren.domElement, pai = el.parentElement, w = (pai && pai.clientWidth) || innerWidth, h = (pai && pai.clientHeight) || innerHeight;
+    // Modo Tela: a resolução é a que o Mestre escolheu (os outros degraus da qualidade automática continuam valendo)
+    const fixa = window.ACF_TELA && ACF_TELA.dpr ? ACF_TELA.dpr(h) : 0;
+    const quer = fixa || Math.max(.35, this.base * esc);
     if (Math.abs(ren.getPixelRatio() - quer) < .01) return;
-    const el = ren.domElement, pai = el.parentElement, w = (pai && pai.clientWidth) || innerWidth, h = (pai && pai.clientHeight) || innerHeight;
     ren.setPixelRatio(quer); ren.setSize(w, h, false); try { ap.pos.tamanho(w, h, quer); } catch (e) {}
   },
   cam() { return this.ap && this.aplicado !== null ? DEGRAUS[this.aplicado].cam || '' : ''; },
@@ -839,7 +841,7 @@ const Tut = {
     ];
   },
   talvez(ap) {
-    if (!ap.V || ap.V.quem !== 'jog' || ls.get('acf-imr-tutorial', false)) return;
+    if (!ap.V || ap.V.quem !== 'jog' || (window.ACF && ACF.tv) || ls.get('acf-imr-tutorial', false)) return;   // a TV da mesa não tem quem aperte
     setTimeout(() => { if (api3() === ap && !ls.get('acf-imr-tutorial', false)) this.mostrar(); }, 1600);
   },
   mostrar() {

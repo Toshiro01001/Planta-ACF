@@ -1388,12 +1388,15 @@
     function salaVisivel(p) {
       if (ctx.quem === 'mestre') return true;
       if (ctx.quem === 'aux') return !!A.salaRevelada(S[p].cn);
+      // Modo Tela: as salas reveladas e as que têm cobaia à vista (como a mesa enxerga)
+      if (A.tv) return !!A.salaRevelada(S[p].cn) || Object.values(tokens()).some(tk => tk && tk.a === a && A.SER[tk.s] && A.SER[tk.s].tipo === 'cobaia' && A.visivelPara(tk) && MAPA.g.salaEm(a, tk.x, tk.y) === p);
       return p === ctx.salaJogador();
     }
     let tStream = 0, visAntes = '', pFoco = null;
     function streaming(x, z, modo) {
       const quer = new Set();
-      if (ctx.quem === 'jog') { const pj = ctx.salaJogador(); if (pj) quer.add(pj); }
+      // jogador: só a sala do próprio token; a TV da mesa (sem token) carrega em volta da câmera, como o Mestre
+      if (ctx.quem === 'jog' && !A.tv) { const pj = ctx.salaJogador(); if (pj) quer.add(pj); }
       else {
         const p0 = salaNoPonto3D(a, x, z) || centroMaisPerto(x, z); quer.add(p0);
         const largo = !imersivo(modo) && ctx.zoomLargo();
@@ -1405,7 +1408,7 @@
       const extra = new Set([...(ctx.extraSalas || [])].filter(p => S[p] && !quer.has(p)));
       [...carregadas.keys()].forEach(p => { if (!quer.has(p) && !extra.has(p)) descarregar(p, true); });
       // a sala da câmera primeiro (é a única que precisa aparecer na hora)
-      pFoco = ctx.quem === 'jog' ? ctx.salaJogador() : (salaNoPonto3D(a, x, z) || centroMaisPerto(x, z));
+      pFoco = ctx.quem === 'jog' && !A.tv ? ctx.salaJogador() : (salaNoPonto3D(a, x, z) || centroMaisPerto(x, z));
       const falta = (quer.has(pFoco) && !carregadas.has(pFoco) ? pFoco : null) || [...quer].find(p => !carregadas.has(p)) || [...extra].find(p => !carregadas.has(p));
       if (falta) carregar(falta);
       const aqLivre = !(ctx.aq && ctx.aq.pendentes());
@@ -1618,7 +1621,7 @@
       if (!A.visivelPara(tk)) return false;
       // auxiliar no Controle de um Filho: enxerga como o Filho (escondido e aprovado no teste some)
       if (ctx.quem === 'aux') { const c = ctx.ctrlAtual(), tc = c && tokens()[c]; if (tc && A.SER[tc.s] && A.SER[tc.s].tipo === 'filho' && A.visivelAoFilho && !A.visivelAoFilho(tk, c)) return false; }
-      if (ctx.quem !== 'jog' || id === A.meu) return true;
+      if (ctx.quem !== 'jog' || id === A.meu || A.tv) return true;
       const g = MAPA.g, pj = ctx.salaJogador(), pt = g.salaEm(a, tk.x, tk.y);
       if (pt) return pt === pj;
       const ci = g.corredorEm(tk.x, tk.y), meuTk = tokens()[A.meu];
@@ -2444,7 +2447,7 @@
     // era o maior pico ao entrar numa sala nova. Fica ligado só no teste local (localhost), para os erros aparecerem.
     ren.debug.checkShaderErrors = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && lsG('acf-3d-semconferir', false) !== true;
     ren.setPixelRatio(1);
-    const dpr = Math.max(.35, Math.min(devicePixelRatio || 1, Qp ? Qp.prMax : alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x (Leve: 1)
+    let dpr = Math.max(.35, Math.min(devicePixelRatio || 1, Qp ? Qp.prMax : alta ? 1.5 : 1.25) * (+CFG.escala || 1));   // nunca acima de 1,5: 2x de pixels custa 4x (Leve: 1)
     const sombras = (CFG.sombras === 'auto' ? alta : !!CFG.sombras) && !desempenhoAtivo();
     ren.outputEncoding = T.sRGBEncoding; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.25;
     ren.shadowMap.enabled = sombras; ren.shadowMap.type = T.PCFSoftShadowMap;
@@ -2517,7 +2520,10 @@
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
     pintarBarra();
 
-    const tamanho = () => { const w = palco.clientWidth || innerWidth, h = palco.clientHeight || innerHeight; ren.setPixelRatio(dpr); ren.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); pos.tamanho(w, h, dpr); };
+    const tamanho = () => { const w = palco.clientWidth || innerWidth, h = palco.clientHeight || innerHeight;
+      // Modo Tela: resolução escolhida pelo Mestre (720p, 1080p, 4K ou a nativa da TV)
+      if (window.ACF_TELA && ACF_TELA.dpr) { const d = ACF_TELA.dpr(h); if (d) dpr = d; }
+      ren.setPixelRatio(dpr); ren.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); pos.tamanho(w, h, dpr); };
     tamanho(); V.tamanho = tamanho; addEventListener('resize', tamanho);
     definirModo(op.manter ? (op.manter.cam.modo === 'jogo' && !V.ctrl ? 'fora' : op.manter.cam.modo) : (V.ctrl ? 'jogo' : 'fora'));
     $('#s3dCN').textContent = `${a}º ANDAR`;
@@ -2809,8 +2815,16 @@
         cam.lookAt(alvo);
       }
       cam.updateProjectionMatrix();
-      const foco = imersivo(est.modo) || V.ctrl ? [est.px, est.pz] : [alvo.x, alvo.z];
-      mundo.atualizar(dt, tt, foco[0], foco[1], est.modo, cam.position);
+      let foco = imersivo(est.modo) || V.ctrl ? [est.px, est.pz] : [alvo.x, alvo.z], modoF = est.modo;
+      // Modo Tela copiando a câmera do Mestre: posição e direção vêm da outra janela; as salas carregam em volta do foco dele
+      const ct = V.camTela;
+      if (ct) {
+        cam.position.set(ct.p[0], ct.p[1], ct.p[2]); cam.quaternion.set(ct.q[0], ct.q[1], ct.q[2], ct.q[3]);
+        if (ct.fov) cam.fov = ct.fov; cam.updateProjectionMatrix();
+        foco = ct.f || [ct.p[0], ct.p[2]]; modoF = ct.m || est.modo;
+      }
+      V.foco = foco;
+      mundo.atualizar(dt, tt, foco[0], foco[1], modoF, cam.position);
       if (NS().inter) { NS().inter.ouvinte = [cam.position.x, cam.position.z]; V.qVideo = (V.qVideo || 0) + 1; if (V.qVideo % 2 === 0) { try { NS().inter.videoQuadro(T, cam, ren.domElement, mundo.interativos, salaNoPonto3D(V.a, cam.position.x, cam.position.z), cam.position.x, cam.position.z); } catch (e) {} } }
       tok.atualizar(dt, tt, V.ctrl, V.ctrl ? [est.px, est.pz] : null, est.modo, cam.position, est.yaw);
       // lanterna: sai dos olhos (dentro) ou do token (fora)
@@ -3594,8 +3608,8 @@
       tVigia = null;
       if (!V) return;
       const A = ACF(), a = V.a, e = A.estado || {};
-      // jogador: se o token mudou de andar, o 3D vai junto; se saiu do mapa, fecha
-      if (V.quem === 'jog') {
+      // jogador: se o token mudou de andar, o 3D vai junto; se saiu do mapa, fecha (o Modo Tela não tem token: o tela.js cuida)
+      if (V.quem === 'jog' && !A.tv) {
         const tk = (e.tokens || {})[A.meu];
         if (!tk) { fechar(); A.aviso('O token da sua cobaia saiu do mapa: o 3D foi fechado.'); return; }
         if (tk.a !== a) {
@@ -3665,6 +3679,17 @@
     abrir, fechar, cenaDe, podeAbrir, publicar: agendarPublicar, andarTeste, interagir, abrirDireto, controlar, carregarThree,
     virar(yaw) { if (V) V.cam.yaw = yaw; }, modo: definirModo,
     get aberta() { return !!V; },
+    // Modo Tela: câmera do Mestre (posição, direção, foco) e se pode ir para a TV (não pode no Controle de um Filho,
+    // na visão da criatura nem com o token de alguém oculto)
+    get camMundo() {
+      if (!V || !V.camera) return null;
+      const A = ACF(), c = V.camera, tk = V.ctrl ? ((A.estado || {}).tokens || {})[V.ctrl] : null, s = tk && A.SER[tk.s];
+      const ok = !(window.ACF_VISAO && ACF_VISAO.ativa) && (!V.ctrl || (s && s.tipo === 'cobaia' && !tk.h));
+      return { a: V.a, p: [c.position.x, c.position.y, c.position.z].map(v => +v.toFixed(3)), q: [c.quaternion.x, c.quaternion.y, c.quaternion.z, c.quaternion.w].map(v => +v.toFixed(4)), fov: +c.fov.toFixed(1), f: (V.foco || [V.cam.px, V.cam.pz]).map(v => +v.toFixed(2)), m: V.cam.modo, ok };
+    },
+    set camTela(o) { if (V) V.camTela = o || null; },
+    get camTela() { return V ? V.camTela || null : null; },
+    redimensionar() { if (V && V.tamanho) V.tamanho(); },
     // câmera parada há mais de 1,2 s (trabalho grosso de outras partes do site espera por isso)
     get parado() { return V && V.api && V.api.ctx && V.api.ctx.parado ? V.api.ctx.parado() : true; },
     get estado() { return V ? { a: V.a, cam: { ...V.cam }, quem: V.quem, ctrl: V.ctrl, tokens: [...V.tok.mapa.keys()], salas: [...V.mundo.carregadas.keys()], perto: V.pertoDe(), preso: V.preso || null, campos: V.mundo.campos.length } : null; },

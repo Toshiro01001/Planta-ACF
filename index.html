@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&family=Special+Elite&family=Caveat:wght@400;700&family=Permanent+Marker&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261104c">
+<link rel="stylesheet" href="style.css?v=20261105c">
 <link rel="stylesheet" href="paineis.css?v=20261103r">
 <link rel="stylesheet" href="qol.css?v=20261104c">
 </head>
@@ -316,8 +316,25 @@
         <select id="selEspiar"><option value="">Ninguém (visão do Mestre)</option></select>
       </label>
       <label class="chave"><input type="checkbox" id="chkRolAberta"><span>Rolagens dos jogadores aparecem no chat Geral (desmarcado: só você vê, no Sussurro)</span></label>
+      <div class="tela-ctl" id="telaCtl">
+        <h3>📺 Modo Tela (TV da mesa)</h3>
+        <div class="ferramentas"><button id="btnTV" class="btn-fantasma">Abrir a janela da Tela</button><span class="tela-st" id="telaSt">○ Tela fechada</span></div>
+        <label class="campo-linha">Vista
+          <select id="telaVista"><option value="3d">3D</option><option value="2d">2.5D</option></select>
+        </label>
+        <label class="campo-linha">Câmera
+          <select id="telaCam"><option value="seguir">Segue os jogadores</option><option value="escolher">Eu escolho a sala ou o jogador</option><option value="copiar">Copia a minha câmera</option></select>
+        </label>
+        <label class="campo-linha" id="telaAlvoL" hidden>Mostrar
+          <select id="telaAlvo"></select>
+        </label>
+        <label class="campo-linha" id="telaResL">Resolução do 3D
+          <select id="telaRes"><option value="720">720p</option><option value="1080">1080p</option><option value="2160">4K</option><option value="nativa">Nativa da TV</option></select>
+        </label>
+        <label class="chave"><input type="checkbox" id="telaSom"><span>Som na Tela (desligado: o som sai só do seu computador)</span></label>
+        <p class="tela-aviso" id="telaAviso" hidden></p>
+      </div>
       <div class="ferramentas">
-        <button id="btnTV" class="btn-fantasma">Abrir a tela da mesa (modo TV)</button>
         <button id="btnTesteSom" class="btn-fantasma">Testar o som do alarme</button>
         <button id="btnHash" class="btn-fantasma">Gerar hash de senha</button>
         <button id="btnReset" class="btn-fantasma">Recolocar cobaias na Zona Neutra…</button>
@@ -720,11 +737,11 @@
 <script src="data.js?v=20261031p"></script>
 <script src="config.js?v=20261020b"></script>
 <script src="escudo.js?v=20261020b"></script>
-<script src="app.js?v=20261104d"></script>
+<script src="app.js?v=20261105a"></script>
 <script src="catalogo-op.js?v=20261020b"></script>
 <script src="fichas.js?v=20261103o"></script>
 <script src="quadro.js?v=20261020b"></script>
-<script src="mesa.js?v=20261104c"></script>
+<script src="mesa.js?v=20261105a"></script>
 <script src="sah-dados.js?v=20261020b"></script>
 <script src="sah.js?v=20261103o"></script>
 <script src="limpo.js?v=20261103o"></script>
@@ -740,12 +757,12 @@
 <script src="tokens3d.js?v=20261105c"></script>
 <script src="vozes.js?v=20261103o"></script>
 <script src="dados3d.js?v=20261103o"></script>
-<script src="sala3d.js?v=20261105i"></script>
+<script src="sala3d.js?v=20261105l"></script>
 <script src="nevoa.js?v=20261104c"></script>
 <script src="filhos.js?v=20261103r"></script>
 <script src="momento.js?v=20261103o"></script>
 <script src="sons-filhos.js?v=20261103o"></script>
-<script src="imersao.js?v=20261105b"></script>
+<script src="imersao.js?v=20261105d"></script>
 <script src="visao3d.js?v=20261103o"></script>
 <script src="perseg3d.js?v=20261103o"></script>
 <script src="fuga3d.js?v=20261104c"></script>
@@ -754,5 +771,6 @@
 <script src="paineis.js?v=20261104d"></script>
 <script src="qol.js?v=20261104c"></script>
 <script src="comando.js?v=20261104c"></script>
+<script src="tela.js?v=20261105a"></script>
 </body>
 </html>
