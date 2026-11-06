@@ -3345,7 +3345,7 @@
       <nav class="s3d-op-abas">${[['graficos', 'Gráficos'], ['camera', 'Câmera e mouse'], ['controles', 'Controles'], ['audio', 'Áudio e chat']].map(([k, t]) => `<button type="button" data-aba-op="${k}" class="${abaOp === k ? 'on' : ''}">${t}</button>`).join('')}</nav>`;
     if (abaOp === 'graficos') {
       h += `<section><p class="mini">Abaixe o que pesar no seu aparelho. As marcadas com ↻ reabrem o 3D na hora.</p>
-        <label class="s3d-lin"><span>Qualidade ↻</span><select data-qual>${(QD ? [['auto', 'Automático']] : []).concat([['alta', 'Alta (modelos V2)'], ['baixa', 'Leve (simples, menos efeitos)']]).map(([v, t]) => `<option value="${v}" ${qEsc === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="s3d-lin"><span>Qualidade ↻</span><select data-qual>${(QD ? [['auto', 'Automático']] : []).concat([['alta', 'Alta (tudo V2/V3)'], ['media', 'Média (mapa V2, personagens V3)'], ['baixa', 'Leve (simples, menos efeitos)']]).map(([v, t]) => `<option value="${v}" ${qEsc === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         ${faixa('escala', .5, 1.5, .05, 'Escala de resolução ↻', pct)}
         ${sel('sombras', auto, 'Sombras da lanterna ↻')}
         ${sel('brilho', auto, 'Brilho das luzes (bloom)')}

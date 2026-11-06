@@ -93,74 +93,85 @@
   });
 
   /* ================= seletor de qualidade (Opções › Gráficos › Qualidade) =================
-     Automático (padrão), Leve (modelos V1, Modo Desempenho, pixel ratio 1) ou Alta (modelos V2 do Blender).
-     Guardado neste aparelho (acf-s3d-qualidade: 'auto' | 'baixa' | 'alta'; 'baixa' é a Leve, nome antigo).
-     O Automático decide pelo aparelho (memória, núcleos, celular e tela) e, com o 3D aberto, cai para Leve se o
-     quadro ficar lento por QD_QUEDA segundos seguidos (fora das carências). Histerese: depois de cair, só volta a
-     tentar a Alta depois de QD_VOLTA de folga firme (e a troca vale na próxima abertura do 3D, sem trocar modelo com
-     o jogo rodando), e a decisão fica guardada por 3 dias. */
+     Automático (padrão), Leve (tudo V1, Modo Desempenho, pixel ratio 1), Média (mapa V2 + personagens V3, criaturas
+     na V1, efeitos médios) ou Alta (tudo: mapa V2, criaturas V2 e personagens V3).
+     Guardado neste aparelho (acf-s3d-qualidade: 'auto' | 'baixa' | 'media' | 'alta'; 'baixa' é a Leve, nome antigo).
+     O Automático decide pelo aparelho (computador: Alta; celular forte: Média; o resto: Leve) e, com o 3D aberto, desce
+     UM degrau (Alta → Média → Leve) se o quadro ficar lento por QD_QUEDA segundos seguidos (fora das carências).
+     Histerese: depois de descer, só volta a tentar o degrau de cima depois de QD_VOLTA de folga firme (e a subida
+     vale na próxima abertura do 3D, sem trocar modelo com o jogo rodando), e a decisão fica guardada por 3 dias. */
   const QK = 'acf-s3d-qualidade', QA = 'acf-qualidade-auto';
+  const NIV = { auto: -1, baixa: 0, leve: 0, media: 1, alta: 2 }, NOME = { leve: 'Leve', baixa: 'Leve', media: 'Média', alta: 'Alta' };
   const QD_QUEDA = 6, QD_FPS_BAIXO = 24, QD_VOLTA = 120, QD_FPS_ALTO = 50, QD_DIAS = 3 * 86400000;
   const Qd = {
     seq: [], baixo: 0, alto: 0, ap: null, ultSeg: 0,
-    escolha() { const v = ls.get(QK, 'auto'); return v === 'alta' || v === 'baixa' ? v : 'auto'; },
-    definir(v) { ls.set(QK, v === 'alta' || v === 'baixa' ? v : 'auto'); this.baixo = this.alto = 0; },
+    escolha() { const v = ls.get(QK, 'auto'); return NIV[v] !== undefined ? v : 'auto'; },
+    definir(v) { ls.set(QK, NIV[v] !== undefined ? v : 'auto'); this.baixo = this.alto = 0; },
     // o aparelho dá conta da Alta? (sem medir nada ainda)
     aparelho() {
       const mem = navigator.deviceMemory || 0, nc = navigator.hardwareConcurrency || 0, cel = celular();
       const curto = Math.min(screen.width || innerWidth, screen.height || innerHeight);
       let alta, motivo;
-      if (mem && mem < 4) { alta = false; motivo = `${mem} GB de memória`; }
-      else if (nc && nc < 4) { alta = false; motivo = `${nc} núcleos`; }
-      else if (cel && ((mem && mem < 6) || (nc && nc < 6) || curto < 360)) { alta = false; motivo = 'celular modesto'; }
-      else { alta = true; motivo = cel ? 'celular forte' : 'computador'; }
-      return { alta, motivo, mem, nc, cel };
+      let n;
+      if (mem && mem < 4) { n = 'leve'; motivo = `${mem} GB de memória`; }
+      else if (nc && nc < 4) { n = 'leve'; motivo = `${nc} núcleos`; }
+      else if (cel && ((mem && mem < 6) || (nc && nc < 6) || curto < 360)) { n = 'leve'; motivo = 'celular modesto'; }
+      else if (cel) { n = 'media'; motivo = 'celular forte'; }
+      else { n = 'alta'; motivo = 'computador'; }
+      alta = n !== 'leve';
+      return { n, alta, motivo, mem, nc, cel };
     },
     // o que o Automático decidiu (com a queda medida guardada por alguns dias)
-    auto() {
-      const s = ls.get(QA, null);
-      if (s && s.n === 'leve' && Date.now() - (+s.ts || 0) < QD_DIAS) return 'leve';
-      return this.aparelho().alta ? 'alta' : 'leve';
-    },
-    efetiva() { const e = this.escolha(); return e === 'alta' ? 'alta' : e === 'baixa' ? 'leve' : this.auto(); },
-    v2() { return this.efetiva() === 'alta'; },
+    // (s.n: o teto depois de uma queda medida; nunca acima do que o aparelho pede)
+    teto() { const s = ls.get(QA, null); return s && NIV[s.n] !== undefined && s.n !== 'baixa' && Date.now() - (+s.ts || 0) < QD_DIAS ? s.n : null; },
+    auto() { const ap = this.aparelho().n, t = this.teto(); return t && NIV[t] < NIV[ap] ? t : ap; },
+    efetiva() { const e = this.escolha(); return e === 'baixa' ? 'leve' : e === 'auto' ? this.auto() : e; },
+    // mapa V2 e personagens V3 (cobaias, NPCs e as criaturas V3): Média e Alta. Criaturas V2 (pesadas): só a Alta.
+    v2() { return this.efetiva() !== 'leve'; },
+    modelosV2() { return this.efetiva() === 'alta'; },
     leve() { return this.efetiva() === 'leve'; },
     // perfil do 3D para sala3d.js: efeitos altos (sombras e resolução até 1,5) só no computador ou com a Alta escolhida
     perfil(cel) {
       const ef = this.efetiva(), manual = this.escolha() === 'alta';
       if (ef === 'leve') return { v2: false, alta: false, prMax: 1, leve: true };
+      if (ef === 'media') return { v2: true, alta: false, prMax: 1.25, leve: false };
       return { v2: true, alta: manual || !cel, prMax: cel && !manual ? 1.25 : 1.5, leve: false };
     },
     desc() {
       const e = this.escolha(), ef = this.efetiva(), ap = this.aparelho();
-      if (e !== 'auto') return e === 'alta' ? 'Alta escolhida à mão' : 'Leve escolhida à mão';
-      const s = ls.get(QA, null), caiu = s && s.n === 'leve' && Date.now() - (+s.ts || 0) < QD_DIAS;
-      return `Automático: ${ef === 'alta' ? 'Alta' : 'Leve'} (${caiu ? 'o 3D ficou lento aqui; tenta a Alta de novo depois de um tempo fluido' : ap.motivo})`;
+      if (e !== 'auto') return `${NOME[ef]} escolhida à mão`;
+      const caiu = NIV[ef] < NIV[ap.n];
+      return `Automático: ${NOME[ef]} (${caiu ? `o 3D ficou lento aqui; tenta a ${NOME[ap.n === 'alta' && ef === 'leve' ? 'media' : ap.n]} de novo depois de um tempo fluido` : ap.motivo})`;
     },
     // um segundo fechado do 3D (desempenho.js já conta os quadros da vista)
     segundo(fps) {
       if (this.escolha() !== 'auto' || !this.ap || document.hidden) { this.baixo = this.alto = 0; return; }
       const foco = typeof document.hasFocus !== 'function' || document.hasFocus();
-      if (this.efetiva() === 'alta') {
+      const ef = this.efetiva();
+      if (ef !== 'leve') {
         // fps de 1 a 3: é o navegador segurando os quadros (janela coberta, tela bloqueada, aba sem foco real), não peso
         // do jogo; não conta para a queda
         const segurado = fps <= 3;
         this.baixo = foco && !segurado && fps < QD_FPS_BAIXO ? this.baixo + 1 : (segurado ? this.baixo : 0);
         if (this.baixo >= QD_QUEDA) {
-          this.baixo = 0; ls.set(QA, { n: 'leve', ts: Date.now() });
-          // troca já: os modelos V2 voltam para a V1 e o Modo Desempenho liga
+          // desce UM degrau já: Alta → Média (as criaturas V2 voltam para a V1); Média → Leve (mapa V2 e personagens
+          // V3 saem, o Modo Desempenho liga)
+          const novo = ef === 'alta' ? 'media' : 'leve';
+          this.baixo = 0; this.alto = 0; ls.set(QA, { n: novo, ts: Date.now() });
           try { if (window.ACF3D && ACF3D.v2) ACF3D.v2.aplicarQualidade(); } catch (e) {}
-          try { if (window.ACF3D && ACF3D.mapaV2 && ACF3D.mapaV2.aplicarQualidade) ACF3D.mapaV2.aplicarQualidade(false); } catch (e) {}
-          try { if (this.ap && typeof this.ap.aplicarDesempenho === 'function') this.ap.aplicarDesempenho(); } catch (e) {}
-          avisarQ('⚙ O 3D estava pesado neste aparelho: qualidade Leve. Para voltar, Opções › Gráficos › Qualidade.');
+          if (novo === 'leve') {
+            try { if (window.ACF3D && ACF3D.mapaV2 && ACF3D.mapaV2.aplicarQualidade) ACF3D.mapaV2.aplicarQualidade(false); } catch (e) {}
+            try { if (this.ap && typeof this.ap.aplicarDesempenho === 'function') this.ap.aplicarDesempenho(); } catch (e) {}
+          }
+          avisarQ(`⚙ O 3D estava pesado neste aparelho: qualidade ${NOME[novo]}. Para voltar, Opções › Gráficos › Qualidade.`);
+          return;
         }
-      } else {
-        // na Leve automática por queda: folga firme por bastante tempo libera tentar a Alta na próxima abertura
-        const s = ls.get(QA, null);
-        if (!s || s.n !== 'leve') return;
-        this.alto = fps >= QD_FPS_ALTO ? this.alto + 1 : 0;
-        if (this.alto >= QD_VOLTA) { this.alto = 0; ls.set(QA, null); }
       }
+      // abaixo do que o aparelho pede por causa de uma queda: folga firme por bastante tempo libera tentar UM degrau
+      // acima na próxima abertura
+      if (NIV[ef] >= NIV[this.aparelho().n]) return;
+      this.alto = fps >= QD_FPS_ALTO ? this.alto + 1 : 0;
+      if (this.alto >= QD_VOLTA) { this.alto = 0; ls.set(QA, ef === 'leve' && this.aparelho().n === 'alta' ? { n: 'media', ts: Date.now() } : null); }
     },
   };
   function avisarQ(txt) { try { const a = A(); if (a && typeof a.aviso === 'function') a.aviso(txt); } catch (e) {} }
@@ -168,7 +179,7 @@
     iniciar(ap) { Qd.ap = ap; Qd.baixo = Qd.alto = 0; },
     fechar() { Qd.ap = null; },
     // Opções › Gráficos: a escolha fica na predefinição do sala3d.js; aqui, o que o Automático decidiu e por quê
-    opcoes(aba) { return aba === 'graficos' ? `<section><h4>Qualidade dos modelos</h4><p class="mini">${esc(Qd.desc())}. Alta: modelos novos feitos no Blender (mais detalhe). Leve: modelos simples e Modo Desempenho.</p></section>` : ''; },
+    opcoes(aba) { return aba === 'graficos' ? `<section><h4>Qualidade dos modelos</h4><p class="mini">${esc(Qd.desc())}. Alta: tudo novo (mapa V2, criaturas V2 e personagens V3). Média: mapa V2 e personagens V3, criaturas simples e efeitos médios. Leve: tudo simples e Modo Desempenho.</p></section>` : ''; },
   });
   window.ACF_QUALIDADE = Qd;
 

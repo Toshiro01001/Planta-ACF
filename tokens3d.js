@@ -2111,6 +2111,12 @@
     stats: { pedidos: 0, prontos: 0, falhas: 0, trocas: 0, msBaixar: 0, msParse: 0, bytes: 0 },
     // a qualidade decide (desempenho.js); sem o seletor carregado, vale a V2
     ligado() { try { return !window.ACF_QUALIDADE || ACF_QUALIDADE.v2() !== false; } catch (e) { return true; } },
+    // por modelo: personagens V3 (cobaias, NPCs, criaturas V3) na Média e na Alta; criaturas V2 só na Alta
+    ligadoPara(e) {
+      if (!this.ligado()) return false;
+      if (!e || e.cobaia || e.v3) return true;
+      try { const Q = window.ACF_QUALIDADE; return !Q || typeof Q.modelosV2 !== 'function' || Q.modelosV2() !== false; } catch (er) { return true; }
+    },
     entrada(forma) { const e = forma && Object.prototype.hasOwnProperty.call(V2_CAT, forma) ? V2_CAT[forma] : null; return e && e.pronto !== false ? e : null; },
     entradaCobaia(s) {
       if (!s) return null;
@@ -2221,8 +2227,7 @@
     },
     // a qualidade mudou com o 3D aberto (desempenho.js): sem a Alta, as cópias V2 voltam para a V1 na hora
     aplicarQualidade() {
-      if (this.ligado()) return;
-      this.vivos.forEach(w => { if (!w.g.parent) { this.vivos.delete(w); return; } w.voltarV1(); });
+      this.vivos.forEach(w => { if (!w.g.parent) { this.vivos.delete(w); return; } if (!this.ligadoPara(w.entV2)) w.voltarV1(); });
     },
     estado() { return { ...this.stats, ligado: this.ligado(), arquivos: this.cache.size, falhas: [...this.falhas] }; },
   };
@@ -2486,7 +2491,8 @@
     w.voltarV1 = () => { w.pend = null; if (!w.v2) return; const pai = w.pai || g; pai.remove(w.v2.g); w.v2.mixer.stopAllAction(); w.v2 = null; w.alt = v1.alt; pai.add(v1.g); nomeY(v1.alt); V2.vivos.delete(w); };
     // peças do corpo para quem decora a miniatura (disfarce3d.js): as da V1 ou, com a V2, os ossos equivalentes
     Object.defineProperty(w, 'partes', { configurable: true, enumerable: true, get: () => (w.v2 ? w.v2.partes : v1.partes) });
-    if (!V2.ligado() || V2.falhas.has(V2.url(e))) return w;
+    w.entV2 = e;
+    if (!V2.ligadoPara(e) || V2.falhas.has(V2.url(e))) return w;
     const t0 = performance.now();
     (e.cobaia ? V2.cobaiaBase(T, e.arq).then(async b => {
       // peças exclusivas da aparência (uma vez por arquivo)
@@ -2497,7 +2503,7 @@
       const clipes = gl.cob ? new Map(Object.entries(gl.cob.clipes)) : await V2.clipes(T, e, gl);
       // o token já saiu de cena, ou demorou demais: fica a V1
       if (!g.parent || performance.now() - t0 > V2_PRAZO) return;
-      if (!V2.ligado()) return;
+      if (!V2.ligadoPara(e)) return;
       if (e.chama && !gl.cob) prepararChama(gl);
       // humanos V3 (low-poly pintado): pixels nítidos de perto (Nearest só nestes)
       if (e.v3 && !gl.cob && !gl.userData.v3ok) { gl.userData.v3ok = 1; gl.scene.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'aoMap'].forEach(k => { const t = m && m[k]; if (t && t.magFilter !== T.NearestFilter) { t.magFilter = T.NearestFilter; t.needsUpdate = true; } })); }); }
@@ -2514,7 +2520,7 @@
     // a troca de fato (chamada a cada quadro enquanto há uma cópia esperando)
     w.trocar = () => {
       const x = w.pend, aq = V2.ap && V2.ap.ctx && V2.ap.ctx.aq;
-      if (!V2.ligado()) { w.pend = null; return; }
+      if (!V2.ligadoPara(e)) { w.pend = null; return; }
       if (w.tPend && performance.now() - w.tPend < 3000 && aq && aq.pendentes()) return;
       w.pend = null; w.v2 = x; w.alt = e.alt;
       // a V1 sai da árvore (outros módulos que acendem os filhos do token não a trazem de volta) e a V2 entra
