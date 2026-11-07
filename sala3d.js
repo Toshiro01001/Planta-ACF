@@ -1569,6 +1569,21 @@
       } else { try { expoCena.r.atualizar && expoCena.r.atualizar(quer); } catch (e) { console.warn('3D exposição:', e); } }
     }
 
+    // altura livre até o teto neste ponto: sala (ALT), corredor (CORR_H) ou passando por um vão de porta (VAO_H).
+    // As criaturas altas usam isso para se agachar (tokens3d.js: t.teto). Barato: só retângulos.
+    function tetoEm(x, z) {
+      const meia = CORR_W / 2 + .1;
+      for (const s of Object.values(S)) {
+        if (x < s.x0 - .7 || x > s.x1 + .7 || z < s.z0 - .7 || z > s.z1 + .7) continue;
+        for (const lado in s.vaos) {
+          const v = s.vaos[lado], ns = lado === 'n' || lado === 's', borda = lado === 'n' ? s.z0 : lado === 's' ? s.z1 : lado === 'w' ? s.x0 : s.x1;
+          if (Math.abs((ns ? x : z) - v.centro) < meia && Math.abs((ns ? z : x) - borda) < .75) return VAO_H;
+        }
+        if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return ALT;
+      }
+      return CORR_H;
+    }
+
     // dentro de uma sala ou corredor (ignora os móveis): a câmera de jogo não sai pelas paredes
     function area3D(x, z, mg = .12) {
       for (const s of Object.values(S)) if (x >= s.x0 + mg && x <= s.x1 - mg && z >= s.z0 + mg && z <= s.z1 - mg) return true;
@@ -1593,7 +1608,7 @@
       a, S, CS, portas, interativos, carregadas, guardadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
       // o que o Mapa V2 (mapa_v2.js) precisa para trocar a aparência sem mexer em posição nem colisão
       v2: { S, CS, corr3D, CORR_W, CORR_H, ALT, ESP, raiz, tetos, portas, paineis: paineisInfo, corr: { parede: mParC, chao: mChaoC, teto: mTetoC } },
-      livre3D, area3D, atualizarPortas, atualizarParedes, recarregar, recarregarCena, trocarMoveisV2, refazerSalasV1, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
+      livre3D, area3D, tetoEm, atualizarPortas, atualizarParedes, recarregar, recarregarCena, trocarMoveisV2, refazerSalasV1, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
@@ -1855,6 +1870,8 @@
         o.t.g.position.set(o.x, 0, o.z);
         let dr = o.rot - o.t.g.rotation.y; while (dr > Math.PI) dr -= Math.PI * 2; while (dr < -Math.PI) dr += Math.PI * 2;
         o.t.g.rotation.y += dr * Math.min(1, dt * 10);
+        // teto baixo (corredor, vão de porta): a criatura alta se agacha (tokens3d.js); só recalcula o teto quando anda
+        if (o.t.teto) { if (o.tetoX === undefined || Math.abs(o.x - o.tetoX) + Math.abs(o.z - o.tetoZ) > .12) { o.tetoX = o.x; o.tetoZ = o.z; o.tetoH = mundo.tetoEm(o.x, o.z); } o.t.teto(o.tetoH, dt); }
         o.t.anim(dt, t, o.andando > 0);
         // LOD das formas detalhadas (filhos3d.js): a distância é a da câmera, corrigida pelo campo de visão
         if (o.t.lod && camPos) { const dc = Math.hypot(camPos.x - o.x, camPos.z - o.z, camPos.y - 1.2); o.t.lod(dc * (V && V.camera ? V.camera.fov / 70 : 1)); }
@@ -3719,6 +3736,10 @@
     _centro: p => V && V.mundo.centro(p),
     _cam: o => V && Object.assign(V.cam, o),
     _tok: id => V && V.tok.posDe(id),
+    // testes: teto baixo (altura livre, escala do corpo, clipe da V2) e conversão 3D -> planta
+    _tokTeto: id => { const o = V && V.tok.mapa.get(id); if (!o) return null; const c = o.t.corpoTeto; return { teto: o.tetoH ?? null, k: c ? +c.scale.y.toFixed(3) : 1, lean: c ? +c.rotation.x.toFixed(3) : 0, v2: !!o.t.v2, clipe: o.t.v2 ? o.t.v2.clipe : '', alt: o.t.alt, base: o.t.base ? +o.t.base.scale.x.toFixed(4) : null, nome: o.nome ? +o.nome.scale.x.toFixed(4) : null, st: o.st || '', uma: o.t.v2 ? o.t.v2.uma : '' }; },
+    _tetoEm: (x, z) => V && V.mundo.tetoEm(x, z),
+    _plantaDe3D: (X, Z) => V && plantaDe3D(V.a, X, Z),
     // testes: forma, estado e ganchos da forma detalhada (acao/estado) de um token
     _tokF: id => { const o = V && V.tok.mapa.get(id); return o ? { forma: o.forma || '', st: o.st || '', acao: typeof o.t.acao === 'function', estado: typeof o.t.estado === 'function', esc: +o.t.g.scale.y.toFixed(2) } : null; },
     _tokEspiar: id => { const o = V && V.tok.mapa.get(id); if (!o) return false; const lg = (window.__acoes3d = window.__acoes3d || []); ['acao', 'estado'].forEach(k => { const f = o.t[k]; if (typeof f === 'function' && !f.__esp) { o.t[k] = (...a) => { lg.push([id, k, a[0]]); return f(...a); }; o.t[k].__esp = 1; } }); return true; },

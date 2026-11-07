@@ -2092,6 +2092,13 @@
     marionetista: { arq: 'marionetista.glb', v: '20261105a', alt: 2.5, rig: 'humanoide' },
     muitos_bracos: { arq: 'muitos_bracos.glb', v: '20261105a', alt: 2.36, rig: 'humanoide' },
     cabelos_longos: { arq: 'cabelos_longos.glb', v: '20261105a', alt: 3.0, rig: 'humanoide' },
+    olhos_muitos: { arq: 'olhos_muitos.glb', v: '20261107a', alt: 1.84, rig: 'proprio' },
+    boca_no_tronco: { arq: 'boca_no_tronco.glb', v: '20261107a', alt: 2.6, rig: 'proprio' },
+    // estática: chuvisco de TV e faixas de falha por shader (só onde o atributo _estatica = 1); cabelo até ~2,4 m
+    estatica_tres_cabecas: { arq: 'estatica_tres_cabecas.glb', v: '20261107a', alt: 2.4, rig: 'humanoide', vel: { andar: 1.5, correr: 3.0 }, estatica: true },
+    // disfarce de candelabro: clipes de transição (uma vez), passada própria, a luz da V1 vai para o osso da lamparina
+    aranha_gaiola: { arq: 'aranha_gaiola.glb', v: '20261107a', alt: 3.9, rig: 'proprio', umaVez: ['virar_candelabro', 'soltar'], vel: { andar: 1.0, correr: 2.4 },
+      disfarce: { estado: 'candelabro', entra: 'virar_candelabro', solto: 'solto', sai: 'soltar' }, luzOsso: 'luz' },
     // humanos em V3 (low-poly pintado, decisão do Mestre): entram quando o arquivo chegar (pronto: false até lá; V1)
     coroa_espinhos_sobretudo: { arq: 'coroa_espinhos_sobretudo_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
     encapuzada_meia_mascara: { arq: 'encapuzada_meia_mascara_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
@@ -2105,7 +2112,7 @@
   const V2_COB_ARQ = { arq: 'cobaia_v3.glb', v: '20261105c', script: 'cobaia_v3.js', global: 'CobaiaV3' };   // arq: corpo padrão (o preset diz o seu em 'arquivo': masculino, feminino, criança)
   const V2_COBAIA = {"luva":{"alt":1.84,"pecas":["camiseta","calca","tenis","cinto","cab_baguncado","rosto_olho_roxo"],"morfos":{"feminino":0,"forte":0.3},"tintas":{"pele":"#d9a88a","cabelo":"#5a3a22","iris":"#4a5a6a","cima":"#ef6a14","baixo":"#e8650f","sapato":"#eeeeea","acessorio":"#141414"},"barba":1,"sardas":0,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,6],"ferimento":0.45,"sangueFresco":0.35,"arquivo":"cobaia_v3.glb"},"faca":{"alt":1.62,"pecas":["camiseta","calca","botas","cinto","cab_coque","x_faca_bolsa","x_faca_planta","x_faca_frasco","x_faca_alca","x_faca_bolsinhas","x_faca_bolsos","oculos_redondos"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#e2bea4","cabelo":"#3b2416","iris":"#5a4422","cima":"#e4dccb","baixo":"#56603e","sapato":"#7a3a2a","acessorio":"#2a2220"},"barba":0,"sardas":1,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,1],"ferimento":0.2,"sangueFresco":0.3,"pose":"pose_faca","arquivo":"cobaia_v3_f.glb"},"papelao":{"alt":1.92,"pecas":["macacao","botas","band_cabeca","x_papelao_sobretudo","x_papelao_ombreiras","x_papelao_faixas","x_papelao_avental","x_papelao_garras"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#8a8a82","cabelo":"#202020","iris":"#ffd84a","cima":"#2e2e30","baixo":"#2a2a2c","sapato":"#121212","acessorio":"#8f8d84"},"barba":0,"sardas":0,"sobrancelhas":0,"marca":0,"etiqueta":[0,0,4],"ferimento":0.25,"sangueFresco":0.2,"olhosBrilho":1,"corBrilho":"#ffc21a","arquivo":"cobaia_v3.glb"},"papel":{"alt":1.7,"pecas":["calca","tenis","brincos","cab_trancas","x_papel_jaleco","x_papel_camisa"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#5a3a2a","cabelo":"#140e0b","iris":"#2a1a10","cima":"#121214","baixo":"#111113","sapato":"#0c0c0c","acessorio":"#111111"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":1,"etiqueta":[0,0,5],"ferimento":0.1,"sangueFresco":0.3,"pose":"pose_papel","esconderMaos":true,"arquivo":"cobaia_v3_f.glb"},"sabonete":{"alt":1.8,"pecas":["macacao","botas","x_sabonete_capa","x_sabonete_capuz","x_sabonete_mascara","x_sabonete_tubo","x_sabonete_cachecol","x_sabonete_couraca","x_sabonete_revolver"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#5a4a3a","cabelo":"#202020","iris":"#ff2a1a","cima":"#22252e","baixo":"#24252b","sapato":"#2e2218","acessorio":"#3a3328"},"barba":0,"sardas":0,"sobrancelhas":0,"marca":0,"etiqueta":[0,0,2],"ferimento":0.15,"olhosBrilho":1,"corBrilho":"#ff1a0a","pose":"pose_sabonete","arquivo":"cobaia_v3.glb"},"velcro":{"alt":1.2,"arquivo":"cobaia_v3_c.glb","pecas":["tenis","cab_franja_longa","x_velcro_vestido","x_velcro_meias"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#ecd8c8","cabelo":"#151214","iris":"#d9781c","cima":"#262427","baixo":"#262427","sapato":"#141214","acessorio":"#141214"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":0,"etiqueta":[0,0,0],"ferimento":0,"sangueFresco":0.3,"pose":"pose_velcro"}};
   const V2_NPC = {"alt":1.74,"pecas":["macacao","tenis","cab_baguncado"],"morfos":{"feminino":0,"forte":0},"tintas":{"pele":"#cfa588","cabelo":"#2b1d14","iris":"#3a2a1a","cima":"#d9661f","baixo":"#cf5f1a","sapato":"#2a2a2a","acessorio":"#1a1a1a"},"barba":0,"sardas":0,"sobrancelhas":1,"marca":0,"etiqueta":[0,0,0],"ferimento":0.05,"sangueFresco":0.3,"arquivo":"cobaia_v3.glb"};
-  const V2_ANIM = { humanoide: { arq: 'anim_humanoide.glb', v: '20261104g' } };
+  const V2_ANIM = { humanoide: { arq: 'anim_humanoide.glb', v: '20261107a' } };
   const V2 = {
     libs: null, cache: new Map(), falhas: new Set(), ap: null, vivos: new Set(), tSoltar: 0,
     stats: { pedidos: 0, prontos: 0, falhas: 0, trocas: 0, msBaixar: 0, msParse: 0, bytes: 0 },
@@ -2343,6 +2350,41 @@
     }
     g.scene.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(m => { if (m && m.emissiveMap && m.onBeforeCompile !== chamaCompilar) { m.onBeforeCompile = chamaCompilar; m.customProgramCacheKey = () => 'chama'; m.needsUpdate = true; } }); });
   }
+  /* ---------- estática (chuvisco de TV): grão trocando 20 vezes por segundo, varredura e faixas que deslocam a malha
+     de lado. Tempo e intensidade divididos por todas as cópias (uma forma rara). ---------- */
+  const EST_T = { value: 0 }, EST_F = { value: .1 };
+  const EST_HS = 'float hsE(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }';
+  function estaticaCompilar(sh) {
+    sh.uniforms.uT = EST_T; sh.uniforms.uFalha = EST_F;
+    sh.vertexShader = 'attribute float _estatica;\nvarying float vEst;\nvarying vec3 vPw;\nuniform float uT; uniform float uFalha;\n' + sh.vertexShader
+      .replace('#include <skinning_vertex>', `#include <skinning_vertex>
+  vEst = _estatica;
+  { vec4 w0 = modelMatrix * vec4(transformed, 1.0); float bY = w0.y * 14.0 - uT * 3.2; float bI = floor(bY);
+    float bH = fract(sin(bI * 91.7 + floor(uT * 7.0) * 3.1) * 43758.5); float on = step(1.0 - (0.05 + uFalha * 0.35), bH) * _estatica;
+    transformed.x += on * (bH - 0.5) * (0.08 + uFalha * 0.3); }`)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n  vPw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying float vEst;\nvarying vec3 vPw;\nuniform float uT; uniform float uFalha;\n' + EST_HS + '\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', `#include <map_fragment>
+  float quadro = floor(uT * 20.0);
+  float nF = hsE(floor(vPw * vec3(170.0, 210.0, 170.0)) + quadro * 0.37);
+  float nG = hsE(floor(vPw * vec3(26.0, 34.0, 26.0)) + quadro * 0.11);
+  float tv = nF * 0.8 + nG * 0.2;
+  float bY = vPw.y * 14.0 - uT * 3.2; float bH = fract(sin(floor(bY) * 91.7 + floor(uT * 7.0) * 3.1) * 43758.5);
+  float faixaOn = step(1.0 - (0.05 + uFalha * 0.35), bH);
+  float linha = 0.78 + 0.22 * sin(vPw.y * 380.0 + uT * 40.0);
+  vec3 cTv = mix(vec3(0.04, 0.01, 0.08), vec3(0.47, 0.15, 0.81), smoothstep(0.05, 0.38, tv)); cTv = mix(cTv, vec3(1.0, 0.95, 1.0), smoothstep(0.42, 0.82, tv));
+  float riscoF = step(0.5, fract(vPw.y * 120.0)); cTv = mix(cTv, mix(vec3(0.5, 0.12, 0.95), vec3(0.95, 0.75, 1.0), nF) * riscoF, faixaOn * 0.85);
+  float lum = dot(diffuseColor.rgb, vec3(0.3, 0.5, 0.2));
+  float kEst = vEst * 0.85 * smoothstep(0.015, 0.06, lum);
+  diffuseColor.rgb = mix(diffuseColor.rgb, cTv * linha * (0.25 + 1.6 * lum), kEst);`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance = mix(totalEmissiveRadiance, (mix(vec3(0.22, 0.05, 0.42), vec3(0.95, 0.85, 1.0), smoothstep(0.55, 0.95, tv)) * (0.04 + tv * 0.4) + vec3(0.6, 0.22, 1.0) * faixaOn * (0.4 + nF) * 0.7), kEst);`);
+  }
+  function prepararEstatica(g) {
+    if (g.userData.estaticaOk) return; g.userData.estaticaOk = 1;
+    g.scene.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(m => { if (m && m.onBeforeCompile !== estaticaCompilar) { m.onBeforeCompile = estaticaCompilar; m.customProgramCacheKey = () => 'estatica'; m.needsUpdate = true; } }); });
+  }
+  let estPulso = 0;
   // uma cópia da V2 para um token (chamada quando o arquivo terminou de ler)
   // pronta: cópia já montada por fora (cobaia_v2.js: grupo, mixer, lod por troca de geometria, slots do detalhe)
   function instanciaV2(T, g, clipes, e, pronta) {
@@ -2367,7 +2409,8 @@
     const mixer = pronta ? pronta.mixer : new T.AnimationMixer(cena), acts = {};
     if (pronta) mixer.stopAllAction();
     clipes.forEach((c, nome) => { acts[nome] = mixer.clipAction(c); });
-    ['ataque', 'revelar', 'parado_extra', 'morto'].forEach(n => { const a = acts[n]; if (a) { a.setLoop(T.LoopOnce, 1); a.clampWhenFinished = true; } });
+    ['ataque', 'revelar', 'parado_extra', 'morto', ...(e.umaVez || [])].forEach(n => { const a = acts[n]; if (a) { a.setLoop(T.LoopOnce, 1); a.clampWhenFinished = true; } });
+    const DISF = e.disfarce || null;
     // a passada natural dos clipes é a de um corpo de 1,75 m: corpo maior dá passo maior
     const escPasso = Math.max(.5, (e.alt || 1.75) / 1.75);
     let estBase = '', corpoAnt = '';
@@ -2375,7 +2418,10 @@
     const sob = sobreposicao(T, cena);
     // cobaia: pose fixa da V1 (braço/antebraço) por cima dos clipes que não pedem os braços (cobaia_v3.js: aplicarPose)
     const POSE = pronta && pronta.cfg && pronta.cfg.pose && pronta.poses ? pronta.poses[pronta.cfg.pose] : null;
-    const COM_POSE = ['parado', 'andar', 'correr', 'agachar', 'curvada'];
+    const COM_POSE = ['parado', 'andar', 'correr', 'agachar', 'curvada', 'andar_tras', 'andar_lado_e', 'andar_lado_d', 'andar_agachado'];
+    // teto baixo: quanto cada clipe abaixa a cabeça (medido no pacote: agachar e andar agachado ~0,64, curvada ~0,83)
+    const FRAC_TETO = { andar_agachado: .66, agachar: .66, curvada: .85 };
+    let tetoNeed = 1, tetoClipe = '';
     let nomeBase = '';
     function trocarBase(nome) {
       const a = acts[nome] || acts.parado; if (!a || a === base) return;
@@ -2403,7 +2449,7 @@
     return {
       g: cena, mixer,
       // vel: m/s do token (o andar acompanha a passada); corpo: '' | 'ferido' | 'morrendo' | 'morto' | 'agachado'
-      anim(dt, andando, vel, corpo) {
+      anim(dt, andando, vel, corpo, dir) {
         // cobaia: o ferimento e o sangue acompanham o estado do corpo (máscaras do material, sem modelo novo)
         if (pronta && corpo !== corpoAnt) {
           corpoAnt = corpo; const c0 = pronta.cfg0 || (pronta.cfg0 = { f: +pronta.cfg.ferimento || 0, s: +pronta.cfg.sangueFresco || 0 });
@@ -2414,12 +2460,20 @@
         else if (corpo === 'morrendo' && acts.caido) quer = 'caido';
         else if (estBase) quer = estBase;
         else if (curvada && acts.curvada) quer = 'curvada';
-        else if (andando) quer = corpo === 'ferido' && acts.ferido ? 'ferido' : vel > 2.2 && acts.correr ? 'correr' : acts.andar ? 'andar' : 'correr';
+        else if (tetoNeed < .97 && corpo !== 'morto' && corpo !== 'morrendo') quer = tetoClipe = andando ? (acts.andar_agachado ? 'andar_agachado' : acts.curvada ? 'curvada' : 'andar') : (tetoNeed >= FRAC_TETO.curvada && acts.curvada ? 'curvada' : acts.agachar ? 'agachar' : acts.curvada ? 'curvada' : 'parado');
+        else if (andando) {
+          quer = corpo === 'ferido' && acts.ferido ? 'ferido' : vel > 2.2 && acts.correr ? 'correr' : acts.andar ? 'andar' : 'correr';
+          // de lado ou de costas (o corpo olha para um lado e anda para outro): clipes do pacote
+          if (corpo !== 'ferido' && dir) { const d = dir === 'tras' ? 'andar_tras' : dir === 'e' ? 'andar_lado_e' : dir === 'd' ? 'andar_lado_d' : ''; if (d && acts[d]) quer = d; }
+        }
         else quer = corpo === 'agachado' && acts.agachar ? 'agachar' : corpo === 'ferido' && acts.curvada ? 'curvada' : 'parado';
+        if (tetoNeed >= .97) tetoClipe = '';
         // passada: o clipe anda na velocidade natural do pacote (andar 1,3 m/s, correr 2,9 m/s, ferido 0,8 m/s)
-        const nat = { andar: 1.3, correr: 2.9, ferido: .8 }[quer];
-        if (nat && vel > .05 && acts[quer]) acts[quer].timeScale = Math.max(.6, Math.min(1.7, vel / (nat * escPasso)));
-        if (!uma) trocarBase(quer); else if (acts[quer] && acts[quer] !== base) { base = acts[quer]; }
+        const nat = { andar: 1.3, correr: 2.9, ferido: .8, andar_tras: .6, andar_lado_e: .68, andar_lado_d: .68, andar_agachado: .6 }[quer];
+        // passada própria do arquivo (forma que não é humana): velocidade natural já na escala do corpo
+        const natP = e.vel && e.vel[quer];
+        if ((natP || nat) && vel > .05 && acts[quer]) acts[quer].timeScale = Math.max(.6, Math.min(1.7, vel / (natP || nat * escPasso)));
+        if (!uma) trocarBase(quer); else if (acts[quer] && acts[quer] !== base) { base = acts[quer]; nomeBase = quer; }
         // o tique de vez em quando, parado
         if (!andando && !uma && acts.parado_extra) { tExtra -= dt; if (tExtra <= 0) { tExtra = 9 + Math.random() * 9; tocarUma('parado_extra'); } }
         mixer.update(dt);
@@ -2431,13 +2485,21 @@
           sob(kSob, tSob, tipoSob);   // (com k = 0 devolve os ossos à pose do clipe)
         }
       },
+      // teto baixo: need = altura livre / altura do corpo; devolve quanto o clipe escolhido abaixa (1 = nada)
+      agachar(need) { tetoNeed = need; return tetoClipe ? (FRAC_TETO[tetoClipe] || 1) : 1; },
+      get clipe() { return uma ? '' : nomeBase; },
+      get uma() { return uma ? uma.getClip().name + ':' + uma.time.toFixed(2) + '/' + uma.getClip().duration.toFixed(2) + (uma.isRunning() ? '' : ' parada') : ''; },
       acao(tipo) {
         const n = tipo === 'atacar' ? 'ataque' : tipo;
+        // atacar ou se revelar desfaz o disfarce (como na V1)
+        if (DISF && estBase === DISF.estado && (n === 'ataque' || n === 'revelar')) estBase = '';
         if (acts[n]) return tocarUma(n);
         if ((tipo === 'ritual' || tipo === 'conjurar') && sob) { tipoSob = tipo; tSob = 0; alvoSob = 1; return true; }
         return false;
       },
       estado(nome) {
+        if (DISF && nome === DISF.estado) { if (estBase !== DISF.estado) { estBase = DISF.estado; if (acts[DISF.entra]) tocarUma(DISF.entra); } return; }
+        if (DISF && nome === DISF.solto) { if (estBase === DISF.estado) { estBase = ''; if (acts[DISF.sai]) tocarUma(DISF.sai); } return; }
         if (nome === 'curvada' || nome === 'curvado') { curvada = true; estBase = ''; }
         else if (nome === 'ereta' || nome === 'ereto' || nome === 'padrao' || !nome) { curvada = false; estBase = ''; }
         else if (acts[nome] && acts[nome].loop !== T.LoopOnce) estBase = nome;   // escalar, rastejar…: o clipe do estado vira a base
@@ -2465,18 +2527,40 @@
     const g = new T.Group(); g.add(v1.g);
     const w = { g, alt: v1.alt, raioBase: v1.raioBase, v1, v2: null, nivelLOD: 0 };
     let st = '', dist = 0;
-    let px = 0, pz = 0, vel = 0;
+    let px = 0, pz = 0, vel = 0, dirAt = '', dirNovo = '', tDir = 0;
+    // disfarce (aranha de gaiola): para quem joga, a base, o anel e o nome somem enquanto ela finge ser objeto
+    let tDisf = 0, disfLimpo = false;
+    const disfarce = () => {
+      const D = e.disfarce; if (!D) return;
+      const A = window.ACF, quer = st === D.estado && !(A && (A.mestre || A.aux)), agora = performance.now();
+      if (!quer) tDisf = 0; else if (!tDisf) tDisf = agora;
+      const esconder = quer && agora - tDisf > 1200;   // (relógio: vale mesmo se a criatura estava fora da câmera)
+      if (esconder === disfLimpo && !esconder) return;
+      g.children.forEach(ch => { if (ch === w.corpoTeto || ch === v1.g || (w.v2 && ch === w.v2.g)) return; const u = ch.userData;
+        if (esconder) { if (!u.dfEsc0) u.dfEsc0 = ch.scale.clone(); if (ch.scale.x > .001) ch.scale.setScalar(.0001); u.dfLimpo = true; }
+        else if (u.dfLimpo) { ch.scale.copy(u.dfEsc0); u.dfLimpo = false; } });
+      disfLimpo = esconder;
+    };
     w.anim = (dt, tt, andando) => {
+      disfarce();
       if (w.pend) w.trocar();
       if (!w.v2) return v1.anim ? v1.anim(dt, tt, andando) : undefined;
       // velocidade do token (o sala3d.js move o grupo): suavizada, para o andar acompanhar a passada
       const dx = g.position.x - px, dz = g.position.z - pz; px = g.position.x; pz = g.position.z;
       if (dt > 0) vel += (Math.min(8, Math.hypot(dx, dz) / dt) - vel) * Math.min(1, dt * 6);
+      // andando para trás ou de lado em relação à frente do corpo (+Z girado por rotation.y): troca só depois de 0,15 s
+      if (andando && Math.hypot(dx, dz) > 1e-4) {
+        let rel = Math.atan2(dx, dz) - g.rotation.y; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+        const ab = Math.abs(rel), q = ab < 1.05 ? '' : ab > 2.1 ? 'tras' : rel > 0 ? 'e' : 'd';
+        if (q !== dirNovo) { dirNovo = q; tDir = 0; } else if (q !== dirAt && (tDir += dt) > .15) dirAt = q;
+      } else if (!andando) { dirAt = dirNovo = ''; }
       if (dist > V2_CONGELA) return;
       if (e.chama) CHAMA_T.value = tt;
-      w.v2.anim(dt, andando, vel, w.estCorpo || '');
+      if (e.estatica) { EST_T.value = tt; estPulso = Math.max(0, estPulso - (dt || 0)); EST_F.value = .1 + .4 * Math.min(1, estPulso / .6); }
+      w.v2.anim(dt, andando, vel, w.estCorpo || '', dirAt);
     };
     w.acao = (tipo, nome) => {
+      if (e.estatica && (tipo === 'atacar' || tipo === 'ataque' || tipo === 'revelar')) estPulso = 1.4;   // a falha estoura no golpe e ao aparecer
       if (w.v2) { if (w.v2.acao(tipo)) return; }
       if (typeof v1.acao === 'function') return v1.acao(tipo, nome);
     };
@@ -2488,7 +2572,16 @@
       return w.nivelLOD;
     };
     const nomeY = alt => g.children.forEach(c => { if (c.isSprite) c.position.y = alt + .32; });
-    w.voltarV1 = () => { w.pend = null; if (!w.v2) return; const pai = w.pai || g; pai.remove(w.v2.g); w.v2.mixer.stopAllAction(); w.v2 = null; w.alt = v1.alt; pai.add(v1.g); nomeY(v1.alt); V2.vivos.delete(w); };
+    // luz da V1 (PointLight da lamparina): com a V2, vai para o osso de mesmo papel e volta ao sair
+    const luzesV1 = [];
+    const moverLuzes = x => {
+      if (!e.luzOsso) return;
+      if (x) { let osso = null; x.g.traverse(o => { if (!osso && o.isBone && o.name === e.luzOsso) osso = o; }); if (!osso) return;
+        v1.g.traverse(o => { if (o.isPointLight) luzesV1.push({ l: o, pai: o.parent, p: o.position.clone() }); });
+        luzesV1.forEach(L => { osso.add(L.l); L.l.position.set(0, 0, 0); }); }
+      else { luzesV1.forEach(L => { if (L.pai) { L.pai.add(L.l); L.l.position.copy(L.p); } }); luzesV1.length = 0; }
+    };
+    w.voltarV1 = () => { w.pend = null; if (!w.v2) return; moverLuzes(null); const pai = w.pai || g; pai.remove(w.v2.g); w.v2.mixer.stopAllAction(); w.v2 = null; w.alt = v1.alt; pai.add(v1.g); nomeY(v1.alt); V2.vivos.delete(w); };
     // peças do corpo para quem decora a miniatura (disfarce3d.js): as da V1 ou, com a V2, os ossos equivalentes
     Object.defineProperty(w, 'partes', { configurable: true, enumerable: true, get: () => (w.v2 ? w.v2.partes : v1.partes) });
     w.entV2 = e;
@@ -2505,6 +2598,7 @@
       if (!g.parent || performance.now() - t0 > V2_PRAZO) return;
       if (!V2.ligadoPara(e)) return;
       if (e.chama && !gl.cob) prepararChama(gl);
+      if (e.estatica && !gl.cob) prepararEstatica(gl);
       // humanos V3 (low-poly pintado): pixels nítidos de perto (Nearest só nestes)
       if (e.v3 && !gl.cob && !gl.userData.v3ok) { gl.userData.v3ok = 1; gl.scene.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'aoMap'].forEach(k => { const t = m && m[k]; if (t && t.magFilter !== T.NearestFilter) { t.magFilter = T.NearestFilter; t.needsUpdate = true; } })); }); }
       const x = gl.cob ? instanciaV2(T, gl.cob, clipes, e, Object.assign(window[V2_COB_ARQ.global].montar(T, gl.cob, gl.extras ? { ...e.preset, extras: gl.extras } : e.preset), { poses: gl.cob.poses || null })) : instanciaV2(T, gl, clipes, e);
@@ -2525,6 +2619,7 @@
       w.pend = null; w.v2 = x; w.alt = e.alt;
       // a V1 sai da árvore (outros módulos que acendem os filhos do token não a trazem de volta) e a V2 entra
       w.pai = v1.g.parent || g; w.pai.remove(v1.g); w.pai.add(x.g); V2.vivos.add(w);   // (pai: o grupo do corpo das cobaias)
+      moverLuzes(x);
       // o nome (posto pelo sala3d.js em cima da V1) acompanha a altura da V2
       nomeY(e.alt);
       V2.stats.trocas++;
@@ -2599,6 +2694,8 @@
     if (NS.prepararLOD && !t.lod) { try { NS.prepararLOD(F, t); } catch (e) {} }
     // modelo V2 (.glb) da forma, se existir: a V1 fica por dentro e aparece até a V2 chegar
     if (!String(id).startsWith('_ensaio_')) { const e2 = s.tipo === 'filho' ? V2.entrada(forma) : (s.tipo === 'cobaia' || s.tipo === 'npc') ? V2.entradaCobaia(s) : null; if (e2) t = comV2(F, t, e2, id); }
+    // Filho: o corpo vai num grupo próprio, para agachar sob teto baixo sem mexer na base nem no nome
+    if (s.tipo === 'filho') prepararTeto(T, t);
     // base redonda na cor do token (como a base de uma miniatura)
     const base = new T.Group();
     const R = t.raioBase || (s.tipo === 'filho' ? .55 : .32);
@@ -2615,6 +2712,25 @@
     if (typeof t.acao === 'function' && s.tipo !== 'filho') ganchosAcao(t, id);
     ritmoDe(T, t);
     return t;
+  }
+
+  /* ---------- teto baixo (corredor 2,7 m, vão de porta 2,2 m): a criatura alta se agacha ----------
+     sala3d.js chama t.teto(alturaLivre, dt). Com a V2 humanoide: andar agachado / agachar / curvada (pacote) e, se
+     ainda não couber, encolhe só o que falta; V1 e esqueleto próprio: encolhe o corpo e inclina um pouco à frente.
+     Suave (sem salto ao passar pela porta). Corpo que cabe: nada muda. */
+  function prepararTeto(T, t) {
+    const ct = new T.Group(); [...t.g.children].forEach(c => ct.add(c)); t.g.add(ct); t.corpoTeto = ct;
+    let k = 1, lean = 0;
+    t.teto = (h, dt) => {
+      const alt = t.alt || 2, need = (h - .12) / alt;
+      let alvo = 1, alvoLean = 0;
+      const x = t.v2 && typeof t.v2.agachar === 'function' ? t.v2 : null;
+      if (x) { const fr = x.agachar(need); alvo = need < .97 ? Math.min(1, need / fr) : 1; }
+      else if (need < .97) { alvo = Math.max(.35, need); alvoLean = .3 * (1 - alvo); }
+      if (Math.abs(alvo - k) < .002 && Math.abs(alvoLean - lean) < .002) return;
+      const f = Math.min(1, (dt || .016) * 5); k += (alvo - k) * f; lean += (alvoLean - lean) * f;
+      ct.scale.setScalar(k); ct.rotation.x = lean;
+    };
   }
 
   /* ---------- ações das miniaturas: o golpe usa a arma do efeito; conjuração e ritual vêm do site ---------- */
