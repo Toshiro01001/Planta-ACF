@@ -13,7 +13,8 @@
 
   /* ================= texturas com desgaste ================= */
   const rgba = (c, a) => { const n = parseInt(c.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
-  function ruido(x, S, r, n, a, tam = 2) { for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '255,255,255'},${a * r()})`; x.fillRect(r() * S, r() * S, tam, tam); } }
+  const comPixels = (x, f) => { const cp = (window.ACF3D || {}).comPixels; return cp ? cp(x, f) : false; };
+  function ruido(x, S, r, n, a, tam = 2) { if (comPixels(x, put => { for (let i = 0; i < n; i++) { const v = r() < .5 ? 0 : 255; put(v, v, v, a * r(), r() * S, r() * S, tam); } })) return; for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '255,255,255'},${a * r()})`; x.fillRect(r() * S, r() * S, tam, tam); } }
   function manchas(x, S, r, n, cor, a, tam = 60) { for (let i = 0; i < n; i++) { const cx = r() * S, cy = r() * S, rr = tam * (.3 + r()); const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr); g.addColorStop(0, rgba(cor, a * (.5 + r() * .5))); g.addColorStop(1, rgba(cor, 0)); x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rr, rr * (.5 + r() * .7), r() * 3, 0, 7); x.fill(); } }
   function escorridos(x, S, r, n, cor, a, topo = 0) { for (let i = 0; i < n; i++) { const x0 = r() * S, y0 = topo + r() * S * .3, L = S * (.2 + r() * .7), w = 2 + r() * 10; const g = x.createLinearGradient(0, y0, 0, y0 + L); g.addColorStop(0, rgba(cor, a)); g.addColorStop(1, rgba(cor, 0)); x.fillStyle = g; x.fillRect(x0, y0, w, L); } }
   function rachaduras(x, S, r, n, a = .45) { x.strokeStyle = `rgba(0,0,0,${a})`; for (let i = 0; i < n; i++) { x.lineWidth = .8 + r() * 1.5; let px = r() * S, py = r() * S; x.beginPath(); x.moveTo(px, py); for (let k = 0; k < 8; k++) { px += (r() - .5) * 40; py += r() * 30; x.lineTo(px, py); } x.stroke(); } }
@@ -23,15 +24,40 @@
   TX.concreto_sujo = (x, S, r) => { ruido(x, S, r, 16000, .1); manchas(x, S, r, 14, '#1a1410', .35, 90); escorridos(x, S, r, 22, '#14100c', .32); rachaduras(x, S, r, 5); manchas(x, S, r, 6, '#3a2a14', .18, 50); };
   TX.metal_sujo = (x, S, r) => { ruido(x, S, r, 9000, .08); grade(x, S, 2, '#000000', .45, 3); rebites(x, S, r, 32); for (let i = 0; i < 18; i++) { const px = r() * S, py = r() * S * .6, L = 40 + r() * 160; const g = x.createLinearGradient(0, py, 0, py + L); g.addColorStop(0, 'rgba(110,52,18,.55)'); g.addColorStop(1, 'rgba(110,52,18,0)'); x.fillStyle = g; x.fillRect(px, py, 3 + r() * 6, L); } manchas(x, S, r, 10, '#5a2a0a', .3, 50); x.strokeStyle = 'rgba(255,255,255,.08)'; for (let i = 0; i < 40; i++) { x.beginPath(); const a = r() * S, b = r() * S; x.moveTo(a, b); x.lineTo(a + (r() - .5) * 60, b + (r() - .5) * 8); x.stroke(); } };
   TX.azulejo_sujo = (x, S, r) => { ruido(x, S, r, 6000, .05); grade(x, S, 8, '#2a2620', .5, 3); const g = x.createLinearGradient(0, S * .5, 0, S); g.addColorStop(0, 'rgba(40,30,20,0)'); g.addColorStop(1, 'rgba(40,30,20,.45)'); x.fillStyle = g; x.fillRect(0, 0, S, S); manchas(x, S, r, 26, '#2a2014', .3, 30); for (let i = 0; i < 30; i++) { x.fillStyle = `rgba(${60 + r() * 40},${8 + r() * 10},8,${.25 + r() * .4})`; x.beginPath(); x.arc(r() * S, r() * S, 1 + r() * 4, 0, 7); x.fill(); } escorridos(x, S, r, 8, '#3a2a18', .25); };
-  TX.forro_sujo = (x, S, r) => { ruido(x, S, r, 12000, .07, 1); for (let i = 0; i < 3000; i++) { x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(r() * S, r() * S, 1.5, 1.5); } grade(x, S, 2, '#3a3a36', .7, 6); for (let i = 0; i < 5; i++) { const cx = r() * S, cy = r() * S, rr = 30 + r() * 70; for (let k = 0; k < 4; k++) { x.strokeStyle = `rgba(90,60,20,${.18 + k * .05})`; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, cy, rr - k * 8, (rr - k * 8) * .7, r(), 0, 7); x.stroke(); } x.fillStyle = 'rgba(90,60,20,.18)'; x.beginPath(); x.ellipse(cx, cy, rr, rr * .7, 0, 0, 7); x.fill(); } };
+  TX.forro_sujo = (x, S, r) => { ruido(x, S, r, 12000, .07, 1); if (!comPixels(x, put => { for (let i = 0; i < 3000; i++) put(0, 0, 0, .18, r() * S, r() * S, 1.5); })) for (let i = 0; i < 3000; i++) { x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(r() * S, r() * S, 1.5, 1.5); } grade(x, S, 2, '#3a3a36', .7, 6); for (let i = 0; i < 5; i++) { const cx = r() * S, cy = r() * S, rr = 30 + r() * 70; for (let k = 0; k < 4; k++) { x.strokeStyle = `rgba(90,60,20,${.18 + k * .05})`; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, cy, rr - k * 8, (rr - k * 8) * .7, r(), 0, 7); x.stroke(); } x.fillStyle = 'rgba(90,60,20,.18)'; x.beginPath(); x.ellipse(cx, cy, rr, rr * .7, 0, 0, 7); x.fill(); } };
   TX.chao_sujo = (x, S, r) => { ruido(x, S, r, 14000, .09); grade(x, S, 4, '#000000', .3, 2); manchas(x, S, r, 22, '#100c08', .4, 70); manchas(x, S, r, 8, '#3a2a18', .25, 40); x.strokeStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 30; i++) { x.lineWidth = 1 + r() * 2; x.beginPath(); const a = r() * S, b = r() * S; x.moveTo(a, b); x.quadraticCurveTo(a + (r() - .5) * 80, b + (r() - .5) * 80, a + (r() - .5) * 120, b + (r() - .5) * 120); x.stroke(); } };
   TX.madeira_velha = (x, S, r) => { for (let i = 0; i < S; i += 64) { x.fillStyle = `rgba(0,0,0,${.05 + r() * .12})`; x.fillRect(0, i, S, 64); x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0, i, S, 3); } x.strokeStyle = 'rgba(30,15,5,.25)'; for (let i = 0; i < 90; i++) { x.lineWidth = .6 + r(); x.beginPath(); const y = r() * S; x.moveTo(0, y); x.bezierCurveTo(S * .3, y + (r() - .5) * 20, S * .6, y + (r() - .5) * 20, S, y + (r() - .5) * 10); x.stroke(); } manchas(x, S, r, 10, '#0c0804', .35, 50); ruido(x, S, r, 4000, .06); };
   TX.porta_aco = (x, S, r) => { ruido(x, S, r, 9000, .08); x.strokeStyle = 'rgba(0,0,0,.5)'; x.lineWidth = 6; x.strokeRect(10, 10, S - 20, S - 20); [S * .33, S * .66].forEach(y => { x.fillStyle = 'rgba(0,0,0,.22)'; x.fillRect(14, y - 6, S - 28, 12); x.fillStyle = 'rgba(255,255,255,.06)'; x.fillRect(14, y - 6, S - 28, 3); }); rebites(x, S, r, 26); for (let i = 0; i < 26; i++) { const px = r() * S, py = r() * S * .5, L = 60 + r() * 220; const g = x.createLinearGradient(0, py, 0, py + L); g.addColorStop(0, 'rgba(90,40,12,.5)'); g.addColorStop(1, 'rgba(90,40,12,0)'); x.fillStyle = g; x.fillRect(px, py, 2 + r() * 5, L); } manchas(x, S, r, 8, '#000000', .3, 60); };
   TX.grade_chao = (x, S, r) => { x.fillStyle = '#050505'; for (let i = 0; i < S; i += 32) for (let j = 0; j < S; j += 32) x.fillRect(i + 5, j + 5, 22, 22); ruido(x, S, r, 5000, .12); manchas(x, S, r, 8, '#5a2a0a', .35, 60); };
   TX.ferrugem = (x, S, r) => { ruido(x, S, r, 16000, .14); manchas(x, S, r, 30, '#6a2a08', .5, 60); manchas(x, S, r, 20, '#2a1004', .4, 40); escorridos(x, S, r, 18, '#3a1404', .35); };
-  TX.cortica = (x, S, r) => { for (let i = 0; i < 26000; i++) { x.fillStyle = `rgba(${90 + r() * 60},${60 + r() * 40},${30 + r() * 20},.5)`; x.fillRect(r() * S, r() * S, 2, 2); } };
+  // cortiça: eram 26 mil pontinhos de 2 px desenhados um a um (fillStyle novo a cada ponto) toda vez que a sala do mural
+  // era montada (~330 ms ao entrar nela). Agora um ladrilho de até 256 px com a mesma densidade é feito uma vez por
+  // sessão (direto nos pixels, emendando nas bordas) e repetido; os sorteios de r são consumidos do mesmo jeito, para
+  // os papéis do mural continuarem nos mesmos lugares.
+  const corticas = new Map();
+  function ladrilhoCortica(L, n) {
+    const k = L + '|' + n; let c = corticas.get(k); if (c) return c;
+    c = document.createElement('canvas'); c.width = c.height = L;
+    const x = c.getContext('2d'), im = x.createImageData(L, L), d = im.data;
+    let a = 2654435761 >>> 0; const r = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    for (let i = 0; i < n; i++) {
+      const cr = 90 + r() * 60, cg = 60 + r() * 40, cb = 30 + r() * 20, px = (r() * L) | 0, py = (r() * L) | 0;
+      for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) {
+        const q = (((py + yy) % L) * L + ((px + xx) % L)) * 4, da = d[q + 3] / 255, oa = .5 + da * .5, f = da * .5;
+        d[q] = (cr * .5 + d[q] * f) / oa; d[q + 1] = (cg * .5 + d[q + 1] * f) / oa; d[q + 2] = (cb * .5 + d[q + 2] * f) / oa; d[q + 3] = oa * 255;
+      }
+    }
+    x.putImageData(im, 0, 0); corticas.set(k, c); return c;
+  }
+  TX.cortica = (x, S, r) => {
+    const L = Math.min(256, S), n = Math.round(26000 * (L / S) * (L / S));
+    let ok = false;
+    try { const pat = x.createPattern(ladrilhoCortica(L, n), 'repeat'); x.save(); x.fillStyle = pat; x.fillRect(0, 0, S, S); x.restore(); ok = true; } catch (e) {}
+    if (!ok) { for (let i = 0; i < 26000; i++) { x.fillStyle = `rgba(${90 + r() * 60},${60 + r() * 40},${30 + r() * 20},.5)`; x.fillRect(r() * S, r() * S, 2, 2); } return; }
+    for (let i = 0; i < 130000; i++) r();
+  };
   TX.parede_mofada = (x, S, r) => { ruido(x, S, r, 12000, .08); manchas(x, S, r, 18, '#1a2214', .4, 80); manchas(x, S, r, 10, '#2a1a0c', .35, 60); escorridos(x, S, r, 30, '#120c06', .35); rachaduras(x, S, r, 7, .5); for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(0,0,0,.25)'; const a = r() * S, b = r() * S; x.beginPath(); x.ellipse(a, b, 20 + r() * 50, 10 + r() * 30, r() * 3, 0, 7); x.fill(); } };
-  TX.carpete_velho = (x, S, r) => { for (let i = 0; i < 30000; i++) { x.fillStyle = `rgba(0,0,0,${r() * .12})`; x.fillRect(r() * S, r() * S, 1, 1); } manchas(x, S, r, 16, '#0a0806', .45, 70); manchas(x, S, r, 5, '#3a0806', .3, 40); };
+  TX.carpete_velho = (x, S, r) => { if (!comPixels(x, put => { for (let i = 0; i < 30000; i++) put(0, 0, 0, r() * .12, r() * S, r() * S, 1); })) for (let i = 0; i < 30000; i++) { x.fillStyle = `rgba(0,0,0,${r() * .12})`; x.fillRect(r() * S, r() * S, 1, 1); } manchas(x, S, r, 16, '#0a0806', .45, 70); manchas(x, S, r, 5, '#3a0806', .3, 40); };
 
   /* ================= os objetos ================= */
   NS.extensoes.push(F => {

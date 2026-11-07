@@ -7,6 +7,31 @@
   /* ================= utilidades de desenho ================= */
   function rng(seed) { let a = (seed * 2654435761) >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const tela = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+  /* pontinhos de textura direto nos pixels: milhares de fillRect, cada um com um fillStyle novo, custavam dezenas de
+     milissegundos por textura (o navegador lê a cor do texto a cada ponto). comPixels(x, f) entrega put(r, g, b, alfa, px,
+     py, tam), que mistura o ponto como o canvas faria; sem transformação nem composição diferente; senão devolve false e
+     quem chamou desenha do jeito antigo (os sorteios só são consumidos se f rodar). */
+  function comPixels(x, desenha) {
+    const c = x && x.canvas; if (!c || !x.getImageData) return false;
+    const t = x.getTransform ? x.getTransform() : null;
+    if (t && !(t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0)) return false;
+    if (x.globalAlpha !== 1 || x.globalCompositeOperation !== 'source-over') return false;
+    const W = c.width, H = c.height; let im; try { im = x.getImageData(0, 0, W, H); } catch (e) { return false; }
+    const d = im.data;
+    const put = (cr, cg, cb, al, px, py, tam) => {
+      if (!(al > 0)) return;
+      const k = Math.max(1, Math.round(tam)), aa = Math.min(1, al * tam * tam / (k * k)), x0 = Math.round(px), y0 = Math.round(py);
+      for (let yy = y0; yy < y0 + k; yy++) {
+        if (yy < 0 || yy >= H) continue;
+        for (let xx = x0; xx < x0 + k; xx++) {
+          if (xx < 0 || xx >= W) continue;
+          const q = (yy * W + xx) * 4, da = d[q + 3] / 255, oa = aa + da * (1 - aa); if (oa <= 0) continue;
+          const f = da * (1 - aa); d[q] = (cr * aa + d[q] * f) / oa; d[q + 1] = (cg * aa + d[q + 1] * f) / oa; d[q + 2] = (cb * aa + d[q + 2] * f) / oa; d[q + 3] = oa * 255;
+        }
+      }
+    };
+    desenha(put); x.putImageData(im, 0, 0); return true;
+  }
 
   /* ---------- telas das texturas geradas: guardadas para o site inteiro (com teto de memória) ----------
      Desenhar uma textura de 512 px são dezenas de milhares de retângulos; cada sala montava as suas de novo. Agora cada
@@ -74,7 +99,7 @@
       if (cacheT.has(k)) return cacheT.get(k);
       const t = texTela('b' + tipo + '|' + cor, 256, cor, rep, x => {
       const r = rng(tipo.length * 31 + cor.length);
-      const ruido = (n, a, tam) => { for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '255,255,255'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
+      const ruido = (n, a, tam) => { if (comPixels(x, put => { for (let i = 0; i < n; i++) { const v = r() < .5 ? 0 : 255; put(v, v, v, a * r(), r() * 256, r() * 256, tam); } })) return; for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${r() < .5 ? '0,0,0' : '255,255,255'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
       if (tipo === 'azulejo' || tipo === 'xadrez' || tipo === 'xadrez_pb') {
         if (tipo === 'xadrez') { x.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2) x.fillRect(i * 64, j * 64, 64, 64); }
         if (tipo === 'xadrez_pb') { x.fillStyle = 'rgba(8,8,8,.9)'; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2) x.fillRect(i * 64, j * 64, 64, 64); for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(40,30,20,${.05 + r() * .12})`; x.beginPath(); x.ellipse(r() * 256, r() * 256, 6 + r() * 30, 4 + r() * 18, r() * 3, 0, 7); x.fill(); } }
@@ -547,7 +572,7 @@
       if (cacheT.has(k)) return cacheT.get(k);
       const t = texTela('n' + tipo + '|' + cor, 256, cor, rep, x => {
       const r = rng(tipo.length * 53 + cor.length * 7);
-      const ruido = (n, a, tam, claro) => { for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${claro === undefined ? (r() < .5 ? '0,0,0' : '255,255,255') : claro ? '255,255,255' : '0,0,0'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
+      const ruido = (n, a, tam, claro) => { if (comPixels(x, put => { for (let i = 0; i < n; i++) { const v = claro === undefined ? (r() < .5 ? 0 : 255) : claro ? 255 : 0; put(v, v, v, a * r(), r() * 256, r() * 256, tam); } })) return; for (let i = 0; i < n; i++) { x.fillStyle = `rgba(${claro === undefined ? (r() < .5 ? '0,0,0' : '255,255,255') : claro ? '255,255,255' : '0,0,0'},${a * r()})`; x.fillRect(r() * 256, r() * 256, tam, tam); } };
       const blob = (n, rgba, rmin, rmax) => { for (let i = 0; i < n; i++) { x.fillStyle = rgba; x.beginPath(); x.ellipse(r() * 256, r() * 256, rmin + r() * (rmax - rmin), rmin + r() * (rmax - rmin) * .7, r() * 3, 0, 7); x.fill(); } };
       if (tipo === 'papel_parede') {
         // papel de parede amarelado das "backrooms": listras finas, losangos apagados, manchas de umidade
@@ -560,7 +585,7 @@
       } else if (tipo === 'carpete_umido') { ruido(9000, .09, 1); blob(14, 'rgba(40,30,10,.12)', 12, 40); blob(6, 'rgba(255,240,200,.05)', 10, 30); }
       else if (tipo === 'forro') {
         x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 4; x.strokeRect(0, 0, 256, 256); x.beginPath(); x.moveTo(128, 0); x.lineTo(128, 256); x.moveTo(0, 128); x.lineTo(256, 128); x.stroke();
-        for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(0,0,0,${.15 * r()})`; x.fillRect(r() * 256, r() * 256, 1, 1); }
+        if (!comPixels(x, put => { for (let i = 0; i < 2500; i++) put(0, 0, 0, .15 * r(), r() * 256, r() * 256, 1); })) for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(0,0,0,${.15 * r()})`; x.fillRect(r() * 256, r() * 256, 1, 1); }
         blob(3, 'rgba(120,90,30,.18)', 10, 35);
       } else if (tipo === 'marmore') {
         ruido(1500, .03, 3); x.strokeStyle = 'rgba(80,80,90,.25)'; x.lineWidth = 1.5;
@@ -1259,5 +1284,5 @@
     if (alt && typeof it.h === 'number' && it.h >= 2.8) o.h = +(it.h + alt - 3).toFixed(2);
     return o;
   }
-  window.ACF3D = Object.assign(window.ACF3D || {}, { criarFabrica, rng, tela, caixasColisao, ajustarItem, telas: Telas });
+  window.ACF3D = Object.assign(window.ACF3D || {}, { criarFabrica, rng, tela, caixasColisao, ajustarItem, telas: Telas, comPixels });
 })();

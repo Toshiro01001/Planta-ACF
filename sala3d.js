@@ -357,15 +357,19 @@
   // o item aparece nesta versão da sala? (5º andar: neutro / rei / mae / consagrado)
   const naVersao = (it, ver) => { if (!it.v || typeof it.v === 'number') return true;   // v numérico é velocidade (ventilador, turbina), não versão
  const l = Array.isArray(it.v) ? it.v : [it.v]; return l.includes(ver || 'neutro'); };
-  function montarItens(F, cena, pai, ver, sala) {
+  // montarItens em fatias: o gerador devolve o controle depois de cada objeto (a pré-montagem da sala da frente roda
+  // alguns objetos por quadro); montarItens roda tudo de uma vez, como antes
+  function montarItens(F, cena, pai, ver, sala) { const it = montarItensG(F, cena, pai, ver, sala); while (!it.next().done); }
+  function* montarItensG(F, cena, pai, ver, sala) {
     F.imagens = cena.imagens || {};
     const lado = cena.lado || 7.071;
     let itens = (cena.itens || []).map(it => lado === SALA_M ? it : NS().ajustarItem(it, lado, SALA_M, ALT));
-    itens.forEach((it, i) => {
-      if (it.t === 'porta' || !naVersao(it, ver)) return;   // no 3D novo, as portas de verdade são as dos corredores
-      const fab = F.P[it.t]; if (!fab) return;
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      if (it.t === 'porta' || !naVersao(it, ver)) continue;   // no 3D novo, as portas de verdade são as dos corredores
+      const fab = F.P[it.t]; if (!fab) continue;
       const nAnim = F.anim ? F.anim.length : 0;
-      let o; try { o = fab({ sem: i + 1, ...it }); } catch (e) { console.warn('3D:', it.t, e); return; }
+      let o; try { o = fab({ sem: i + 1, ...it }); } catch (e) { console.warn('3D:', it.t, e); continue; }
       if (F.anim && F.anim.length !== nAnim) {
         // o objeto tem animação por quadro: roda as animações dele algumas vezes e descobre quais peças NÃO mudam
         // (banca do Maurício, terminal: só o personagem e as luzes se mexem; as prateleiras entram na malha estática)
@@ -385,7 +389,8 @@
       if (it.int) o.userData.int = { m: it.int, nome: it.intN || '', item: it.intItem || '', qtd: it.intQtd ?? null, som: it.intSom || '', txt: it.intTxt || '', ini: it.intIni ?? null };
       if (it.t === 'campo_infinito') o.userData.campo = { r0: it.r0 || 1.3, r1: it.r1 || 2.6, ext: it.ext || 7, per: it.per || 'vontade', dt: it.dt || 20 };
       pai.add(o);
-    });
+      yield 1;
+    }
   }
   /* ----- malha estática por material: as peças paradas viram UMA malha por material -----
      Cada objeto continua na cena (hierarquia, userData, posição, caixa de colisão, raio do clique, contorno do
@@ -1290,18 +1295,28 @@
       return true;
     }
     function carregar(p) {
-      const s = S[p]; if (carregadas.has(p)) return;
+      if (carregadas.has(p)) return;
+      if (pre && pre.p === p) terminarPre();   // a sala da frente estava sendo pré-montada: termina já e devolve
       if (devolver(p)) return;
+      const it = montarSala(p, false); while (!it.next().done);
+    }
+    /* ----- montagem da sala: de uma vez (carregar) ou em fatias, fora da cena (pré-montagem). Na pré-montagem a sala
+       nasce fora da cena e vai direto para as guardadas: entrar nela depois é só pôr de volta (devolver), sem montar,
+       sem gerar textura e sem subir nada para a placa no quadro em que ela aparece. ----- */
+    function* montarSala(p, preMont) {
+      const s = S[p];
+      const ints = preMont ? [] : interativos, cps = preMont ? [] : campos;
       const ver = ((est().var3d || {})['c' + s.cn]) || 'neutro';
       const desc = [], anim = [], luzes = [], g = new T.Group();
-      g.position.set(s.cx, 0, s.cz); raiz.add(g);
+      g.position.set(s.cx, 0, s.cz); if (!preMont) raiz.add(g);
       const cena = s.cena || {};
       const F2 = NSX.criarFabrica(T, anim, luzes, desc, { alt: ALT }); F2.T = T;
-      montarItens(F2, cena, g, ver, { cn: s.cn, vaos: Object.entries(s.vaos).map(([lado, v]) => ({ lado, u: v.centro - (lado === 'n' || lado === 's' ? s.cx : s.cz) })) });
+      if (preMont) pre.desc = desc;
+      yield* montarItensG(F2, cena, g, ver, { cn: s.cn, vaos: Object.entries(s.vaos).map(([lado, v]) => ({ lado, u: v.centro - (lado === 'n' || lado === 's' ? s.cx : s.cz) })) });
       g.updateMatrixWorld(true);
       // Parede de Desejos (mapa/paredes): entra antes das colisões e da fusão, como os outros objetos parados da sala
       const pd = colocarParede(s, g, F2);
-      g.children.forEach(o => { if (o.userData.campo) campos.push({ p, cn: s.cn, x: s.cx + o.position.x, z: s.cz + o.position.z, ...o.userData.campo }); });
+      g.children.forEach(o => { if (o.userData.campo) cps.push({ p, cn: s.cn, x: s.cx + o.position.x, z: s.cz + o.position.z, ...o.userData.campo }); });
       const virt = luzes.map(l => { const w = new T.Vector3(); l.getWorldPosition(w); let dono = l.parent; while (dono && dono.parent && dono.parent !== g) dono = dono.parent; l.parent.remove(l); return { l, p: w, base: l.intensity, cn: s.cn, dono: dono && dono.parent === g ? dono : null }; });
       (cena.luzes || []).forEach((l, i) => {
         const L = new T.PointLight(l.c || '#fff', l.i ?? 1, l.d ?? 8, 2);
@@ -1312,30 +1327,63 @@
       if (cena.sombra !== false && s.cena) virt.push({ l: new T.PointLight(cena.sombraCor || '#fff4e6', (cena.sombraI ?? .8) * .8, 10, 2), p: new T.Vector3(s.cx + .8, ALT - .4, s.cz + .6), base: (cena.sombraI ?? .8) * .8, cn: s.cn });
       // interações (abrir, ligar, tocar, ler, vestir, telão): interacoes3d.js
       const IN = NS().inter ? NS().inter.preparar(T, g, s, p, desc) : { lista: [], dinam: [] };
-      IN.lista.forEach(e => interativos.push(e));
+      IN.lista.forEach(e => ints.push(e));
       // materiais que brilham (lâmpadas, telas): apagam junto com a luz da sala
       const emissivos = [];
       g.traverse(o => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > .3 && !o.material.userData.eco && !emissivos.find(e => e.m === o.material)) emissivos.push({ m: o.material, base: o.material.emissiveIntensity }); });   // (o símbolo da Parede brilha sempre: material dividido entre as salas)
       // esconderijos desta sala
       const esconde = [];
       g.children.forEach(o => { if (o.userData.esc) { const w = new T.Vector3(); o.getWorldPosition(w); esconde.push({ tipo: 'esconderijo', cn: s.cn, p, i: o.userData.i, nome: o.userData.esc, pos: w, obj: o }); } });
-      esconde.forEach(e => interativos.push(e));
+      esconde.forEach(e => ints.push(e));
       // coisas de usar: o Maurício (loja), o bebedouro e a geladeira (despensa)
-      g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); interativos.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w, obj: o }); } });
+      g.children.forEach(o => { if (o.userData.uso) { const w = new T.Vector3(); o.getWorldPosition(w); ints.push({ tipo: 'uso', uso: o.userData.uso, cn: s.cn, p, pos: w, obj: o }); } });
       // itens do livro jogados: aparecem quando o Mestre espalha (mapa/estoque/i_<CN>_<n>)
-      g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; interativos.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
-      if (pd) interativos.push({ tipo: 'parede', cn: s.cn, p, pos: pd.pos, obj: pd.obj });
+      g.children.forEach(o => { if (o.userData.t === 'item_chao') { const w = new T.Vector3(); o.getWorldPosition(w); const it = (cena.itens || [])[o.userData.i] || {}; ints.push({ tipo: 'item', k: `i_${s.cn}_${o.userData.i}`, nome: it.item || 'Item', cn: s.cn, p, pos: w, obj: o }); } });
+      if (pd) ints.push({ tipo: 'parede', cn: s.cn, p, pos: pd.pos, obj: pd.obj });
       const c = { g, desc, anim, virt, obst: obstaculos(T, g), emissivos, esconde, ver, docs: [], sigDocs: '', inter: IN, parede: pd ? pd.obj : null, cena: s.cena };
-      carregadas.set(p, c);
+      if (!preMont) carregadas.set(p, c);
+      if (preMont) yield 1;
       // Móveis V2 (Média e Alta, moveis_v2.js): troca só a aparência, depois das colisões e antes da fusão
       if (NS().moveisV2 && NS().moveisV2.ativo()) { try { NS().moveisV2.trocar(T, g, s.cena, desc); } catch (e) { console.warn('3D móveis V2:', e); } }
-      if (NS().inter) NS().inter.aplicar(c, true);
+      if (!preMont && NS().inter) NS().inter.aplicar(c, true);
+      if (preMont) yield 1;
       if (FUNDIR) { try { c.fusao = fundirEstaticos(T, g, desc, IN); } catch (e) { console.warn('3D fusão:', e); } }
       atualizarItens(p); sincDocs(p, F2); sincItensM(p, F2);
       // sala nova: shaders e texturas dela ficam prontos no tempo ocioso (antes de alguém olhar para ela). A vizinha
       // (atrás de uma porta) entra escondida e só aparece quando o aquecedor terminar (ou em 2 s): compilar e subir as
       // texturas dela no quadro em que ela aparecia derrubava o FPS por alguns segundos ao entrar numa sala.
+      if (preMont) { c.campos = cps; c.salvos = ints; c.oculta = 0; c.pre = true; if (ctx.aquecer) ctx.aquecer(g); guardar(p, c); return; }
       if (ctx.aquecer) { ctx.aquecer(g); if (p !== pFoco) { g.visible = false; c.oculta = performance.now(); } }
+    }
+    let pre = null, tPre = 0;
+    const ORC_PRE = celular ? 3 : 4;   // milissegundos por quadro para a pré-montagem
+    function terminarPre() { const j = pre; if (!j) return; try { while (!j.it.next().done); } catch (e) { console.warn('3D pré-montagem:', e); if (j.desc) destruir({ desc: j.desc }); } if (pre === j) pre = null; }
+    function cancelarPre() { const j = pre; if (!j) return; pre = null; try { j.it.return(); } catch (e) {} if (j.desc) destruir({ desc: j.desc }); }
+    const guardadaBoa = p => { const c = guardadas.get(p); if (!c) return false; const ver = ((est().var3d || {})['c' + S[p].cn]) || 'neutro'; return c.ver === ver && !!c.parede === paredeAqui(S[p].cn) && c.cena === S[p].cena; };
+    function iniciarPre(p) { if (pre || !S[p] || carregadas.has(p) || guardadaBoa(p)) return false; pre = { p, it: montarSala(p, true), desc: null }; return true; }
+    function passoPre() {
+      const j = pre; if (!j) return; const t0 = performance.now();
+      try { let r; do { r = j.it.next(); } while (!r.done && performance.now() - t0 < ORC_PRE); if (r.done && pre === j) pre = null; }
+      catch (e) { console.warn('3D pré-montagem:', e); if (j.desc) destruir({ desc: j.desc }); if (pre === j) pre = null; }
+    }
+    // qual sala pré-montar: a do outro lado da porta (jogador). No corredor, as duas pontas (primeiro a que a câmera
+    // olha); dentro de uma sala, as vizinhas de porta aberta, da porta mais perto para a mais longe. Só salas com cena publicada
+    // (o jogador já recebeu esses dados) e sem passar do cache de salas guardadas.
+    const vPre = new T.Vector3();
+    function escolherPre(x, z) {
+      if (ctx.quem !== 'jog' || A.tv) return null;
+      const pj = ctx.salaJogador(), ok = q => q && q !== pj && S[q] && S[q].cena && !carregadas.has(q) && !guardadaBoa(q);
+      const p0 = salaNoPonto3D(a, x, z); let cand = [];
+      if (!p0) {
+        let best = null, bd = 1e9;
+        CS.forEach(c => { if (c.saida || !S[c.p1] || !S[c.p2]) return; const A1 = S[c.p1], B1 = S[c.p2], vx = B1.cx - A1.cx, vz = B1.cz - A1.cz, L2 = vx * vx + vz * vz || 1; const t = Math.max(0, Math.min(1, ((x - A1.cx) * vx + (z - A1.cz) * vz) / L2)); const d = (A1.cx + vx * t - x) ** 2 + (A1.cz + vz * t - z) ** 2; if (d < bd) { bd = d; best = c; } });
+        if (best) { let fx = 0, fz = 0; if (ctx.camera) { ctx.camera.getWorldDirection(vPre); fx = vPre.x; fz = vPre.z; } cand = [best.p1, best.p2].sort((u, v) => ((S[v].cx - x) * fx + (S[v].cz - z) * fz) - ((S[u].cx - x) * fx + (S[u].cz - z) * fz)); }
+      } else {
+        cand = vizinhas(p0).filter(([q, ci]) => { const P = portas.find(w => w && w.c.ci === ci); return P && P.v === 'a'; }).map(([q]) => q)
+          .map(q => { const s0 = S[p0], vx = S[q].cx - s0.cx, vz = S[q].cz - s0.cz, L = Math.hypot(vx, vz) || 1, px = s0.cx + vx / L * SALA_M / 2, pz = s0.cz + vz / L * SALA_M / 2; return [q, Math.hypot(px - x, pz - z)]; }).sort((u, v) => u[1] - v[1]).map(([q]) => q);
+      }
+      cand = cand.slice(0, Math.max(1, GUARDA_MAX - 1));
+      return cand.find(ok) || null;
     }
     // itens do chão: só aparecem os que estão no estoque (o Mestre espalhou e ninguém pegou)
     function atualizarItens(pSo) {
@@ -1422,7 +1470,7 @@
       // a sala da câmera primeiro (é a única que precisa aparecer na hora)
       pFoco = ctx.quem === 'jog' && !A.tv ? ctx.salaJogador() : (salaNoPonto3D(a, x, z) || centroMaisPerto(x, z));
       const falta = (quer.has(pFoco) && !carregadas.has(pFoco) ? pFoco : null) || [...quer].find(p => !carregadas.has(p)) || [...extra].find(p => !carregadas.has(p));
-      if (falta) carregar(falta);
+      if (falta) { if (falta === pFoco || !iniciarPre(falta) && !(pre && pre.p === falta)) carregar(falta); }
       const aqLivre = !(ctx.aq && ctx.aq.pendentes());
       carregadas.forEach((c, p) => {
         // com a compilação em segundo plano a espera não trava nada: a vizinha só aparece pronta (10 s no máximo)
@@ -1434,7 +1482,7 @@
       if (vis !== visAntes) { visAntes = vis; Object.values(S).forEach(s => s.veus.forEach(v => { v.visible = !salaVisivel(s.p); })); }
     }
     // remontar uma sala (versão Rei/Mãe trocada, cena nova)
-    function recarregar(p) { if (guardadas.has(p)) { destruir(guardadas.get(p)); guardadas.delete(p); } if (carregadas.has(p)) { descarregar(p); carregar(p); } }
+    function recarregar(p) { if (pre && pre.p === p) cancelarPre(); if (guardadas.has(p)) { destruir(guardadas.get(p)); guardadas.delete(p); } if (carregadas.has(p)) { descarregar(p); carregar(p); } }
     // Móveis V2 chegaram com salas já montadas: cada sala sai da fusão, troca a aparência e é fundida de novo
     function trocarMoveisV2() {
       const MV = NS().moveisV2; if (!MV || !MV.ativo()) return 0; let n = 0;
@@ -1615,13 +1663,14 @@
 
     setTimeout(() => { try { sincExpo(); } catch (e) {} }, 0);
     return {
-      a, S, CS, portas, interativos, carregadas, guardadas, raiz, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
+      a, S, CS, portas, interativos, carregadas, guardadas, raiz, _pre: { escolher: escolherPre, get job() { return pre ? pre.p : null; } }, tetos, campos, portasFund, get refusoesPortas() { return nRefusoes; },
       // o que o Mapa V2 (mapa_v2.js) precisa para trocar a aparência sem mexer em posição nem colisão
       v2: { S, CS, corr3D, CORR_W, CORR_H, ALT, ESP, raiz, tetos, portas, paineis: paineisInfo, corr: { parede: mParC, chao: mChaoC, teto: mTetoC } },
       livre3D, area3D, tetoEm, atualizarPortas, atualizarParedes, recarregar, recarregarCena, trocarMoveisV2, refazerSalasV1, estadoPorta, atualizarItens, atualizarDocs, atualizarItensM, carregar, sincExpo,
       atualizarInter: () => { if (NS().inter) carregadas.forEach(c => NS().inter.aplicar(c, false)); },
       centro: p => [S[p].cx, S[p].cz],
       atualizar(dt, t, x, z, modo, cam) {
+        passoPre(); tPre -= dt; if (!pre && !(tPre > 0)) { tPre = .4; try { const q = escolherPre(x, z); if (q) iniciarPre(q); } catch (e) { if (!NS()._preErro) { NS()._preErro = String(e); console.warn('3D pré-escolha:', e); } } }
         tStream -= dt; if (!(tStream > 0)) { tStream = .3; streaming(x, z, modo); if (FUNDIR) carregadas.forEach(c => { try { if (vigiarFusao(c.g)) c.fusao = c.g.userData.fusao && { refeita: true }; } catch (e) {} }); try { detalhe(modo); } catch (e) {} }   // !(>0) também pega NaN
         carregadas.forEach(c => { for (let i = 0; i < c.anim.length; i++) c.anim[i](dt, t); });
         portas.forEach(P => { if (P) for (let i = 0; i < P.anim.length; i++) P.anim[i](dt, t); });
@@ -1646,7 +1695,7 @@
       descartar() {
         if (expoCena) { try { expoCena.r.descartar && expoCena.r.descartar(); } catch (e) {} expoCena.desc.forEach(d => { try { d.dispose(); } catch (e) {} }); expoCena = null; }
         [...carregadas.keys()].forEach(p => descarregar(p));
-        guardadas.forEach(destruir); guardadas.clear();
+        cancelarPre(); guardadas.forEach(destruir); guardadas.clear();
         portas.forEach(P => P && P.desc.forEach(x => { try { x.dispose(); } catch (e) {} }));
       }
     };
