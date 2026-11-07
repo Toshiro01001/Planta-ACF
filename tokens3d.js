@@ -2012,7 +2012,8 @@
   /* ---------- modelos .glb opcionais (modelos/modelos.json) ---------- */
   let manifesto = null, pedindo = null;
   const gltfCache = new Map();
-  const carregarScript = src => new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = falha; document.head.appendChild(s); });
+  // um <script> por endereço na página toda (mapa_v2.js e moveis_v2.js usam o mesmo registro, ACF3D.scripts)
+  const carregarScript = src => { const R = (window.ACF3D = window.ACF3D || {}).scripts = (window.ACF3D || {}).scripts || {}; return R[src] || (R[src] = new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = e => { delete R[src]; s.remove(); falha(e); }; document.head.appendChild(s); })); };
   function carregarModelos() {
     if (pedindo) return pedindo;
     pedindo = fetch('modelos/modelos.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(async j => {
@@ -2154,6 +2155,24 @@
       return pr;
     },
     url(e) { return V2_DIR + e.arq + '?v=' + e.v; },
+    // pré-carga da abertura (sala3d.js): bibliotecas, montador e os .glb dos tokens do andar vão para o cache
+    // (lista: [{ s, forma }]; mesma regra de qualidade de quem vai usar: ligadoPara)
+    preCarregar(lista) {
+      const aq = (window.ACF3D || {}).aquecer; if (!aq || !this.ligado()) return;
+      const us = new Set(); let humano = false, cob = false;
+      (lista || []).forEach(({ s, forma }) => {
+        if (!s) return;
+        const e = s.tipo === 'filho' ? this.entrada(forma) : (s.tipo === 'cobaia' || s.tipo === 'npc') ? this.entradaCobaia(s) : null;
+        if (!e || !this.ligadoPara(e) || this.falhas.has(this.url(e))) return;
+        us.add(this.url(e)); if (e.rig === 'humanoide') humano = true; if (e.cobaia) cob = true;
+      });
+      if (!us.size) return;
+      if (!(window.THREE && THREE.GLTFLoader)) { aq(LIB + 'GLTFLoader.js' + LIB_V); aq(LIB + 'SkeletonUtils.js' + LIB_V); }
+      if (!window.MeshoptDecoder) aq(LIB + 'meshopt_decoder.js' + LIB_V);
+      if (cob && !window[V2_COB_ARQ.global]) aq(V2_COB_ARQ.script + (TOK_V ? '?' + TOK_V : ''));
+      if (humano) aq(this.url(V2_ANIM.humanoide));
+      us.forEach(aq);
+    },
     urls() { return Object.values(V2_CAT).filter(e => e.pronto !== false).concat(Object.values(V2_ANIM), [...new Set([V2_COB_ARQ.arq, ...Object.values(V2_COBAIA).map(p => p.arquivo).filter(Boolean)])].map(arq => ({ arq, v: V2_COB_ARQ.v }))).map(e => new URL(this.url(e), location.href).href); },
     carregarLibs(T) {
       if (this.libs) return this.libs;

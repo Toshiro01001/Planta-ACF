@@ -27,6 +27,9 @@
     s.onload = () => ok(true); s.onerror = () => { s.remove(); ok(false); };   // sem o arquivo, o 3D abre do mesmo jeito
     document.head.appendChild(s);
   });
+  // o mesmo arquivo pedido duas vezes (pré-carga da abertura e montagem do andar) roda uma vez só
+  const baixando = {};
+  const baixarUma = arq => baixando[arq] || (baixando[arq] = baixar(arq).then(ok => { if (!ok) delete baixando[arq]; return ok; }));
   const carregarExtras = () => extrasP || (extrasP = Promise.all([
     (window.ACF3D || {}).andaresProntos ? true : baixar('andares3d.js'),
     (window.ACF3D || {}).formasFilho ? true : baixar('filhos3d.js'),
@@ -45,6 +48,13 @@
   // objeto de cena "campo_infinito": a figura flutuante (triângulo invertido) com o campo em volta.
   // O que ele faz com quem chega perto fica em Campos (mover): quanto mais perto, mais devagar; perto demais, preso.
   (window.ACF3D = window.ACF3D || {}).extensoes = window.ACF3D.extensoes || [];
+  // pré-carga: baixa um arquivo para o cache (o sw.js guarda os de ?v=) sem usar; o carregador de verdade lê de lá depois
+  const aquecidos = new Set();
+  window.ACF3D.aquecer = u => {
+    if (!u || aquecidos.has(u) || !window.fetch) return;
+    aquecidos.add(u);
+    fetch(u, { credentials: 'same-origin', priority: 'low' }).then(r => r.ok ? r.arrayBuffer() : null).catch(() => { aquecidos.delete(u); });
+  };
   window.ACF3D.extensoes.push(F => {
     const { P, m, G, T, guardar, anim, luz } = F;
     P.campo_infinito = o => {
@@ -2436,6 +2446,8 @@
       try { await carregarThree(); await carregarExtras(); await NS().carregarModelos(); } catch (e) { if (seq === abrirSeq) msg.textContent = 'Não consegui carregar o 3D (sem internet?). Tente de novo.'; return; }
     }
     if (d.hidden || seq !== abrirSeq) return;
+    // os arquivos de que a montagem precisa já chegaram: o resto baixa enquanto o andar é montado
+    preCarga(op.a || Math.ceil(cn / 25));
     if (V) fechar(true);
     // deixa a barra aparecer antes de montar o andar (a montagem em si é um passo só)
     progresso('Montando o andar…', .42);
@@ -2460,6 +2472,21 @@
     caixa.querySelector('span').textContent = `${txt} ${p}%`;
     const barra = caixa.querySelector('[role="progressbar"]'); barra.setAttribute('aria-valuenow', p);
     barra.firstChild.style.width = p + '%';
+  }
+  /* pré-carga da abertura (Média e Alta): o kit do mapa V2, os móveis V2 e os corpos dos tokens deste andar começam a
+     baixar assim que o three.js e os arquivos grandes chegam, e descem enquanto o andar é montado. Antes, só eram
+     pedidos depois da montagem (segundos de CPU no celular), e o download vinha depois disso, em fila. Mais cedo
+     (no clique) disputaria a banda com os arquivos de que a montagem precisa. Na Leve não baixa nada a mais. */
+  function preCarga(a) {
+    try {
+      if (!mapaV2Ligado()) return;
+      const pede = (arq, chave) => { const m = NS()[chave]; if (m) { if (m.preCarregar) m.preCarregar(); return; }
+        baixarUma(arq).then(ok => { const x = ok && NS()[chave]; if (x && x.preCarregar) x.preCarregar(); }); };
+      pede('mapa_v2.js', 'mapaV2'); pede('moveis_v2.js', 'moveisV2');
+      const A = ACF(), tks = (A && A.estado && A.estado.tokens) || {}, fm = (A && A.estado && A.estado.formas) || {}, lista = [];
+      for (const id in tks) { const tk = tks[id]; if (tk && tk.a === a && A.SER && A.SER[tk.s]) lista.push({ s: A.SER[tk.s], forma: tk.fm || fm[tk.s] || fm[id] }); }
+      if (NS().v2 && NS().v2.preCarregar) NS().v2.preCarregar(lista);
+    } catch (e) {}
   }
   // baixa já (sem rodar) um arquivo que só roda depois do three.js
   function pre(arq) {
@@ -2553,9 +2580,9 @@
     ctx.camera = cam;
     ctx.parado = () => !!V && performance.now() - (V.ultCam || 0) > 1200;
     // Mapa V2 (kit de terror do Blender): só na qualidade Alta; o arquivo e o kit baixam aqui, na primeira vez
-    if (mapaV2Ligado()) { const ligar = () => { if (V && V.mundo === mundo && NS().mapaV2) NS().mapaV2.montar(ctx, mundo); }; if (NS().mapaV2) setTimeout(ligar, 0); else baixar('mapa_v2.js').then(ligar); }
+    if (mapaV2Ligado()) { const ligar = () => { if (V && V.mundo === mundo && NS().mapaV2) NS().mapaV2.montar(ctx, mundo); }; if (NS().mapaV2) setTimeout(ligar, 0); else baixarUma('mapa_v2.js').then(ligar); }
     // Móveis V2 (Média e Alta): modelos e texturas baixam na primeira vez; as salas já montadas trocam ao chegar
-    if (mapaV2Ligado()) { const ligarM = () => { if (V && V.mundo === mundo && NS().moveisV2) NS().moveisV2.iniciar(ctx, mundo); }; if (NS().moveisV2) setTimeout(ligarM, 0); else baixar('moveis_v2.js').then(ligarM); }
+    if (mapaV2Ligado()) { const ligarM = () => { if (V && V.mundo === mundo && NS().moveisV2) NS().moveisV2.iniciar(ctx, mundo); }; if (NS().moveisV2) setTimeout(ligarM, 0); else baixarUma('moveis_v2.js').then(ligarM); }
     if (V.ctrlMestre && ((A.estado || {}).tokens || {})[V.ctrlMestre]) V.ctrl = V.ctrlMestre;
     pintarBarra();
 

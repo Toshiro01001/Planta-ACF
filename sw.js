@@ -52,13 +52,22 @@ async function pagina(req) {
     throw er;
   }
 }
-// arquivo versionado do site: guardado primeiro; da rede, guarda só resposta boa
+// arquivo versionado do site: guardado primeiro; da rede, guarda só resposta boa.
+// Pedido igual já a caminho (pré-carga da abertura do 3D e o carregador de verdade): espera aquele e serve do guardado,
+// em vez de baixar o mesmo arquivo duas vezes
+const voando = new Map();
 async function guardadoPrimeiro(req) {
-  const c = await caches.open(CACHE), hit = await c.match(req.url);
+  const u = req.url, c = await caches.open(CACHE), hit = await c.match(u);
   if (hit) return hit;
-  const r = await fetch(req);
-  if (r.ok && r.type === 'basic') c.put(req.url, r.clone()).catch(() => {});
-  return r;
+  const ja = voando.get(u);
+  if (ja) { await ja; const h = await c.match(u); if (h) return h; }
+  let fim; const vez = new Promise(ok => { fim = ok; });
+  voando.set(u, vez); vez.then(() => { if (voando.get(u) === vez) voando.delete(u); });
+  try {
+    const r = await fetch(req);
+    if (r.ok && r.type === 'basic') c.put(u, r.clone()).catch(() => {}).then(fim); else fim();
+    return r;
+  } catch (er) { fim(); throw er; }
 }
 let guardandoThree = null, threeGuardado = false;
 caches.open(CACHE).then(c => c.match(THREE)).then(hit => { threeGuardado = !!hit; }).catch(() => {});

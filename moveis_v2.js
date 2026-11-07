@@ -8,12 +8,15 @@
 (() => {
   'use strict';
   const NS = () => (window.ACF3D = window.ACF3D || {});
-  const VERSAO = ((document.currentScript && document.currentScript.src) || '').split('?')[1] || '';
   const BASE = 'modelos/moveis_v2/';
-  const url = a => BASE + a + (VERSAO ? '?' + VERSAO : '');
+  // versão dos arquivos dos móveis (própria: trocar só quando um arquivo daqui mudar; antes era a do sala3d.js, e cada
+  // entrega do site fazia todo aparelho baixar tudo de novo)
+  const ARQ_V = '20261107a';
+  const url = a => BASE + a + '?v=' + ARQ_V;
   let forcado = null;   // só para fotos de comparação (MoveisV2.teste)
   const ligado = () => { if (forcado !== null) return forcado; try { const Q = window.ACF_QUALIDADE; return !!(Q && typeof Q.v2 === 'function' && Q.v2()); } catch (e) { return false; } };
-  const script = src => new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = ok; s.onerror = falha; document.head.appendChild(s); });
+  // um <script> por endereço na página toda (mapa, móveis e tokens pedem as mesmas bibliotecas ao mesmo tempo)
+  const script = src => (NS().scripts = NS().scripts || {})[src] || (NS().scripts[src] = new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = ok; s.onerror = e => { delete NS().scripts[src]; s.remove(); falha(e); }; document.head.appendChild(s); }));
 
   /* ---------- cor do Mestre por peça: slot -> [parâmetro da cena, padrão do V1] ---------- */
   const TINTA = {
@@ -39,6 +42,8 @@
     'cadeira_plastico', 'banco_madeira', 'caixa_metal', 'lixeira', 'carrinho', 'estante_pastas', 'estante', 'armario', 'luminaria']);
 
   /* ---------- carregamento (uma vez por sessão; o sw.js guarda os arquivos com ?v=) ---------- */
+  const ARQS = ['moveis_cor.webp', 'moveis_nor.webp', 'moveis_orm.webp', 'carne_cor.webp', 'carne_nor.webp', 'carne_mr.webp', 'sangue_cor.webp',
+    'sangue_nor.webp', 'pastas_cor.webp', 'pastas_nor.webp', 'mancha_cor.webp', 'mancha_nor.webp', 'moveis_v2.glb'];
   let kit = null, prometido = null;
   function lerAttr(a) {
     const n = a.count, k = a.itemSize, out = new Float32Array(n * k), arr = a.array;
@@ -51,9 +56,8 @@
   function carregar(T) {
     if (prometido) return prometido;
     prometido = (async () => {
-      const V = VERSAO ? '?' + VERSAO : '';
-      if (!T.GLTFLoader) await script('lib/GLTFLoader.js' + V);
-      if (!window.MeshoptDecoder) await script('lib/meshopt_decoder.js' + V);
+      if (!T.GLTFLoader) await script('lib/GLTFLoader.js?v=r128');
+      if (!window.MeshoptDecoder) await script('lib/meshopt_decoder.js?v=r128');
       await window.MeshoptDecoder.ready;
       const tl = new T.TextureLoader();
       const tex = (a, srgb, rep) => new Promise((ok, falha) => tl.load(url(a), t => { t.encoding = srgb ? T.sRGBEncoding : T.LinearEncoding; t.anisotropy = 4; if (rep) t.wrapS = t.wrapT = T.RepeatWrapping; ok(t); }, undefined, falha));
@@ -360,6 +364,8 @@
   }
   NS().moveisV2 = {
     carregar, iniciar, trocar, aplicarQualidade, TIPOS,
+    // pré-carga (sala3d.js, no clique do 3D): só põe os arquivos no cache
+    preCarregar() { const aq = NS().aquecer; if (aq) ARQS.forEach(a => aq(url(a))); },
     teste(on) { forcado = on; aplicarQualidade(on === null ? ligado() : on); },
     ativo: () => !!kit && ligado(),
     estado() {

@@ -7,7 +7,6 @@
 (() => {
   'use strict';
   const NS = () => (window.ACF3D = window.ACF3D || {});
-  const VERSAO = ((document.currentScript && document.currentScript.src) || '').split('?')[1] || '';
   const BASE = 'modelos/mapa_v2/';
   const ARQ = {
     supCor: 'kit_superficies_cor.webp', supNor: 'kit_superficies_normal.webp',
@@ -19,7 +18,10 @@
   const lsEstilo = () => 'v2';   // V3 do mapa arquivado (decisão do Mestre: mapa em V2); só MapaV2.estiloTeste('v3') para comparação, com os arquivos do arquivo_v3
   let estiloForcado = null;
   const estilo = () => estiloForcado || lsEstilo();
-  const url = a => BASE + a + (VERSAO ? '?' + VERSAO : '');
+  // versão dos arquivos do kit (própria: trocar só quando um arquivo do kit mudar; antes era a do sala3d.js, e cada entrega
+  // do site fazia todo aparelho baixar o kit inteiro de novo)
+  const KIT_V = '20261107a';
+  const url = a => BASE + a + '?v=' + KIT_V;
 
   /* ---------- ladrilhos do atlas de superfícies (4 x 4; núcleo 480 px + borda de 16 px em 512) ---------- */
   const L = { reboco: 0, descascado: 1, azulejo: 2, papel: 3, metal: 4, mofo: 5, concreto: 6, ladrilho: 7, carpete: 8, madeira: 9, grade: 10, forro: 11, concreto_teto: 12, acolchoado: 13, chapa: 14 };
@@ -64,12 +66,13 @@
 
   /* ---------- carregamento (uma vez por sessão; o navegador e o sw.js guardam) ---------- */
   const prontos = {};
-  const script = src => new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = ok; s.onerror = falha; document.head.appendChild(s); });
+  // um <script> por endereço na página toda (mapa, móveis e tokens pedem as mesmas bibliotecas ao mesmo tempo)
+  const script = src => (NS().scripts = NS().scripts || {})[src] || (NS().scripts[src] = new Promise((ok, falha) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = ok; s.onerror = e => { delete NS().scripts[src]; s.remove(); falha(e); }; document.head.appendChild(s); }));
   function carregar(T, est) {
     if (prontos[est]) return prontos[est];
     const pronto = prontos[est] = (async () => {
-      if (!T.GLTFLoader) await script('lib/GLTFLoader.js' + (VERSAO ? '?' + VERSAO : ''));
-      if (!window.MeshoptDecoder) await script('lib/meshopt_decoder.js' + (VERSAO ? '?' + VERSAO : ''));
+      if (!T.GLTFLoader) await script('lib/GLTFLoader.js?v=r128');
+      if (!window.MeshoptDecoder) await script('lib/meshopt_decoder.js?v=r128');
       await window.MeshoptDecoder.ready;
       const tl = new T.TextureLoader();
       const px = est === 'v3';
@@ -558,6 +561,8 @@ vec3 mv2Nor(float k, vec2 uv) { return textureGrad(normalMap, mv2At(k, uv), dFdx
   }
   NS().mapaV2 = {
     DEGRADACAO, montar,
+    // pré-carga (sala3d.js, no clique do 3D): só põe os arquivos do kit no cache
+    preCarregar() { const aq = NS().aquecer; if (aq && estilo() === 'v2') ['supCor', 'supNor', 'kitCor', 'kitNor', 'kitOrm', 'kit'].forEach(k => aq(url(ARQ[k]))); },
     // fotos de comparação: remonta o andar aberto com outra degradação (null volta ao valor do andar)
     degradacaoTeste(d) { degrForcada = d; aplicarQualidade(false); aplicarQualidade(true); },
     // piloto V3: 'v2' | 'v3' (remonta o andar aberto); no aparelho, 'acf-mapa-estilo' no localStorage escolhe o padrão

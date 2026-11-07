@@ -886,6 +886,8 @@ Cada auxiliar com perfil de robô (C2P0, B00BIES, M3RL1N, K4ISER) coloca o próp
 
 O Three.js (cdnjs, r128) só baixa na primeira abertura. No andar inteiro, só os móveis da sala atual (e vizinhas, para o Mestre) ficam carregados; as luzes são um conjunto fixo (6 no celular, 10 no computador) que copia as mais próximas.
 
+**Pré-carga da abertura** (Média e Alta): assim que o Three.js e os arquivos grandes do 3D chegam, o kit do mapa V2, os móveis V2, as bibliotecas e os corpos V2/V3 dos tokens do andar começam a baixar, com prioridade baixa, enquanto o andar é montado. Antes, só eram pedidos depois da montagem, e o download vinha em fila depois dela. Medido com internet de 10 Mbps simulada, na primeira vez: tudo em alta qualidade de ~20 s para ~11 s no celular (Média) e de ~32 s para ~14 s no computador (Alta); a cena aparece no mesmo tempo de antes. Cada arquivo desce uma vez só: o `sw.js` segura um segundo pedido igual até o primeiro terminar e serve o guardado, e cada `<script>` entra uma vez na página. Os arquivos do kit do mapa e dos móveis têm versão própria (`KIT_V` em `mapa_v2.js`, `ARQ_V` em `moveis_v2.js`): uma entrega do site que não mexe neles não obriga mais o aparelho a baixá-los de novo.
+
 A **qualidade automática** (`imersao.js`) cuida do resto: veja abaixo.
 
 ### Imersão automática (`imersao.js`)
