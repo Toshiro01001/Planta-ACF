@@ -1700,7 +1700,7 @@
       } }),
     // Cara Pálida: alto e magro, um pouco curvado, braços compridos; cabeça lisa e branca sem rosto nenhum; terno
     // preto de três peças (paletó, colete com botões, camisa branca, gravata preta, lenço no bolso), luvas e sapatos
-    // pretos; uma lâmina longa e escura na mão, arrastando atrás
+    // pretos; mãos normais (sem nada nelas)
     'cara-palida': (F, s) => humano(F, { alt: 2.0, golpe: 'branca', porte: .86, bracoLongo: 1.1, pele: '#e8e6e2', camisaTex: tecidoTex(F, '#0e0e11', { sem: 81, dobras: true, costuras: [0, .5] }),
       calcaTex: tecidoTex(F, '#0d0d10', { sem: 82, dobras: true, costuras: [.25, .75] }), manga: '#101013', sapato: '#070707', sola: '#050505', maos: '#0c0c0e',
       cabecaMat: matTex(F, semRostoTex(F), { r: .22 }), escalaCabeca: [1, 1.12, 1.02], semNariz: true, semOrelhas: true, cabelo: { tipo: 'nenhum' }, giroCabeca: .12,
@@ -1721,8 +1721,6 @@
           { arcoY: (y, j) => { const w = [.06, .42, .36][j], a = [.5, .5, .42][j]; return k > 0 ? [a, w] : [-a - w, w]; }, seg: 5 }));
         casca(F, corpo, [[Y.quadril - .14, W.q * 1.14, W.dQ * 1.2], [Y.quadril, W.q * 1.06, W.dQ * 1.1], [Y.cintura + .01, W.c * 1.03, W.dC * 1.06]], pal, { abertura: .8, seg: 18 });
         F.bx(corpo, .04, .022, .008, branco, Math.sin(.85) * W.p * 1.03, Y.peito + .015, Math.cos(.85) * W.dP * 1.04 + .01).rotation.y = .85;
-        // lâmina longa e escura na mão direita, arrastando para trás
-        tuboAfilado(F, bracos[0].mao, [[0, -.05, .02], [0, -.35, -.04], [0, -.7, -.16], [0, -.92, -.34], [0, -1.0, -.5]], t => .016 * (1 - t * .85), m('#1a0a0c', { me: .6, r: .3 }), { seg: 18, rad: 5 });
       } }),
     // Risa: chanel preto com mecha azul e franja; maquiagem de palhaço (base branca, nariz vermelho, riscos escuros
     // sob os olhos, batom vermelho, olhos verde-água); gargantilha; vestido preto ombro a ombro com mangas bufantes,
@@ -2103,7 +2101,15 @@
     // humanos em V3 (low-poly pintado, decisão do Mestre): entram quando o arquivo chegar (pronto: false até lá; V1)
     coroa_espinhos_sobretudo: { arq: 'coroa_espinhos_sobretudo_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
     encapuzada_meia_mascara: { arq: 'encapuzada_meia_mascara_v3.glb', v: '20261105a', alt: 1.95, rig: 'humanoide', v3: true },
+    // NPCs em V3 (mesmo esqueleto e pacote dos humanos; clipes próprios por cima). O rastejante tem parado, andar,
+    // correr, ataque e afins de quatro no próprio arquivo (alt menor: o nome fica perto do corpo)
+    homem_mascara_coelho: { arq: 'homem_mascara_coelho.glb', v: '20261108b', alt: 1.97, rig: 'humanoide', v3: true },
+    homem_terno_sem_rosto: { arq: 'homem_terno_sem_rosto.glb', v: '20261108a', alt: 2.1, rig: 'humanoide', v3: true },
+    palhaca_vestido_preto: { arq: 'palhaca_vestido_preto.glb', v: '20261108a', alt: 1.66, rig: 'humanoide', v3: true },
+    homem_palido_rastejante: { arq: 'homem_palido_rastejante.glb', v: '20261108a', alt: 1.2, rig: 'humanoide', v3: true },
   };
+  // NPC (id do personagem) → modelo V3 próprio; os outros NPCs seguem no corpo de cobaia de macacão
+  const V3_NPC = { coelho: 'homem_mascara_coelho', 'cara-palida': 'homem_terno_sem_rosto', risa: 'palhaca_vestido_preto', onirico: 'homem_palido_rastejante' };
   /* corpo V2 das cobaias: UM arquivo com o corpo e todas as peças (cobaia_base.glb); o script montador (cobaia_v3.js) junta as peças de
      cada token numa malha só (+ cabelo, + peças exclusivas da aparência num arquivo próprio, cobaia_x_<aparência>.glb,
      baixado só quando ela está na sessão) e pinta pelas tintas. Cobaias completas na V2 e os NPCs (macacão na cor do
@@ -2128,6 +2134,7 @@
     entrada(forma) { const e = forma && Object.prototype.hasOwnProperty.call(V2_CAT, forma) ? V2_CAT[forma] : null; return e && e.pronto !== false ? e : null; },
     entradaCobaia(s) {
       if (!s) return null;
+      if (s.tipo === 'npc' && V3_NPC[s.id]) return this.entrada(V3_NPC[s.id]);
       let p = s.tipo === 'cobaia' ? V2_COBAIA[s.id] : s.tipo === 'npc' ? V2_NPC : null;
       if (!p) return null;
       p = JSON.parse(JSON.stringify(p));
