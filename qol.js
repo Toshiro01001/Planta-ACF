@@ -438,11 +438,13 @@
           <small>${cn ? 'CN ' + pad2(cn) : tk.a ? tk.a + 'º andar · corredor' : 'fora do mapa'}</small>
           ${lista.length > 1 ? `<button type="button" class="qol-hud-bt" data-qa="lista" aria-label="Trocar o controlado" title="Trocar (J, depois 1 a 9)">⇄</button>` : ''}
           <button type="button" class="qol-hud-bt" data-qa="frases" aria-label="Frases rápidas" title="Frases rápidas (U)">💬</button>
-          <button type="button" class="qol-hud-bt" data-qa="min" aria-label="Recolher">${this.min ? '▴' : '▾'}</button></div>` +
+          <button type="button" class="qol-hud-bt" data-qa="min" aria-label="Recolher">${this.min ? '▴' : '▾'}</button>
+          <button type="button" class="qol-hud-bt" data-qa="fechar" aria-label="Fechar o painel" title="Fechar (reabre em Controle rápido, no painel)">✕</button></div>` +
         (this.min ? '' : `<div class="qol-hud-l2"><span>${st.length ? esc(st.join(' · ')) : 'livre'}</span>${al ? `<span class="qol-hud-alvo">🎯 ${esc(al.nome)} · <b>${esc(fm(al.m))}</b>${al.onde ? ' · CN ' + pad2(al.onde) : ''}</span>` : '<span class="qol-hud-alvo">🎯 nenhuma cobaia à vista</span>'}</div>` +
           (rc.length ? `<div class="qol-hud-rc">${rc.map(r => `<span class="qol-rc ${r.cls}" title="${esc(r.n + (r.lim ? ' · ' + r.lim : ''))}"><i aria-hidden="true">${r.i}</i>${esc(r.n)}<small>${esc(r.st)}</small></span>`).join('')}</div>` : ''));
     },
     min: ls.get('acf-qol-aux-min', false),
+    fechado: ls.get('acf-qol-aux-fechado', false),   // o auxiliar fechou o painel flutuante (fica guardado; reabre no bloco Controle rápido)
     el: null,
     desenhar() {
       if (!ehAux()) { if (this.el) this.el.hidden = true; return; }
@@ -451,7 +453,7 @@
       const d3 = s3dAberto() && $('#s3d'), alvo = d3 ? ($('.s3d-tit', d3) || d3) : body; if (this.el.parentElement !== alvo) alvo.appendChild(this.el);
       const h = this.hudHtml();
       if (this.el.dataset.h !== h) { this.el.innerHTML = h; this.el.dataset.h = h; }
-      this.el.hidden = !h || body.classList.contains('qol-so-mapa') && !s3dAberto();
+      this.el.hidden = !h || this.fechado || body.classList.contains('qol-so-mapa') && !s3dAberto();
       // no 3D, o que fica embaixo do painel (dica, visão da criatura) desce o quanto ele ocupa (medido só quando muda)
       if (d3 && !this.el.hidden && this.el.dataset.hm !== h) { this.el.dataset.hm = h; const r = this.el.getBoundingClientRect(), r0 = d3.getBoundingClientRect(); d3.style.setProperty('--qol-hud-fim', Math.round(r.bottom - r0.top) + 'px'); }
       if (this.listaAberta) this.desenharLista();
@@ -462,6 +464,14 @@
       if (b.dataset.qa === 'lista') this.listaAberta ? this.fecharLista() : this.abrirLista();
       if (b.dataset.qa === 'frases') Frases.alternar();
       if (b.dataset.qa === 'min') { this.min = !this.min; ls.set('acf-qol-aux-min', this.min); this.desenhar(); }
+      if (b.dataset.qa === 'fechar') this.fechar(true);
+    },
+    fechar(v) {
+      this.fechado = !!v; ls.set('acf-qol-aux-fechado', this.fechado);
+      if (this.fechado) this.fecharLista();
+      if (this.el) this.el.dataset.hm = '';                       // o 3D mede de novo o que fica embaixo do painel
+      const d3 = s3dAberto() && $('#s3d'); if (d3 && this.fechado) d3.style.setProperty('--qol-hud-fim', '0px');
+      this.desenhar();
     },
     abrirLista() { this.listaAberta = true; this.desenharLista(); },
     fecharLista() { this.listaAberta = false; const j = $('#qolTroca'); if (j) j.hidden = true; },
@@ -943,11 +953,12 @@
     const cur = Aux.atual(), l = Aux.controlaveis();
     const rc = cur && (SER(tokens()[cur].s) || {}).tipo === 'filho' ? Aux.recargas(cur) : [];
     return `<p class="qol-sub">${toque() ? 'Toque para controlar.' : 'Teclas 1 a 9 no mapa; no 3D, J e depois o número.'} O painel flutuante mostra estado, alvo e distância.</p>
+      <div class="qol-linha"><button type="button" class="qol-bt" data-qa-hud>${Aux.fechado ? '🪟 Mostrar o painel flutuante' : '🪟 Fechar o painel flutuante'}</button></div>
       ${l.length ? `<ol class="qol-troca-l">${l.map(([id, tk], i) => { const s = SER(tk.s) || {}; return `<li><button type="button" data-qt-id="${esc(id)}" class="${id === cur ? 'on' : ''}"><kbd>${i + 1}</kbd><span class="qol-hud-cor" style="--c:${esc(s.cor || '#8b5cf6')}"></span><b>${esc(rot(tk))}</b><small>${s.tipo === 'robo' ? 'robô' : 'Filho'}</small></button></li>`; }).join('')}</ol>` : '<p class="qol-vazio">Nenhum Filho ou robô seu no mapa.</p>'}
       ${rc.length ? `<h3 class="qol-h">Recargas</h3><div class="qol-hud-rc">${rc.map(r => `<span class="qol-rc ${r.cls}"><i aria-hidden="true">${r.i}</i>${esc(r.n)}<small>${esc(r.st)}</small></span>`).join('')}</div>` : ''}
       <div class="qol-linha"><button type="button" class="qol-bt" data-qa-fr>💬 Frases rápidas</button><button type="button" class="qol-bt" data-qa-busca>🔎 Buscar (Ctrl+K)</button></div>`;
   }
-  function auxBlocoLigar(c) { c.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.qtId) Aux.escolher(b.dataset.qtId); if (b.hasAttribute('data-qa-fr')) Frases.abrir(); if (b.hasAttribute('data-qa-busca')) Busca.abrir(); }; }
+  function auxBlocoLigar(c) { c.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.qtId) Aux.escolher(b.dataset.qtId); if (b.hasAttribute('data-qa-fr')) Frases.abrir(); if (b.hasAttribute('data-qa-busca')) Busca.abrir(); if (b.hasAttribute('data-qa-hud')) { Aux.fechar(!Aux.fechado); desenharBloco('blocoQolAux'); } }; }
 
   let fechQol = ls.get('acf-qol-fech', {});
   function criarBlocos() {
