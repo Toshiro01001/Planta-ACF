@@ -1068,3 +1068,10 @@ Com isso: todo mundo vê o mapa público; Filhos, NPCs e robôs ocultos, nomes s
 ---
 
 Desenvolvido por Rodrigo Terroso Junior. O Claude, da Anthropic, foi usado como ferramenta durante o desenvolvimento.
+
+## Visual industrial (16/11/2026)
+
+- `skin-industrial.css`: camada de visual carregada por último no `index.html`. Troca paleta (âmbar e ferro), fontes e a casca do topo, elevador, barra de câmera, painel, cartões, mapa e HUD de retratos. Não altera a lógica. Para desligar, remova a linha do `index.html`.
+- `skin-industrial.js`: marca a qualidade efetiva no `<body>` (desliga animações decorativas em aparelho fraco) e monta a faixa de estado do Mestre (on-line, quebras, relógio, perseguição, luz), só lendo o que o painel já mostra.
+- `fonts/`: todas as fontes são locais (Oswald, IBM Plex Mono e as dos painéis e da Parede de Desejos). O site não consulta mais o Google Fonts.
+- `paineis.js`: as abas do Mestre agrupam as ferramentas em Pedindo atenção, Em andamento, Fixados e por categoria.

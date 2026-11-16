@@ -1,0 +1,239 @@
+/* Skin "Horror Industrial" · M1L! | RTJ
+   Camada de visual carregada por último. Não mexe na lógica: só troca paleta, fontes e a casca
+   (topo, elevador, câmera, painel, cartões). Fontes locais, sem CDN. */
+@font-face{font-family:Oswald;font-weight:400;font-display:swap;src:url(fonts/oswald-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:Oswald;font-weight:500;font-display:swap;src:url(fonts/oswald-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:Oswald;font-weight:600;font-display:swap;src:url(fonts/oswald-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:Oswald;font-weight:700;font-display:swap;src:url(fonts/oswald-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Plex Mono";font-weight:400;font-display:swap;src:url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Plex Mono";font-weight:500;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Plex Mono";font-weight:600;font-display:swap;src:url(fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
+
+:root{
+  --bg:#0a0908; --bg2:#100d0b; --painel:#0f0c0a; --linha:rgba(232,226,212,.16);
+  --roxo:#e0a030; --roxo-claro:#ffbf47; --roxo-escuro:#3a2a10;
+  --texto:#e8e2d4; --texto-dim:rgba(232,226,212,.58);
+  --perigo:#d8453a; --ok:#7fe0c0;
+  --display:Oswald,"Arial Narrow",sans-serif; --mono:"Plex Mono",ui-monospace,Menlo,monospace; --corpo:"Plex Mono",ui-monospace,Menlo,monospace;
+  --pn-bg:#0d0b09; --pn-bg2:#16120f; --pn-borda:rgba(232,226,212,.16); --pn-borda2:rgba(232,226,212,.3); --pn-r:0px;
+  --topo-h:56px;
+}
+body{font-size:14px}
+::selection{background:#e0a030;color:#0a0908}
+.btn-fantasma,.btn-roxo,.camera button,.andar-btn,.cartao,.cartao *{border-radius:0!important}
+
+/* grão e vinheta por cima de tudo, sem custo de GPU relevante (imagem estática) */
+body::after{content:"";position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 45%,transparent 50%,rgba(0,0,0,.5) 100%)}
+
+/* topo */
+.topo{position:relative;padding:0 18px;background:linear-gradient(180deg,rgba(10,9,8,.94),rgba(10,9,8,.72));border-bottom:1px solid var(--linha)}
+.topo::after{content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:1px;background:linear-gradient(90deg,var(--roxo),transparent 28%,transparent 72%,var(--roxo))}
+.marca-kicker{font-size:9px;letter-spacing:.3em;color:var(--texto-dim)}
+.marca h1{font:600 21px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;margin-top:3px}
+.sync{border-radius:0;border:0;padding:0;font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.sync.vivo::before{content:"";display:inline-block;width:7px;height:7px;background:var(--ok);box-shadow:0 0 8px var(--ok);margin-right:7px}
+.btn-fantasma{font:600 12px/1 var(--display);letter-spacing:.2em;text-transform:uppercase;padding:10px 14px;border-color:var(--pn-borda2);color:var(--texto)}
+.btn-fantasma:hover{border-color:var(--roxo);color:var(--roxo-claro)}
+.btn-fantasma.ativo{background:var(--roxo);color:#0a0908;border-color:var(--roxo)}
+#btnMestre{background:var(--roxo);color:#0a0908;border-color:var(--roxo)}
+.btn-roxo{font:600 12px/1 var(--display);letter-spacing:.2em;text-transform:uppercase;background:var(--roxo);color:#0a0908}
+
+/* elevador */
+.elevador{background:transparent;border-right:1px solid var(--linha);gap:12px}
+.elevador-titulo{writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.3em;font-size:10px}
+.andar-btn{width:46px;height:46px;border:1px solid var(--linha);background:rgba(20,17,15,.6);color:var(--texto-dim);font:600 18px/1 var(--display)}
+.andar-btn:hover{border-color:var(--roxo);color:var(--texto)}
+.andar-btn.ativo,.andar-btn.atual{background:var(--roxo);border-color:var(--roxo);color:#0a0908;box-shadow:0 0 22px rgba(224,160,48,.35)}
+
+/* título do andar */
+.andar-legenda{left:22px;top:18px}
+.andar-legenda span{font:600 30px/1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.andar-legenda small{font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-top:7px}
+.andar-legenda small::before{content:"";display:inline-block;width:26px;height:1px;background:var(--roxo);vertical-align:3px;margin-right:9px}
+
+/* dock da câmera: barra única centrada, com colchetes de canto */
+.camera{right:auto;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:0;padding:6px;
+  background:linear-gradient(180deg,rgba(28,24,20,.86),rgba(16,14,12,.9));border:1px solid var(--linha);backdrop-filter:blur(6px)}
+.camera::before,.camera::after{content:"";position:absolute;width:9px;height:9px;border:1px solid var(--roxo);pointer-events:none}
+.camera::before{left:-1px;top:-1px;border-right:0;border-bottom:0}.camera::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.camera button{width:42px;height:38px;background:transparent;border:0;color:var(--texto);font:600 12px/1 var(--display);letter-spacing:.1em;position:relative}
+.camera button+button::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:1px;background:var(--linha)}
+.camera button:hover{background:rgba(224,160,48,.12)}
+.camera button.ativo{background:var(--roxo);color:#0a0908}
+.camera .cam-3d{width:54px;background:var(--roxo);color:#0a0908;letter-spacing:.2em}
+.dica{left:22px;bottom:70px;font-size:10px;letter-spacing:.08em}
+.btn-dados{border-radius:0}
+
+/* painel lateral */
+.painel{background:linear-gradient(90deg,rgba(10,9,8,.55),rgba(10,9,8,.85));border-left:1px solid var(--linha);padding:14px 14px 40px}
+.bloco h2{font:600 15px/1 var(--display);letter-spacing:.16em;color:var(--texto)}
+.bloco h2::before{content:"";display:inline-block;width:14px;height:1px;background:var(--roxo);vertical-align:4px;margin-right:9px}
+.bloco h3{font-size:10px;letter-spacing:.16em}
+.bloco + .bloco{border-top-color:var(--linha)}
+.abas-mestre{border:1px solid var(--linha);display:flex;gap:0}
+.abas-mestre button{flex:1;padding:9px 0;font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;border:0;border-right:1px solid var(--linha);background:transparent;color:var(--texto-dim);border-radius:0}
+.abas-mestre button.ativo{background:var(--roxo);color:#0a0908}
+.lista-seres li{border:1px solid var(--linha);background:linear-gradient(180deg,rgba(28,24,20,.7),rgba(16,14,12,.8));padding:8px 10px;position:relative}
+.lista-seres li::before{content:"";position:absolute;left:-1px;top:-1px;width:8px;height:8px;border-left:1px solid var(--roxo);border-top:1px solid var(--roxo)}
+.lista-seres li:hover{background:rgba(224,160,48,.08)}
+body.hud-limpo #painel details.cartao-sec,body.hud-limpo #painel #mesaBau>details,body.hud-limpo #painel #sahSort>details,body.hud-limpo #painel #mesaConq>details,body.hud-limpo #painel #mesaExpo>details{border-radius:0;background:linear-gradient(180deg,rgba(28,24,20,.7),rgba(16,14,12,.82))}
+body.hud-limpo #painel details>summary{font-family:var(--display);letter-spacing:.14em;text-transform:uppercase}
+
+/* cartão de ser selecionado */
+.cartao{background:linear-gradient(180deg,rgba(28,24,20,.94),rgba(16,14,12,.96));border:1px solid var(--linha);border-left:3px solid var(--cor,var(--roxo));backdrop-filter:blur(6px)}
+.cartao h3{font:600 16px/1 var(--display);letter-spacing:.12em;text-transform:uppercase}
+.cartao img{border-radius:0!important}
+
+/* campos */
+input,select,textarea{border-radius:0}
+
+/* celular: elevador vira faixa no topo, dock menor, painel em gaveta (a lógica da gaveta já existe) */
+@media (max-width:820px){
+  .topo{padding:0 12px}
+  .marca h1{font-size:15px;letter-spacing:.1em}.marca-kicker{display:none}
+  .elevador-titulo{writing-mode:horizontal-tb;transform:none}
+  .andar-btn{width:40px;height:40px;font-size:16px}
+  .andar-legenda span{font-size:22px}
+  .andar-legenda{left:14px;top:12px}
+  .camera{bottom:10px;max-width:calc(100% - 16px);overflow:hidden;padding:4px}
+  .camera button{width:34px;height:36px;font-size:11px}
+  .camera .cam-3d{width:44px}
+  .dica{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---------- mapa: piso, paredes, saídas em metal e ferrugem ---------- */
+.viewport{background:radial-gradient(ellipse at 50% 40%,rgba(224,160,48,.07),transparent 60%),transparent}
+.stage-base{background-color:#0d0b09;background-image:linear-gradient(rgba(232,226,212,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(232,226,212,.05) 1px,transparent 1px);border:1px solid rgba(232,226,212,.3);box-shadow:0 0 0 9px rgba(10,9,8,.55),0 30px 80px rgba(0,0,0,.75)}
+.sala,.corredor{background-color:#1a1612;background-image:linear-gradient(rgba(232,226,212,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,226,212,.06) 1px,transparent 1px)}
+.sala{box-shadow:inset 0 0 0 1px rgba(232,226,212,.2)}
+.macico{background:#241d17;background-image:linear-gradient(rgba(232,226,212,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,226,212,.04) 1px,transparent 1px)}
+.parede{background:linear-gradient(180deg,#4a3d30,#1e1812);border-top:2px solid #e0a030}
+.parede.v{background:linear-gradient(90deg,#1e1812,#4a3d30);border-top:0;border-right:2px solid #e0a030}
+.saida{background:repeating-linear-gradient(45deg,#17120d 0 8px,#2a2015 8px 16px);box-shadow:inset 0 0 0 2px #e0a030,0 0 18px rgba(224,160,48,.45);color:#ffe4a8}
+.saida.poco{background:radial-gradient(circle,#000 35%,#1a140d 75%)}
+.saida-seta{color:#e0a030}
+.sala-cn{font:600 32px var(--display);letter-spacing:.14em;color:rgba(232,226,212,.9)}
+.sala-nome{font-family:var(--mono);font-weight:500;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--texto-dim)}
+.andar-btn.atual{box-shadow:0 0 22px rgba(224,160,48,.4)}
+
+/* ---------- dock da câmera: sempre uma barra horizontal ---------- */
+body.hud-limpo .camera,body.hud-limpo .camera.aberta{display:flex;flex-direction:row;flex-wrap:nowrap;max-height:none;gap:0;align-items:stretch;right:auto;left:50%;bottom:18px;transform:translateX(-50%)}
+body.hud-limpo .camera button{width:42px;height:38px;border-radius:0;background:transparent;border:0;backdrop-filter:none;font:600 12px/1 var(--display);letter-spacing:.1em}
+body.hud-limpo .camera button.cam-3d{width:54px;background:var(--roxo);color:#0a0908;border:0;box-shadow:none;font:600 12px/1 var(--display);letter-spacing:.2em}
+body.hud-limpo .camera:not(.aberta) .cam-extra{display:inline-block}
+body.hud-limpo .camera .cam-mais{display:none}
+body.hud-limpo .camera button[hidden]{display:none}
+@media (max-width:820px){
+  body.hud-limpo .camera,body.hud-limpo .camera.aberta{bottom:10px;max-width:calc(100% - 12px);overflow-x:auto}
+  body.hud-limpo .camera button{width:36px;height:38px;flex:none}
+  body.hud-limpo .camera button.cam-3d{width:44px}
+}
+
+/* ajustes de convivência dos botões flutuantes */
+#btnMestre{color:#0a0908!important;-webkit-text-fill-color:#0a0908}
+.btn-dados,.btn-desfazer{bottom:74px!important}
+.btn-desfazer{left:auto!important;right:18px}
+@media (max-width:820px){
+  body.hud-limpo .camera,body.hud-limpo .camera.aberta{bottom:64px}
+  .marca h1{font-size:13px;letter-spacing:.08em;line-height:1.05}
+  .btn-dados,.btn-desfazer{bottom:112px!important}
+}
+#btnMestre{background:var(--roxo)!important;border-color:var(--roxo)!important}
+@media (max-width:820px){
+  body.hud-limpo .camera button{width:29px;height:38px;font-size:10px;letter-spacing:.04em}
+  body.hud-limpo .camera button.cam-3d{width:38px}
+  body.hud-limpo .camera,body.hud-limpo .camera.aberta{overflow:visible}
+}
+
+/* título só "A Caixa de Fósforos" (tira a sigla A.C.F. do celular estreito) */
+@media (max-width:480px){
+  .marca h1{font-size:15px;letter-spacing:.08em;line-height:1.05}
+  .marca h1::before{content:none}
+  .topo{padding:0 8px}
+  .topo-dir .btn-fantasma{padding:8px 9px;font-size:12px}
+}
+/* salas: filete superior na cor do elemento e tinta mais discreta */
+.sala{border-top:3px solid var(--el,transparent)}
+.mostra-elementos .sala-tinta{opacity:.2}
+
+/* abas do Mestre sem sobreposição */
+.abas-mestre button{letter-spacing:.08em;font-size:10.5px;padding:9px 2px;min-width:0;overflow:hidden;text-overflow:clip;white-space:nowrap}
+/* busca, filtros e botões do painel em ângulo reto */
+#painel input,#painel select,#painel button,#painel .chip,#painel summary,#painel details{border-radius:0!important}
+#painel input[type=search],#painel input[type=text]{background:rgba(20,17,15,.7);border:1px solid var(--linha);color:var(--texto);font-family:var(--mono);letter-spacing:.08em}
+#painel [class*=filtro] button,#painel [class*=chip],#painel [class*=cat] button{border-radius:0!important;border-color:var(--linha)}
+#painel [class*=filtro] button.ativo,#painel [class*=chip].ativo{background:var(--roxo);color:#0a0908;border-color:var(--roxo)}
+.btn-dados,.btn-desfazer{background:linear-gradient(180deg,rgba(28,24,20,.9),rgba(16,14,12,.92))!important;border:1px solid var(--linha)!important;color:var(--texto)!important;font:600 12px/1 var(--display)!important;letter-spacing:.2em;text-transform:uppercase;padding:12px 14px}
+.painel-dados,.cartao,.aviso,.sua-vez{border-radius:0!important}
+
+/* fontes locais dos outros painéis (antes vinham do Google) */
+@font-face{font-family:"Special Elite";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/special-elite-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Caveat";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/caveat-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Caveat";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/caveat-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Permanent Marker";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/permanent-marker-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"VT323";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/vt323-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Cinzel";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/cinzel-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Cinzel";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/cinzel-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Lora";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/lora-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Lora";font-weight:600;font-style:normal;font-display:swap;src:url(fonts/lora-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Lora";font-weight:400;font-style:italic;font-display:swap;src:url(fonts/lora-latin-400-italic.woff2) format("woff2")}
+@font-face{font-family:"Share Tech Mono";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/share-tech-mono-latin-400-normal.woff2) format("woff2")}
+
+/* ---------- HUD de retratos: moldura industrial, pulso de vida e varredura (só transform/opacity) ---------- */
+.hud-mancha{display:none}
+.hud-foto{border-radius:0;inset:10px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.8),0 0 0 2px var(--cor);animation:hud-respira 5s ease-in-out infinite}
+.hud-retrato::before,.hud-retrato::after{content:"";position:absolute;width:10px;height:10px;border:2px solid var(--cor);z-index:2;pointer-events:none}
+.hud-retrato::before{left:4px;top:4px;border-right:0;border-bottom:0}.hud-retrato::after{right:4px;bottom:4px;border-left:0;border-top:0}
+.hud-retrato .hud-foto::after{content:"";position:absolute;left:0;right:0;top:0;height:35%;background:linear-gradient(180deg,transparent,rgba(255,255,255,.12),transparent);transform:translateY(-120%);animation:hud-varre 6s linear infinite}
+.hud-foto{overflow:hidden}
+.hud-card:nth-child(2n) .hud-foto,.hud-card:nth-child(2n) .hud-foto::after{animation-delay:-1.7s}
+.hud-card:nth-child(3n) .hud-foto,.hud-card:nth-child(3n) .hud-foto::after{animation-delay:-3.1s}
+.hud-pe{border-radius:0;font-family:var(--mono)}
+.hud-nome{font-family:var(--display);letter-spacing:.14em;text-shadow:0 0 2px #000,0 2px 8px rgba(0,0,0,.9)}
+.hud-pv{text-shadow:0 0 2px #000,0 2px 8px rgba(0,0,0,.9)}
+.hud-estado{border-radius:0;transform:none}
+.hud-card.morrendo .hud-foto{animation:hud-pulso 1.1s ease-in-out infinite}
+.hud-card.enlouquecendo .hud-foto{animation:hud-glitch 2.2s steps(2) infinite}
+@keyframes hud-respira{50%{transform:scale(1.035)}}
+@keyframes hud-varre{0%{transform:translateY(-120%)}60%,100%{transform:translateY(320%)}}
+@media (prefers-reduced-motion:reduce){.hud-foto,.hud-retrato .hud-foto::after{animation:none!important}}
+body[data-qualidade=leve] .hud-foto,body[data-qualidade=leve] .hud-retrato .hud-foto::after{animation:none}
+
+/* ---------- Painel do Mestre reorganizado ---------- */
+@media (min-width:1101px){body.hud-limpo .corpo{grid-template-columns:92px 1fr 380px}}
+.pn-console{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:10px 0 12px;border:1px solid var(--linha);background:linear-gradient(180deg,rgba(28,24,20,.8),rgba(16,14,12,.9));position:relative}
+.pn-console::before{content:"";position:absolute;left:-1px;top:-1px;width:9px;height:9px;border-left:1px solid var(--roxo);border-top:1px solid var(--roxo)}
+.pn-console[hidden]{display:none}
+.pn-console .c{padding:7px 6px 8px;border-right:1px solid var(--linha);min-width:0}
+.pn-console .c:last-child{border-right:0}
+.pn-console span{display:block;font:500 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--texto-dim)}
+.pn-console b{display:block;margin-top:5px;font:600 14px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-console .ok b{color:var(--ok)}.pn-console .al b{color:var(--perigo)}
+body.pn-folha-on .pn-console,.painel.pn-folha .pn-console{display:none}
+.pn-grupo{display:flex;align-items:center;gap:8px;margin:16px 0 6px;padding:0 0 6px;border-bottom:1px solid var(--linha);font:600 12px/1 var(--display);letter-spacing:.18em;text-transform:uppercase;color:var(--texto)}
+.pn-grupo:first-child{margin-top:4px}
+.pn-grupo i{font-style:normal;font-size:13px}
+.pn-grupo em{margin-left:auto;font:500 10px var(--mono);font-style:normal;color:var(--roxo);letter-spacing:.1em}
+.pn-grupo[data-g=atencao]{color:var(--perigo);border-bottom-color:rgba(216,69,58,.5)}
+.pn-grupo[data-g=vivo]{color:var(--ok);border-bottom-color:rgba(127,224,192,.4)}
+.pn-lista{display:flex;flex-direction:column;gap:6px}
+.pn-card{border-radius:0}
+.pn-sub{font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+
+/* fontes da Parede de Desejos (só baixam quando usadas) */
+@font-face{font-family:"Metal Mania";font-weight:400;font-display:swap;src:url(fonts/metal-mania-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Butcherman";font-weight:400;font-display:swap;src:url(fonts/butcherman-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Shadows Into Light Two";font-weight:400;font-display:swap;src:url(fonts/shadows-into-light-two-latin-400-normal.woff2) format("woff2")}
+
+/* dica de controles no canto superior direito do mapa, longe dos botões */
+.dica{left:auto;right:18px;bottom:auto;top:18px;max-width:34%;text-align:right}
+.pn-console span{letter-spacing:.06em}
+/* celular: alvos de toque de 44 px na barra de câmera, com rolagem lateral e o 3D sempre visível */
+@media (max-width:820px){
+  body.hud-limpo .camera,body.hud-limpo .camera.aberta{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;max-width:calc(100% - 12px)}
+  body.hud-limpo .camera::-webkit-scrollbar{display:none}
+  body.hud-limpo .camera button{width:44px;height:44px;font-size:12px;flex:none}
+  body.hud-limpo .camera button.cam-3d{width:52px;position:sticky;right:0;z-index:2}
+}

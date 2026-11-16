@@ -214,9 +214,19 @@
     $('.pn-sub', lanc).textContent = sub;
     // cartões (atualiza por chave para não piscar)
     const cx = $('.pn-lista', lanc);
-    const ids = vis.map(b => b.id).join(',');
+    // agrupamento (Mestre): atenção, em andamento, fixados e depois cada categoria. Cada bloco entra em um grupo só.
+    let agrupar = !busc && !cat && vis.length >= 6;
+    const GRUPOS = [['atencao', '🚨', 'Pedindo atenção'], ['vivo', '▶', 'Em andamento'], ['fav', '★', 'Fixados'], ...Object.keys(CATS).map(k => [k, CATS[k][0], CATS[k][1]]), ['outros', '▪', 'Outras ferramentas']];
+    const grupoDe = b => { const r = resumoDe(b); if (r.some(x => x[2] === 'alerta')) return 'atencao'; if (r.some(x => x[2] === 'vivo')) return 'vivo'; if (b.classList.contains('fav')) return 'fav'; return reg(b).cat || 'outros'; };
+    let ordem = vis, cabGrupo = new Map();
+    if (agrupar && new Set(vis.map(grupoDe)).size < 2) agrupar = false;
+    if (agrupar) {
+      const por = {}; vis.forEach(b => { (por[grupoDe(b)] = por[grupoDe(b)] || []).push(b); });
+      ordem = []; GRUPOS.forEach(([k, ic, nm]) => { if (por[k]) { cabGrupo.set(por[k][0], [k, ic, nm, por[k].length]); ordem.push(...por[k]); } });
+    }
+    const ids = ordem.map(b => b.id + (cabGrupo.has(b) ? '#' + cabGrupo.get(b)[0] : '')).join(',') + (agrupar ? '|g' : '');
     if (cx.dataset.ids !== ids) {
-      cx.innerHTML = vis.map(b => { const r = reg(b); return `<button type="button" class="pn-card" data-pn-abre="${b.id}" data-cat="${r.cat || ''}"><span class="pn-card-ic" aria-hidden="true">${r.ic}</span><span class="pn-card-tx"><b class="pn-card-t"></b><span class="pn-chips"></span></span><span class="pn-card-dir" aria-hidden="true"></span></button>`; }).join('') || `<p class="pn-nada">${busc ? 'Nada com esse nome. Tente outra palavra.' : 'Nada nesta categoria.'}</p>`;
+      cx.innerHTML = ordem.map(b => { const r = reg(b); const g = cabGrupo.get(b); return (g ? `<h4 class="pn-grupo" data-g="${g[0]}"><i aria-hidden="true">${g[1]}</i><span>${esc(g[2])}</span><em>${g[3]}</em></h4>` : '') + `<button type="button" class="pn-card" data-pn-abre="${b.id}" data-cat="${r.cat || ''}"><span class="pn-card-ic" aria-hidden="true">${r.ic}</span><span class="pn-card-tx"><b class="pn-card-t"></b><span class="pn-chips"></span></span><span class="pn-card-dir" aria-hidden="true"></span></button>`; }).join('') || `<p class="pn-nada">${busc ? 'Nada com esse nome. Tente outra palavra.' : 'Nada nesta categoria.'}</p>`;
       cx.dataset.ids = ids;
     }
     vis.forEach(b => {

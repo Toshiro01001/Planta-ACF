@@ -528,12 +528,7 @@ async function carregarContagens() {
   } catch (e) { P.contOk = false; }
   desenharParede(); desenharMesaParede();
 }
-function carregarFontesParede() {
-  if ($('#fontesParede')) return;
-  const l = document.createElement('link'); l.id = 'fontesParede'; l.rel = 'stylesheet';
-  l.href = 'https://fonts.googleapis.com/css2?family=Metal+Mania&family=Butcherman&family=Shadows+Into+Light+Two&display=swap';
-  document.head.appendChild(l);
-}
+function carregarFontesParede() { /* fontes locais em skin-industrial.css */ }
 function abrirParede() {
   if (!(A.mestre || A.aux) && !(A.meu && paredeAberta())) return;
   carregarFontesParede();
