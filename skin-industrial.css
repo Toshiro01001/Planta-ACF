@@ -38,6 +38,7 @@ body::after{content:"";position:fixed;inset:0;z-index:2;pointer-events:none;
 .btn-fantasma.ativo{background:var(--roxo);color:#0a0908;border-color:var(--roxo)}
 #btnMestre{background:var(--roxo);color:#0a0908;border-color:var(--roxo)}
 .btn-roxo{font:600 12px/1 var(--display);letter-spacing:.2em;text-transform:uppercase;background:var(--roxo);color:#0a0908}
+.terminal .btn-roxo{color:#fff} /* fundo verde-escuro da tela de senha do andar: texto claro (contraste 6,1:1) */
 
 /* elevador */
 .elevador{background:transparent;border-right:1px solid var(--linha);gap:12px}
